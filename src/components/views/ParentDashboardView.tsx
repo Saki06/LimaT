@@ -45,8 +45,12 @@ import {
   History,
   TrendingUp,
   Layers,
-  BookmarkCheck
+  BookmarkCheck,
+  Star,
+  Video,
+  CreditCard
 } from "lucide-react";
+import { initialConnectTeachers } from "@/data/connectMockData";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 
@@ -123,6 +127,10 @@ export function ParentDashboardView() {
   const [hasMedicalSlip, setHasMedicalSlip] = useState(false);
 
   const handleTabChange = (tab: string) => {
+    if (tab === "connect" || tab === "find_teachers") {
+      setCurrentView("connect");
+      return;
+    }
     setActiveTab(tab);
     if (tab === "overview") {
       setCurrentView("dashboard");
@@ -257,6 +265,7 @@ export function ParentDashboardView() {
         <div className="relative z-10 mt-6 pt-5 border-t border-white/15 flex items-center gap-2 overflow-x-auto no-scrollbar">
           {[
             { id: "overview", label: "Executive Overview", icon: Sparkles },
+            { id: "connect", label: "Find Teachers", icon: GraduationCap },
             { id: "report_card", label: "Term Report Cards", icon: Award },
             { id: "exams", label: "Term Exams & Schedules", icon: FileSpreadsheet },
             { id: "circulars", label: "School Circulars", icon: Bell }
@@ -287,6 +296,37 @@ export function ParentDashboardView() {
       {/* ========================================================= */}
       {activeTab === "overview" && (
         <div className="space-y-6">
+          {/* Quick Tutor & Tuition Masterclass Banner for Active Child */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-[#0d5c4d] via-[#106b5a] to-[#083e34] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-[#167866]">
+            <div className="flex items-center gap-3.5">
+              <div className="h-12 w-12 rounded-2xl bg-[#f3b738] text-slate-950 flex items-center justify-center font-black shrink-0 shadow-sm text-xl">
+                👨‍🏫
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-extrabold text-sm sm:text-base text-white tracking-tight">
+                    Find Specialized Tutors for {activeChild.name}
+                  </h4>
+                  <span className="px-2 py-0.5 rounded-full bg-[#f3b738] text-slate-950 text-[10px] font-black uppercase">
+                    Masterclasses
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-100/90 mt-0.5">
+                  Browse verified teachers for {activeChild.grade}, compare monthly tuition fees, view syllabus tutes, and enroll your child with direct bank slip verification.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCurrentView("connect")}
+              className="px-4 py-2 rounded-xl bg-[#f3b738] hover:bg-[#d99c25] text-slate-950 font-black text-xs transition-all shadow-sm shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>Explore Tutors &amp; Packages</span>
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
           {/* Key Executive KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Card 1: Academic Average */}
@@ -451,6 +491,125 @@ export function ParentDashboardView() {
                       <p className="text-base font-black text-[#0d2b26]">{sub.score} / 100</p>
                       <p className="text-[10px] font-bold text-emerald-600">Grade {sub.grade}</p>
                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Find Teachers & Tuition Fee Packages Showcase for Parent */}
+          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#e6ece8] shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="p-2 rounded-xl bg-emerald-50 text-[#0d5c4d]">
+                    <GraduationCap className="h-5 w-5" />
+                  </span>
+                  <h3 className="text-lg font-black text-[#0d2b26] tracking-tight">
+                    Find Teachers &amp; Tuition Packages for {activeChild.name}
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase">
+                    Verified Solo Tutors
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Explore verified teachers for {activeChild.grade}, compare monthly tuition fees, preview lesson videos, and enroll your child with direct bank slip verification.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentView("connect")}
+                className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-black shadow-sm transition-all hover:scale-[1.02] flex items-center gap-2 shrink-0 cursor-pointer"
+              >
+                <span>View All Teachers &amp; Packages</span>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Grid of Verified Teachers with full details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {initialConnectTeachers.slice(0, 3).map((teacher) => (
+                <div
+                  key={teacher.id}
+                  className="rounded-2xl border border-[#c4e9e0] bg-[#fdfefe] p-5 hover:shadow-md transition-all flex flex-col justify-between space-y-4 relative"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`h-12 w-12 rounded-xl ${teacher.avatarColor} text-white font-black text-base flex items-center justify-center shrink-0 shadow-2xs`}
+                        >
+                          {teacher.initials}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="font-extrabold text-sm text-[#0d2b26]">
+                              {teacher.name}
+                            </h4>
+                            {teacher.verified && (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-xs font-semibold text-slate-500">
+                            {teacher.subject}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 text-amber-800 text-xs font-black border border-amber-200 shrink-0">
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        <span>{teacher.rating.toFixed(1)}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                      {teacher.bio}
+                    </p>
+
+                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500 font-semibold pt-1">
+                      <span className="bg-slate-100 px-2 py-0.5 rounded-md text-slate-700">
+                        {teacher.studentsCount} Students
+                      </span>
+                      <span>•</span>
+                      <span className="bg-slate-100 px-2 py-0.5 rounded-md text-slate-700">
+                        {teacher.liveClassesCount} Live Meets/mo
+                      </span>
+                      <span>•</span>
+                      <span className="bg-[#ecf8f5] text-[#0d5c4d] font-bold px-2 py-0.5 rounded-md">
+                        {teacher.lessonsCount} Tutes
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#ecf8f5] border border-[#a5f3df] flex items-baseline justify-between">
+                      <div>
+                        <span className="text-lg font-black text-[#0d2b26]">
+                          LKR {teacher.monthlyFee.toLocaleString()}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-semibold"> / month</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                        Live Class Pass
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView("connect")}
+                      className="flex-1 py-2 px-3 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <CreditCard className="h-3.5 w-3.5 text-amber-300" />
+                      <span>Enroll Child</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView("connect")}
+                      className="py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Details
+                    </button>
                   </div>
                 </div>
               ))}

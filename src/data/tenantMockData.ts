@@ -2,123 +2,75 @@ import { Tenant, TenantModuleConfig, TenantPreset } from '@/types/tenant';
 
 export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
   // =========================================================================
-  // 1. CAMPUS LIFE & OPERATIONS (School Domain)
+  // 1. BATCH MANAGEMENT & ANNOUNCEMENTS (Solo Tutor Batches)
   // =========================================================================
   {
-    key: 'campus_sports',
-    label: 'Campus Sports Houses & Tournaments',
-    category: 'Campus Life & Operations',
+    key: 'batch_management',
+    label: 'Student Batches & Class Cohorts',
+    category: 'Batch Management & Announcements',
     targetRole: 'shared',
-    description: 'Inter-house cricket, football, sports standings, rosters, and live tournament fixtures.',
-    badge: 'School Special',
+    description: 'Manage A/L candidate batches (Theory, Revision, Paper Class) with live join attendance registers.',
+    badge: 'Batch Control',
     subOptions: [
       {
-        key: 'sub_sports_houses',
-        label: 'House Standings & Point Tables',
-        description: 'Track annual athletic meet house points, rank positions, and championship trophies.'
+        key: 'sub_batches_cohorts',
+        label: 'Course Batches (Theory, Revision, Paper Class)',
+        description: 'Configure batch schedules, enrollment caps, and batch titles.'
       },
       {
-        key: 'sub_sports_fixtures',
-        label: 'Match Fixtures & Match Schedules',
-        description: 'Schedule cricket, football, rugby, and track & field matches with venue details.'
+        key: 'sub_batches_assistants',
+        label: 'Assistant Tutor & Paper Marker Access',
+        description: 'Assign marking assistants with paper grading and session moderation permissions.'
       },
       {
-        key: 'sub_sports_rosters',
-        label: 'Team Player Squads & Captains',
-        description: 'Manage player rosters, jersey numbers, and student captaincy badges.'
+        key: 'sub_batches_attendance',
+        label: 'Live Class Join Register & Student Logs',
+        description: 'Track student attendance in live sessions and export monthly student attendance sheets.'
       },
       {
-        key: 'sub_sports_live_scores',
-        label: 'Live Match Scorecards & Commentary',
-        description: 'Real-time match scoring, overs/wickets counter, and live commentary feeds.'
-      }
-    ]
-  },
-  {
-    key: 'campus_events',
-    label: 'School Events, RSVP & Ceremonies',
-    category: 'Campus Life & Operations',
-    targetRole: 'shared',
-    description: 'Prize day, annual athletic meet, cultural festivals, and event RSVP ticketing.',
-    badge: 'School Special',
-    subOptions: [
-      {
-        key: 'sub_events_calendar',
-        label: 'Public School Event Calendar',
-        description: 'Monthly and term event calendars with date, time, and venue details.'
+        key: 'sub_batches_announcements',
+        label: 'Urgent Class Notice & Sticky Banner',
+        description: 'Broadcast time changes, urgent circulars, and exam alerts directly to student dashboards.'
       },
       {
-        key: 'sub_events_rsvp',
-        label: 'Online Student & Guest RSVP',
-        description: 'Digital seat reservations and headcount registration for campus ceremonies.'
-      },
-      {
-        key: 'sub_events_reminders',
-        label: 'Automated Event Reminders',
-        description: 'In-app and SMS reminders sent to registered attendees 24 hours prior.'
-      }
-    ]
-  },
-  {
-    key: 'campus_announcements',
-    label: 'Official Campus Circulars & Feeds',
-    category: 'Campus Life & Operations',
-    targetRole: 'shared',
-    description: 'Administrative announcements, exam schedules, multi-paragraph circulars, and notifications.',
-    subOptions: [
-      {
-        key: 'sub_announcements_urgent',
-        label: 'Urgent Alert Sticky Banner',
-        description: 'Display high-priority emergency or weather circulars at the top of all student dashboards.'
-      },
-      {
-        key: 'sub_announcements_pdf',
-        label: 'Printable Official PDF Circulars',
-        description: 'Attach official school letterhead PDFs for parents and students to download.'
-      },
-      {
-        key: 'sub_announcements_targeted',
-        label: 'Grade-Specific Audience Filters',
-        description: 'Target circulars strictly to Grade 10, 11, 12, or 13 candidate batches.'
-      }
-    ]
-  },
-  {
-    key: 'school_classes_grades',
-    label: 'Academic Grades & Class Sections',
-    category: 'Campus Life & Operations',
-    targetRole: 'admin',
-    description: 'Grade 10 to 13 section management (10-A, 11-Science, 12-Maths) with designated class teachers.',
-    subOptions: [
-      {
-        key: 'sub_classes_sections',
-        label: 'Grade Class Rooms (10-A, 11-B, 12-Bio)',
-        description: 'Configure grade divisions, maximum student caps, and section naming.'
-      },
-      {
-        key: 'sub_classes_teachers',
-        label: 'Designated Class Teacher Assignee',
-        description: 'Assign master class teachers with supervisory permissions for their section.'
-      },
-      {
-        key: 'sub_classes_attendance',
-        label: 'Daily Roll Call Attendance Register',
-        description: 'Digital morning attendance register with automated monthly percentage calculation.'
+        key: 'sub_batches_timetable',
+        label: 'Downloadable Class Schedule & Timetable PDFs',
+        description: 'Share monthly master schedules and paper discussion timetables.'
       }
     ]
   },
 
   // =========================================================================
-  // 2. TUITION & COMMERCIAL BILLING (Tuition / Solo Tutors)
+  // 2. TUITION & COMMERCIAL BILLING (Solo Tutors)
   // =========================================================================
   {
     key: 'tuition_subscriptions',
-    label: 'Tuition Subscriptions & Connect Hub',
+    label: 'Find Teachers & Tuition Connect Hub',
     category: 'Tuition & Commercial Billing',
     targetRole: 'shared',
-    description: 'Student recurring monthly tuition subscriptions, subscriber roster, and auto-access gating.',
+    description: 'Student recurring monthly tuition subscriptions, Find Teachers directory, and automated access control.',
     badge: 'Tuition Core',
     subOptions: [
+      {
+        key: 'find_teachers',
+        label: 'Find Teachers Sidebar Menu (Student Workspace)',
+        description: 'Show or hide the Find Teachers option in the student navigation sidebar.'
+      },
+      {
+        key: 'sub_connect_find_teachers',
+        label: 'Option 1: Find Teachers (Tutor Discovery Tab)',
+        description: 'Enable or disable the Find Teachers tab in the student workspace to browse tutors, lesson plans, and fees.'
+      },
+      {
+        key: 'sub_connect_subscriptions',
+        label: 'Option 2: Subscriptions & Invoices Tab',
+        description: 'Enable or disable the Subscriptions & Invoices tab in the student workspace for viewing active plans and tax receipts.'
+      },
+      {
+        key: 'sub_connect_study_groups',
+        label: 'Option 3: Peer Study Groups Tab',
+        description: 'Enable or disable the Study Groups collaboration tab in the student workspace for peer study circles.'
+      },
       {
         key: 'sub_tuition_plans',
         label: 'Custom Tiered Tuition Plans (LKR)',
@@ -126,12 +78,12 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
       },
       {
         key: 'sub_tuition_slips',
-        label: 'BOC & Commercial Bank Slip Upload',
-        description: 'Students upload bank deposit receipts with transaction numbers for manual verification.'
+        label: 'Bank Deposit Slip Upload & Manual Verification',
+        description: 'Students upload BOC, Commercial Bank, or HNB receipts with reference numbers for approval.'
       },
       {
         key: 'sub_tuition_online_pay',
-        label: 'Online Visa / Mastercard / LANKAQR',
+        label: 'Online Visa / Mastercard & LANKAQR',
         description: 'Direct instant online card checkout with automated invoice activation.'
       },
       {
@@ -148,14 +100,14 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
   },
   {
     key: 'course_marketplace',
-    label: 'Course Materials & Paper Marketplace',
+    label: 'Digital Lesson & Paper Marketplace',
     category: 'Tuition & Commercial Billing',
     targetRole: 'student',
     description: 'Direct purchasing of downloadable past papers, revision packages, and masterclass bundles.',
     subOptions: [
       {
         key: 'sub_market_standalone_papers',
-        label: 'Individual Past Paper Sales',
+        label: 'Individual Model Paper & Marking Scheme Sales',
         description: 'Allow non-enrolled students to purchase model papers or marking schemes individually.'
       },
       {
@@ -172,7 +124,7 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
   },
 
   // =========================================================================
-  // 3. LIVE BROADCAST & VIRTUAL CLASSROOM
+  // 3. LIVE BROADCAST & VIRTUAL STUDIO
   // =========================================================================
   {
     key: 'live_broadcast_studio',
@@ -184,7 +136,7 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
     subOptions: [
       {
         key: 'sub_live_google_meet',
-        label: 'Google Meet Faculty Room Launcher',
+        label: 'Google Meet 1-Click Tutor Launcher',
         description: 'Permanent Google Meet room URL with 1-click start and student join controls.'
       },
       {
@@ -194,7 +146,7 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
       },
       {
         key: 'sub_live_sms_alerts',
-        label: '1-Click Student Broadcast SMS Alerts',
+        label: '1-Click Student Broadcast SMS & WhatsApp Alerts',
         description: 'Send instant SMS & push alerts to all enrolled subscribers 15 minutes before class.'
       },
       {
@@ -219,6 +171,7 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
     category: 'Curriculum & Digital Learning',
     targetRole: 'teacher',
     description: 'Structured course syllabus breakdown with units, subtopics, learning objectives, and notes.',
+    badge: 'Curriculum',
     subOptions: [
       {
         key: 'sub_syllabus_units',
@@ -242,7 +195,7 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
       },
       {
         key: 'sub_syllabus_digital_books',
-        label: 'PDF Digital Textbooks & Lecture Notes',
+        label: 'PDF Digital Lecture Handouts & Tutes',
         description: 'Downloadable teacher lecture handouts, formula sheets, and PDF textbooks.'
       }
     ]
@@ -253,10 +206,11 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
   // =========================================================================
   {
     key: 'assignments_grading',
-    label: 'Assessments, Homework & Grading Studio',
+    label: 'Assessments, Homework & Model Tests',
     category: 'Assessments & Examinations',
     targetRole: 'teacher',
-    description: 'Student assignment upload portal with teacher annotation mark-sheets and feedback.',
+    description: 'Student assignment upload portal with teacher annotation mark-sheets and scorecards.',
+    badge: 'Examinations',
     subOptions: [
       {
         key: 'sub_assign_student_upload',
@@ -269,52 +223,53 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
         description: 'Mark assignments out of 100, record rubric criteria, and provide written feedback.'
       },
       {
-        key: 'sub_assign_term_exams',
-        label: 'Term Examination Timetables & Seating',
-        description: 'Publish official examination hall allocations, desk numbers, and candidate timetables.'
+        key: 'sub_assign_model_exams',
+        label: 'Timed Online Model Examinations & Mock Tests',
+        description: 'Schedule timed model paper trials with auto-submission timers and mark distributions.'
       },
       {
         key: 'sub_assign_report_cards',
-        label: 'Student Term Report Cards & GPA',
-        description: 'Automated student progress report cards with class rankings and grade point averages.'
+        label: 'Student Progress Scorecard & Batch Rank',
+        description: 'Automated student progress report cards with batch rankings and performance stats.'
       },
       {
         key: 'sub_assign_study_groups',
-        label: 'Peer Study Groups & Discussion Circles',
+        label: 'Peer Discussion Forum & Doubt Exchange',
         description: 'Student collaboration rooms for past paper problem-solving and peer discussion.'
       }
     ]
   },
 
   // =========================================================================
-  // 6. FACULTY & ADMINISTRATION
+  // 6. TUTOR BRANDING & MONETIZATION
   // =========================================================================
   {
-    key: 'multi_teacher_roster',
-    label: 'Faculty, Administration & White-Labeling',
-    category: 'Faculty & Administration',
+    key: 'tutor_branding',
+    label: 'Tutor Branding & Creator Monetization',
+    category: 'Tutor Branding & Monetization',
     targetRole: 'admin',
-    description: 'Managing department heads, sectional teachers, staff directory, and teaching workloads.',
+    description: 'Personal brand white-labeling, custom domain, automated WhatsApp alerts, and income analytics.',
+    badge: 'Solo Branding',
     subOptions: [
       {
-        key: 'sub_admin_multi_staff',
-        label: 'Multi-Teacher & Subject Faculty Roster',
-        description: 'Add and manage multiple teachers, assigned subjects, and teaching hour quotas.'
+        key: 'sub_brand_custom_domain',
+        label: 'Custom Domain & Subdomain (e.g. sammaths.lk)',
+        description: 'Connect custom domain or branded subdomain with automated SSL security.'
       },
       {
-        key: 'sub_admin_principal_panel',
-        label: 'Principal Supervision Control Panel',
-        description: 'Supervisory dashboard to audit teacher activity and curriculum completion across grades.'
+        key: 'sub_brand_logo_theme',
+        label: 'Personal Brand Crest, Logo & Color Theme',
+        description: 'Customize portal theme colors, brand banner, and personal tutor logo.'
       },
       {
-        key: 'sub_admin_parent_portal',
-        label: 'Parent SMS Gateway & Progress Monitoring',
-        description: 'Send automated SMS notifications to parents for attendance, exam marks, and fees.'
+        key: 'sub_brand_whatsapp_bot',
+        label: 'Automated WhatsApp Bot for Links & Reminders',
+        description: 'Auto-deliver class joining links and fee receipt alerts directly via WhatsApp.'
       },
       {
-        key: 'sub_admin_white_label',
-        label: 'Custom Subdomain & White-Label Crest',
-        description: 'White-label LMS with institutional crest/logo, colors, and custom domain (e.g., royal.lms.lk).'
+        key: 'sub_brand_revenue_analytics',
+        label: 'Monthly Tuition Revenue & Growth Analytics',
+        description: 'Real-time metrics on active paying students, monthly recurring revenue, and student retention.'
       }
     ]
   }
@@ -336,105 +291,56 @@ const buildFullFeatures = (config: Record<string, boolean>): Record<string, bool
 // Presets for 1-click tenant setup
 export const TENANT_PRESETS: TenantPreset[] = [
   {
-    id: 'preset_school',
-    name: 'K-12 School Enterprise Edition',
-    type: 'school',
-    description: 'Comprehensive setup for National & Private Schools with Sports Houses, Events, Term Exams, Report Cards, and Multi-Teacher Staff.',
-    icon: 'School',
+    id: 'preset_tutor_pro',
+    name: 'Solo Educator Pro Edition',
+    type: 'individual_teacher',
+    description: 'Full live studio for solo tutors: Live Google Meet classes, Study Packages, Bank Slip Approvals, Student Subscriptions, and Syllabus Builder.',
+    icon: 'GraduationCap',
     features: buildFullFeatures({
-      campus_sports: true,
-      campus_events: true,
-      campus_announcements: true,
-      school_classes_grades: true,
-      tuition_subscriptions: false,
-      course_marketplace: false,
+      batch_management: true,
+      tuition_subscriptions: true,
+      course_marketplace: true,
+      live_broadcast_studio: true,
+      syllabus_builder: true,
+      assignments_grading: true,
+      tutor_branding: true
+    })
+  },
+  {
+    id: 'preset_tutor_masterclass',
+    name: 'Solo Masterclass & Paper Class Edition',
+    type: 'individual_teacher',
+    description: 'Designed for intensive paper class tutors: Past paper marketplace, Model evaluation schemes, Live video solutions, and Homework submissions.',
+    icon: 'Award',
+    features: buildFullFeatures({
+      batch_management: true,
+      tuition_subscriptions: true,
+      course_marketplace: true,
+      live_broadcast_studio: true,
+      syllabus_builder: true,
+      assignments_grading: true,
+      tutor_branding: true
+    })
+  },
+  {
+    id: 'preset_tutor_starter',
+    name: 'Solo Creator Starter Edition',
+    type: 'individual_teacher',
+    description: 'Affordable setup for emerging solo tutors: Pre-recorded Video Courses, Model Papers & PDF Library, Homework Submissions, and Basic Subscriptions.',
+    icon: 'Sparkles',
+    features: buildFullFeatures({
+      batch_management: true,
+      tuition_subscriptions: true,
+      course_marketplace: true,
       live_broadcast_studio: false,
       syllabus_builder: true,
       assignments_grading: true,
-      multi_teacher_roster: true
-    })
-  },
-  {
-    id: 'preset_tuition',
-    name: 'Tuition Center & Academy Edition',
-    type: 'tuition_center',
-    description: 'Tailored for commercial coaching institutes: Monthly tuition subscriptions, BOC/Commercial bank slip approval, Live Broadcast studio, and Marketplace.',
-    icon: 'Building2',
-    features: buildFullFeatures({
-      campus_sports: false,
-      campus_events: false,
-      campus_announcements: true,
-      school_classes_grades: true,
-      tuition_subscriptions: true,
-      course_marketplace: true,
-      live_broadcast_studio: true,
-      syllabus_builder: true,
-      assignments_grading: true,
-      multi_teacher_roster: true
-    })
-  },
-  {
-    id: 'preset_tutor',
-    name: 'Solo Educator / Individual Tutor Pro',
-    type: 'individual_teacher',
-    description: 'Streamlined personal studio for solo tuition teachers: direct bank slip verifications, Connect Hub subscribers, Live Meet classes, and past papers.',
-    icon: 'GraduationCap',
-    features: buildFullFeatures({
-      campus_sports: false,
-      campus_events: false,
-      campus_announcements: false,
-      school_classes_grades: false,
-      tuition_subscriptions: true,
-      course_marketplace: true,
-      live_broadcast_studio: true,
-      syllabus_builder: true,
-      assignments_grading: true,
-      multi_teacher_roster: false
+      tutor_branding: false
     })
   }
 ];
 
 export const INITIAL_TENANTS: Tenant[] = [
-  {
-    id: 'tenant_royal',
-    name: 'Royal College Colombo',
-    code: 'RC-CMB',
-    type: 'school',
-    plan: 'enterprise',
-    status: 'active',
-    contactEmail: 'admin@royalcollege.lk',
-    contactPhone: '+94 11 269 1163',
-    adminName: 'M. V. S. Gunathilake (Principal)',
-    studentCount: 8450,
-    teacherCount: 380,
-    monthlyFeeLkr: 150000,
-    createdAt: '2025-01-10',
-    renewalDate: '2027-01-10',
-    primaryColor: '#0d5c4d',
-    address: 'Rajakeeya Mawatha, Colombo 07',
-    tagline: 'Disce aut Discede (Learn or Depart)',
-    enabledFeatures: { ...TENANT_PRESETS[0].features }
-  },
-  {
-    id: 'tenant_apex',
-    name: 'Apex Higher Education Institute',
-    code: 'APEX-NGD',
-    type: 'tuition_center',
-    plan: 'enterprise',
-    status: 'active',
-    contactEmail: 'admissions@apexedu.lk',
-    contactPhone: '+94 11 282 4455',
-    adminName: 'Eng. Janaka Wickramasinghe',
-    studentCount: 3200,
-    teacherCount: 24,
-    monthlyFeeLkr: 95000,
-    createdAt: '2025-06-01',
-    renewalDate: '2026-12-31',
-    primaryColor: '#1d4ed8',
-    address: 'High Level Road, Nugegoda',
-    tagline: 'The Apex of A/L Excellence',
-    enabledFeatures: { ...TENANT_PRESETS[1].features }
-  },
   {
     id: 'tenant_samantha',
     name: 'Dr. Samantha Perera (Combined Maths)',
@@ -453,26 +359,66 @@ export const INITIAL_TENANTS: Tenant[] = [
     primaryColor: '#059669',
     address: 'Online Faculty & Studio, Colombo',
     tagline: 'A/L Combined Mathematics Masterclass',
-    enabledFeatures: { ...TENANT_PRESETS[2].features }
+    enabledFeatures: { ...TENANT_PRESETS[0].features }
   },
   {
-    id: 'tenant_jaffna_hindu',
-    name: 'Jaffna Hindu College',
-    code: 'JHC-JAF',
-    type: 'school',
+    id: 'tenant_thanushan',
+    name: 'Eng. K. Thanushan (A/L Physics Masterclass)',
+    code: 'TUTOR-PHYS',
+    type: 'individual_teacher',
+    plan: 'pro',
+    status: 'active',
+    contactEmail: 'thanushan.physics@gmail.com',
+    contactPhone: '+94 77 987 6543',
+    adminName: 'Eng. K. Thanushan (B.Sc. Eng)',
+    studentCount: 285,
+    teacherCount: 1,
+    monthlyFeeLkr: 22000,
+    createdAt: '2025-08-10',
+    renewalDate: '2027-08-10',
+    primaryColor: '#7c3aed',
+    address: 'Online Studio & Live Faculty, Jaffna & Colombo',
+    tagline: 'Conceptual Physics & Live Practical Problem Solving',
+    enabledFeatures: { ...TENANT_PRESETS[0].features }
+  },
+  {
+    id: 'tenant_nilmini',
+    name: 'Dr. Nilmini Silva (A/L Chemistry Studio)',
+    code: 'TUTOR-CHEM',
+    type: 'individual_teacher',
+    plan: 'pro',
+    status: 'active',
+    contactEmail: 'nilmini.chem@alchemistry.lk',
+    contactPhone: '+94 71 456 7890',
+    adminName: 'Dr. Nilmini Silva (Ph.D.)',
+    studentCount: 220,
+    teacherCount: 1,
+    monthlyFeeLkr: 20000,
+    createdAt: '2025-05-15',
+    renewalDate: '2027-05-15',
+    primaryColor: '#2563eb',
+    address: 'Online Studio & Video Lab, Kandy & Colombo',
+    tagline: 'Organic Mechanisms & Physical Chemistry Clarity',
+    enabledFeatures: { ...TENANT_PRESETS[0].features }
+  },
+  {
+    id: 'tenant_limat_saas',
+    name: 'Mr. Lima T. (Commerce & Accounting)',
+    code: 'TUTOR-LIMA',
+    type: 'individual_teacher',
     plan: 'enterprise',
     status: 'active',
-    contactEmail: 'principal@jaffnahindu.lk',
-    contactPhone: '+94 21 222 2379',
-    adminName: 'S. Nimalan (Principal)',
-    studentCount: 3100,
-    teacherCount: 145,
-    monthlyFeeLkr: 85000,
-    createdAt: '2025-04-12',
-    renewalDate: '2026-11-30',
-    primaryColor: '#7c2d12',
-    address: 'Kandarodai Road, Jaffna',
-    tagline: 'Kadavul Unmai (God is Truth)',
-    enabledFeatures: { ...TENANT_PRESETS[0].features }
+    contactEmail: 'limat.tutor@limat.lk',
+    contactPhone: '+94 77 123 4567',
+    adminName: 'Mr. Lima T. (MBA, B.Com)',
+    studentCount: 350,
+    teacherCount: 1,
+    monthlyFeeLkr: 25000,
+    createdAt: '2025-01-01',
+    renewalDate: '2028-01-01',
+    primaryColor: '#0d5c4d',
+    address: 'Colombo Online Studio & Interactive Hub',
+    tagline: 'Case Studies, Model Papers & Live Financial Accounting',
+    enabledFeatures: { ...TENANT_PRESETS[1].features }
   }
 ];

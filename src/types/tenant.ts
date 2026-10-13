@@ -7,12 +7,12 @@ export type TenantPlan = 'starter' | 'pro' | 'enterprise';
 export type TenantStatus = 'active' | 'trial' | 'suspended';
 
 export type FeatureCategory =
-  | 'Campus Life & Operations'
+  | 'Batch Management & Announcements'
   | 'Tuition & Commercial Billing'
   | 'Live Broadcast & Studio'
   | 'Curriculum & Digital Learning'
   | 'Assessments & Examinations'
-  | 'Faculty & Administration';
+  | 'Tutor Branding & Monetization';
 
 export type TargetRoleScope = 'student' | 'teacher' | 'admin' | 'shared';
 
@@ -54,6 +54,7 @@ export interface Tenant {
   primaryColor?: string;
   address?: string;
   tagline?: string;
+  googleMeetLink?: string;
 }
 
 export interface TenantPreset {

@@ -93,7 +93,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
     else if (tab === "pricing_plans") setCurrentView("super_admin_pricing");
   };
   const [selectedTenantForMatrix, setSelectedTenantForMatrix] = useState<string>(activeTenantId);
-  const [typeFilter, setTypeFilter] = useState<"all" | TenantType>("all");
+  const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [featureSearchQuery, setFeatureSearchQuery] = useState("");
   const [matrixRoleScope, setMatrixRoleScope] = useState<"all" | "student" | "teacher" | "admin">("all");
@@ -126,15 +126,15 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
   const [newTenantData, setNewTenantData] = useState({
     name: "",
     code: "",
-    type: "school" as TenantType,
+    type: "individual_teacher" as TenantType,
     plan: "pro" as TenantPlan,
     adminName: "",
     contactEmail: "",
     contactPhone: "",
-    monthlyFeeLkr: 75000,
+    monthlyFeeLkr: 18000,
     address: "",
-    studentCount: 1200,
-    teacherCount: 50
+    studentCount: 150,
+    teacherCount: 1
   });
 
   // Edit Tenant Modal
@@ -143,18 +143,22 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
   // Deleting Tenant Modal
   const [deletingTenant, setDeletingTenant] = useState<Tenant | null>(null);
 
-  // Filtered tenants
+  // Filtered tenants by subject or search
   const filteredTenants = useMemo(() => {
     return tenants.filter((t) => {
-      const matchType = typeFilter === "all" || t.type === typeFilter;
+      const matchSubject =
+        subjectFilter === "all" ||
+        t.name.toLowerCase().includes(subjectFilter.toLowerCase()) ||
+        (t.tagline && t.tagline.toLowerCase().includes(subjectFilter.toLowerCase())) ||
+        t.code.toLowerCase().includes(subjectFilter.toLowerCase());
       const matchQuery =
         !searchQuery.trim() ||
         t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.adminName.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchType && matchQuery;
+      return matchSubject && matchQuery;
     });
-  }, [tenants, typeFilter, searchQuery]);
+  }, [tenants, subjectFilter, searchQuery]);
 
   // Current tenant for matrix
   const matrixTenant = tenants.find((t) => t.id === selectedTenantForMatrix) || activeTenant;
@@ -229,12 +233,12 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
 
   // Categories for Feature Matrix
   const categories: FeatureCategory[] = [
-    "Campus Life & Operations",
+    "Batch Management & Announcements",
     "Tuition & Commercial Billing",
     "Live Broadcast & Studio",
     "Curriculum & Digital Learning",
     "Assessments & Examinations",
-    "Faculty & Administration"
+    "Tutor Branding & Monetization"
   ];
 
   // Batch toggle all features in a category (parent + sub-options)
@@ -293,22 +297,11 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                Global Client &amp; Sub-Feature Management Portal
+                Global Creator &amp; Solo Tutor Management Portal
               </h1>
               <p className="text-xs sm:text-sm text-slate-200 max-w-3xl leading-relaxed">
-                Manage all customer institutions (Schools, Tuition Centers, and Solo Teachers). Turn specific parent modules and granular sub-features ON/OFF per client, assign custom plan presets, and simulate any tenant's live workspace experience.
+                Manage all registered educators (Solo Tutors and Tuition Coaching Studios). Turn specific parent modules and granular sub-features ON/OFF per creator, assign custom plan presets, and simulate any tutor&apos;s live workspace experience.
               </p>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
-              <Button
-                onClick={() => setIsAddModalOpen(true)}
-                className="bg-[#f3b738] hover:bg-[#dba126] text-slate-950 font-black text-xs sm:text-sm px-5 py-5 rounded-2xl flex items-center gap-2 cursor-pointer shadow-lg transition-transform hover:scale-[1.02]"
-              >
-                <Plus className="h-5 w-5" />
-                <span>+ Onboard New Client</span>
-              </Button>
             </div>
           </div>
         </CardContent>
@@ -318,19 +311,19 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
       <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-white border-2 border-[#0d5c4d]/30 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-[#0d5c4d] text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-xs">
-            {activeTenant.type === "school" ? "🏫" : activeTenant.type === "tuition_center" ? "🏛️" : "👨‍🏫"}
+            👨‍🏫
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded bg-[#0d5c4d] text-white">
-                Active Tenant Simulator
+                Active Tutor Simulator
               </span>
               <span className="text-xs font-mono text-slate-500">[{activeTenant.code}]</span>
             </div>
             <p className="text-sm font-black text-[#0d2b26] mt-0.5">
               {activeTenant.name}{" "}
               <span className="text-xs font-normal text-slate-500">
-                &bull; {activeTenant.type === "school" ? "K-12 School" : activeTenant.type === "tuition_center" ? "Tuition Academy" : "Solo Educator"}
+                &bull; Independent Solo Educator Studio
               </span>
             </p>
           </div>
@@ -349,7 +342,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
           >
             {tenants.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name} ({t.type === "school" ? "School" : t.type === "tuition_center" ? "Tuition" : "Solo Tutor"})
+                {t.name} (Solo Tutor)
               </option>
             ))}
           </select>
@@ -361,9 +354,9 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
         <Card className="border-[#e6ece8] bg-white shadow-2xs">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 font-semibold">Total Client Tenants</p>
-              <p className="text-2xl font-black text-[#0d2b26] mt-1">{tenants.length} Clients</p>
-              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">{activeTenantsCount} active subscriptions</p>
+              <p className="text-xs text-slate-500 font-semibold">Total Registered Solo Tutors</p>
+              <p className="text-2xl font-black text-[#0d2b26] mt-1">{tenants.length} Solo Tutors</p>
+              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">{activeTenantsCount} active educator studios</p>
             </div>
             <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
               <Building2 className="h-5 w-5" />
@@ -409,7 +402,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
           }`}
         >
           <Building2 className="h-4 w-4" />
-          <span>Client &amp; Institution Directory</span>
+          <span>Solo Tutor Directory</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white">
             {tenants.length}
           </span>
@@ -448,26 +441,26 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
       {/* =================================================================== */}
       {activeTab === "tenants" && (
         <div className="space-y-4">
-          {/* Filter & Search */}
+          {/* Subject Stream Filter & Search */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-              {(["all", "school", "tuition_center", "individual_teacher"] as const).map((type) => (
+              {[
+                { key: "all", label: "👨‍🏫 All Solo Tutors" },
+                { key: "maths", label: "📐 Combined Maths" },
+                { key: "phys", label: "⚡ Physics" },
+                { key: "chem", label: "🧪 Chemistry" },
+                { key: "commerce", label: "📊 Commerce & Accounts" }
+              ].map((sub) => (
                 <button
-                  key={type}
-                  onClick={() => setTypeFilter(type)}
+                  key={sub.key}
+                  onClick={() => setSubjectFilter(sub.key)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    typeFilter === type
+                    subjectFilter === sub.key
                       ? "bg-[#0d5c4d] text-white shadow-xs"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  {type === "all"
-                    ? "All Clients"
-                    : type === "school"
-                    ? "🏫 Schools"
-                    : type === "tuition_center"
-                    ? "🏛️ Tuition Institutes"
-                    : "👨‍🏫 Solo Tutors"}
+                  {sub.label}
                 </button>
               ))}
             </div>
@@ -503,19 +496,9 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge
-                              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
-                                tenant.type === "school"
-                                  ? "bg-blue-100 text-blue-900"
-                                  : tenant.type === "tuition_center"
-                                  ? "bg-amber-100 text-amber-900"
-                                  : "bg-emerald-100 text-emerald-900"
-                              }`}
+                              className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900"
                             >
-                              {tenant.type === "school"
-                                ? "K-12 School Edition"
-                                : tenant.type === "tuition_center"
-                                ? "Tuition Academy Edition"
-                                : "Solo Educator Edition"}
+                              Solo Educator Studio
                             </Badge>
 
                             <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
@@ -584,7 +567,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
                       {/* Contact & Admin Details */}
                       <div className="space-y-1 text-slate-600 text-[11px]">
                         <p>
-                          <strong>Admin / Principal:</strong> {tenant.adminName}
+                          <strong>Lead Tutor / Director:</strong> {tenant.adminName}
                         </p>
                         <p>
                           <strong>Email:</strong> {tenant.contactEmail} &bull; <strong>Phone:</strong> {tenant.contactPhone}
@@ -752,7 +735,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
                     : "bg-purple-50 text-purple-900 hover:bg-purple-100"
                 }`}
               >
-                🏫 School &amp; Admin Operations
+                ⚙️ Tutor Admin &amp; Branding
               </button>
             </div>
 
@@ -1013,126 +996,155 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-              {/* Plan 1: Solo Educator */}
-              <div className="p-5 rounded-2xl border-2 border-emerald-300 bg-emerald-50/40 space-y-4 flex flex-col justify-between">
+              {/* Plan 1: Solo Creator Starter */}
+              <div className="p-5 rounded-2xl border-2 border-slate-300 bg-slate-50/60 space-y-4 flex flex-col justify-between">
                 <div className="space-y-3">
-                  <Badge className="bg-emerald-100 text-emerald-900 font-extrabold text-[10px]">
-                    Solo Educator Pro
+                  <Badge className="bg-slate-200 text-slate-800 font-extrabold text-[10px]">
+                    Solo Creator Starter
                   </Badge>
                   <div>
-                    <p className="text-2xl font-black text-[#0d2b26]">LKR 18,000</p>
-                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Teacher License</p>
+                    <p className="text-2xl font-black text-[#0d2b26]">LKR 8,500</p>
+                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Solo Tutor License</p>
                   </div>
                   <ul className="space-y-1.5 text-xs text-slate-700">
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Direct Tuition Subscriptions
+                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Pre-recorded Video Courses
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Bank Slip BOC/Commercial Approvals
+                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Downloadable Past Paper Library
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Live Meet/Zoom Broadcast Studio
+                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Homework &amp; Quiz Submissions
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Past Paper Resource Library
+                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Up to 100 Enrolled Students
+                    </li>
+                    <li className="flex items-center gap-1.5 text-slate-400 line-through">
+                      <X className="h-3.5 w-3.5" /> Live Google Meet Studio
                     </li>
                     <li className="flex items-center gap-1.5 text-slate-400 line-through">
                       <X className="h-3.5 w-3.5" /> Multi-Teacher Management
                     </li>
-                    <li className="flex items-center gap-1.5 text-slate-400 line-through">
-                      <X className="h-3.5 w-3.5" /> Campus Sports &amp; Events
-                    </li>
                   </ul>
                 </div>
 
                 <Button
                   size="sm"
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="w-full bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold"
+                  onClick={() => {
+                    setNewTenantData((prev) => ({
+                      ...prev,
+                      type: "individual_teacher",
+                      plan: "starter",
+                      monthlyFeeLkr: 8500
+                    }));
+                    setIsAddModalOpen(true);
+                  }}
+                  className="w-full bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold cursor-pointer"
                 >
-                  Onboard Solo Tutor
+                  Onboard Starter Tutor
                 </Button>
               </div>
 
-              {/* Plan 2: Tuition Academy */}
-              <div className="p-5 rounded-2xl border-2 border-blue-400 bg-blue-50/40 space-y-4 flex flex-col justify-between shadow-xs">
+              {/* Plan 2: Solo Educator Pro */}
+              <div className="p-5 rounded-2xl border-2 border-emerald-400 bg-emerald-50/50 space-y-4 flex flex-col justify-between shadow-xs">
                 <div className="space-y-3">
-                  <Badge className="bg-blue-100 text-blue-900 font-extrabold text-[10px]">
-                    Tuition Academy Edition
-                  </Badge>
+                  <div className="flex items-center justify-between">
+                    <Badge className="bg-emerald-100 text-emerald-900 font-extrabold text-[10px]">
+                      Solo Educator Pro
+                    </Badge>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-200/60 px-2 py-0.5 rounded-full">
+                      Most Popular
+                    </span>
+                  </div>
                   <div>
-                    <p className="text-2xl font-black text-[#0d2b26]">LKR 95,000</p>
-                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; Up to 50 Tutors</p>
+                    <p className="text-2xl font-black text-[#0d2b26]">LKR 18,000</p>
+                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Solo Tutor License</p>
                   </div>
                   <ul className="space-y-1.5 text-xs text-slate-700">
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-blue-600" /> Multi-Teacher &amp; Faculty Roster
+                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Unlimited Enrolled Students
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-blue-600" /> Tuition Subscriptions &amp; Bank Slips
+                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Direct Tuition Subscriptions
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-blue-600" /> Live Virtual Lecture Halls
+                      <Check className="h-3.5 w-3.5 text-emerald-600" /> BOC / Commercial Bank Slip Approvals
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-blue-600" /> Course Marketplace &amp; Past Papers
+                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Live Meet / Zoom Broadcast Studio
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-blue-600" /> Institute Branding &amp; Logo
+                      <Check className="h-3.5 w-3.5 text-emerald-600" /> Interactive Study Packages &amp; Syllabus
                     </li>
                     <li className="flex items-center gap-1.5 text-slate-400 line-through">
-                      <X className="h-3.5 w-3.5" /> Inter-House Sports System
+                      <X className="h-3.5 w-3.5" /> Multi-Teacher Management
                     </li>
                   </ul>
                 </div>
 
                 <Button
                   size="sm"
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="w-full bg-blue-800 hover:bg-blue-900 text-white text-xs font-bold"
+                  onClick={() => {
+                    setNewTenantData((prev) => ({
+                      ...prev,
+                      type: "individual_teacher",
+                      plan: "pro",
+                      monthlyFeeLkr: 18000
+                    }));
+                    setIsAddModalOpen(true);
+                  }}
+                  className="w-full bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold cursor-pointer"
                 >
-                  Onboard Tuition Center
+                  Onboard Pro Tutor
                 </Button>
               </div>
 
-              {/* Plan 3: K-12 School Enterprise */}
-              <div className="p-5 rounded-2xl border-2 border-amber-300 bg-amber-50/40 space-y-4 flex flex-col justify-between">
+              {/* Plan 3: Solo Masterclass Elite */}
+              <div className="p-5 rounded-2xl border-2 border-purple-400 bg-purple-50/40 space-y-4 flex flex-col justify-between shadow-xs">
                 <div className="space-y-3">
-                  <Badge className="bg-amber-100 text-amber-900 font-extrabold text-[10px]">
-                    K-12 School Enterprise
+                  <Badge className="bg-purple-100 text-purple-900 font-extrabold text-[10px]">
+                    Solo Masterclass Elite
                   </Badge>
                   <div>
-                    <p className="text-2xl font-black text-[#0d2b26]">LKR 150,000</p>
-                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; Unlimited Students &amp; Staff</p>
+                    <p className="text-2xl font-black text-[#0d2b26]">LKR 28,000</p>
+                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Solo Tutor License</p>
                   </div>
                   <ul className="space-y-1.5 text-xs text-slate-700">
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-amber-700" /> Inter-House Sports &amp; Tournaments
+                      <Check className="h-3.5 w-3.5 text-purple-600" /> Unlimited Enrolled Students
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-amber-700" /> Campus Events &amp; Circulars
+                      <Check className="h-3.5 w-3.5 text-purple-600" /> 1-on-1 Paper Evaluation &amp; Solutions
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-amber-700" /> Academic Classes &amp; Sections (10-A, 11-B)
+                      <Check className="h-3.5 w-3.5 text-purple-600" /> Model Paper &amp; Revision Marketplace
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-amber-700" /> Multi-Teacher &amp; Sectional Heads
+                      <Check className="h-3.5 w-3.5 text-purple-600" /> Priority Dedicated Video CDN
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-amber-700" /> National Curriculum Syllabus Builder
+                      <Check className="h-3.5 w-3.5 text-purple-600" /> Automated WhatsApp SMS Alerts
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <Check className="h-3.5 w-3.5 text-amber-700" /> Parent SMS Portal Access
+                      <Check className="h-3.5 w-3.5 text-purple-600" /> Custom Domain &amp; Tutor Brand
                     </li>
                   </ul>
                 </div>
 
                 <Button
                   size="sm"
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="w-full bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold"
+                  onClick={() => {
+                    setNewTenantData((prev) => ({
+                      ...prev,
+                      type: "individual_teacher",
+                      plan: "enterprise",
+                      monthlyFeeLkr: 28000
+                    }));
+                    setIsAddModalOpen(true);
+                  }}
+                  className="w-full bg-purple-800 hover:bg-purple-900 text-white text-xs font-bold cursor-pointer"
                 >
-                  Onboard School
+                  Onboard Masterclass Tutor
                 </Button>
               </div>
             </div>
@@ -1141,23 +1153,23 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
       )}
 
       {/* =================================================================== */}
-      {/* MODAL 1: ONBOARD NEW CLIENT TENANT                                  */}
+      {/* MODAL 1: ONBOARD NEW SOLO TUTOR                                     */}
       {/* =================================================================== */}
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        title="Onboard New Client Tenant"
-        description="Add a new School, Tuition Institute, or Solo Educator to the platform and assign their initial feature package."
+        title="Onboard New Solo Tutor"
+        description="Add a new independent educator to the platform and assign their initial study packages and live studio."
       >
         <form onSubmit={handleAddTenantSubmit} className="space-y-4 pt-2">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Institution / Teacher Name <span className="text-rose-500">*</span>
+              Tutor Name &amp; Title <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
               required
-              placeholder="e.g. St. Thomas College / Rotary Hall / Dr. Perera"
+              placeholder="e.g. Dr. Samantha Perera / Eng. K. Thanushan"
               value={newTenantData.name}
               onChange={(e) => setNewTenantData({ ...newTenantData, name: e.target.value })}
               className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
@@ -1167,12 +1179,12 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Client Code <span className="text-rose-500">*</span>
+                Tutor Code <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 required
-                placeholder="e.g. STC-MLT"
+                placeholder="e.g. TUTOR-MATHS"
                 value={newTenantData.code}
                 onChange={(e) => setNewTenantData({ ...newTenantData, code: e.target.value })}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-mono text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
@@ -1180,25 +1192,23 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Customer Type</label>
-              <select
-                value={newTenantData.type}
-                onChange={(e) => setNewTenantData({ ...newTenantData, type: e.target.value as TenantType })}
-                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#0d5c4d]"
-              >
-                <option value="school">K-12 School</option>
-                <option value="tuition_center">Tuition Academy / Institute</option>
-                <option value="individual_teacher">Individual Tutor</option>
-              </select>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Subject Specialization</label>
+              <input
+                type="text"
+                placeholder="e.g. Combined Mathematics"
+                value={newTenantData.address}
+                onChange={(e) => setNewTenantData({ ...newTenantData, address: e.target.value })}
+                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Primary Admin / Principal</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Lead Tutor / Director</label>
               <input
                 type="text"
-                placeholder="e.g. Rev. Fr. Marc Billimoria"
+                placeholder="e.g. Dr. Samantha Perera"
                 value={newTenantData.adminName}
                 onChange={(e) => setNewTenantData({ ...newTenantData, adminName: e.target.value })}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
@@ -1283,16 +1293,14 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Customer Type</label>
-                <select
-                  value={editingTenant.type}
-                  onChange={(e) => setEditingTenant({ ...editingTenant, type: e.target.value as TenantType })}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white"
-                >
-                  <option value="school">K-12 School</option>
-                  <option value="tuition_center">Tuition Academy</option>
-                  <option value="individual_teacher">Solo Educator</option>
-                </select>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Subject Specialization</label>
+                <input
+                  type="text"
+                  value={editingTenant.tagline || ""}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, tagline: e.target.value })}
+                  placeholder="e.g. A/L Combined Mathematics"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900"
+                />
               </div>
 
               <div>

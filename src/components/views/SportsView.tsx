@@ -20,17 +20,39 @@ import {
   ExternalLink,
   Crown,
   Sparkles,
-  Info
+  Info,
+  ShieldCheck,
+  FileText,
+  Download
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { Tournament, TournamentFormat, TournamentStatus, Fixture } from "@/types/lms";
+import { SportsRegistrationWizard } from "@/components/sports/SportsRegistrationWizard";
+import { CheckRegistrationView } from "@/components/sports/CheckRegistrationView";
+import { AdminSportsRegistrationsDesk } from "@/components/sports/AdminSportsRegistrationsDesk";
+import {
+  INITIAL_CHAMPIONSHIP_SPORTS,
+  INITIAL_ATHLETE_REGISTRATIONS,
+  ChampionshipSportItem,
+  StoredAthleteRegistration
+} from "@/components/sports/sportsRegistrationData";
 
-type SportsTab = "tournaments" | "fixtures" | "standings";
+type SportsTab =
+  | "tournaments"
+  | "registration"
+  | "check_registration"
+  | "admin_registrations"
+  | "fixtures"
+  | "standings";
 
-export function SportsView() {
+export function SportsView({
+  initialTab = "tournaments"
+}: {
+  initialTab?: SportsTab;
+}) {
   const {
     sports,
     teams,
@@ -42,14 +64,77 @@ export function SportsView() {
     deleteTournament,
     createFixture,
     currentRole,
+    currentUser,
     recordMatchResult,
+    addToast,
     t
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<SportsTab>("tournaments");
+  const [activeTab, setActiveTab] = useState<SportsTab>(initialTab);
+
+  React.useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
   const [selectedSport, setSelectedSport] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Eezhagam / Championship Sports Web Registration Platform States
+  const [athleteRegistrations, setAthleteRegistrations] = useState<StoredAthleteRegistration[]>(
+    INITIAL_ATHLETE_REGISTRATIONS
+  );
+  const [championshipSports, setChampionshipSports] = useState<ChampionshipSportItem[]>(
+    INITIAL_CHAMPIONSHIP_SPORTS
+  );
+
+  const handleNewRegistration = (newRecord: StoredAthleteRegistration) => {
+    setAthleteRegistrations((prev) => [newRecord, ...prev]);
+    addToast({
+      type: "success",
+      title: "Championship Registration Confirmed!",
+      message: `Entry Pass ${newRecord.registrationNumber} issued for ${newRecord.athleteName}.`
+    });
+  };
+
+  const handleUpdateRegStatus = (
+    id: string,
+    newStatus: "Confirmed" | "Pending" | "Approved" | "Rejected"
+  ) => {
+    setAthleteRegistrations((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
+    );
+    addToast({
+      type: "info",
+      title: "Participant Status Updated",
+      message: `Registration ${id} set to ${newStatus}.`
+    });
+  };
+
+  const handleAddChampionshipSport = (newSport: ChampionshipSportItem) => {
+    setChampionshipSports((prev) => [...prev, newSport]);
+    addToast({
+      type: "success",
+      title: "New Sport Added",
+      message: `${newSport.name} published to championship registry.`
+    });
+  };
+
+  const handleAddChampionshipEvent = (
+    sportId: string,
+    newEvent: any
+  ) => {
+    setChampionshipSports((prev) =>
+      prev.map((s) => (s.id === sportId ? { ...s, events: [...s.events, newEvent] } : s))
+    );
+    addToast({
+      type: "success",
+      title: "New Event Published",
+      message: `${newEvent.name} added to sports schedule.`
+    });
+  };
 
   // Modals state
   const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] = useState(false);
@@ -65,9 +150,9 @@ export function SportsView() {
     startDate: "",
     endDate: "",
     venue: "",
-    organizer: "Sri Lanka Schools Sports Association",
+    organizer: "Sri Lanka Inter-Academy Sports Board",
     trophyTitle: "",
-    participatingTeamsInput: "St. Michael High School, Trinity Central College, Royal Academy Colombo, Ananda College",
+    participatingTeamsInput: "Lions Cricket Academy, Trinity Sports Club, Royal Titans Academy, Apex Warriors",
     status: "upcoming" as TournamentStatus,
     currentRound: "Round 1 / Group Stage",
     description: "",
@@ -78,17 +163,17 @@ export function SportsView() {
   const [fixtureForm, setFixtureForm] = useState({
     competitionName: "",
     sportName: "Cricket",
-    homeTeam: "St. Michael High School",
+    homeTeam: "Lions Cricket Academy",
     awayTeam: "",
     date: "",
     time: "09:30 AM",
-    venue: "College Main Grounds"
+    venue: "City Sports Complex"
   });
 
   // Score recording modal states
   const [homeScore, setHomeScore] = useState("215/8 (50 ov)");
   const [awayScore, setAwayScore] = useState("198 all out");
-  const [outcome, setOutcome] = useState("St. Michael Won by 17 runs");
+  const [outcome, setOutcome] = useState("Lions Academy Won by 17 runs");
 
   const isAdminOrTeacher = currentRole === "admin" || currentRole === "teacher";
 
@@ -205,7 +290,7 @@ export function SportsView() {
               {t.sports.title || "Sports Operations & Tournaments"}
             </h1>
             <p className="text-sm text-emerald-100/80 leading-relaxed">
-              Organize inter-school championships, manage team rosters, track live scorecards, and monitor league standings.
+              Organize sports tournaments, manage team rosters, track live scorecards, and monitor league standings.
             </p>
           </div>
 
@@ -226,25 +311,27 @@ export function SportsView() {
               </div>
             </div>
 
-            {isAdminOrTeacher && (
-              <div className="flex flex-col gap-2 shrink-0">
+            {/* Action Buttons: Register for Sports + Admin Actions */}
+            <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+              <Button
+                onClick={() => setActiveTab("registration")}
+                className="bg-[#f3b738] hover:bg-[#dfa224] text-[#0d2b26] font-black text-xs shadow-md flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl cursor-pointer"
+              >
+                <Sparkles className="h-4 w-4 text-[#0d2b26]" />
+                <span>+ Register for Championship</span>
+              </Button>
+
+              {isAdminOrTeacher && (
                 <Button
                   onClick={() => setIsCreateTournamentModalOpen(true)}
-                  className="bg-[#f3b738] hover:bg-[#dfa224] text-[#0d2b26] font-black text-xs shadow-md flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl"
-                >
-                  <Plus className="h-4 w-4 stroke-[3]" />
-                  <span>{t.sports.createTournament || "+ Create Tournament"}</span>
-                </Button>
-                <Button
-                  onClick={() => setIsScheduleFixtureModalOpen(true)}
                   variant="outline"
-                  className="bg-white/10 hover:bg-white/20 border-white/30 text-white font-bold text-xs h-9 px-3 rounded-xl"
+                  className="bg-white/10 hover:bg-white/20 border-white/30 text-white font-bold text-xs h-10 px-3.5 rounded-xl"
                 >
-                  <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                  + Schedule Match
+                  <Plus className="h-4 w-4 mr-1" />
+                  <span>{t.sports.createTournament || "New Tournament"}</span>
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
@@ -253,22 +340,69 @@ export function SportsView() {
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
             <button
               onClick={() => setActiveTab("tournaments")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === "tournaments"
                   ? "bg-white text-[#0d5c4d] shadow-sm scale-102"
                   : "bg-white/10 hover:bg-white/20 text-white"
               }`}
             >
               <Trophy className="h-3.5 w-3.5 text-amber-400" />
-              <span>{t.sports.tournaments || "Tournaments & Championships"}</span>
+              <span>{t.sports.tournaments || "Tournaments"}</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/20 text-white">
                 {tournaments.length}
               </span>
             </button>
 
+            {/* Online Registration Wizard Tab */}
+            <button
+              onClick={() => setActiveTab("registration")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === "registration"
+                  ? "bg-white text-[#0d5c4d] shadow-sm scale-102 font-black"
+                  : "bg-[#f3b738] text-slate-950 font-black hover:bg-[#dfa224]"
+              }`}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-slate-950" />
+              <span>Online Registration</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-800 text-white font-mono">
+                10-Step
+              </span>
+            </button>
+
+            {/* Check My Registration Tab */}
+            <button
+              onClick={() => setActiveTab("check_registration")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === "check_registration"
+                  ? "bg-white text-[#0d5c4d] shadow-sm scale-102"
+                  : "bg-white/10 hover:bg-white/20 text-white"
+              }`}
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span>Check My Registration</span>
+            </button>
+
+            {/* Admin Registrations Desk Tab */}
+            {isAdminOrTeacher && (
+              <button
+                onClick={() => setActiveTab("admin_registrations")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                  activeTab === "admin_registrations"
+                    ? "bg-white text-[#0d5c4d] shadow-sm scale-102"
+                    : "bg-white/10 hover:bg-white/20 text-white"
+                }`}
+              >
+                <ShieldCheck className="h-3.5 w-3.5 text-amber-300" />
+                <span>Registrations Desk</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500 text-white font-bold">
+                  {athleteRegistrations.length}
+                </span>
+              </button>
+            )}
+
             <button
               onClick={() => setActiveTab("fixtures")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === "fixtures"
                   ? "bg-white text-[#0d5c4d] shadow-sm scale-102"
                   : "bg-white/10 hover:bg-white/20 text-white"
@@ -283,7 +417,7 @@ export function SportsView() {
 
             <button
               onClick={() => setActiveTab("standings")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === "standings"
                   ? "bg-white text-[#0d5c4d] shadow-sm scale-102"
                   : "bg-white/10 hover:bg-white/20 text-white"
@@ -692,6 +826,40 @@ export function SportsView() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: ONLINE ATHLETE REGISTRATION WIZARD (10-STEP MULTI-STEP FLOW)         */}
+      {/* ========================================================================= */}
+      {activeTab === "registration" && (
+        <SportsRegistrationWizard
+          onRegistrationComplete={handleNewRegistration}
+          onCancel={() => setActiveTab("tournaments")}
+          currentUser={currentUser}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: CHECK MY REGISTRATION (ID + PHONE SEARCH)                            */}
+      {/* ========================================================================= */}
+      {activeTab === "check_registration" && (
+        <CheckRegistrationView
+          registrations={athleteRegistrations}
+          onOpenRegister={() => setActiveTab("registration")}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: ADMIN REGISTRATIONS DESK (KPIs, MULTI-FILTERS, CSV EXPORT)           */}
+      {/* ========================================================================= */}
+      {activeTab === "admin_registrations" && (
+        <AdminSportsRegistrationsDesk
+          registrations={athleteRegistrations}
+          onUpdateRegistrationStatus={handleUpdateRegStatus}
+          sportsList={championshipSports}
+          onAddSport={handleAddChampionshipSport}
+          onAddEvent={handleAddChampionshipEvent}
+        />
       )}
 
       {/* ========================================================================= */}

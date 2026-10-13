@@ -10,9 +10,9 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "LimaT Smart Book — Learning and school life, beautifully connected",
+  title: "LimaT Tutor & Sports SaaS — Empowering Independent Tutors & Sports Tournaments",
   description:
-    "LimaT Smart Book brings lessons, assessments, progress, sports, and events together in one calm, trusted platform. Built for Sri Lankan schools in English, Sinhala, and Tamil."
+    "LimaT SaaS brings independent tutor course packages, syllabus builder, student subscriptions, bank slip approvals, and campus sports tournaments into one unified platform."
 };
 
 export default function RootLayout({

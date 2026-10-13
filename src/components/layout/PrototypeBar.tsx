@@ -42,10 +42,10 @@ export function PrototypeBar() {
           <div className="flex items-center gap-2 font-bold text-white tracking-wide shrink-0">
             <span className="flex h-2.5 w-2.5 rounded-full bg-[#f3b738] shadow-[0_0_8px_#f3b738]" />
             <span className="font-extrabold tracking-tight text-white text-xs sm:text-sm">
-              LimaT Smart Book
+              LimaT Tutor & Sports SaaS
             </span>
             <span className="text-[9.5px] uppercase font-bold px-2 py-0.5 rounded-full bg-[#0d5c4d] text-emerald-200 border border-[#167866] hidden sm:inline-block">
-              Interactive System
+              Tutor SaaS Ecosystem
             </span>
           </div>
 
@@ -117,14 +117,14 @@ export function PrototypeBar() {
                 title="Switch to Staff Landing Page"
               >
                 <School className={`h-3.5 w-3.5 ${landingPortal === "staff" ? "text-slate-950" : "text-slate-300"}`} />
-                <span>Staff</span>
+                <span>Tutor/Staff</span>
               </button>
             </div>
           )}
 
-          {/* Client Tenant Selector */}
+          {/* SaaS Workspace Selector */}
           <div className="flex items-center gap-1.5 bg-[#051c18] border border-[#14473e] rounded-xl px-2 py-1 shrink-0">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Client:</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400">Workspace:</span>
             <select
               value={activeTenantId}
               onChange={(e) => setActiveTenantId(e.target.value)}
@@ -132,7 +132,7 @@ export function PrototypeBar() {
             >
               {tenants.map((tenant) => (
                 <option key={tenant.id} value={tenant.id} className="bg-[#082a24] text-white">
-                  {tenant.type === "school" ? "🏫" : tenant.type === "tuition_center" ? "🏛️" : "👨‍🏫"} {tenant.name}
+                  👨‍🏫 {tenant.name}
                 </option>
               ))}
             </select>
@@ -141,7 +141,7 @@ export function PrototypeBar() {
 
         {/* Right: Role Switcher, Language & Theme Controls */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Role Switcher with clean, non-colliding labels */}
+          {/* Role Switcher with clean labels */}
           <div className="flex items-center bg-[#051c18] border border-[#14473e] rounded-xl p-0.5 shrink-0 isolate">
             {/* Student */}
             <button
@@ -149,7 +149,7 @@ export function PrototypeBar() {
               onClick={() => handleRoleChange("student")}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 currentRole === "student"
-                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  ? "bg-[#0d5c4d] text-white shadow-xs font-black"
                   : "text-slate-300 hover:text-white hover:bg-white/5"
               }`}
             >
@@ -157,7 +157,7 @@ export function PrototypeBar() {
               <span>Student</span>
             </button>
 
-            {/* Teacher */}
+            {/* Solo Tutor */}
             <button
               type="button"
               onClick={() => handleRoleChange("teacher")}
@@ -168,10 +168,10 @@ export function PrototypeBar() {
               }`}
             >
               <School className={`h-3.5 w-3.5 ${currentRole === "teacher" ? "text-slate-950" : "text-slate-300"}`} />
-              <span>Teacher</span>
+              <span>Solo Tutor</span>
             </button>
 
-            {/* Admin (concise 5-letter label to prevent text wrap & clipping) */}
+            {/* Platform Admin */}
             <button
               type="button"
               onClick={() => handleRoleChange("admin")}

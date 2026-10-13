@@ -3,10 +3,11 @@
 import React, { useState, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import { useHubSettings } from "@/context/AdminContext";
-import { TeacherSubscriber } from "@/types/lms";
-import { initialTeacherSubscribers } from "@/data/connectMockData";
+import { TeacherSubscriber, TutorPackage, ConnectStudyGroup } from "@/types/lms";
+import { initialTeacherSubscribers, initialTutorPackages, initialConnectStudyGroups } from "@/data/connectMockData";
 import {
   Users,
+  Users2,
   CreditCard,
   Receipt,
   CheckCircle2,
@@ -25,24 +26,85 @@ import {
   Eye,
   X,
   Building,
-  GraduationCap
+  GraduationCap,
+  Package,
+  Plus,
+  Trash2,
+  Edit3,
+  Check,
+  Layers,
+  DollarSign,
+  ToggleLeft,
+  ToggleRight,
+  Lock
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 
-type TeacherConnectTab = "subscribers" | "slips";
+type TeacherConnectTab = "packages" | "groups" | "subscribers" | "slips";
 
 export function TeacherConnectView() {
   const { currentUser, t } = useApp();
   const hubSettings = useHubSettings();
   if (!hubSettings.enabled) {
-    return <Card className="p-10 text-center"><p className="text-lg font-black text-[#0d2b26]">Connect Hub is currently disabled</p><p className="mt-2 text-sm text-slate-500">Please contact your school administrator.</p></Card>;
+    return <Card className="p-10 text-center"><p className="text-lg font-black text-[#0d2b26]">Tutor Connect Hub is currently disabled</p><p className="mt-2 text-sm text-slate-500">Please contact platform administration.</p></Card>;
   }
 
-  // Active tab inside Teacher Connect Hub
-  const [activeTab, setActiveTab] = useState<TeacherConnectTab>("subscribers");
+  // Active tab inside Teacher Connect Hub - Default to Packages (கட்டணப் பேக்கேஜ்கள்)
+  const [activeTab, setActiveTab] = useState<TeacherConnectTab>("packages");
+
+  // Packages CRUD state
+  const [packages, setPackages] = useState<TutorPackage[]>(initialTutorPackages);
+  const [packageSearchQuery, setPackageSearchQuery] = useState("");
+  const [packageStatusFilter, setPackageStatusFilter] = useState<"all" | "active" | "draft">("all");
+
+  // Package Modals
+  const [isCreatePackageModalOpen, setIsCreatePackageModalOpen] = useState(false);
+  const [isEditPackageModalOpen, setIsEditPackageModalOpen] = useState(false);
+  const [editingPackage, setEditingPackage] = useState<TutorPackage | null>(null);
+  const [deletingPackage, setDeletingPackage] = useState<TutorPackage | null>(null);
+
+  // Form State
+  const initialPackageForm = {
+    title: "",
+    subject: "Combined Mathematics",
+    grade: "Grade 12 & 13 (A/L)",
+    monthlyFeeLkr: 3000,
+    billingCycle: "Monthly" as "Monthly" | "Term (3 Months)" | "Full Syllabus Pass",
+    description: "",
+    features: [
+      "Live Interactive Classes / Week (Google Meet)",
+      "Recorded Video Lessons Archive with 24/7 Access",
+      "Printable Theory & Exercise Tutes (PDF)",
+      "Monthly Model Paper Discussion & Marking"
+    ],
+    liveClassesPerWeek: 3,
+    status: "active" as "active" | "draft",
+    badge: ""
+  };
+  const [packageFormData, setPackageFormData] = useState(initialPackageForm);
+  const [newPerkInput, setNewPerkInput] = useState("");
+
+  // Study Groups state (Teacher-Exclusive Study Circles)
+  const [studyGroups, setStudyGroups] = useState<ConnectStudyGroup[]>(initialConnectStudyGroups);
+  const [groupSearchQuery, setGroupSearchQuery] = useState("");
+  const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
+  const [isEditGroupModalOpen, setIsEditGroupModalOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<ConnectStudyGroup | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<ConnectStudyGroup | null>(null);
+
+  const initialGroupForm = {
+    name: "",
+    subject: "Combined Mathematics",
+    activeTopic: "",
+    schedule: "Every Tue & Thu · 7:30 PM - 9:00 PM",
+    meetUrl: "https://meet.google.com/kavitha-maths-circle",
+    maxMembers: 80,
+    description: ""
+  };
+  const [groupFormData, setGroupFormData] = useState(initialGroupForm);
 
   // Subscribers state
   const [subscribers, setSubscribers] = useState<TeacherSubscriber[]>(initialTeacherSubscribers);
@@ -60,6 +122,168 @@ export function TeacherConnectView() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // Filtered packages
+  const filteredPackages = useMemo(() => {
+    return packages.filter((pkg) => {
+      const matchQuery =
+        !packageSearchQuery.trim() ||
+        pkg.title.toLowerCase().includes(packageSearchQuery.toLowerCase()) ||
+        pkg.subject.toLowerCase().includes(packageSearchQuery.toLowerCase()) ||
+        pkg.grade.toLowerCase().includes(packageSearchQuery.toLowerCase());
+      const matchStatus = packageStatusFilter === "all" || pkg.status === packageStatusFilter;
+      return matchQuery && matchStatus;
+    });
+  }, [packages, packageSearchQuery, packageStatusFilter]);
+
+  // Total metrics
+  const totalPackageRevenue = useMemo(() => {
+    return packages.reduce((acc, p) => acc + (p.status === "active" ? p.enrolledCount * p.monthlyFeeLkr : 0), 0);
+  }, [packages]);
+
+  const totalEnrolledStudents = useMemo(() => {
+    return packages.reduce((acc, p) => acc + (p.status === "active" ? p.enrolledCount : 0), 0);
+  }, [packages]);
+
+  // Package CRUD Handlers
+  const handleOpenCreatePackage = () => {
+    setPackageFormData({
+      ...initialPackageForm,
+      title: "",
+      description: ""
+    });
+    setNewPerkInput("");
+    setIsCreatePackageModalOpen(true);
+  };
+
+  const handleSaveCreatePackage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!packageFormData.title.trim()) {
+      showToast("Please enter a package title!");
+      return;
+    }
+    const newPkg: TutorPackage = {
+      id: `pkg_${Date.now()}`,
+      teacherId: currentUser.id || "usr_teacher_01",
+      title: packageFormData.title.trim(),
+      subject: packageFormData.subject,
+      grade: packageFormData.grade,
+      monthlyFeeLkr: Number(packageFormData.monthlyFeeLkr) || 2500,
+      billingCycle: packageFormData.billingCycle,
+      description: packageFormData.description.trim() || "Comprehensive tuition module with live interactive classes and revision notes.",
+      features: packageFormData.features.length > 0 ? packageFormData.features : ["Live Interactive Classes / Week", "Recorded Video Access"],
+      liveClassesPerWeek: Number(packageFormData.liveClassesPerWeek) || 2,
+      status: packageFormData.status,
+      enrolledCount: 0,
+      badge: packageFormData.badge.trim() || undefined,
+      createdAt: new Date().toISOString().split("T")[0]
+    };
+    setPackages((prev) => [newPkg, ...prev]);
+    setIsCreatePackageModalOpen(false);
+    showToast(`Package "${newPkg.title}" created successfully!`);
+  };
+
+  const handleOpenEditPackage = (pkg: TutorPackage) => {
+    setEditingPackage(pkg);
+    setPackageFormData({
+      title: pkg.title,
+      subject: pkg.subject,
+      grade: pkg.grade,
+      monthlyFeeLkr: pkg.monthlyFeeLkr,
+      billingCycle: pkg.billingCycle,
+      description: pkg.description,
+      features: [...pkg.features],
+      liveClassesPerWeek: pkg.liveClassesPerWeek,
+      status: pkg.status === "archived" ? "draft" : pkg.status,
+      badge: pkg.badge || ""
+    });
+    setNewPerkInput("");
+    setIsEditPackageModalOpen(true);
+  };
+
+  const handleSaveEditPackage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPackage) return;
+    if (!packageFormData.title.trim()) {
+      showToast("Please enter a package title!");
+      return;
+    }
+    setPackages((prev) =>
+      prev.map((p) =>
+        p.id === editingPackage.id
+          ? {
+              ...p,
+              title: packageFormData.title.trim(),
+              subject: packageFormData.subject,
+              grade: packageFormData.grade,
+              monthlyFeeLkr: Number(packageFormData.monthlyFeeLkr) || p.monthlyFeeLkr,
+              billingCycle: packageFormData.billingCycle,
+              description: packageFormData.description.trim(),
+              features: packageFormData.features,
+              liveClassesPerWeek: Number(packageFormData.liveClassesPerWeek) || p.liveClassesPerWeek,
+              status: packageFormData.status,
+              badge: packageFormData.badge.trim() || undefined
+            }
+          : p
+      )
+    );
+    setIsEditPackageModalOpen(false);
+    setEditingPackage(null);
+    showToast(`Package "${packageFormData.title}" updated successfully!`);
+  };
+
+  const handleOpenDeletePackage = (pkg: TutorPackage) => {
+    setDeletingPackage(pkg);
+  };
+
+  const handleConfirmDeletePackage = () => {
+    if (!deletingPackage) return;
+    setPackages((prev) => prev.filter((p) => p.id !== deletingPackage.id));
+    showToast(`Package "${deletingPackage.title}" deleted.`);
+    setDeletingPackage(null);
+  };
+
+  const handleTogglePackageStatus = (pkgId: string) => {
+    setPackages((prev) =>
+      prev.map((p) => {
+        if (p.id === pkgId) {
+          const nextStatus = p.status === "active" ? "draft" : "active";
+          showToast(`Package "${p.title}" status changed to ${nextStatus.toUpperCase()}`);
+          return { ...p, status: nextStatus };
+        }
+        return p;
+      })
+    );
+  };
+
+  const handleDuplicatePackage = (pkg: TutorPackage) => {
+    const clone: TutorPackage = {
+      ...pkg,
+      id: `pkg_${Date.now()}`,
+      title: `${pkg.title} (Copy)`,
+      status: "draft",
+      enrolledCount: 0,
+      createdAt: new Date().toISOString().split("T")[0]
+    };
+    setPackages((prev) => [clone, ...prev]);
+    showToast(`Created duplicate draft of "${pkg.title}"`);
+  };
+
+  const handleAddPerk = () => {
+    if (!newPerkInput.trim()) return;
+    setPackageFormData((prev) => ({
+      ...prev,
+      features: [...prev.features, newPerkInput.trim()]
+    }));
+    setNewPerkInput("");
+  };
+
+  const handleRemovePerk = (indexToRemove: number) => {
+    setPackageFormData((prev) => ({
+      ...prev,
+      features: prev.features.filter((_, idx) => idx !== indexToRemove)
+    }));
   };
 
   // Copy meet link
@@ -98,8 +322,93 @@ export function TeacherConnectView() {
 
   // Pending slips count
   const pendingSlips = subscribers.filter((s) => s.status === "pending_slip");
-  const activeSubscribersCount = subscribers.filter((s) => s.status === "active").length;
+  // Filtered study groups for teacher
+  const filteredTeacherGroups = useMemo(() => {
+    return studyGroups.filter((g) => {
+      const matchQuery =
+        !groupSearchQuery.trim() ||
+        g.name.toLowerCase().includes(groupSearchQuery.toLowerCase()) ||
+        g.subject.toLowerCase().includes(groupSearchQuery.toLowerCase()) ||
+        g.activeTopic.toLowerCase().includes(groupSearchQuery.toLowerCase());
+      return matchQuery;
+    });
+  }, [studyGroups, groupSearchQuery]);
 
+  const handleOpenCreateGroup = () => {
+    setGroupFormData(initialGroupForm);
+    setIsCreateGroupModalOpen(true);
+  };
+
+  const handleSaveCreateGroup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!groupFormData.name.trim()) {
+      showToast("Please enter a study group title!");
+      return;
+    }
+    const newGroup: ConnectStudyGroup = {
+      id: `cg_${Date.now()}`,
+      teacherId: currentUser.id || "ct_01",
+      teacherName: currentUser.name || "Ms. Kavitha Rajan",
+      name: groupFormData.name.trim(),
+      subject: groupFormData.subject,
+      description: groupFormData.description.trim() || "Exclusive study circle for enrolled students to discuss past papers and solve doubts.",
+      membersCount: 1,
+      maxMembers: Number(groupFormData.maxMembers) || 80,
+      activeTopic: groupFormData.activeTopic.trim() || "General Paper Discussion",
+      schedule: groupFormData.schedule.trim() || "Weekly Evening Session",
+      meetUrl: groupFormData.meetUrl.trim() || "https://meet.google.com/circle-live",
+      isJoined: true,
+      color: "from-purple-500/10 to-indigo-500/5"
+    };
+    setStudyGroups((prev) => [newGroup, ...prev]);
+    setIsCreateGroupModalOpen(false);
+    showToast(`Study Group "${newGroup.name}" created! Available exclusively to your subscribed students.`);
+  };
+
+  const handleOpenEditGroup = (group: ConnectStudyGroup) => {
+    setEditingGroup(group);
+    setGroupFormData({
+      name: group.name,
+      subject: group.subject,
+      activeTopic: group.activeTopic,
+      schedule: group.schedule,
+      meetUrl: group.meetUrl || "https://meet.google.com/circle-live",
+      maxMembers: group.maxMembers,
+      description: group.description
+    });
+    setIsEditGroupModalOpen(true);
+  };
+
+  const handleSaveEditGroup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingGroup) return;
+    setStudyGroups((prev) =>
+      prev.map((g) =>
+        g.id === editingGroup.id
+          ? {
+              ...g,
+              name: groupFormData.name.trim(),
+              subject: groupFormData.subject,
+              activeTopic: groupFormData.activeTopic.trim(),
+              schedule: groupFormData.schedule.trim(),
+              meetUrl: groupFormData.meetUrl.trim(),
+              maxMembers: Number(groupFormData.maxMembers) || 80,
+              description: groupFormData.description.trim()
+            }
+          : g
+      )
+    );
+    setIsEditGroupModalOpen(false);
+    setEditingGroup(null);
+    showToast("Study Group updated successfully!");
+  };
+
+  const handleConfirmDeleteGroup = () => {
+    if (!deletingGroup) return;
+    setStudyGroups((prev) => prev.filter((g) => g.id !== deletingGroup.id));
+    setDeletingGroup(null);
+    showToast("Study Group deleted.");
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-16">
@@ -254,10 +563,44 @@ export function TeacherConnectView() {
       {/* Teacher Connect Navigation Tabs */}
       <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-white/80 backdrop-blur-md border border-[#c4e9e0] shadow-xs">
         <button
+          onClick={() => setActiveTab("packages")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "packages"
+              ? "bg-[#0d5c4d] text-white shadow-xs font-black"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          }`}
+        >
+          <Package className="h-4 w-4" />
+          <span>Fee Packages (கட்டணப் பேக்கேஜ்கள்)</span>
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+            activeTab === "packages" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+          }`}>
+            {packages.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("groups")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "groups"
+              ? "bg-[#0d5c4d] text-white shadow-xs font-black"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          }`}
+        >
+          <Users2 className="h-4 w-4" />
+          <span>Study Groups (கல்விக் குழுக்கள்)</span>
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+            activeTab === "groups" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+          }`}>
+            {studyGroups.length}
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveTab("subscribers")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === "subscribers"
-              ? "bg-[#0d5c4d] text-white shadow-xs"
+              ? "bg-[#0d5c4d] text-white shadow-xs font-black"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
           }`}
         >
@@ -274,7 +617,7 @@ export function TeacherConnectView() {
           onClick={() => setActiveTab("slips")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === "slips"
-              ? "bg-[#0d5c4d] text-white shadow-xs"
+              ? "bg-[#0d5c4d] text-white shadow-xs font-black"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
           }`}
         >
@@ -286,12 +629,388 @@ export function TeacherConnectView() {
             </span>
           )}
         </button>
-
-
       </div>
 
       {/* =================================================================== */}
-      {/* TAB 1: SUBSCRIBED STUDENTS LIST (The Core Teacher Connect Feature)  */}
+      {/* TAB 0: TUITION FEE PACKAGES CRUD (கட்டணப் பேக்கேஜ்கள் மேலாண்மை)     */}
+      {/* =================================================================== */}
+      {activeTab === "packages" && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          {/* Header Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-extrabold text-[#0d2b26]">Tuition &amp; Course Fee Packages</h3>
+                <span className="px-2 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-extrabold border border-[#c4e9e0]">
+                  CRUD Studio
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Configure student monthly subscription tiers, pricing, live class schedules, and included perks.
+              </p>
+            </div>
+
+            <Button
+              onClick={handleOpenCreatePackage}
+              className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create New Package</span>
+            </Button>
+          </div>
+
+          {/* Quick Metrics & Search Toolbar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
+            <div className="relative flex-1 max-w-md">
+              <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search packages by title, subject, or grade..."
+                value={packageSearchQuery}
+                onChange={(e) => setPackageSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:bg-white transition-all"
+              />
+            </div>
+
+            <div className="flex items-center gap-2.5 shrink-0">
+              <span className="text-xs text-slate-500 font-bold flex items-center gap-1">
+                <Filter className="h-3.5 w-3.5" /> Status:
+              </span>
+              <select
+                value={packageStatusFilter}
+                onChange={(e) => setPackageStatusFilter(e.target.value as any)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="all">All Packages ({packages.length})</option>
+                <option value="active">Active Only ({packages.filter((p) => p.status === "active").length})</option>
+                <option value="draft">Drafts ({packages.filter((p) => p.status === "draft").length})</option>
+              </select>
+
+              <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-slate-200 text-xs font-bold text-slate-600">
+                <span>Revenue:</span>
+                <span className="text-[#0d5c4d] font-black">LKR {totalPackageRevenue.toLocaleString()} / mo</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Packages Grid */}
+          {filteredPackages.length === 0 ? (
+            <Card className="p-12 text-center border-dashed border-2 border-slate-200 bg-white/60">
+              <Package className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <h4 className="text-sm font-bold text-slate-800">No Packages Found</h4>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                No fee packages matching your filter criteria. Create a new package to start accepting student subscriptions.
+              </p>
+              <Button
+                onClick={handleOpenCreatePackage}
+                className="mt-4 bg-[#0d5c4d] text-white text-xs font-bold"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> Create Package
+              </Button>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredPackages.map((pkg) => (
+                <Card
+                  key={pkg.id}
+                  className="border-[#e6ece8] bg-white hover:border-[#0d5c4d]/50 hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group"
+                >
+                  <CardHeader className="p-5 pb-3 border-b border-slate-100/80 bg-gradient-to-b from-[#f8faf9] to-white">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {pkg.badge && (
+                          <span className="px-2 py-0.5 rounded-full bg-[#fef7e6] text-[#b47a16] border border-[#fde4af] text-[10px] font-black uppercase tracking-wider">
+                            ★ {pkg.badge}
+                          </span>
+                        )}
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
+                            pkg.status === "active"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}
+                        >
+                          {pkg.status}
+                        </span>
+                      </div>
+
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {pkg.createdAt}
+                      </span>
+                    </div>
+
+                    <CardTitle className="text-base font-extrabold text-[#0d2b26] group-hover:text-[#0d5c4d] transition-colors leading-snug">
+                      {pkg.title}
+                    </CardTitle>
+                    <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                      {pkg.subject} &bull; <span className="text-slate-600">{pkg.grade}</span>
+                    </p>
+                  </CardHeader>
+
+                  <CardContent className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                    {/* Price Banner */}
+                    <div className="p-3.5 rounded-2xl bg-[#ecf8f5]/70 border border-[#c4e9e0] flex items-baseline justify-between">
+                      <div>
+                        <span className="text-xs text-[#0d5c4d] font-bold block">Tuition Fee</span>
+                        <span className="text-2xl font-black text-[#0d5c4d] tracking-tight">
+                          LKR {pkg.monthlyFeeLkr.toLocaleString()}
+                        </span>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-800 bg-white/80 px-2 py-1 rounded-lg border border-[#c4e9e0]">
+                        {pkg.billingCycle}
+                      </span>
+                    </div>
+
+                    {/* Live Classes Frequency */}
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                      <Video className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                      <span>{pkg.liveClassesPerWeek} Live Interactive Lectures / Week</span>
+                    </div>
+
+                    {/* Description */}
+                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                      {pkg.description}
+                    </p>
+
+                    {/* Features Checklist */}
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        Included Student Perks:
+                      </p>
+                      <ul className="space-y-1 text-xs text-slate-700">
+                        {pkg.features.slice(0, 4).map((perk, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                            <span className="line-clamp-1">{perk}</span>
+                          </li>
+                        ))}
+                        {pkg.features.length > 4 && (
+                          <li className="text-[11px] text-[#0d5c4d] font-bold pl-5">
+                            +{pkg.features.length - 4} more benefits
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+
+                    {/* Bottom Enrollment & Revenue Stats */}
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                        <Users className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                        <span>{pkg.enrolledCount} Subscribed</span>
+                      </div>
+                      <div className="font-mono font-bold text-[#0d5c4d]">
+                        LKR {(pkg.enrolledCount * pkg.monthlyFeeLkr).toLocaleString()} / mo
+                      </div>
+                    </div>
+
+                    {/* Actions Toolbar */}
+                    <div className="pt-2 flex items-center gap-1.5 border-t border-slate-100">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenEditPackage(pkg)}
+                        className="flex-1 border-slate-200 hover:border-[#0d5c4d] hover:bg-[#ecf8f5] text-[#0d5c4d] text-xs font-bold cursor-pointer"
+                        title="Edit Package Details"
+                      >
+                        <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDuplicatePackage(pkg)}
+                        className="border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold cursor-pointer"
+                        title="Duplicate as Draft"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleTogglePackageStatus(pkg.id)}
+                        className={`text-xs font-bold cursor-pointer border ${
+                          pkg.status === "active"
+                            ? "border-amber-200 text-amber-700 hover:bg-amber-50"
+                            : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                        }`}
+                        title={pkg.status === "active" ? "Switch to Draft" : "Publish to Students"}
+                      >
+                        {pkg.status === "active" ? "Pause" : "Publish"}
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenDeletePackage(pkg)}
+                        className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 text-xs font-bold cursor-pointer"
+                        title="Delete Package"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* TAB 1: TEACHER STUDY GROUPS CRUD (மாணவர் கல்விக் குழுக்கள் மேலாண்மை)*/}
+      {/* =================================================================== */}
+      {activeTab === "groups" && (
+        <div className="space-y-5 animate-in fade-in duration-200">
+          {/* Header Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-extrabold text-[#0d2b26]">Teacher Study Circles &amp; Doubt Groups</h3>
+                <span className="px-2 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-extrabold border border-[#c4e9e0]">
+                  Exclusive to Subscribed Students
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Create and host collaborative discussion circles, past paper breakdowns, and live problem-solving for your enrolled students.
+              </p>
+            </div>
+
+            <Button
+              onClick={handleOpenCreateGroup}
+              className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs px-4 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create New Study Circle</span>
+            </Button>
+          </div>
+
+          {/* Search Toolbar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
+            <div className="relative flex-1 max-w-md">
+              <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search study circles by title, subject, or current topic..."
+                value={groupSearchQuery}
+                onChange={(e) => setGroupSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:bg-white transition-all"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+              <span className="text-slate-400">Total Circles:</span>
+              <span className="text-[#0d5c4d] font-black">{studyGroups.length}</span>
+            </div>
+          </div>
+
+          {/* Groups Grid */}
+          {filteredTeacherGroups.length === 0 ? (
+            <Card className="p-12 text-center border-dashed border-2 border-slate-200 bg-white/60">
+              <Users2 className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <h4 className="text-sm font-bold text-slate-800">No Study Circles Found</h4>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                You haven&apos;t created any study groups yet. Create one to let your subscribed students discuss weekly questions and past paper doubts.
+              </p>
+              <Button
+                onClick={handleOpenCreateGroup}
+                className="mt-4 bg-[#0d5c4d] text-white text-xs font-bold"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> Create Study Circle
+              </Button>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredTeacherGroups.map((group) => (
+                <Card
+                  key={group.id}
+                  className="border-[#e6ece8] bg-white hover:border-[#0d5c4d]/50 hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group"
+                >
+                  <CardHeader className="p-5 pb-3 border-b border-slate-100/80 bg-gradient-to-b from-[#f8faf9] to-white">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="px-2.5 py-0.5 rounded-md bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-extrabold uppercase">
+                        {group.subject}
+                      </span>
+                      <span className="text-xs font-bold text-slate-500">
+                        {group.membersCount} / {group.maxMembers} Students
+                      </span>
+                    </div>
+
+                    <CardTitle className="text-base font-black text-[#0d2b26] leading-snug">
+                      {group.name}
+                    </CardTitle>
+                    <p className="text-xs text-slate-600 line-clamp-2 mt-1 leading-relaxed">
+                      {group.description}
+                    </p>
+                  </CardHeader>
+
+                  <CardContent className="p-5 pt-3 space-y-4">
+                    {/* Live Topic & Schedule Details */}
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5 text-xs">
+                      <p className="font-bold text-slate-700 flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                        <span className="text-slate-500 font-medium">Topic:</span>{" "}
+                        <span className="text-slate-900 truncate">{group.activeTopic}</span>
+                      </p>
+                      <p className="text-slate-600 flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span className="text-slate-500 font-medium">Schedule:</span>{" "}
+                        <span className="truncate">{group.schedule}</span>
+                      </p>
+                    </div>
+
+                    {/* Security Notice */}
+                    <div className="flex items-center gap-1.5 text-[10px] text-emerald-800 bg-[#ecf8f5] px-2.5 py-1.5 rounded-lg font-bold">
+                      <Lock className="h-3 w-3 text-[#0d5c4d]" />
+                      <span>Only your subscribed students can access</span>
+                    </div>
+
+                    {/* Actions Row */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                      {group.meetUrl && (
+                        <a
+                          href={group.meetUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs transition-colors"
+                        >
+                          <Video className="h-3.5 w-3.5" />
+                          <span>Launch Meet</span>
+                          <ExternalLink className="h-3 w-3 opacity-80" />
+                        </a>
+                      )}
+
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenEditGroup(group)}
+                          className="border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold cursor-pointer"
+                          title="Edit Circle"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setDeletingGroup(group)}
+                          className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300 text-xs font-bold cursor-pointer"
+                          title="Delete Circle"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* TAB 2: SUBSCRIBED STUDENTS LIST (The Core Teacher Connect Feature)  */}
       {/* =================================================================== */}
       {activeTab === "subscribers" && (
         <div className="space-y-4">
@@ -590,6 +1309,750 @@ export function TeacherConnectView() {
                 className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold shadow-xs cursor-pointer"
               >
                 <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve &amp; Activate
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+      {/* =================================================================== */}
+      {/* MODAL 1: CREATE NEW TUITION PACKAGE                                 */}
+      {/* =================================================================== */}
+      <Modal
+        isOpen={isCreatePackageModalOpen}
+        onClose={() => setIsCreatePackageModalOpen(false)}
+        title="Create New Tuition Package"
+        description="Set up a new subscription tier with custom pricing, live lectures schedule, and student perks."
+      >
+        <form onSubmit={handleSaveCreatePackage} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Package Title <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. A/L Combined Mathematics Full Masterclass"
+              value={packageFormData.title}
+              onChange={(e) => setPackageFormData({ ...packageFormData, title: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d] focus:bg-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Subject</label>
+              <select
+                value={packageFormData.subject}
+                onChange={(e) => setPackageFormData({ ...packageFormData, subject: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="Combined Mathematics">Combined Mathematics</option>
+                <option value="Pure Mathematics">Pure Mathematics</option>
+                <option value="Applied Mathematics">Applied Mathematics</option>
+                <option value="Physics">Physics</option>
+                <option value="Chemistry">Chemistry</option>
+                <option value="Biology">Biology</option>
+                <option value="Information Technology (ICT)">Information Technology (ICT)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Target Grade</label>
+              <select
+                value={packageFormData.grade}
+                onChange={(e) => setPackageFormData({ ...packageFormData, grade: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="Grade 12 & 13 (A/L)">Grade 12 &amp; 13 (A/L)</option>
+                <option value="Grade 12 (A/L)">Grade 12 (A/L)</option>
+                <option value="Grade 13 (A/L)">Grade 13 (A/L)</option>
+                <option value="Grade 11 (O/L)">Grade 11 (O/L)</option>
+                <option value="Grade 10">Grade 10</option>
+                <option value="A/L Revision">A/L Revision</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Fee (LKR) <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="500"
+                step="100"
+                required
+                value={packageFormData.monthlyFeeLkr}
+                onChange={(e) => setPackageFormData({ ...packageFormData, monthlyFeeLkr: Number(e.target.value) })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-bold focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Billing Cycle</label>
+              <select
+                value={packageFormData.billingCycle}
+                onChange={(e) => setPackageFormData({ ...packageFormData, billingCycle: e.target.value as any })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="Monthly">Monthly</option>
+                <option value="Term (3 Months)">Term (3 Months)</option>
+                <option value="Full Syllabus Pass">Full Syllabus Pass</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Live Classes / Wk</label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={packageFormData.liveClassesPerWeek}
+                onChange={(e) => setPackageFormData({ ...packageFormData, liveClassesPerWeek: Number(e.target.value) })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-bold focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Highlight Badge (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Most Popular, Best Value"
+                value={packageFormData.badge}
+                onChange={(e) => setPackageFormData({ ...packageFormData, badge: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Initial Status</label>
+              <select
+                value={packageFormData.status}
+                onChange={(e) => setPackageFormData({ ...packageFormData, status: e.target.value as any })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-bold focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="active">Active (Published to Marketplace)</option>
+                <option value="draft">Draft (Private / Coming Soon)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Course Overview Description</label>
+            <textarea
+              rows={2}
+              placeholder="Explain the curriculum depth, exam techniques, and outcomes students will receive..."
+              value={packageFormData.description}
+              onChange={(e) => setPackageFormData({ ...packageFormData, description: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d] focus:bg-white resize-none"
+            />
+          </div>
+
+          {/* Student Perks / Features Manager */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Included Student Perks</label>
+            <div className="space-y-2 mb-2 max-h-36 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200">
+              {packageFormData.features.map((perk, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 p-1.5 px-2.5 rounded-lg bg-white border border-slate-200 text-xs">
+                  <span className="flex items-center gap-1.5 text-slate-800">
+                    <Check className="h-3 w-3 text-emerald-600 shrink-0" />
+                    <span className="line-clamp-1">{perk}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePerk(i)}
+                    className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer"
+                    title="Remove Perk"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Add custom perk (e.g. Weekly Model Paper Discussion)..."
+                value={newPerkInput}
+                onChange={(e) => setNewPerkInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddPerk();
+                  }
+                }}
+                className="flex-1 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddPerk}
+                className="text-xs font-bold text-[#0d5c4d] border-[#c4e9e0] hover:bg-[#ecf8f5] cursor-pointer shrink-0"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Perk
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCreatePackageModalOpen(false)}
+              className="text-xs font-bold"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold px-4 shadow-xs cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Publish Package
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* =================================================================== */}
+      {/* MODAL 2: EDIT TUITION PACKAGE                                       */}
+      {/* =================================================================== */}
+      <Modal
+        isOpen={isEditPackageModalOpen}
+        onClose={() => {
+          setIsEditPackageModalOpen(false);
+          setEditingPackage(null);
+        }}
+        title="Edit Tuition Package"
+        description="Update pricing, live lecture frequency, and curriculum perks for this tier."
+      >
+        <form onSubmit={handleSaveEditPackage} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Package Title <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={packageFormData.title}
+              onChange={(e) => setPackageFormData({ ...packageFormData, title: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d] focus:bg-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Subject</label>
+              <select
+                value={packageFormData.subject}
+                onChange={(e) => setPackageFormData({ ...packageFormData, subject: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="Combined Mathematics">Combined Mathematics</option>
+                <option value="Pure Mathematics">Pure Mathematics</option>
+                <option value="Applied Mathematics">Applied Mathematics</option>
+                <option value="Physics">Physics</option>
+                <option value="Chemistry">Chemistry</option>
+                <option value="Biology">Biology</option>
+                <option value="Information Technology (ICT)">Information Technology (ICT)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Target Grade</label>
+              <select
+                value={packageFormData.grade}
+                onChange={(e) => setPackageFormData({ ...packageFormData, grade: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="Grade 12 & 13 (A/L)">Grade 12 &amp; 13 (A/L)</option>
+                <option value="Grade 12 (A/L)">Grade 12 (A/L)</option>
+                <option value="Grade 13 (A/L)">Grade 13 (A/L)</option>
+                <option value="Grade 11 (O/L)">Grade 11 (O/L)</option>
+                <option value="Grade 10">Grade 10</option>
+                <option value="A/L Revision">A/L Revision</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Fee (LKR) <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="500"
+                step="100"
+                required
+                value={packageFormData.monthlyFeeLkr}
+                onChange={(e) => setPackageFormData({ ...packageFormData, monthlyFeeLkr: Number(e.target.value) })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-bold focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Billing Cycle</label>
+              <select
+                value={packageFormData.billingCycle}
+                onChange={(e) => setPackageFormData({ ...packageFormData, billingCycle: e.target.value as any })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="Monthly">Monthly</option>
+                <option value="Term (3 Months)">Term (3 Months)</option>
+                <option value="Full Syllabus Pass">Full Syllabus Pass</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Live Classes / Wk</label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={packageFormData.liveClassesPerWeek}
+                onChange={(e) => setPackageFormData({ ...packageFormData, liveClassesPerWeek: Number(e.target.value) })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-bold focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Highlight Badge</label>
+              <input
+                type="text"
+                placeholder="e.g. Most Popular"
+                value={packageFormData.badge}
+                onChange={(e) => setPackageFormData({ ...packageFormData, badge: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Status</label>
+              <select
+                value={packageFormData.status}
+                onChange={(e) => setPackageFormData({ ...packageFormData, status: e.target.value as any })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-bold focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="active">Active (Published)</option>
+                <option value="draft">Draft (Private)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Course Description</label>
+            <textarea
+              rows={2}
+              value={packageFormData.description}
+              onChange={(e) => setPackageFormData({ ...packageFormData, description: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d] focus:bg-white resize-none"
+            />
+          </div>
+
+          {/* Perks list */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Included Student Perks</label>
+            <div className="space-y-2 mb-2 max-h-36 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200">
+              {packageFormData.features.map((perk, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 p-1.5 px-2.5 rounded-lg bg-white border border-slate-200 text-xs">
+                  <span className="flex items-center gap-1.5 text-slate-800">
+                    <Check className="h-3 w-3 text-emerald-600 shrink-0" />
+                    <span className="line-clamp-1">{perk}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePerk(i)}
+                    className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Add perk..."
+                value={newPerkInput}
+                onChange={(e) => setNewPerkInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddPerk();
+                  }
+                }}
+                className="flex-1 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddPerk}
+                className="text-xs font-bold text-[#0d5c4d] border-[#c4e9e0] hover:bg-[#ecf8f5] cursor-pointer shrink-0"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsEditPackageModalOpen(false);
+                setEditingPackage(null);
+              }}
+              className="text-xs font-bold"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold px-4 shadow-xs cursor-pointer"
+            >
+              <Check className="h-3.5 w-3.5 mr-1" /> Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* =================================================================== */}
+      {/* MODAL 3: DELETE PACKAGE CONFIRMATION                                */}
+      {/* =================================================================== */}
+      <Modal
+        isOpen={!!deletingPackage}
+        onClose={() => setDeletingPackage(null)}
+        title="Delete Tuition Package"
+        description="Are you sure you want to remove this tuition subscription package?"
+      >
+        {deletingPackage && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-1">
+              <p className="font-bold text-sm">Deleting &quot;{deletingPackage.title}&quot;</p>
+              <p className="text-slate-600">
+                Fee: LKR {deletingPackage.monthlyFeeLkr.toLocaleString()} / month &bull; {deletingPackage.enrolledCount} enrolled students
+              </p>
+              <p className="text-rose-700 font-semibold pt-1">
+                Existing active students will keep access until their current billing period expires, but no new students will be able to subscribe.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setDeletingPackage(null)}
+                className="text-xs font-bold"
+              >
+                Keep Package
+              </Button>
+              <Button
+                onClick={handleConfirmDeletePackage}
+                className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Yes, Delete Package
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* =================================================================== */}
+      {/* MODAL 4: CREATE STUDY CIRCLE                                        */}
+      {/* =================================================================== */}
+      <Modal
+        isOpen={isCreateGroupModalOpen}
+        onClose={() => setIsCreateGroupModalOpen(false)}
+        title="Create Student Study Circle"
+        description="Launch an exclusive peer discussion group for your enrolled students."
+      >
+        <form onSubmit={handleSaveCreateGroup} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Circle Title <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. A/L 2026 Combined Maths Doubt Clearance Circle"
+              value={groupFormData.name}
+              onChange={(e) => setGroupFormData({ ...groupFormData, name: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d] focus:bg-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Subject</label>
+              <select
+                value={groupFormData.subject}
+                onChange={(e) => setGroupFormData({ ...groupFormData, subject: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="Combined Mathematics">Combined Mathematics</option>
+                <option value="Physics">Physics</option>
+                <option value="Chemistry">Chemistry</option>
+                <option value="Biology">Biology</option>
+                <option value="Information & Communication Technology">Information & Communication Technology</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Max Capacity (Students)</label>
+              <input
+                type="number"
+                min="10"
+                max="250"
+                value={groupFormData.maxMembers}
+                onChange={(e) => setGroupFormData({ ...groupFormData, maxMembers: Number(e.target.value) })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-bold focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Current Focus Topic <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Differential Equations & Applied Mechanics past paper questions"
+              value={groupFormData.activeTopic}
+              onChange={(e) => setGroupFormData({ ...groupFormData, activeTopic: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d] focus:bg-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Weekly Schedule</label>
+              <input
+                type="text"
+                placeholder="e.g. Every Tue & Thu · 7:30 PM - 9:00 PM"
+                value={groupFormData.schedule}
+                onChange={(e) => setGroupFormData({ ...groupFormData, schedule: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Discussion Meet / Channel Link</label>
+              <input
+                type="url"
+                placeholder="https://meet.google.com/..."
+                value={groupFormData.meetUrl}
+                onChange={(e) => setGroupFormData({ ...groupFormData, meetUrl: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Circle Description</label>
+            <textarea
+              rows={2}
+              placeholder="Brief description of circle objectives, questions to prepare, and guidelines."
+              value={groupFormData.description}
+              onChange={(e) => setGroupFormData({ ...groupFormData, description: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d] focus:bg-white resize-none"
+            />
+          </div>
+
+          {/* Security policy notice */}
+          <div className="p-3 rounded-xl bg-[#ecf8f5] border border-[#a5f3df] text-[11px] text-[#0d5c4d] flex items-start gap-2">
+            <Lock className="h-4 w-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-extrabold">Subscriber Security Policy</p>
+              <p className="text-slate-600">
+                Only students with an active paid subscription to your packages can join this study circle and view the meeting room.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCreateGroupModalOpen(false)}
+              className="text-xs font-bold"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold px-4 shadow-xs cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Create Study Circle
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* =================================================================== */}
+      {/* MODAL 5: EDIT STUDY CIRCLE                                          */}
+      {/* =================================================================== */}
+      <Modal
+        isOpen={isEditGroupModalOpen}
+        onClose={() => {
+          setIsEditGroupModalOpen(false);
+          setEditingGroup(null);
+        }}
+        title="Edit Study Circle"
+        description="Update your discussion circle's topic, schedule, and live meeting room."
+      >
+        <form onSubmit={handleSaveEditGroup} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Circle Title <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={groupFormData.name}
+              onChange={(e) => setGroupFormData({ ...groupFormData, name: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d] focus:bg-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Subject</label>
+              <select
+                value={groupFormData.subject}
+                onChange={(e) => setGroupFormData({ ...groupFormData, subject: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="Combined Mathematics">Combined Mathematics</option>
+                <option value="Physics">Physics</option>
+                <option value="Chemistry">Chemistry</option>
+                <option value="Biology">Biology</option>
+                <option value="Information & Communication Technology">Information & Communication Technology</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Max Capacity (Students)</label>
+              <input
+                type="number"
+                min="10"
+                max="250"
+                value={groupFormData.maxMembers}
+                onChange={(e) => setGroupFormData({ ...groupFormData, maxMembers: Number(e.target.value) })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-bold focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Current Focus Topic <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={groupFormData.activeTopic}
+              onChange={(e) => setGroupFormData({ ...groupFormData, activeTopic: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d] focus:bg-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Weekly Schedule</label>
+              <input
+                type="text"
+                value={groupFormData.schedule}
+                onChange={(e) => setGroupFormData({ ...groupFormData, schedule: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Discussion Meet Link</label>
+              <input
+                type="url"
+                value={groupFormData.meetUrl}
+                onChange={(e) => setGroupFormData({ ...groupFormData, meetUrl: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Circle Description</label>
+            <textarea
+              rows={2}
+              value={groupFormData.description}
+              onChange={(e) => setGroupFormData({ ...groupFormData, description: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d] focus:bg-white resize-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsEditGroupModalOpen(false);
+                setEditingGroup(null);
+              }}
+              className="text-xs font-bold"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold px-4 shadow-xs cursor-pointer"
+            >
+              <Check className="h-3.5 w-3.5 mr-1" /> Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* =================================================================== */}
+      {/* MODAL 6: DELETE STUDY CIRCLE CONFIRMATION                           */}
+      {/* =================================================================== */}
+      <Modal
+        isOpen={!!deletingGroup}
+        onClose={() => setDeletingGroup(null)}
+        title="Delete Study Circle"
+        description="Are you sure you want to remove this collaborative study circle?"
+      >
+        {deletingGroup && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-1">
+              <p className="font-bold text-sm">Deleting &quot;{deletingGroup.name}&quot;</p>
+              <p className="text-slate-600">
+                Subject: {deletingGroup.subject} &bull; {deletingGroup.membersCount} students joined
+              </p>
+              <p className="text-rose-700 font-semibold pt-1">
+                Students will no longer have access to this circle room.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setDeletingGroup(null)}
+                className="text-xs font-bold"
+              >
+                Keep Circle
+              </Button>
+              <Button
+                onClick={handleConfirmDeleteGroup}
+                className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Yes, Delete Circle
               </Button>
             </div>
           </div>

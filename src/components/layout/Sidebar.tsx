@@ -34,6 +34,9 @@ import {
   Sliders,
   CreditCard,
   Shield,
+  Package,
+  UserCheck,
+  Globe,
   X
 } from "lucide-react";
 
@@ -91,13 +94,13 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
   const rawStudentNav: NavItem[] = [
     // Core Learning Group
     { id: "dashboard", label: t.nav.dashboard, icon: Home, group: "Core Learning" },
-    ...(isFeatureEnabled("tuition_subscriptions") || isFeatureEnabled("bank_slip_approvals")
+    ...(isFeatureEnabled("tuition_subscriptions") && isFeatureEnabled("find_teachers")
       ? [
           {
             id: "connect",
-            label: "Connect",
-            icon: Link2,
-            badge: "Classes",
+            label: "Find Teachers",
+            icon: GraduationCap,
+            badge: "Tutors",
             badgeVariant: "gold" as const,
             group: "Core Learning"
           }
@@ -148,38 +151,28 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
         ]
       : []),
 
-    // Campus Life Group (Filtered by feature flags)
-    ...((isFeatureEnabled("campus_sports") ||
-    isFeatureEnabled("campus_events") ||
-    isFeatureEnabled("campus_announcements"))
-      ? [
-          {
-            id: "school_life",
-            label: t.nav.schoolLife || "School Life",
-            icon: Trophy,
-            group: "Campus Life",
-            children: [
-              ...(isFeatureEnabled("campus_sports") ? [{ id: "sports", label: "Sports", icon: Trophy }] : []),
-              ...(isFeatureEnabled("campus_events") ? [{ id: "events", label: "Events", icon: Calendar }] : []),
-              ...(isFeatureEnabled("campus_announcements")
-                ? [{ id: "announcements", label: "Announcements", icon: Bell }]
-                : [])
-            ]
-          }
-        ]
-      : []),
+    // Sports & Tournaments (Always Available for Students)
+    {
+      id: "sports",
+      label: "Sports Tournaments & Leagues",
+      icon: Trophy,
+      badge: "League",
+      badgeVariant: "gold" as const,
+      group: "Sports & Academy"
+    },
 
     // Account & Profile
     { id: "profile", label: "My Profile", icon: User, group: "Personal Account" }
   ];
 
   const rawTeacherNav: NavItem[] = [
-    { id: "dashboard", label: t.nav.dashboard, icon: Home, group: "Teaching Studio" },
+    { id: "dashboard", label: "Tutor Studio Overview", icon: Home, group: "Teaching Studio" },
+
     ...(isFeatureEnabled("live_broadcast_studio")
       ? [
           {
             id: "live_schedule",
-            label: "Live Schedule",
+            label: "Live Video Classes",
             icon: Video,
             badge: "Live",
             badgeVariant: "default" as const,
@@ -191,16 +184,16 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
       ? [
           {
             id: "connect",
-            label: "Connect Hub",
-            icon: Link2,
-            badge: "Subscribers",
+            label: "Packages & Subscribers",
+            icon: Package,
+            badge: "Packages",
             badgeVariant: "gold" as const,
             group: "Teaching Studio"
           }
         ]
       : []),
     ...(isFeatureEnabled("syllabus_builder")
-      ? [{ id: "syllabus", label: t.nav.syllabus, icon: Layers, group: "Teaching Studio" }]
+      ? [{ id: "syllabus", label: "Packages & Syllabus", icon: Layers, group: "Teaching Studio" }]
       : []),
     ...(isFeatureEnabled("assignments_grading")
       ? [
@@ -219,43 +212,86 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
       ? [
           {
             id: "library",
-            label: "Library Resources",
+            label: "Past Papers & Tutes",
             icon: Library,
             badge: "Author",
             badgeVariant: "gold" as const,
             group: "Assessments & Review"
           }
         ]
-      : [])
+      : []),
+    // Sports & Championship Registrations
+    {
+      id: "sports_admin",
+      label: "Sports & Championship",
+      icon: Trophy,
+      badge: "Meet",
+      badgeVariant: "gold" as const,
+      group: "Teaching Studio"
+    },
+    // Personal Account & Studio Profile
+    { id: "profile", label: "Tutor Profile & Studio", icon: User, group: "Personal Account" }
   ];
 
   const adminNav: NavItem[] = [
-    { id: "dashboard", label: t.admin.dashboard, icon: Home, group: "Administration" },
+    { id: "dashboard", label: "Tutor Admin Overview", icon: Home, group: "Tutor Operations" },
+    ...(isFeatureEnabled("batch_management")
+      ? [
+          {
+            id: "classes",
+            label: "Batches & Attendance",
+            icon: Users,
+            badge: "Active",
+            badgeVariant: "gold" as const,
+            group: "Tutor Operations"
+          },
+          {
+            id: "announcements",
+            label: "Class Notices & Alerts",
+            icon: Bell,
+            group: "Tutor Operations"
+          }
+        ]
+      : []),
+    ...(isFeatureEnabled("tuition_subscriptions")
+      ? [
+          {
+            id: "users",
+            label: "Student Directory & Billing",
+            icon: UserCheck,
+            badge: "Paid",
+            badgeVariant: "default" as const,
+            group: "Tuition & Billing"
+          },
+          {
+            id: "connect_admin",
+            label: "Tuition Fees & Bank Slips",
+            icon: CreditCard,
+            group: "Tuition & Billing"
+          }
+        ]
+      : []),
+    ...(isFeatureEnabled("tutor_branding")
+      ? [
+          {
+            id: "admin_settings",
+            label: "Branding, Domain & WhatsApp",
+            icon: Globe,
+            badge: "Custom Domain",
+            badgeVariant: "gold" as const,
+            group: "Tutor Branding"
+          }
+        ]
+      : []),
+    // Sports & Championship Registrations Admin Desk
     {
-      id: "manage_staff",
-      label: t.admin.manageStaff,
-      icon: Users,
-      group: "Administration",
-      children: [
-        { id: "staff_teachers", label: t.admin.teachers, icon: GraduationCap },
-        { id: "staff_coaches", label: t.admin.coaches, icon: Trophy }
-      ]
-    },
-    { id: "curriculum", label: t.admin.subjectCurriculum, icon: BookOpen, group: "Administration" },
-    { id: "users", label: t.admin.userDirectory, icon: Users, group: "Administration" },
-    {
-      id: "campus_operations",
-      label: t.admin.campusOperations,
-      icon: Building2,
-      group: "Administration",
-      children: [
-        { id: "sports_admin", label: t.admin.sports, icon: Trophy },
-        { id: "events_admin", label: t.admin.events, icon: Calendar },
-        { id: "timetable_admin", label: "Timetable", icon: Calendar },
-        { id: "announcements", label: t.admin.announcements, icon: Bell }
-      ]
-    },
-    { id: "admin_settings", label: t.admin.profileSettings, icon: Settings, group: "Administration" }
+      id: "sports_admin",
+      label: "Sports & Athlete Registrations",
+      icon: Trophy,
+      badge: "Championship",
+      badgeVariant: "gold" as const,
+      group: "Campus & Sports"
+    }
   ];
 
   const superAdminNav: NavItem[] = [
@@ -287,9 +323,18 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
 
   const parentNav: NavItem[] = [
     { id: "dashboard", label: "Parent Overview", icon: Home, group: "Parent Portal" },
+    {
+      id: "connect",
+      label: "Find Teachers",
+      icon: GraduationCap,
+      badge: "Tutors",
+      badgeVariant: "gold" as const,
+      group: "Learning & Tutors"
+    },
     { id: "report_card", label: "Term Report Cards", icon: Award, group: "Academic Tracking" },
-    { id: "exams", label: "Exam Schedules & Timetables", icon: FileText, badge: "Upcoming", badgeVariant: "warning", group: "Academic Tracking" },
-    { id: "circulars", label: "School Circulars", icon: Bell, badge: "3 New", badgeVariant: "default", group: "Communication" }
+    { id: "exams", label: "Exam Schedules & Timetables", icon: FileText, badge: "Upcoming", badgeVariant: "warning" as const, group: "Academic Tracking" },
+    { id: "sports", label: "Sports Tournaments", icon: Trophy, group: "Campus & Sports" },
+    { id: "circulars", label: "School Circulars", icon: Bell, badge: "3 New", badgeVariant: "default" as const, group: "Communication" }
   ];
 
   const currentNavItems: NavItem[] = {

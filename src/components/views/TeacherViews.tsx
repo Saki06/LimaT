@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import {
   BookOpen,
@@ -51,7 +51,7 @@ import {
   Tooltip,
   CartesianGrid
 } from "recharts";
-import { Assignment } from "@/types/lms";
+import { Assignment, Course, Announcement } from "@/types/lms";
 
 interface TeacherViewsProps {
   initialTab?: "home" | "grading" | "assignments" | "analytics";
@@ -67,12 +67,25 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
     updateAssignment,
     deleteAssignment,
     createLesson,
+    announcements,
     createAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement,
     currentView,
     setCurrentView,
     setSelectedCourseId,
-    t
+    currentUser,
+    t,
+    activeTenant
   } = useApp();
+
+  // Filter courses strictly for this individual Solo Tutor's workspace
+  const teacherCourses: Course[] = useMemo(() => {
+    const tutorCourses = courses.filter(
+      (c) => c.teacherName === currentUser?.name || c.id === "crs_math_12" || c.title.toLowerCase().includes("math")
+    );
+    return tutorCourses.length > 0 ? tutorCourses : courses.slice(0, 2);
+  }, [courses, currentUser]);
 
   const [activeTab, setActiveTab] = useState<"home" | "grading" | "assignments" | "analytics">(
     currentView === "assignments"
@@ -205,11 +218,22 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
     setSupplementaryFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // New announcement form state
+  // New announcement / notice form state
   const [annTitle, setAnnTitle] = useState("");
   const [annMessage, setAnnMessage] = useState("");
-  const [annAudience, setAnnAudience] = useState("12-Physical Science Students");
+  const [annAudience, setAnnAudience] = useState("All Enrolled Students");
   const [annPriority, setAnnPriority] = useState<"normal" | "high">("normal");
+
+  // Edit announcement / notice state
+  const [editingNotice, setEditingNotice] = useState<Announcement | null>(null);
+  const [isEditAnnouncementModalOpen, setIsEditAnnouncementModalOpen] = useState(false);
+  const [editAnnTitle, setEditAnnTitle] = useState("");
+  const [editAnnMessage, setEditAnnMessage] = useState("");
+  const [editAnnAudience, setEditAnnAudience] = useState("All Enrolled Students");
+  const [editAnnPriority, setEditAnnPriority] = useState<"normal" | "high">("normal");
+
+  // View announcement modal state
+  const [viewingNotice, setViewingNotice] = useState<Announcement | null>(null);
 
   // Filtered submissions for Grading Desk
   const filteredSubmissions = submissions.filter((s) => {
@@ -349,16 +373,44 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
 
   const handleCreateAnnouncementSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!annTitle) return;
+    if (!annTitle.trim()) return;
     createAnnouncement({
-      title: annTitle,
-      message: annMessage,
+      title: annTitle.trim(),
+      message: annMessage.trim(),
       targetAudience: annAudience,
-      priority: annPriority
+      priority: annPriority,
+      authorName: activeTenant?.adminName || currentUser.name || "Dr. Samantha Perera",
+      authorRole: "Solo Tutor"
     });
     setIsCreateAnnouncementModalOpen(false);
     setAnnTitle("");
     setAnnMessage("");
+  };
+
+  const handleOpenEditNotice = (notice: Announcement) => {
+    setEditingNotice(notice);
+    setEditAnnTitle(notice.title);
+    setEditAnnMessage(notice.message);
+    setEditAnnAudience(notice.targetAudience);
+    setEditAnnPriority(notice.priority === "urgent" ? "high" : (notice.priority as any) || "normal");
+    setIsEditAnnouncementModalOpen(true);
+  };
+
+  const handleEditAnnouncementSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingNotice || !editAnnTitle.trim()) return;
+    updateAnnouncement(editingNotice.id, {
+      title: editAnnTitle.trim(),
+      message: editAnnMessage.trim(),
+      targetAudience: editAnnAudience,
+      priority: editAnnPriority
+    });
+    setIsEditAnnouncementModalOpen(false);
+    setEditingNotice(null);
+  };
+
+  const handleDeleteNotice = (id: string) => {
+    deleteAnnouncement(id);
   };
 
   // Performance analytics calculation
@@ -391,54 +443,60 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
 
   const todaySchedule: ScheduleItem[] = [
     {
-      period: "Period 1 & 2",
-      time: "07:50 AM – 09:10 AM",
+      period: "Morning Batch",
+      time: "07:30 AM – 09:00 AM",
       course: "Grade 12 Combined Mathematics",
       courseId: "crs_math_12",
       topic: "Unit 1: Quadratic Inequations & Interval Sign Analysis",
-      classRoom: "Hall 04 · Senior Secondary Wing",
-      deliveryMode: "physical",
-      type: "Theory Lecture",
+      classRoom: "Virtual Studio Classroom · Stream #CM-12",
+      deliveryMode: "live_online",
+      meetingUrl: "https://meet.google.com/lms-math-12",
+      meetingId: "SOLO-MATH-12-AM",
+      passcode: "558291",
+      type: "Live Theory Lecture",
       status: "completed",
       studentsCount: 42
     },
     {
-      period: "Period 3 & 4",
+      period: "Live Masterclass",
       time: "09:30 AM – 11:00 AM",
       course: "Grade 13 Applied Mathematics",
       courseId: "crs_math_12",
       topic: "Unit 2: Differential Calculus & Curve Sketching",
-      classRoom: "Nawana Live Stream · Room #MATH-A1",
+      classRoom: "Tutor Live Studio · Room #MATH-A1",
       deliveryMode: "live_online",
       meetingUrl: "https://meet.google.com/lms-math-13",
-      meetingId: "NWN-MATH-LIVE-992",
+      meetingId: "SOLO-MATH-LIVE-992",
       passcode: "774921",
-      type: "Live Interactive Class",
+      type: "Live Interactive Masterclass",
       status: "in_progress",
       studentsCount: 38
     },
     {
-      period: "Period 6",
-      time: "11:45 AM – 12:30 PM",
-      course: "Grade 12 Physics & Applied Lab",
-      courseId: "crs_phy_12",
-      topic: "Lab Practical: Simple Harmonic Motion & Period Verification",
-      classRoom: "Physics Lab 02 · Main Lab Block",
-      deliveryMode: "physical",
-      type: "Practical Session",
+      period: "Afternoon Workshop",
+      time: "04:00 PM – 05:30 PM",
+      course: "Grade 12 Applied Mathematics Mechanics",
+      courseId: "crs_math_12",
+      topic: "Mechanics Intensive: Equilibrium Systems & Newton's Laws",
+      classRoom: "Tutor Live Studio · Room #MATH-MECH",
+      deliveryMode: "live_online",
+      meetingUrl: "https://meet.google.com/lms-math-mech",
+      meetingId: "SOLO-MATH-MECH-880",
+      passcode: "419082",
+      type: "Live Problem Workshop",
       status: "upcoming",
-      studentsCount: 40
+      studentsCount: 32
     },
     {
-      period: "Period 8",
-      time: "01:45 PM – 02:30 PM",
+      period: "Evening Clinic",
+      time: "07:30 PM – 09:00 PM",
       course: "Grade 12 Combined Mathematics",
       courseId: "crs_math_12",
       topic: "Live Doubt Clearance & Past Paper Clinic",
-      classRoom: "Nawana Virtual Room #MATH-CLN",
+      classRoom: "Doubt Clearance Studio · Room #MATH-CLN",
       deliveryMode: "live_online",
       meetingUrl: "https://meet.google.com/lms-math-doubt",
-      meetingId: "NWN-MATH-CLN-410",
+      meetingId: "SOLO-MATH-CLN-410",
       passcode: "392011",
       type: "Live Tutorial Clinic",
       status: "upcoming",
@@ -565,7 +623,7 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
                         Today&apos;s Teaching Schedule &amp; Timetable
                       </CardTitle>
                       <p className="text-xs text-slate-500">
-                        Sunday / Monday sessions conforming to National Advanced Level Academic Calendar
+                        Today&apos;s scheduled live batch streams, interactive Google Meet sessions, and student clinics.
                       </p>
                     </div>
                   </div>
@@ -744,7 +802,7 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
                 </CardHeader>
                 <CardContent className="p-5 space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {courses.map((course) => {
+                    {teacherCourses.map((course) => {
                       const totalLessons = course.totalLessons || 12;
                       const completedLessons = course.completedLessons || 6;
                       const progressPct = Math.round((completedLessons / totalLessons) * 100);
@@ -926,6 +984,101 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
                   })}
                 </div>
               </Card>
+
+              {/* 4. Learning Feed Broadcasts & Notices (Solo Tutor Feed Management) */}
+              <Card className="border-[#e6ece8] bg-white shadow-2xs">
+                <CardHeader className="p-5 pb-3 border-b border-[#e6ece8] flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-9 w-9 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
+                      <Bell className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-sm font-black text-[#0d2b26]">
+                        Learning Feed Broadcasts &amp; Notices
+                      </CardTitle>
+                      <p className="text-xs text-slate-500">
+                        Live updates and materials broadcast directly to your students&apos; Learning Feed
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setIsCreateAnnouncementModalOpen(true)}
+                    className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs shadow-xs cursor-pointer gap-1.5"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Post Notice
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-5 space-y-3">
+                  {announcements.length > 0 ? (
+                    announcements.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-4 rounded-xl border border-[#e6ece8] hover:border-[#b2e5d9] bg-white shadow-2xs space-y-2.5 transition-all"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-black text-[#0d2b26]">{item.title}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                              {item.targetAudience}
+                            </span>
+                            {item.priority === "high" || item.priority === "urgent" ? (
+                              <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black uppercase tracking-wider">
+                                Urgent
+                              </span>
+                            ) : null}
+                          </div>
+                          <span className="text-[11px] text-slate-400 font-mono shrink-0">
+                            {item.publishedAt}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed whitespace-pre-line">
+                          {item.message}
+                        </p>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            Author: <strong className="text-slate-800">{item.authorName}</strong>
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setViewingNotice(item)}
+                              className="h-7 px-2 text-xs text-slate-600 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] font-bold cursor-pointer"
+                            >
+                              <Eye className="h-3.5 w-3.5 mr-1" /> View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleOpenEditNotice(item)}
+                              className="h-7 px-2 text-xs text-slate-600 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] font-bold cursor-pointer"
+                            >
+                              <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteNotice(item.id)}
+                              className="h-7 px-2 text-xs text-rose-600 hover:bg-rose-50 font-bold cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-8 text-center rounded-xl border border-dashed border-slate-200 bg-[#fbfdfc] space-y-2">
+                      <Bell className="h-6 w-6 text-slate-400 mx-auto" />
+                      <p className="text-xs font-bold text-slate-600">No broadcast notices yet</p>
+                      <p className="text-[11px] text-slate-400">Click &quot;Post Notice&quot; above to publish updates directly to your students&apos; Learning Feed.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
 
             {/* Right Column (4 cols) - Pending Tasks & Student Doubts & Notices */}
@@ -1001,22 +1154,22 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
 
 
 
-              {/* Faculty Office Hours Card */}
+              {/* Solo Tutor 1-on-1 Consultation Hours Card */}
               <Card className="border-[#e6ece8] bg-white shadow-2xs">
                 <CardContent className="p-5 space-y-2">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-[#0d5c4d]" />
-                    <h4 className="text-xs font-extrabold text-[#0d2b26]">Office Consultation Hours</h4>
+                    <h4 className="text-xs font-extrabold text-[#0d2b26]">Online 1-on-1 Consultation Hours</h4>
                   </div>
                   <p className="text-xs text-slate-600">
-                    <span className="font-semibold text-slate-900">Monday &amp; Thursday:</span> 02:30 PM – 04:00 PM
+                    <span className="font-semibold text-slate-900">Monday &amp; Thursday:</span> 04:30 PM – 06:00 PM
                   </p>
                   <p className="text-xs text-slate-500">
-                    Venue: Mathematics Department Office, Senior Block 2nd Floor.
+                    Format: Virtual 1-on-1 Doubt Clearance via Google Meet &bull; Bookable via Tutor Connect.
                   </p>
                   <div className="pt-1">
                     <span className="inline-block text-[11px] font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded border border-[#c4e9e0]">
-                      Open for Drop-in Tutoring
+                      Active for Enrolled Subscribers
                     </span>
                   </div>
                 </CardContent>
@@ -2334,12 +2487,12 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
         </form>
       </Modal>
 
-      {/* Modal: Create Announcement (Section 6.6) */}
+      {/* Modal: Create Announcement / Feed Update */}
       <Modal
         isOpen={isCreateAnnouncementModalOpen}
         onClose={() => setIsCreateAnnouncementModalOpen(false)}
-        title="Publish Official Announcement"
-        description="Broadcast circulars, notices, and examination schedules to students."
+        title="Publish Notice & Learning Feed Update"
+        description="Post lecture notes, paper discussions, or batch notices directly to your students' Learning Feed."
       >
         <form onSubmit={handleCreateAnnouncementSubmit} className="space-y-4">
           <div>
@@ -2351,7 +2504,7 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
               required
               value={annTitle}
               onChange={(e) => setAnnTitle(e.target.value)}
-              placeholder="e.g. Term 2 Practical Examination Guidelines"
+              placeholder="e.g. 2024 Provincial Model Paper Analysis & Vault Notes"
               className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
             />
           </div>
@@ -2359,16 +2512,16 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Target Audience
+                Target Batch
               </label>
               <select
                 value={annAudience}
                 onChange={(e) => setAnnAudience(e.target.value)}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                <option value="12-Physical Science Students">12-Physical Science Students</option>
-                <option value="All Grade 12 Students">All Grade 12 Students</option>
-                <option value="Cricket Squad Members">Cricket Squad Members</option>
+                <option value="All Enrolled Students">All Enrolled Students</option>
+                <option value="Target A/L Batch">Target A/L Batch</option>
+                <option value="Revision Batch">Revision Batch</option>
               </select>
             </div>
             <div>
@@ -2395,7 +2548,7 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
               required
               value={annMessage}
               onChange={(e) => setAnnMessage(e.target.value)}
-              placeholder="Enter full announcement details, deadlines, and room allocations..."
+              placeholder="Enter lecture details, topics covered, download instructions, or live session reminders..."
               className="w-full p-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
             />
           </div>
@@ -2408,11 +2561,139 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
             >
               Cancel
             </Button>
-            <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold">
-              Dispatch Announcement
+            <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold cursor-pointer">
+              Publish to Learning Feed
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal: Edit Announcement / Feed Update */}
+      <Modal
+        isOpen={isEditAnnouncementModalOpen}
+        onClose={() => {
+          setIsEditAnnouncementModalOpen(false);
+          setEditingNotice(null);
+        }}
+        title="Edit Learning Feed Notice"
+        description="Update the notice title, target batch, or content for your students."
+      >
+        <form onSubmit={handleEditAnnouncementSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+              Notice Title
+            </label>
+            <input
+              type="text"
+              required
+              value={editAnnTitle}
+              onChange={(e) => setEditAnnTitle(e.target.value)}
+              className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Target Batch
+              </label>
+              <select
+                value={editAnnAudience}
+                onChange={(e) => setEditAnnAudience(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="All Enrolled Students">All Enrolled Students</option>
+                <option value="Target A/L Batch">Target A/L Batch</option>
+                <option value="Revision Batch">Revision Batch</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Priority
+              </label>
+              <select
+                value={editAnnPriority}
+                onChange={(e) => setEditAnnPriority(e.target.value as any)}
+                className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                <option value="normal">Standard Notice</option>
+                <option value="high">High Priority / Urgent</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+              Message Content
+            </label>
+            <textarea
+              rows={4}
+              required
+              value={editAnnMessage}
+              onChange={(e) => setEditAnnMessage(e.target.value)}
+              className="w-full p-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsEditAnnouncementModalOpen(false);
+                setEditingNotice(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold cursor-pointer">
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: View Notice Details */}
+      <Modal
+        isOpen={!!viewingNotice}
+        onClose={() => setViewingNotice(null)}
+        title={viewingNotice?.title || "Notice Details"}
+        description={`Target: ${viewingNotice?.targetAudience || "All Students"} • Published: ${viewingNotice?.publishedAt || "Recently"}`}
+      >
+        {viewingNotice && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-[#f8faf9] border border-[#e6ece8] space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Author: <strong className="text-slate-800">{viewingNotice.authorName}</strong></span>
+                <span className="font-mono">{viewingNotice.publishedAt}</span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line pt-2 border-t border-slate-200">
+                {viewingNotice.message}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const noticeToEdit = viewingNotice;
+                  setViewingNotice(null);
+                  handleOpenEditNotice(noticeToEdit);
+                }}
+                className="text-xs font-bold cursor-pointer"
+              >
+                <Edit3 className="h-3.5 w-3.5 mr-1" /> Edit Notice
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setViewingNotice(null)}
+                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold cursor-pointer"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* LIVE VIRTUAL CLASSROOM STUDIO MODAL */}

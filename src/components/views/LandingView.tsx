@@ -35,8 +35,11 @@ import {
   Award,
   Phone,
   Heart,
-  Lightbulb,
-  ChevronRight
+  ChevronRight,
+  BarChart3,
+  CreditCard,
+  QrCode,
+  Send
 } from "lucide-react";
 
 type SupportedRole = "student" | "parent" | "teacher" | "admin";
@@ -105,19 +108,15 @@ export function LandingView({
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
+
   // Sign Up Form State
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
-  const [signupSchool, setSignupSchool] = useState("St. Michael High School");
-  const [signupGradeOrDept, setSignupGradeOrDept] = useState("Grade 11-A");
+  const [signupPhone, setSignupPhone] = useState("");
+  const [signupBatch, setSignupBatch] = useState("2026 A/L Theory (English / Tamil)");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(true);
-
-  // Security Access Controls (Prevents unauthorized Teacher & Admin registration)
-  const [teacherPasscode, setTeacherPasscode] = useState("");
-  const [adminSecurityKey, setAdminSecurityKey] = useState("");
-  const [studentIndexNumber, setStudentIndexNumber] = useState("");
 
   // Sri Lankan Parent-Specific Sign In & Registration States
   const [parentLoginMethod, setParentLoginMethod] = useState<"password" | "otp">("password");
@@ -129,49 +128,40 @@ export function LandingView({
   const [parentPhone, setParentPhone] = useState("");
   const [parentNic, setParentNic] = useState("");
   const [childName, setChildName] = useState("");
-  const [childAdmissionNo, setChildAdmissionNo] = useState("");
-  const [childGrade, setChildGrade] = useState("Grade 10-B");
+  const [childPhoneOrId, setChildPhoneOrId] = useState("");
+  const [childBatch, setChildBatch] = useState("2026 A/L Theory (English / Tamil)");
   const [parentConsent, setParentConsent] = useState(true);
 
-  // Pre-fill credentials based on role
+  // Pre-fill credentials based on role (Solo Tutor Platform)
   const rolePresetCredentials = {
     student: {
-      name: "Student",
-      email: "student@school.lk",
-      detail: "Student Learning Desk",
-      school: "St. Michael High School"
+      name: "Sathurjan K.",
+      email: "student@soloclass.lk",
+      detail: "2026 A/L Combined Maths",
+      school: "Apex Science Academy"
     },
     parent: {
       name: "Mrs. Priyadarshani Kulatunga",
-      email: "parent@school.lk",
-      detail: "Guardian of Sathurjan K. (Grade 12-A)",
-      school: "Trinity College Kandy"
+      email: "parent@soloclass.lk",
+      detail: "Parent of Sathurjan K. (Fee & Attendance)",
+      school: "Apex Science Academy"
     },
     teacher: {
-      name: "Faculty Member",
-      email: "teacher@school.lk",
-      detail: "Teaching Faculty",
-      school: "St. Michael High School"
+      name: "Dr. K. Arulnesan",
+      email: "tutor@soloclass.lk",
+      detail: "Master Tutor & Course Creator",
+      school: "Apex Science Academy"
     },
     admin: {
-      name: "Campus Administrator",
-      email: "admin@school.lk",
-      detail: "Campus Administration",
-      school: "St. Michael High School"
+      name: "Class Operations Admin",
+      email: "admin@soloclass.lk",
+      detail: "Tuition Desk Administration",
+      school: "Apex Science Academy"
     }
   };
 
   const handleRoleSelect = (role: SupportedRole) => {
     setSelectedRole(role);
-    if (role === "student") {
-      setSignupGradeOrDept("Grade 11-A");
-    } else if (role === "parent") {
-      setSignupGradeOrDept("Parent of Grade 12 & Grade 8");
-    } else if (role === "teacher") {
-      setSignupGradeOrDept("Science & Math Faculty");
-    } else {
-      setSignupGradeOrDept("Campus Administration");
-    }
   };
 
   const openAuth = (tab: "login" | "signup", role: SupportedRole = "student", mode: "drawer" | "fullpage" = "drawer") => {
@@ -196,7 +186,7 @@ export function LandingView({
     setAuthMode("closed");
     addToast({
       type: "success",
-      title: `Signed in as ${role === "student" ? "Student" : role === "parent" ? "Parent" : role === "teacher" ? "Teacher" : "Administrator"}`,
+      title: `Signed in as ${role === "student" ? "Student" : role === "parent" ? "Parent" : "Solo Tutor"}`,
       message: `Welcome back, ${rolePresetCredentials[role].name}!`
     });
     onEnterApp();
@@ -229,8 +219,10 @@ export function LandingView({
       type: "success",
       title: "Login Successful",
       message: selectedRole === "parent"
-        ? "Welcome to Parent Guardian Desk! Live attendance and report cards loaded."
-        : `Welcome back to LimaT Smart Book (${selectedRole === "student" ? "Student" : selectedRole === "teacher" ? "Teacher" : "Admin"} Portal)`
+        ? "Welcome to Parent Guardian Desk! Live attendance and fee receipts loaded."
+        : selectedRole === "teacher"
+        ? "Welcome to Solo Tutor Cockpit! Course creator desk loaded."
+        : "Welcome back to LimaT Smart Book! Learning feed loaded."
     });
     onEnterApp();
   };
@@ -246,13 +238,13 @@ export function LandingView({
       return;
     }
 
-    // Role-based Security Enforcement
+    // Role-based Registration Enforcement
     if (selectedRole === "parent") {
-      if (!signupName.trim() || !parentPhone.trim() || !childName.trim() || !childAdmissionNo.trim()) {
+      if (!signupName.trim() || !parentPhone.trim() || !childName.trim() || !childPhoneOrId.trim()) {
         addToast({
           type: "error",
           title: "Missing Required Details",
-          message: "Please fill in Guardian Name, Mobile Number, Student's Full Name, and Student Admission Number."
+          message: "Please fill in Guardian Name, Mobile Number, Student Full Name, and Student WhatsApp/ID."
         });
         return;
       }
@@ -260,7 +252,7 @@ export function LandingView({
         addToast({
           type: "error",
           title: "Guardian Verification Required",
-          message: "Please confirm that you are the legal parent or guardian of this student."
+          message: "Please confirm that you are the legal parent or guardian to monitor tuition records."
         });
         return;
       }
@@ -269,34 +261,10 @@ export function LandingView({
       addToast({
         type: "success",
         title: "Guardian Account Registered!",
-        message: `Welcome, ${parentTitle} ${signupName}! Account successfully linked with ${childName} (${childGrade}).`
+        message: `Welcome, ${parentTitle} ${signupName}! Account successfully linked with ${childName}.`
       });
       onEnterApp();
       return;
-    }
-
-    if (selectedRole === "teacher") {
-      const code = teacherPasscode.trim().toUpperCase();
-      if (!code || (code !== "TEACH-2026" && code !== "FACULTY" && code !== "TEACHER")) {
-        addToast({
-          type: "error",
-          title: "Teacher Passcode Required",
-          message: "Access Denied: Only verified school faculty can register. Enter your School Teacher Passcode (Key: TEACH-2026)."
-        });
-        return;
-      }
-    }
-
-    if (selectedRole === "admin") {
-      const key = adminSecurityKey.trim().toUpperCase();
-      if (!key || (key !== "ADMIN-MASTER" && key !== "PRINCIPAL" && key !== "ADMIN")) {
-        addToast({
-          type: "error",
-          title: "Administrator Key Required",
-          message: "Access Denied: School Administrator accounts are restricted. Enter the Master Authorization Key (Key: ADMIN-MASTER)."
-        });
-        return;
-      }
     }
 
     setCurrentRole(selectedRole);
@@ -304,16 +272,45 @@ export function LandingView({
     addToast({
       type: "success",
       title: "Account Created Successfully!",
-      message: `Welcome, ${signupName || rolePresetCredentials[selectedRole].name}! Your ${selectedRole} profile has been verified and initialized.`
+      message: `Welcome, ${signupName || rolePresetCredentials[selectedRole].name}! Your ${selectedRole === "student" ? "Student" : selectedRole === "teacher" ? "Tutor" : selectedRole} profile has been initialized.`
     });
     onEnterApp();
   };
 
   // =========================================================================
-  // REUSABLE AUTH FORM COMPONENT (Tailored per portal type: student vs staff)
+  // REUSABLE AUTH FORM COMPONENT (Dedicated per role: Student vs Parent vs Tutor)
   // =========================================================================
   const renderAuthContent = () => (
     <div className="space-y-4">
+      {/* Active Role Dedicated Badge Header */}
+      <div className={`p-3 rounded-2xl flex items-center justify-between border ${
+        selectedRole === "student"
+          ? "bg-[#ecf8f5] border-[#c4e9e0] text-[#0d5c4d]"
+          : selectedRole === "parent"
+          ? "bg-[#f0f5fa] border-[#cbdfe8] text-[#1e3a5f]"
+          : "bg-[#fef7e6] border-[#fde4af] text-[#b47a16]"
+      }`}>
+        <div className="flex items-center gap-2">
+          {selectedRole === "student" ? (
+            <GraduationCap className="h-4 w-4" />
+          ) : selectedRole === "parent" ? (
+            <Users className="h-4 w-4" />
+          ) : (
+            <Sparkles className="h-4 w-4" />
+          )}
+          <span className="text-xs font-black uppercase tracking-wider">
+            {selectedRole === "student"
+              ? "Student Portal"
+              : selectedRole === "parent"
+              ? "Parent & Guardian Portal"
+              : "Solo Tutor Cockpit"}
+          </span>
+        </div>
+        <span className="text-[10px] font-bold opacity-75">
+          {selectedRole === "student" ? "Direct Enrollment" : selectedRole === "parent" ? "Fee & Attendance" : "Course Creator"}
+        </span>
+      </div>
+
       {/* Tab Switcher: Sign In vs Create Account */}
       <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 text-xs font-bold">
         <button
@@ -336,57 +333,14 @@ export function LandingView({
               : "text-slate-500 hover:text-slate-800"
           }`}
         >
-          Create Account (Sign Up)
+          {selectedRole === "parent"
+            ? "Register Guardian"
+            : selectedRole === "teacher"
+            ? "Register as Tutor"
+            : "Create Account (Sign Up)"}
         </button>
       </div>
 
-      {/* Role Selector: Only shown for Staff Portal so staff can select Teacher vs Admin */}
-      {portalType === "staff" && (
-        <div className="space-y-1.5">
-          <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 block">
-            Select Staff Role:
-          </label>
-          <div className="grid grid-cols-2 gap-2.5">
-            {/* Teacher */}
-            <button
-              type="button"
-              onClick={() => handleRoleSelect("teacher")}
-              className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
-                selectedRole === "teacher"
-                  ? "bg-slate-100 border-slate-800 text-slate-900 shadow-xs ring-2 ring-slate-800/20"
-                  : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
-              }`}
-            >
-              <div className="flex items-center gap-1.5">
-                <School className="h-4 w-4" />
-                <span className="text-xs font-black">Teacher</span>
-              </div>
-              <span className="text-[9.5px] opacity-75">
-                Faculty Desk
-              </span>
-            </button>
-
-            {/* Admin */}
-            <button
-              type="button"
-              onClick={() => handleRoleSelect("admin")}
-              className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-0.5 ${
-                selectedRole === "admin"
-                  ? "bg-slate-100 border-slate-800 text-slate-900 shadow-xs ring-2 ring-slate-800/20"
-                  : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
-              }`}
-            >
-              <div className="flex items-center gap-1.5">
-                <Shield className="h-4 w-4" />
-                <span className="text-xs font-black">Admin</span>
-              </div>
-              <span className="text-[9.5px] opacity-75">
-                School Leadership
-              </span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* -------------------- SIGN IN TAB CONTENT -------------------- */}
       {authTab === "login" && (
@@ -423,28 +377,6 @@ export function LandingView({
           )}
 
           <form onSubmit={handleLoginSubmit} className="space-y-3">
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
-                School / Institution
-              </label>
-              <div className="relative">
-                <Building2 className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <select
-                  value={signupSchool}
-                  onChange={(e) => setSignupSchool(e.target.value)}
-                  className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-none focus:border-[#0d5c4d] cursor-pointer"
-                >
-                  {schools.map((s) => (
-                    <option key={s.id} value={s.name}>
-                      {s.name}
-                    </option>
-                  ))}
-                  <option value="Royal Academy Colombo">Royal Academy Colombo</option>
-                  <option value="Jaffna Central High">Jaffna Central High</option>
-                </select>
-              </div>
-            </div>
-
             {/* If Parent chose SMS OTP Login */}
             {selectedRole === "parent" && parentLoginMethod === "otp" ? (
               <div className="space-y-3">
@@ -464,7 +396,7 @@ export function LandingView({
                     />
                   </div>
                   <p className="text-[10px] text-slate-500 mt-1">
-                    Enter the mobile phone registered with your child&apos;s school office.
+                    Enter the mobile phone registered with your child&apos;s tuition class.
                   </p>
                 </div>
 
@@ -512,15 +444,15 @@ export function LandingView({
                 </button>
               </div>
             ) : (
-              /* Standard Password Login (for Parent, Student, Staff) */
+              /* Standard Password Login (for Student, Parent, Tutor) */
               <>
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     {selectedRole === "student"
-                      ? "Student Email or Index No"
+                      ? "Student Mobile No or Email"
                       : selectedRole === "parent"
                       ? "Parent Mobile No or Email Address"
-                      : "Staff Email or Faculty ID"}
+                      : "Tutor Email or Mobile Number"}
                   </label>
                   <div className="relative">
                     {selectedRole === "parent" ? (
@@ -535,10 +467,10 @@ export function LandingView({
                       onChange={(e) => setLoginEmail(e.target.value)}
                       placeholder={
                         selectedRole === "student"
-                          ? "e.g. student@school.lk or Index No"
+                          ? "e.g. 077 123 4567 or student@gmail.com"
                           : selectedRole === "parent"
                           ? "e.g. 077 123 4567 or parent@gmail.com"
-                          : "e.g. staff@school.lk or Faculty ID"
+                          : "e.g. tutor@soloclass.lk or 077 987 6543"
                       }
                       className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
                     />
@@ -556,10 +488,10 @@ export function LandingView({
                         e.preventDefault();
                         addToast({
                           type: "info",
-                          title: "Password Reset",
+                          title: "Password Reset Code",
                           message: selectedRole === "parent"
-                            ? "Please contact your school office or use SMS OTP Login to access your portal."
-                            : "Please contact your school office or administration to reset your password."
+                            ? "Use SMS OTP Login to sign in instantly, or enter your mobile to receive a reset code."
+                            : "Enter your registered mobile number or email to receive a password reset OTP code."
                         });
                       }}
                       className="text-[11px] font-bold text-[#0d5c4d] hover:underline"
@@ -604,12 +536,14 @@ export function LandingView({
                   className={`w-full text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1 ${
                     selectedRole === "parent"
                       ? "bg-[#1e3a5f] hover:bg-[#152a45]"
+                      : selectedRole === "teacher"
+                      ? "bg-[#b47a16] hover:bg-[#96640f]"
                       : "bg-[#0d5c4d] hover:bg-[#083e34]"
                   }`}
                 >
                   <LogIn className="h-4 w-4" />
                   <span>
-                    Sign In to {selectedRole === "student" ? "Student" : selectedRole === "parent" ? "Parent" : selectedRole === "teacher" ? "Teacher" : "Admin"} Portal
+                    Sign In to {selectedRole === "student" ? "Student Portal" : selectedRole === "parent" ? "Parent Portal" : "Tutor Cockpit"}
                   </span>
                 </button>
               </>
@@ -621,15 +555,15 @@ export function LandingView({
       {/* -------------------- SIGN UP TAB CONTENT -------------------- */}
       {authTab === "signup" && (
         <form onSubmit={handleSignupSubmit} className="space-y-4 pt-1">
-          {/* SPECIALIZED SRI LANKAN PARENT REGISTRATION FORM */}
+          {/* SPECIALIZED PARENT REGISTRATION FORM */}
           {selectedRole === "parent" ? (
             <div className="space-y-4">
               <div className="p-3.5 rounded-xl bg-[#f0f5fa] border border-[#cbdfe8] text-xs text-[#1e3a5f] flex items-start gap-2.5">
                 <Shield className="h-4 w-4 text-[#1e3a5f] shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-black">Official Guardian Link • Sri Lanka</p>
+                  <p className="font-black">Tuition Guardian Portal • Sri Lanka</p>
                   <p className="text-[11px] text-[#2d4a6f] leading-relaxed mt-0.5">
-                    Your parent profile will be linked with your child&apos;s school admission record for live attendance and report cards.
+                    Link with your child&apos;s tuition class profile to track monthly fees, class attendance, and test ranks.
                   </p>
                 </div>
               </div>
@@ -676,7 +610,7 @@ export function LandingView({
                   </div>
                 </div>
 
-                {/* Relationship & NIC */}
+                {/* Relationship & Mobile Phone */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -696,23 +630,7 @@ export function LandingView({
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      National ID (NIC) No (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={parentNic}
-                      onChange={(e) => setParentNic(e.target.value)}
-                      placeholder="e.g. 198574102934 / 857410293V"
-                      className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* Mobile Phone & Email */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Mobile Number (For School SMS) *
+                      Mobile Number (For Fee Slips & SMS) *
                     </label>
                     <div className="relative">
                       <Phone className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -726,53 +644,18 @@ export function LandingView({
                       />
                     </div>
                   </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Email Address (Optional)
-                    </label>
-                    <div className="relative">
-                      <Mail className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="email"
-                        value={signupEmail}
-                        onChange={(e) => setSignupEmail(e.target.value)}
-                        placeholder="e.g. parent@gmail.com"
-                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10 transition-all font-medium"
-                      />
-                    </div>
-                  </div>
                 </div>
               </div>
 
-              {/* SECTION 2: STUDENT / CHILD SCHOOL RECORD LINKING */}
+              {/* SECTION 2: STUDENT / CHILD TUITION RECORD LINKING */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
                 <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                   <GraduationCap className="h-3.5 w-3.5 text-[#1e3a5f]" />
                   <span>2. Student Linking & Verification</span>
                 </p>
 
-                {/* School Name */}
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Student&apos;s School *
-                  </label>
-                  <select
-                    value={signupSchool}
-                    onChange={(e) => setSignupSchool(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#1e3a5f] font-medium cursor-pointer"
-                  >
-                    {schools.map((s) => (
-                      <option key={s.id} value={s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                    <option value="Royal Academy Colombo">Royal Academy Colombo</option>
-                    <option value="Jaffna Central High">Jaffna Central High</option>
-                  </select>
-                </div>
 
-                {/* Student Full Name & Admission No */}
+                {/* Student Full Name & WhatsApp / Student ID */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -783,50 +666,24 @@ export function LandingView({
                       required
                       value={childName}
                       onChange={(e) => setChildName(e.target.value)}
-                      placeholder="e.g. Kaveen Kulatunga"
+                      placeholder="e.g. Sathurjan Kaveen"
                       className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
                     />
                   </div>
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Admission / Index No *
+                      Student WhatsApp No / Student ID *
                     </label>
                     <input
                       type="text"
                       required
-                      value={childAdmissionNo}
-                      onChange={(e) => setChildAdmissionNo(e.target.value)}
-                      placeholder="e.g. ADM-2024-1042"
+                      value={childPhoneOrId}
+                      onChange={(e) => setChildPhoneOrId(e.target.value)}
+                      placeholder="e.g. 077 987 6543 or STU-2026-042"
                       className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
                     />
                   </div>
-                </div>
-
-                {/* Student Grade & Class */}
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Child&apos;s Current Grade & Class *
-                  </label>
-                  <select
-                    value={childGrade}
-                    onChange={(e) => setChildGrade(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#1e3a5f] font-medium cursor-pointer"
-                  >
-                    <option value="Grade 1-A">Grade 1-A</option>
-                    <option value="Grade 2-A">Grade 2-A</option>
-                    <option value="Grade 3-A">Grade 3-A</option>
-                    <option value="Grade 4-A">Grade 4-A</option>
-                    <option value="Grade 5-A">Grade 5-A (Scholarship)</option>
-                    <option value="Grade 6-A">Grade 6-A</option>
-                    <option value="Grade 7-A">Grade 7-A</option>
-                    <option value="Grade 8-B">Grade 8-B</option>
-                    <option value="Grade 9-A">Grade 9-A</option>
-                    <option value="Grade 10-B">Grade 10-B (O/L)</option>
-                    <option value="Grade 11-A">Grade 11-A (O/L)</option>
-                    <option value="Grade 12-A">Grade 12-A (A/L Science)</option>
-                    <option value="Grade 13-A">Grade 13-A (A/L Maths)</option>
-                  </select>
                 </div>
               </div>
 
@@ -876,7 +733,7 @@ export function LandingView({
                       className="rounded text-[#1e3a5f] focus:ring-0 mt-0.5"
                     />
                     <span className="text-[11px] leading-relaxed">
-                      I verify that I am the legal parent or guardian of this student and authorize school record access.
+                      I verify that I am the legal parent or guardian to monitor tuition fee receipts and attendance.
                     </span>
                   </label>
                 </div>
@@ -891,11 +748,11 @@ export function LandingView({
               </button>
             </div>
           ) : (
-            /* STANDARD STUDENT & STAFF REGISTRATION FORM */
+            /* STUDENT & TUTOR REGISTRATION FORM */
             <>
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Full Name
+                  {selectedRole === "teacher" ? "Tutor / Educator Full Name *" : "Student Full Name *"}
                 </label>
                 <div className="relative">
                   <UserIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -904,24 +761,7 @@ export function LandingView({
                     required
                     value={signupName}
                     onChange={(e) => setSignupName(e.target.value)}
-                    placeholder="e.g. Enter your full name"
-                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    required
-                    value={signupEmail}
-                    onChange={(e) => setSignupEmail(e.target.value)}
-                    placeholder="e.g. name@school.lk"
+                    placeholder={selectedRole === "teacher" ? "e.g. Dr. K. Arulnesan" : "e.g. Sathurjan Kaveen"}
                     className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
                   />
                 </div>
@@ -930,108 +770,60 @@ export function LandingView({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
-                    School Name
+                    Mobile Number (WhatsApp) *
                   </label>
-                  <select
-                    value={signupSchool}
-                    onChange={(e) => setSignupSchool(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium cursor-pointer"
-                  >
-                    {schools.map((s) => (
-                      <option key={s.id} value={s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                    <option value="Royal Academy Colombo">Royal Academy Colombo</option>
-                    <option value="Jaffna Central High">Jaffna Central High</option>
-                  </select>
+                  <div className="relative">
+                    <Phone className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="tel"
+                      required
+                      value={signupPhone}
+                      onChange={(e) => setSignupPhone(e.target.value)}
+                      placeholder="e.g. 077 123 4567"
+                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
-                    {selectedRole === "student" ? "Grade & Class" : "Department / Subject"}
+                    Email Address *
+                  </label>
+                  <div className="relative">
+                    <Mail className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      value={signupEmail}
+                      onChange={(e) => setSignupEmail(e.target.value)}
+                      placeholder={selectedRole === "teacher" ? "tutor@soloclass.lk" : "student@gmail.com"}
+                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SUBJECT SPECIALIZATION (Only for Solo Tutor) */}
+              {selectedRole === "teacher" && (
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Subject Specialization / Class Brand *
                   </label>
                   <input
                     type="text"
                     required
-                    value={signupGradeOrDept}
-                    onChange={(e) => setSignupGradeOrDept(e.target.value)}
-                    placeholder={selectedRole === "student" ? "e.g. Grade 11-A" : "e.g. Science Faculty"}
+                    value={signupBatch}
+                    onChange={(e) => setSignupBatch(e.target.value)}
+                    placeholder="e.g. Combined Maths & Physics (Theory & Revision)"
                     className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium"
                   />
                 </div>
-              </div>
-
-              {/* Role-Specific Security Verification Inputs */}
-              {selectedRole === "teacher" && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <Lock className="h-3.5 w-3.5 text-slate-400" />
-                      <span>Teacher Verification Passcode *</span>
-                    </label>
-                    <span className="text-[10px] text-slate-400 font-medium">
-                      (Passcode: TEACH-2026)
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={teacherPasscode}
-                      onChange={(e) => setTeacherPasscode(e.target.value)}
-                      placeholder="Enter teacher passcode"
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {selectedRole === "admin" && (
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <Shield className="h-3.5 w-3.5 text-slate-400" />
-                      <span>Admin Security Key *</span>
-                    </label>
-                    <span className="text-[10px] text-slate-400 font-medium">
-                      (Key: ADMIN-MASTER)
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <Shield className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="password"
-                      required
-                      value={adminSecurityKey}
-                      onChange={(e) => setAdminSecurityKey(e.target.value)}
-                      placeholder="Enter admin authorization key"
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {selectedRole === "student" && (
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Student Admission / Index Number (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={studentIndexNumber}
-                    onChange={(e) => setStudentIndexNumber(e.target.value)}
-                    placeholder="e.g. STU-2026-081"
-                    className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-mono font-semibold placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] transition-all"
-                  />
-                </div>
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Create Password
+                    Create Password *
                   </label>
                   <div className="relative">
                     <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1048,7 +840,7 @@ export function LandingView({
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Confirm Password
+                    Confirm Password *
                   </label>
                   <div className="relative">
                     <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1078,10 +870,14 @@ export function LandingView({
 
               <button
                 type="submit"
-                className="w-full bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1"
+                className={`w-full text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1 ${
+                  selectedRole === "teacher"
+                    ? "bg-[#b47a16] hover:bg-[#96640f]"
+                    : "bg-[#0d5c4d] hover:bg-[#083e34]"
+                }`}
               >
                 <UserPlus className="h-4 w-4" />
-                <span>Create Account & Join as {selectedRole === "student" ? "Student" : selectedRole === "teacher" ? "Teacher" : "Administrator"}</span>
+                <span>Create Account & Join as {selectedRole === "student" ? "Student" : "Solo Tutor"}</span>
               </button>
             </>
           )}
@@ -1141,19 +937,23 @@ export function LandingView({
             <div className="lg:col-span-5 space-y-5 hidden lg:block">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-xs font-black">
                 <span className="h-2 w-2 rounded-full bg-[#0d5c4d]" />
-                <span>{portalType === "student" ? "Student Learning Portal" : "Faculty Leadership Hub"}</span>
+                <span>{selectedRole === "student" ? "Student Learning Portal" : selectedRole === "parent" ? "Parent & Guardian Desk" : "Solo Tutor Cockpit"}</span>
               </div>
 
               <h2 className="text-3xl font-black text-[#0d2b26] leading-tight">
-                {portalType === "student"
-                  ? "Welcome to your digital learning classroom."
-                  : "Empowering Sri Lankan school leadership & educators."}
+                {selectedRole === "student"
+                  ? "Welcome to your digital tuition classroom."
+                  : selectedRole === "parent"
+                  ? "Monitor tuition fee receipts and attendance."
+                  : "Empowering solo tutors & course creators."}
               </h2>
 
               <p className="text-sm text-slate-600 leading-relaxed">
-                {portalType === "student"
-                  ? "Study course units, download national past papers, complete timed tests, and celebrate house sports."
-                  : "Design syllabi, mark student answers with rubrics, manage class allocations, and publish official school circulars."}
+                {selectedRole === "student"
+                  ? "Study course units, download term past papers with marking schemes, complete timed quizzes, and check your rank."
+                  : selectedRole === "parent"
+                  ? "Upload monthly tuition fee slips, review attendance scan records, and monitor academic progress."
+                  : "Publish interactive study notes, schedule online classes, track monthly tuition fee payments, and post instant batch announcements."}
               </p>
 
               <div className="p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-xs space-y-3">
@@ -1162,8 +962,8 @@ export function LandingView({
                     L
                   </div>
                   <div>
-                    <h4 className="text-xs font-black text-[#0d2b26]">St. Michael High School</h4>
-                    <p className="text-[10px] text-slate-500">1,420 Students • 86 Faculty Teachers</p>
+                    <h4 className="text-xs font-black text-[#0d2b26]">Apex Science &amp; Maths Academy</h4>
+                    <p className="text-[10px] text-slate-500">A/L Theory &amp; Revision Batches • Digital Classroom</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold">
@@ -1182,12 +982,12 @@ export function LandingView({
                       {authTab === "login" ? "Sign In to LimaT" : "Create Account"}
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      {portalType === "student" ? "Pupil & Student Portal" : "Faculty & Administrative Access"}
+                      {selectedRole === "student" ? "Student Learning Portal" : selectedRole === "parent" ? "Parent & Guardian Desk" : "Solo Tutor Portal"}
                     </p>
                   </div>
 
                   <span className="h-9 w-9 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center font-bold">
-                    {portalType === "student" ? <GraduationCap className="h-5 w-5" /> : <Shield className="h-5 w-5" />}
+                    {selectedRole === "student" ? <GraduationCap className="h-5 w-5" /> : selectedRole === "parent" ? <Users className="h-5 w-5" /> : <Sparkles className="h-5 w-5 text-[#b47a16]" />}
                   </span>
                 </div>
 
@@ -1252,10 +1052,10 @@ export function LandingView({
             <button
               type="button"
               onClick={() => handlePortalSwitch("staff")}
-              className="text-xs font-bold text-slate-600 hover:text-slate-950 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="text-xs font-bold text-amber-800 hover:text-amber-950 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <School className="h-3.5 w-3.5 text-[#b47a16]" />
-              <span>Staff Login</span>
+              <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+              <span>Solo Tutor Hub →</span>
             </button>
           </div>
         </nav>
@@ -1372,11 +1172,11 @@ export function LandingView({
         </nav>
       )}
 
-      {/* ----------------- 3. FACULTY & ADMIN PORTAL NAVIGATION ----------------- */}
+      {/* ----------------- 3. SOLO TUTOR / STAFF PORTAL NAVIGATION ----------------- */}
       {portalType === "staff" && (
         <nav className="h-16 sm:h-20 border-b border-[#e6ece8] bg-white/95 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#f3b738] flex items-center justify-center text-slate-950 font-black text-base sm:text-xl shadow-xs font-sans shrink-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#0d5c4d] flex items-center justify-center text-[#f3b738] font-black text-base sm:text-xl shadow-xs font-sans shrink-0">
               L
             </div>
             <div className="min-w-0">
@@ -1384,23 +1184,22 @@ export function LandingView({
                 <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
                   LimaT Smart Book
                 </span>
-                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-900 text-amber-300 border border-slate-700 text-[10px] font-extrabold shrink-0">
-                  <School className="h-3 w-3 text-[#f3b738]" />
-                  Faculty & Admin Hub
+                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#fef8eb] text-[#b47a16] border border-[#fbd38d] text-[10px] font-extrabold shrink-0">
+                  <Sparkles className="h-3 w-3 text-[#b47a16]" />
+                  Solo Tutor Cockpit
                 </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block truncate">
-                LEARN · GROW · LEAD
+                AUTHOR · BROADCAST · ATTENDANCE · FEE MONITORING
               </p>
             </div>
           </div>
 
-          {/* Right Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
               type="button"
               onClick={() => handlePortalSwitch("gateway")}
-              className="text-xs font-bold text-slate-600 hover:text-slate-950 px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-slate-600 hover:text-[#0d5c4d] px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1 cursor-pointer"
               title="All Portals"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
@@ -1410,19 +1209,19 @@ export function LandingView({
             <button
               type="button"
               onClick={() => openAuth("login", "teacher", "drawer")}
-              className="text-xs font-bold text-slate-700 hover:text-slate-950 px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-slate-700 hover:text-[#0d5c4d] px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1 cursor-pointer"
             >
-              <LogIn className="h-3.5 w-3.5 text-[#b47a16]" />
-              <span><span className="hidden sm:inline">Staff </span>Sign In</span>
+              <LogIn className="h-3.5 w-3.5 text-[#0d5c4d]" />
+              <span>Tutor Sign In</span>
             </button>
 
             <button
               type="button"
               onClick={() => openAuth("signup", "teacher", "drawer")}
-              className="text-xs font-black bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2.5 transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+              className="text-xs font-black bg-[#0d5c4d] hover:bg-[#083e34] text-white rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2.5 transition-all shadow-xs flex items-center gap-1 cursor-pointer"
             >
-              <UserPlus className="h-3.5 w-3.5 text-[#f3b738]" />
-              <span><span className="hidden sm:inline">Register </span>Staff</span>
+              <UserPlus className="h-3.5 w-3.5" />
+              <span>Register as Tutor</span>
             </button>
           </div>
         </nav>
@@ -1492,8 +1291,8 @@ export function LandingView({
               </p>
             </div>
 
-            {/* 2 Clean Role Cards (Student & Parent) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 my-1.5 sm:my-3 max-w-2xl sm:max-w-3xl mx-auto w-full items-stretch">
+            {/* 3 Clean Role Cards: Student, Parent & Solo Tutor */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5 lg:gap-6 my-1.5 sm:my-3 max-w-4xl lg:max-w-5xl mx-auto w-full items-stretch">
               {/* CARD 1: STUDENT */}
               <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
                 {/* Brush-Splash Character Illustration */}
@@ -1599,6 +1398,59 @@ export function LandingView({
                   </button>
                 </div>
               </div>
+
+              {/* CARD 3: SOLO TUTOR */}
+              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-amber-100 hover:border-[#b47a16] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+                {/* Character Illustration / Mascot */}
+                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center">
+                  <img
+                    src="/images/ai_tutor_mascot.jpg"
+                    alt="Solo Tutor and Course Creator"
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 rounded-2xl"
+                  />
+                </div>
+
+                {/* Pill Button in Amber / Gold Theme */}
+                <button
+                  type="button"
+                  onClick={() => handlePortalSwitch("staff")}
+                  className="w-full max-w-xs bg-[#b47a16] hover:bg-[#8d5f10] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
+                >
+                  <Sparkles className="h-4 sm:h-5 w-4 sm:w-5" />
+                  <span>Solo Tutor</span>
+                  <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                {/* Subtitle Caption */}
+                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
+                  Teach, broadcast notices, manage batches & fees.
+                </p>
+
+                {/* Quick Direct Sign In / Register Links */}
+                <div className="flex items-center gap-3 text-xs pt-1.5 font-semibold text-slate-500">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handlePortalSwitch("staff");
+                      openAuth("login", "teacher", "drawer");
+                    }}
+                    className="font-bold text-[#b47a16] hover:underline cursor-pointer"
+                  >
+                    Tutor Sign In →
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handlePortalSwitch("staff");
+                      openAuth("signup", "teacher", "drawer");
+                    }}
+                    className="hover:text-slate-900 cursor-pointer"
+                  >
+                    Register
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Bottom Playful Tagline */}
@@ -1616,11 +1468,11 @@ export function LandingView({
             <div className="pb-1.5 pt-1 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-[11px] text-slate-500 border-t border-slate-200/60">
               <button
                 type="button"
-                onClick={() => handlePortalSwitch("staff")}
-                className="font-bold text-slate-600 hover:text-slate-900 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                onClick={() => openAuth("login", "teacher", "drawer")}
+                className="font-bold text-slate-600 hover:text-[#0d5c4d] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
               >
-                <School className="h-3.5 w-3.5 text-amber-600" />
-                <span>Are you a Teacher or Principal? Faculty &amp; Admin Hub →</span>
+                <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                <span>Solo Tutor or Course Creator? Access Tutor Cockpit →</span>
               </button>
 
               <span className="text-[10px] text-slate-400">
@@ -2237,189 +2089,238 @@ export function LandingView({
       )}
 
       {/* ========================================================================= */}
-      {/* 3. FACULTY & ADMIN LANDING PAGE (Active when portalType === "staff")      */}
+      {/* 3. SOLO TUTOR LANDING PAGE (Active when portalType === "staff")           */}
       {/* ========================================================================= */}
       {portalType === "staff" && (
-        <main className="px-4 sm:px-8 lg:px-12 py-10 sm:py-16 max-w-7xl mx-auto w-full space-y-16">
-          {/* Staff Hero Section */}
+        <main className="px-4 sm:px-8 lg:px-12 py-10 sm:py-16 max-w-7xl mx-auto w-full space-y-16 animate-in fade-in duration-300">
+          {/* Solo Tutor Hero Section */}
           <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
             {/* Left Content */}
             <div className="lg:col-span-7 space-y-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-xs font-black shadow-2xs">
-                <span className="h-2 w-2 rounded-full bg-amber-600 animate-pulse" />
-                <span>School Faculty & Administration Hub • Sri Lanka</span>
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#fef8eb] text-[#b47a16] border border-[#fbd38d] text-xs font-black shadow-2xs">
+                <span className="h-2 w-2 rounded-full bg-[#b47a16] animate-pulse" />
+                <span>Solo Tutor Command Center • Independent Educators</span>
               </div>
 
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.15]">
-                Empowering teachers & <br className="hidden sm:inline" />
-                <span className="text-[#0d5c4d]">modern school leadership.</span>
+                Lead your private tuition <br className="hidden sm:inline" />
+                <span className="text-[#0d5c4d]">with total autonomy.</span>
               </h1>
 
               <p className="text-sm sm:text-base lg:text-lg text-slate-600 max-w-xl leading-relaxed">
-                Build digital curricula, mark assignments with rubrics, manage classroom timetables, coordinate faculty staff, and publish official school circulars.
+                Everything an independent tuition master needs: publish courses, broadcast announcements directly to students&apos; learning feeds, run timed quizzes, verify bank fee slips, and monitor live attendance.
               </p>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 w-full">
                 <button
                   type="button"
-                  onClick={() => openAuth("login", "teacher", "drawer")}
-                  className="bg-[#f3b738] hover:bg-[#e0a424] text-slate-950 font-black text-sm px-6 py-3.5 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
+                  onClick={() => handle1ClickDemoLogin("teacher")}
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-sm px-6 py-3.5 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
                 >
-                  <LogIn className="h-4 w-4" />
-                  <span>Teacher Login</span>
+                  <Sparkles className="h-4 w-4 text-[#f3b738]" />
+                  <span>Launch Tutor Cockpit</span>
+                  <ArrowRight className="h-4 w-4" />
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => openAuth("login", "admin", "drawer")}
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-sm px-6 py-3.5 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
+                  onClick={() => openAuth("signup", "teacher", "drawer")}
+                  className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-extrabold text-sm px-6 py-3.5 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
                 >
-                  <Shield className="h-4 w-4" />
-                  <span>Administrator Access</span>
+                  <UserPlus className="h-4 w-4 text-[#0d5c4d]" />
+                  <span>Register New Tutor Account</span>
                 </button>
               </div>
 
-              {/* Staff Security Badges */}
+              {/* Tutor Features Bar */}
               <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2.5 sm:gap-4 text-xs font-bold text-slate-600 pt-2">
                 <div className="flex items-center gap-1.5">
-                  <Lock className="h-4 w-4 text-amber-600 shrink-0" />
-                  <span>Faculty Passcode Protected Registration</span>
+                  <Check className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                  <span>Interactive Learning Feed Broadcaster</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Shield className="h-4 w-4 text-slate-800 shrink-0" />
-                  <span>Restricted Admin Master Authorization</span>
+                  <Check className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                  <span>Automated Quiz & MCQ Grading</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Check className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                  <span>Bank Slip Verification & Fee Receipts</span>
                 </div>
               </div>
             </div>
 
-            {/* Right Staff Leadership Card (Generic Institutional Overview) */}
+            {/* Right Tutor Card (Cockpit Interactive Preview) */}
             <div className="lg:col-span-5">
               <div className="rounded-3xl overflow-hidden border border-[#e6ece8] bg-white shadow-xl">
-                <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-[#082a24] p-7 text-white space-y-4">
+                <div className="bg-gradient-to-br from-[#082a24] via-[#0d5c4d] to-[#14473e] p-7 text-white space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                      <Shield className="h-3.5 w-3.5" />
-                      <span>Faculty & Campus HQ</span>
+                    <span className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-[#f3b738]" />
+                      <span>Solo Tutor Cockpit</span>
                     </span>
-                    <span className="text-xs font-mono font-bold text-emerald-400">Institutional Governance</span>
+                    <span className="text-xs font-mono font-bold text-[#f3b738]">Live Dashboard</span>
                   </div>
 
                   <div>
-                    <h3 className="text-2xl font-black text-white">Faculty & Admin Operations</h3>
-                    <p className="text-xs text-slate-300">Centralized Academic Administration & Teacher Governance</p>
+                    <h3 className="text-2xl font-black text-white">Dr. K. Arulnesan</h3>
+                    <p className="text-xs text-emerald-200">A/L Combined Mathematics & Physics Specialist</p>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 pt-2">
                     <div className="p-2.5 rounded-xl bg-white/10 text-center">
-                      <p className="text-base font-black text-[#f3b738]">Syllabus</p>
-                      <p className="text-[10px] text-slate-300">Term Tracking</p>
+                      <p className="text-base font-black text-white">480+</p>
+                      <p className="text-[10px] text-slate-300">Enrolled Students</p>
                     </div>
                     <div className="p-2.5 rounded-xl bg-white/10 text-center">
-                      <p className="text-base font-black text-white">Rubrics</p>
-                      <p className="text-[10px] text-slate-300">Grading Suite</p>
+                      <p className="text-base font-black text-[#f3b738]">94%</p>
+                      <p className="text-[10px] text-slate-300">Fee Settled</p>
                     </div>
                     <div className="p-2.5 rounded-xl bg-white/10 text-center">
-                      <p className="text-base font-black text-emerald-300">Registry</p>
-                      <p className="text-[10px] text-slate-300">Student Records</p>
+                      <p className="text-base font-black text-emerald-300">98.4%</p>
+                      <p className="text-[10px] text-slate-300">Attendance</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-5 bg-white space-y-3.5">
-                  <p className="text-xs font-bold text-slate-700">Staff Access Portals:</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openAuth("login", "teacher", "drawer")}
-                      className="p-3 rounded-xl bg-[#fef7e6] hover:bg-[#faebd0] border border-[#fde4af] text-left transition-all cursor-pointer"
-                    >
-                      <p className="text-xs font-black text-[#b47a16] flex items-center gap-1.5">
-                        <Users className="h-3.5 w-3.5" />
-                        <span>Teacher Portal</span>
-                      </p>
-                      <p className="text-[10px] text-slate-500">Lesson Plans & Grading</p>
-                    </button>
+                  <p className="text-xs font-bold text-slate-700">Educator Workspace Modules:</p>
 
-                    <button
-                      type="button"
-                      onClick={() => openAuth("login", "admin", "drawer")}
-                      className="p-3 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-left transition-all cursor-pointer"
-                    >
-                      <p className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                        <School className="h-3.5 w-3.5" />
-                        <span>Admin Portal</span>
-                      </p>
-                      <p className="text-[10px] text-slate-500">Principal & Governance</p>
-                    </button>
+                  <div className="space-y-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-[#fef8eb] text-[#b47a16] flex items-center justify-center shrink-0">
+                        <Send className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-[#0d2b26]">Direct Learning Feed Broadcaster</p>
+                        <p className="text-[10px] text-slate-500">Post announcements, notices, zoom links, & study tips directly to student feeds</p>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0">
+                        <BookOpen className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-[#0d2b26]">Syllabus & Video Lesson Studio</p>
+                        <p className="text-[10px] text-slate-500">Curate lessons, PDF handouts, past exam papers, and video lectures</p>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-[#f0f5fa] text-[#1e3a5f] flex items-center justify-center shrink-0">
+                        <CreditCard className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-[#0d2b26]">Fee Slip Verification & QR Tracking</p>
+                        <p className="text-[10px] text-slate-500">Approve tuition bank deposits and track classroom attendance with instant SMS</p>
+                      </div>
+                    </div>
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => openAuth("signup", "teacher", "drawer")}
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    onClick={() => handle1ClickDemoLogin("teacher")}
+                    className="w-full bg-[#f8faf9] hover:bg-[#ecf8f5] border border-slate-200 hover:border-[#0d5c4d] text-[#0d5c4d] font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-1"
                   >
-                    <UserPlus className="h-3.5 w-3.5 text-[#f3b738]" />
-                    <span>Register New Faculty Account (Passcode Required)</span>
+                    <span>Enter Tutor Workspace Demo</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Staff Pillars */}
-          <section className="space-y-6">
-            <div className="text-center max-w-xl mx-auto">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-800 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
-                Staff Governance Modules
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26] mt-2">
-                Engineered for Academic Excellence & Administration
+          {/* Section 2: Tutor Core Capabilities Grid */}
+          <section className="space-y-8 pt-4">
+            <div className="text-center max-w-2xl mx-auto space-y-2">
+              <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26] tracking-tight">
+                Designed Exclusively for Independent Educators
               </h2>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Replace fragmented WhatsApp groups, paper receipt books, and scattered drive links with a unified, professional tuition academy system.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-amber-400 transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {/* Feature 1 */}
+              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
+                <div className="h-10 w-10 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
+                  <Send className="h-5 w-5" />
+                </div>
+                <h3 className="font-black text-sm text-[#0d2b26]">Live Student Noticeboard</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Post high-priority announcements, homework tasks, and class notices with edit, pin, and delete controls directly visible to all students.
+                </p>
+              </div>
+
+              {/* Feature 2 */}
+              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
+                <div className="h-10 w-10 rounded-xl bg-[#fef8eb] text-[#b47a16] flex items-center justify-center">
                   <BookOpen className="h-5 w-5" />
                 </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Curriculum Builder</h3>
+                <h3 className="font-black text-sm text-[#0d2b26]">Course & Lesson Studio</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Design units, organize lessons, upload learning PDFs, and sync with term tests easily.
+                  Organize theory, revision, and paper class materials into Units and Topics with downloadable PDFs, video tutorials, and past papers.
                 </p>
               </div>
 
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-amber-400 transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
-                  <CheckCircle2 className="h-5 w-5" />
+              {/* Feature 3 */}
+              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
+                <div className="h-10 w-10 rounded-xl bg-[#f0f5fa] text-[#1e3a5f] flex items-center justify-center">
+                  <FileText className="h-5 w-5" />
                 </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Grading Desk</h3>
+                <h3 className="font-black text-sm text-[#0d2b26]">Online Quizzes & Ranking</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Review student answers, assign marks with rubric criteria, and release results transparently.
+                  Build timed MCQ practice tests with automated mark calculation, answer reviews, and batch leaderboard standings.
                 </p>
               </div>
 
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-amber-400 transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center">
-                  <Users className="h-5 w-5" />
+              {/* Feature 4 */}
+              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
+                <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                  <CreditCard className="h-5 w-5" />
                 </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Classroom Allocations</h3>
+                <h3 className="font-black text-sm text-[#0d2b26]">Tuition Fee Reconciliation</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Manage grades 1 to 13, sections (A/B/C), teacher subjects, and master timetable coordination.
+                  Review student/parent bank deposit slips with 1-click approvals, digital payment receipts, and real-time payment status lists.
                 </p>
               </div>
 
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-amber-400 transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center">
-                  <Shield className="h-5 w-5" />
+              {/* Feature 5 */}
+              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
+                <div className="h-10 w-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center">
+                  <QrCode className="h-5 w-5" />
                 </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Official Circulars</h3>
+                <h3 className="font-black text-sm text-[#0d2b26]">Smart QR Attendance</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Issue verified institutional notices and emergency announcements to parents and students.
+                  Scan student IDs or mark attendance in seconds. Parents receive instant notification that their child has checked into class.
+                </p>
+              </div>
+
+              {/* Feature 6 */}
+              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
+                <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
+                  <BarChart3 className="h-5 w-5" />
+                </div>
+                <h3 className="font-black text-sm text-[#0d2b26]">Student Performance Insights</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Spot students falling behind early with clear charts on assignment completion, quiz averages, and class consistency.
                 </p>
               </div>
             </div>
           </section>
 
+          {/* Quick Return to Splitter */}
+          <div className="text-center pt-4">
+            <button
+              type="button"
+              onClick={() => handlePortalSwitch("gateway")}
+              className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Back to Portal Selection</span>
+            </button>
+          </div>
         </main>
       )}
 
@@ -2465,14 +2366,14 @@ export function LandingView({
               <button
                 type="button"
                 onClick={() => handlePortalSwitch("staff")}
-                className={`hover:text-[#0d5c4d] cursor-pointer ${portalType === "staff" ? "text-[#0d5c4d] font-black underline" : ""}`}
+                className={`hover:text-[#0d5c4d] cursor-pointer ${portalType === "staff" ? "text-[#b47a16] font-black underline" : "text-[#b47a16] font-bold"}`}
               >
-                Faculty & Admin Hub
+                Solo Tutor Portal
               </button>
             </div>
 
             <p className="text-center sm:text-right text-[11px] text-slate-400">
-              Sri Lanka Digital School Platform • Built for English, Sinhala, and Tamil.
+              Sri Lanka Solo Tutor Platform • Built for English, Sinhala, and Tamil.
             </p>
           </div>
         </footer>
@@ -2503,8 +2404,8 @@ export function LandingView({
                     {selectedRole === "parent"
                       ? "Parent & Guardian Desk"
                       : selectedRole === "student"
-                      ? "Student Access"
-                      : "Staff Governance"}
+                      ? "Student Portal"
+                      : "Solo Tutor Cockpit"}
                   </p>
                 </div>
               </div>
@@ -2541,7 +2442,7 @@ export function LandingView({
             <div className="px-4 sm:px-6 py-3 bg-[#f8faf9] border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 shrink-0">
               <span className="flex items-center gap-1">
                 <Shield className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                <span>Protected School Directory</span>
+                <span>Secure Tuition Platform</span>
               </span>
               <button
                 type="button"

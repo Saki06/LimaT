@@ -68,19 +68,15 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-base sm:text-xl tracking-tight text-[#0d2b26] truncate">
-                LimaT Smart Book
+                LimaT Tutor & Sports
               </span>
               <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-[10px] font-bold shrink-0">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#0d5c4d]" />
-                {activeTenant?.name || "Sri Lanka Education"}
+                {activeTenant?.name || "Tutor SaaS Platform"}
               </span>
             </div>
             <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d]/80 font-bold hidden sm:block truncate">
-              {activeTenant?.type === "school"
-                ? "K-12 School Edition"
-                : activeTenant?.type === "tuition_center"
-                ? "Tuition Academy Edition"
-                : "Solo Educator Edition"}
+              Independent Tutors & Sports Tournaments Ecosystem
             </p>
           </div>
         </div>

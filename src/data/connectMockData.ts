@@ -4,7 +4,8 @@ import {
   ConnectStudyGroup,
   ConnectMessage,
   ConnectPurchase,
-  TeacherSubscriber
+  TeacherSubscriber,
+  TutorPackage
 } from '@/types/lms';
 
 export const initialConnectTeachers: ConnectTeacher[] = [
@@ -182,49 +183,61 @@ export const initialConnectStudents: ConnectStudent[] = [
 export const initialConnectStudyGroups: ConnectStudyGroup[] = [
   {
     id: 'cg_01',
-    name: 'A/L 2025 Combined Maths Master Circle',
+    teacherId: 'ct_01',
+    teacherName: 'Ms. Kavitha Rajan',
+    name: 'A/L 2026 Combined Maths Master Circle',
     subject: 'Combined Mathematics',
-    description: 'Daily evening problem-solving circle covering Pure Maths (Induction, Calculus) and Applied Mechanics.',
+    description: 'Weekly teacher-led problem solving circle covering Pure Maths (Induction, Calculus) and Applied Mechanics with peer review.',
     membersCount: 64,
     maxMembers: 100,
     activeTopic: 'Differential Equations & Partial Fractions',
     schedule: 'Every Tue & Thu · 7:30 PM - 9:00 PM',
+    meetUrl: 'https://meet.google.com/kavitha-maths-circle',
     isJoined: true,
     color: 'from-purple-500/10 to-indigo-500/5'
   },
   {
     id: 'cg_02',
+    teacherId: 'ct_02',
+    teacherName: 'Mr. Thuvaragan S.',
     name: 'Physics Mechanics Problem Busters',
     subject: 'Physics',
-    description: 'Weekly breakdown of past paper structured essays and high-yield derivations in Circular Motion and Statics.',
+    description: 'Structured essay breakdowns, difficult past paper questions, and high-yield derivations in Statics and Rotation.',
     membersCount: 48,
     maxMembers: 80,
     activeTopic: 'Simple Harmonic Motion (SHM) & Oscillations',
     schedule: 'Every Saturday · 10:00 AM - 11:30 AM',
+    meetUrl: 'https://meet.google.com/thuvaragan-physics-circle',
     isJoined: false,
     color: 'from-emerald-500/10 to-teal-500/5'
   },
   {
     id: 'cg_03',
+    teacherId: 'ct_04',
+    teacherName: 'Mr. Ketheesan K.',
     name: 'ICT Python & SQL Project Lab',
     subject: 'Information & Communication Technology',
-    description: 'Hands-on coding practice for A/L ICT Section B, database normalization, and networking protocols.',
+    description: 'Hands-on coding practice for A/L ICT Section B, database normalization, and live code reviews.',
     membersCount: 39,
     maxMembers: 50,
     activeTopic: 'Database Normalization (1NF to 3NF) & SQL Joins',
     schedule: 'Every Sunday · 4:00 PM - 5:30 PM',
+    meetUrl: 'https://meet.google.com/ketheesan-ict-circle',
     isJoined: false,
     color: 'from-amber-500/10 to-yellow-500/5'
   },
   {
     id: 'cg_04',
+    teacherId: 'ct_03',
+    teacherName: 'Dr. Sarath Perera',
     name: 'Chemistry Organic Reactions Sprint',
     subject: 'Chemistry',
-    description: 'Flashcard sessions and reaction roadmaps for aliphatic and aromatic organic chemistry.',
+    description: 'Flashcard sessions and reaction roadmaps for aliphatic and aromatic organic chemistry led by Dr. Sarath.',
     membersCount: 52,
     maxMembers: 80,
     activeTopic: 'Carbonyl Compounds (Aldehydes & Ketones) Grignard Reactions',
     schedule: 'Every Monday · 6:30 PM - 8:00 PM',
+    meetUrl: 'https://meet.google.com/sarath-chem-circle',
     isJoined: true,
     color: 'from-sky-500/10 to-blue-500/5'
   }
@@ -436,5 +449,171 @@ export const initialTeacherSubscribers: TeacherSubscriber[] = [
     paymentMethod: 'Card (Visa)',
     attendanceRate: 94
     ,schoolId: 'sch_01'
+  }
+];
+
+export const initialTutorPackages: TutorPackage[] = [
+  {
+    id: 'pkg_01',
+    teacherId: 'ct_01',
+    title: 'A/L Combined Mathematics Full Masterclass',
+    subject: 'Combined Mathematics',
+    grade: 'Grade 12 & 13 (A/L)',
+    monthlyFeeLkr: 3500,
+    billingCycle: 'Monthly',
+    description: 'Complete comprehensive syllabus coverage: Calculus, Trigonometry, Statics & Dynamics, with weekly live classes, printed tute delivery, and monthly model paper discussions.',
+    features: [
+      '4 Live Interactive Classes / Week (Google Meet)',
+      'High-Definition Recorded Video Archive with 24/7 Access',
+      'Theory & Exercise Tutes (Printable PDF + Answer Guides)',
+      'Monthly Timed Model Paper Discussion & Individual Marking',
+      'Dedicated WhatsApp VIP Doubt Clearing Group'
+    ],
+    liveClassesPerWeek: 4,
+    status: 'active',
+    enrolledCount: 86,
+    badge: 'Most Popular',
+    createdAt: '2026-01-10'
+  },
+  {
+    id: 'pkg_02',
+    teacherId: 'ct_01',
+    title: 'Pure Mathematics Theory & Proofs Intensive',
+    subject: 'Pure Mathematics',
+    grade: 'Grade 12 (A/L)',
+    monthlyFeeLkr: 2500,
+    billingCycle: 'Monthly',
+    description: 'Focused deep-dive into Pure Mathematics: Functions, Polynomials, Complex Numbers, Matrices and Integration theorems for students targeting Island Top 50.',
+    features: [
+      '2 Live Theory Masterclasses / Week',
+      'Detailed Theorem Proof Sheets & Formula Handbooks',
+      '10-Year Past Paper Structured Question Breakdown',
+      'Bi-weekly Online Diagnostic Quizzes'
+    ],
+    liveClassesPerWeek: 2,
+    status: 'active',
+    enrolledCount: 38,
+    badge: 'Core Theory',
+    createdAt: '2026-02-01'
+  },
+  {
+    id: 'pkg_03',
+    teacherId: 'ct_01',
+    title: 'Applied Maths & Mechanics Problem Solving Pass',
+    subject: 'Applied Mathematics',
+    grade: 'Grade 13 (A/L)',
+    monthlyFeeLkr: 2200,
+    billingCycle: 'Monthly',
+    description: 'Master vectors, friction, equilibrium, projectiles, and circular motion with step-by-step problem-solving templates and shortcut calculation methods.',
+    features: [
+      '2 Live Problem Solving Sessions / Week',
+      'Mechanics Real-World Vector Diagrams & Worksheets',
+      'Recorded Video Replays with Chapter Bookmarks',
+      'Teacher Direct Q&A Support'
+    ],
+    liveClassesPerWeek: 2,
+    status: 'active',
+    enrolledCount: 24,
+    createdAt: '2026-03-05'
+  },
+  {
+    id: 'pkg_05',
+    teacherId: 'ct_02',
+    title: 'A/L Physics Theory & Real-Life Simulations Pass',
+    subject: 'Physics',
+    grade: 'Grade 12 & 13 (A/L)',
+    monthlyFeeLkr: 2000,
+    billingCycle: 'Monthly',
+    description: 'Comprehensive Mechanics, Waves & Optics, Electricity and Modern Physics with hands-on conceptual demonstrations and structured essay writing methods.',
+    features: [
+      '4 Live Google Meet Classes / Month',
+      'Step-by-step Physics MCQ Shortcut Speed Techniques',
+      'Full Term Test Model Paper Discussions',
+      'Direct WhatsApp Homework Mentorship'
+    ],
+    liveClassesPerWeek: 4,
+    status: 'active',
+    enrolledCount: 54,
+    badge: 'High Demand',
+    createdAt: '2026-02-15'
+  },
+  {
+    id: 'pkg_06',
+    teacherId: 'ct_02',
+    title: 'Physics Mechanics & Past Paper Breakdown',
+    subject: 'Physics',
+    grade: 'Grade 12 (A/L)',
+    monthlyFeeLkr: 1800,
+    billingCycle: 'Monthly',
+    description: 'Dedicated focus on Rotational Dynamics, Circular Motion, Gravitation, and 20 years of past paper essays.',
+    features: [
+      '2 Live Masterclasses / Week',
+      'Detailed Derivation Summary Sheets',
+      'Past Paper Model Marking Schemes'
+    ],
+    liveClassesPerWeek: 2,
+    status: 'active',
+    enrolledCount: 31,
+    createdAt: '2026-03-01'
+  },
+  {
+    id: 'pkg_07',
+    teacherId: 'ct_03',
+    title: 'Chemistry Organic & Inorganic Masterclass Pass',
+    subject: 'Chemistry',
+    grade: 'Grade 12 & 13 (A/L)',
+    monthlyFeeLkr: 2800,
+    billingCycle: 'Monthly',
+    description: '100 Organic reaction conversion roadmaps, Equilibrium calculations, and Industrial Chemistry by former Chief Examiner Dr. Sarath Perera.',
+    features: [
+      '4 Live Theory & Reaction Mechanism Classes / Month',
+      'Colour-coded Reaction Flowcharts & Workbooks',
+      'Monthly Timed Paper Evaluation & Feedback'
+    ],
+    liveClassesPerWeek: 4,
+    status: 'active',
+    enrolledCount: 72,
+    badge: 'Author Recommended',
+    createdAt: '2026-01-20'
+  },
+  {
+    id: 'pkg_08',
+    teacherId: 'ct_04',
+    title: 'A/L ICT Python Programming & SQL Database Plan',
+    subject: 'Information & Communication Technology',
+    grade: 'Grade 12 & 13 (A/L)',
+    monthlyFeeLkr: 2200,
+    billingCycle: 'Monthly',
+    description: 'Hands-on programming practice, database relational schema design, network topology calculations, and section B code questions.',
+    features: [
+      '3 Live Coding & Theory Classes / Week',
+      'Downloadable Python Code Repositories & SQL Scripts',
+      'Project-based Past Paper breakdown'
+    ],
+    liveClassesPerWeek: 3,
+    status: 'active',
+    enrolledCount: 45,
+    badge: 'Practical Focused',
+    createdAt: '2026-02-10'
+  },
+  {
+    id: 'pkg_09',
+    teacherId: 'ct_05',
+    title: 'Biology Plant Physiology & Genetics Mastery Pass',
+    subject: 'Biology',
+    grade: 'Grade 12 & 13 (A/L)',
+    monthlyFeeLkr: 2000,
+    billingCycle: 'Monthly',
+    description: 'Visual 3D molecular biology models, Mendelian genetic pedigrees, and resource book line-by-line review.',
+    features: [
+      '3 Live Interactive Classes / Week',
+      'High-Yield Structured Essay Points & Diagrams',
+      'Model MCQ Strategy Sessions'
+    ],
+    liveClassesPerWeek: 3,
+    status: 'active',
+    enrolledCount: 36,
+    badge: 'Top Rated',
+    createdAt: '2026-02-28'
   }
 ];

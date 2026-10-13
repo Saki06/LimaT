@@ -40,11 +40,12 @@ import { Announcement } from "@/types/lms";
 // Helper function to detect audience scope
 export function getAudienceCategory(targetAudience: string): "all" | "teachers" | "students" {
   const lower = (targetAudience || "").toLowerCase();
-  if (lower.includes("teacher") || lower.includes("faculty") || lower.includes("staff")) {
+  if (lower.includes("tutor") || lower.includes("teacher") || lower.includes("coach") || lower.includes("faculty") || lower.includes("staff")) {
     return "teachers";
   }
   if (
     lower.includes("student") ||
+    lower.includes("subscriber") ||
     lower.includes("candidate") ||
     lower.includes("grade") ||
     lower.includes("player") ||
@@ -66,7 +67,7 @@ export function AnnouncementsView() {
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterAudience, setFilterAudience] = useState<string>("all");
 
-  // Expandable circular cards
+  // Expandable cards
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 
   // 3-dot menu dropdown state
@@ -78,11 +79,11 @@ export function AnnouncementsView() {
   const [draft, setDraft] = useState({
     title: "",
     message: "",
-    targetAudience: "Whole School (Everyone)",
+    targetAudience: "Platform-Wide (Everyone)",
     priority: "normal" as Announcement["priority"]
   });
 
-  // Preview Circular Modal State
+  // Preview Modal State
   const [previewCircular, setPreviewCircular] = useState<Announcement | null>(null);
 
   // Delete Confirmation Modal State
@@ -90,12 +91,11 @@ export function AnnouncementsView() {
 
   // Available audience choices for publishing
   const audienceOptions = [
-    { value: "Whole School (Everyone)", label: "Whole School (Everyone)", desc: "Visible to all students, faculty & administrators" },
-    { value: "Teachers Only", label: "Teachers Only (Faculty Memo)", desc: "Confidential circular for teaching staff & heads only" },
-    { value: "Students Only", label: "Students Only (All Batches)", desc: "Relevant for secondary & collegiate students" },
-    { value: "Senior Students (Grades 11-12)", label: "Senior Students (Grades 11-12)", desc: "Assessment & examination candidates" },
-    { value: "Sports Squad & Coaches", label: "Sports Squad & Coaches", desc: "Athletic teams & physical education mentors" },
-    { value: "Parents & School Community", label: "Parents & School Community", desc: "PTA notices & institutional updates" }
+    { value: "Platform-Wide (Everyone)", label: "Platform-Wide (Everyone)", desc: "Visible to all students, solo tutors, coaches & admins" },
+    { value: "Solo Tutors & Coaches", label: "Solo Tutors & Coaches", desc: "Confidential notices, payout updates & tutor guidelines" },
+    { value: "Students & Subscribers", label: "Students & Subscribers", desc: "Course materials, subscription alerts & student notices" },
+    { value: "Sports Squad & Coaches", label: "Sports Squad & Coaches", desc: "Tournament fixtures, match schedules & athletic updates" },
+    { value: "Parents & Guardians", label: "Parents & Guardians", desc: "Subscription invoices & progress reports" }
   ];
 
   // Open Create Modal
@@ -104,7 +104,7 @@ export function AnnouncementsView() {
     setDraft({
       title: "",
       message: "",
-      targetAudience: "Whole School (Everyone)",
+      targetAudience: "Platform-Wide (Everyone)",
       priority: "normal"
     });
     setIsEditorOpen(true);
@@ -223,7 +223,7 @@ export function AnnouncementsView() {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
           <Lock className="h-3.5 w-3.5 text-indigo-600" />
-          Teachers Only (Faculty Memo)
+          Solo Tutors & Coaches
         </span>
       );
     }
@@ -238,7 +238,7 @@ export function AnnouncementsView() {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0]">
         <Globe className="h-3.5 w-3.5 text-[#0d5c4d]" />
-        Whole School (Common)
+        Platform-Wide
       </span>
     );
   };
@@ -259,10 +259,10 @@ export function AnnouncementsView() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-black text-[#0d2b26] flex items-center gap-2">
-                    Circular Control Center
+                    Platform Announcements
                   </h1>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Dispatch administrative circulars, manage faculty memos, student notices, and institution-wide alerts.
+                    Broadcast platform-wide updates, tutor guidelines, student notices, and system alerts.
                   </p>
                 </div>
               </div>
@@ -274,14 +274,14 @@ export function AnnouncementsView() {
                 className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold h-10 px-4 rounded-xl shadow-sm gap-2 cursor-pointer transition-all active:scale-95"
               >
                 <Plus className="h-4 w-4" />
-                Dispatch New Circular
+                Publish Announcement
               </Button>
             </div>
           </div>
 
           {/* Broadcast Overview KPI Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Card 1: Total Circulars */}
+            {/* Card 1: Total Announcements */}
             <Card className="border-[#e6ece8] bg-white shadow-2xs hover:shadow-xs transition-shadow">
               <CardContent className="p-4 flex items-center gap-3.5">
                 <div className="h-11 w-11 rounded-2xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0">
@@ -290,7 +290,7 @@ export function AnnouncementsView() {
                 <div>
                   <p className="text-2xl font-black text-[#0d2b26] leading-none">{totalCount}</p>
                   <p className="text-xs font-bold text-slate-500 mt-1">Total Announcements</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Active institutional circulars</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Active platform broadcasts</p>
                 </div>
               </CardContent>
             </Card>
@@ -304,7 +304,7 @@ export function AnnouncementsView() {
                 <div>
                   <p className="text-2xl font-black text-rose-600 leading-none">{urgentHighCount}</p>
                   <p className="text-xs font-bold text-slate-500 mt-1">Active High & Urgent Alerts</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Priority broadcasts requiring action</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Priority broadcasts highlighted in feeds</p>
                 </div>
               </CardContent>
             </Card>
@@ -316,13 +316,13 @@ export function AnnouncementsView() {
                   <Users className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-slate-600">Audience Distribution</p>
+                  <p className="text-xs font-bold text-slate-600">Audience Reach</p>
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#ecf8f5] text-[#0d5c4d]">
-                      <Globe className="h-3 w-3" /> {wholeSchoolCount} Common
+                      <Globe className="h-3 w-3" /> {wholeSchoolCount} All Users
                     </span>
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700">
-                      <Lock className="h-3 w-3" /> {teachersCount} Teachers
+                      <Lock className="h-3 w-3" /> {teachersCount} Tutors
                     </span>
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-sky-50 text-sky-700">
                       <GraduationCap className="h-3 w-3" /> {studentsCount} Students
@@ -339,10 +339,10 @@ export function AnnouncementsView() {
           <div>
             <h1 className="text-2xl font-black text-[#0d2b26] flex items-center gap-2">
               <Bell className="h-6 w-6 text-[#0d5c4d]" />
-              {t.nav.announcements || "Official Announcements & Circulars"}
+              Platform Announcements
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              Official campus notices, academic circulars, timetable schedules, and institutional events.
+              Official platform updates, tutor notices, tournament schedules, and system alerts.
             </p>
           </div>
         </div>
@@ -360,7 +360,7 @@ export function AnnouncementsView() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search circulars by title, keyword, or author..."
+              placeholder="Search announcements by title, keyword, or author..."
               className="w-full h-10 pl-10 pr-4 rounded-xl bg-[#f8faf9] border border-[#e2eae5] text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d] transition-all"
             />
             {searchQuery && (
@@ -423,10 +423,10 @@ export function AnnouncementsView() {
             }`}
           >
             <Globe className="h-3 w-3" />
-            Whole School ({wholeSchoolCount})
+            Platform-Wide ({wholeSchoolCount})
           </button>
 
-          {/* Teachers Only tab */}
+          {/* Solo Tutors tab */}
           {(!isStudent || isAdmin) && (
             <button
               onClick={() => setFilterAudience("teachers")}
@@ -437,7 +437,7 @@ export function AnnouncementsView() {
               }`}
             >
               <Lock className="h-3 w-3" />
-              Teachers Only ({teachersCount})
+              Solo Tutors & Coaches ({teachersCount})
             </button>
           )}
 
@@ -451,7 +451,7 @@ export function AnnouncementsView() {
             }`}
           >
             <GraduationCap className="h-3 w-3" />
-            Students Only ({studentsCount})
+            Students & Subscribers ({studentsCount})
           </button>
         </div>
       </div>
@@ -465,9 +465,9 @@ export function AnnouncementsView() {
             <div className="h-12 w-12 rounded-full bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center mx-auto">
               <Megaphone className="h-6 w-6" />
             </div>
-            <h3 className="text-base font-bold text-[#0d2b26]">No Circulars Found</h3>
+            <h3 className="text-base font-bold text-[#0d2b26]">No Announcements Found</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              No circulars match your current search query or filter criteria. Try adjusting the audience or priority filter.
+              No announcements match your current search query or filter criteria. Try adjusting the audience or priority filter.
             </p>
             {isAdmin && (
               <Button onClick={openCreate} className="mt-2 bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold">
@@ -522,8 +522,8 @@ export function AnnouncementsView() {
                               className="fixed inset-0 z-20"
                               onClick={() => setOpenActionMenuId(null)}
                             />
-                            <div className="absolute right-0 top-9 z-30 w-44 rounded-xl bg-white border border-[#e2eae5] shadow-lg py-1.5 animate-in fade-in zoom-in-95 duration-150 text-left">
-                              {/* Option 1: Preview Circular */}
+                            <div className="absolute right-0 top-9 z-30 w-48 rounded-xl bg-white border border-[#e2eae5] shadow-lg py-1.5 animate-in fade-in zoom-in-95 duration-150 text-left">
+                              {/* Option 1: Preview Announcement */}
                               <button
                                 type="button"
                                 onClick={() => {
@@ -533,7 +533,7 @@ export function AnnouncementsView() {
                                 className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-slate-700 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] transition-colors cursor-pointer"
                               >
                                 <Eye className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                                <span>Preview Circular</span>
+                                <span>Preview Bulletin</span>
                               </button>
 
                               {/* Admin Management options: Edit & Delete */}
@@ -548,7 +548,7 @@ export function AnnouncementsView() {
                                     className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-slate-700 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] transition-colors cursor-pointer"
                                   >
                                     <Pencil className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                                    <span>Edit Circular</span>
+                                    <span>Edit Announcement</span>
                                   </button>
 
                                   <div className="h-px bg-slate-100 my-1" />
@@ -562,7 +562,7 @@ export function AnnouncementsView() {
                                     className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                                   >
                                     <Trash2 className="h-3.5 w-3.5 text-rose-500" />
-                                    <span>Remove Circular</span>
+                                    <span>Delete Announcement</span>
                                   </button>
                                 </>
                               )}
@@ -601,7 +601,7 @@ export function AnnouncementsView() {
                           </>
                         ) : (
                           <>
-                            <ChevronDown className="h-3.5 w-3.5" /> Read Full Circular / Detailed Instructions
+                            <ChevronDown className="h-3.5 w-3.5" /> Read Full Announcement / Detailed Notice
                           </>
                         )}
                       </button>
@@ -623,7 +623,7 @@ export function AnnouncementsView() {
                     <div className="flex items-center gap-3">
                       <span className="text-[11px] text-[#0d5c4d] font-bold flex items-center gap-1 bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-[#c4e9e0]">
                         <CheckCircle2 className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                        Official Verified Circular
+                        Verified Platform Notice
                       </span>
 
                       <button
@@ -631,7 +631,7 @@ export function AnnouncementsView() {
                         onClick={() => setPreviewCircular(ann)}
                         className="text-xs font-bold text-[#0d5c4d] hover:underline inline-flex items-center gap-1 cursor-pointer"
                       >
-                        <FileText className="h-3.5 w-3.5" /> Letterhead View
+                        <FileText className="h-3.5 w-3.5" /> Official Bulletin
                       </button>
                     </div>
                   </div>
@@ -643,27 +643,27 @@ export function AnnouncementsView() {
       </div>
 
       {/* ============================================================ */}
-      {/* 4. CIRCULAR PUBLISHING MODAL (CREATE / EDIT) */}
+      {/* 4. ANNOUNCEMENT PUBLISHING MODAL (CREATE / EDIT) */}
       {/* ============================================================ */}
       <Modal
         isOpen={isEditorOpen}
         onClose={() => setIsEditorOpen(false)}
-        title={editingAnnouncement ? "Edit Administrative Circular" : "Dispatch New Administrative Circular"}
-        description="Broadcast an official school announcement, faculty memo, or student bulletin."
+        title={editingAnnouncement ? "Edit Platform Announcement" : "Publish New Platform Announcement"}
+        description="Broadcast an official platform notice, tutor update, or student bulletin."
         maxWidth="max-w-2xl"
       >
         <form onSubmit={saveAnnouncement} className="space-y-4 pt-2">
-          {/* Circular Title */}
+          {/* Announcement Title */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Circular Subject / Title <span className="text-rose-500">*</span>
+              Announcement Title <span className="text-rose-500">*</span>
             </label>
             <input
               required
               type="text"
               value={draft.title}
               onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-              placeholder="e.g. Term 2 Examination Timetable & Candidate Guidelines"
+              placeholder="e.g. Platform Upgrade: Interactive Whiteboard & Payout Cycle"
               className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
             />
           </div>
@@ -687,7 +687,7 @@ export function AnnouncementsView() {
                 ))}
               </select>
               <p className="text-[11px] text-slate-500 mt-1">
-                {audienceOptions.find((o) => o.value === draft.targetAudience)?.desc || "Designated circular recipients"}
+                {audienceOptions.find((o) => o.value === draft.targetAudience)?.desc || "Designated announcement recipients"}
               </p>
             </div>
 
@@ -702,7 +702,7 @@ export function AnnouncementsView() {
                 className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
               >
                 <option value="normal">Normal (Routine Notice)</option>
-                <option value="high">High (Important Circular)</option>
+                <option value="high">High (Featured Announcement)</option>
                 <option value="urgent">Urgent (Immediate Attention)</option>
               </select>
               <div className="mt-1.5 flex items-center gap-1 text-[11px]">
@@ -713,27 +713,27 @@ export function AnnouncementsView() {
                 )}
                 {draft.priority === "high" && (
                   <span className="text-amber-600 font-bold flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> Highlights on student & faculty dashboard feeds
+                    <AlertTriangle className="h-3 w-3" /> Highlights on student & tutor dashboard feeds
                   </span>
                 )}
                 {draft.priority === "normal" && (
-                  <span className="text-slate-500">Standard notice in circular board</span>
+                  <span className="text-slate-500">Standard notice in announcement feed</span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Circular Message */}
+          {/* Announcement Message */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Official Message / Circular Content <span className="text-rose-500">*</span>
+              Official Message / Notice Content <span className="text-rose-500">*</span>
             </label>
             <textarea
               required
               rows={6}
               value={draft.message}
               onChange={(e) => setDraft({ ...draft, message: e.target.value })}
-              placeholder="Draft your circular body text with bullet points, session timings, and guidelines..."
+              placeholder="Draft your announcement body text with bullet points, session timings, and guidelines..."
               className="w-full p-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d] leading-relaxed resize-y"
             />
           </div>
@@ -745,20 +745,20 @@ export function AnnouncementsView() {
             </Button>
             <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-2">
               <Send className="h-4 w-4" />
-              {editingAnnouncement ? "Save Changes" : "Broadcast Circular"}
+              {editingAnnouncement ? "Save Changes" : "Broadcast Announcement"}
             </Button>
           </div>
         </form>
       </Modal>
 
       {/* ============================================================ */}
-      {/* 5. OFFICIAL CIRCULAR LETTERHEAD PREVIEW MODAL */}
+      {/* 5. OFFICIAL ANNOUNCEMENT BULLETIN PREVIEW MODAL */}
       {/* ============================================================ */}
       <Modal
         isOpen={Boolean(previewCircular)}
         onClose={() => setPreviewCircular(null)}
-        title="Official Circular Letterhead View"
-        description="Formal formatted view of this institutional communication."
+        title="Official Announcement Bulletin"
+        description="Formatted official bulletin view of this platform broadcast."
         maxWidth="max-w-2xl"
       >
         {previewCircular && (
@@ -769,17 +769,17 @@ export function AnnouncementsView() {
               <div className="text-center pb-4 border-b-2 border-[#0d5c4d] relative">
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <div className="h-8 w-8 rounded-lg bg-[#0d5c4d] text-white flex items-center justify-center font-black text-sm">
-                    SM
+                    EP
                   </div>
                   <h2 className="text-base font-black tracking-wider uppercase text-[#0d2b26]">
-                    St. Michael High School
+                    EduPlatform Network
                   </h2>
                 </div>
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                  Office of the Principal & Academic Directorate · Batticaloa
+                  Central Administration & Academic Operations Desk
                 </p>
                 <p className="text-[9px] text-slate-400 mt-0.5">
-                  Ref: SMHS/CIRCULAR/2026-{previewCircular.id.replace("ann_", "0")} &bull; Dispatched: {previewCircular.publishedAt}
+                  Ref: EP/NOTICE/2026-{previewCircular.id.replace("ann_", "0")} &bull; Dispatched: {previewCircular.publishedAt}
                 </p>
               </div>
 
@@ -795,14 +795,14 @@ export function AnnouncementsView() {
                 </div>
               </div>
 
-              {/* Circular Subject */}
+              {/* Notice Subject */}
               <div>
                 <h3 className="text-base font-black text-[#0d2b26] leading-snug">
                   SUBJECT: {previewCircular.title.toUpperCase()}
                 </h3>
               </div>
 
-              {/* Circular Message */}
+              {/* Notice Message */}
               <div className="text-sm text-slate-800 whitespace-pre-line leading-relaxed font-normal py-2">
                 {previewCircular.message}
               </div>
@@ -810,8 +810,8 @@ export function AnnouncementsView() {
               {/* Official Sign-off Stamp */}
               <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-mono font-bold text-[#0d5c4d]">Digitally Signed & Certified</div>
-                  <p className="text-[10px] text-slate-500">St. Michael Central Administration System</p>
+                  <div className="text-xs font-mono font-bold text-[#0d5c4d]">Digitally Verified Notice</div>
+                  <p className="text-[10px] text-slate-500">EduPlatform Central Administration System</p>
                 </div>
                 <div className="text-right">
                   <p className="font-black text-xs text-slate-900">{previewCircular.authorName}</p>
@@ -843,7 +843,7 @@ export function AnnouncementsView() {
                       openEdit(cur);
                     }}
                   >
-                    <Pencil className="h-3.5 w-3.5 mr-1" /> Edit Circular
+                    <Pencil className="h-3.5 w-3.5 mr-1" /> Edit Announcement
                   </Button>
                 )}
                 <Button
@@ -865,8 +865,8 @@ export function AnnouncementsView() {
       <Modal
         isOpen={Boolean(announcementToDelete)}
         onClose={() => setAnnouncementToDelete(null)}
-        title="Remove Circular Announcement"
-        description="Are you sure you want to retract and remove this announcement from the platform?"
+        title="Delete Platform Announcement"
+        description="Are you sure you want to retract and delete this announcement from the platform?"
         maxWidth="max-w-md"
       >
         <div className="space-y-4 pt-2">
@@ -880,7 +880,7 @@ export function AnnouncementsView() {
           )}
 
           <p className="text-xs text-slate-500">
-            This will immediately remove the notice from student and teacher circular boards across the school portal.
+            This will immediately remove the notice from tutor and student boards across the platform.
           </p>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
@@ -896,7 +896,7 @@ export function AnnouncementsView() {
               }}
               className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
             >
-              Remove Circular
+              Delete Announcement
             </Button>
           </div>
         </div>

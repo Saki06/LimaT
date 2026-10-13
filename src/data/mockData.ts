@@ -886,20 +886,20 @@ export const initialFixtures: Fixture[] = [
     id: 'fix_01',
     teamId: 'tm_cricket_1st',
     sportName: 'Cricket',
-    homeTeam: 'St. Michael High School (First XI)',
-    awayTeam: 'Trinity Central College',
+    homeTeam: 'Lions Cricket Academy (Senior XI)',
+    awayTeam: 'Trinity Sports Academy',
     date: '2026-10-04',
     time: '09:30 AM',
-    venue: 'College Main Oval',
-    competitionName: 'All-Island Inter-School Tier 1 Tournament',
+    venue: 'City Sports Oval',
+    competitionName: 'All-Island Inter-Academy Tier 1 Tournament',
     status: 'scheduled'
   },
   {
     id: 'fix_02',
     teamId: 'tm_cricket_1st',
     sportName: 'Cricket',
-    homeTeam: 'St. Michael High School',
-    awayTeam: 'Royal Academy Colombo',
+    homeTeam: 'Lions Cricket Academy',
+    awayTeam: 'Royal Titans Academy',
     date: '2026-09-24',
     time: '10:00 AM',
     venue: 'Colombo Colts Grounds',
@@ -908,7 +908,7 @@ export const initialFixtures: Fixture[] = [
     result: {
       homeScore: '248/6 (50 ov)',
       awayScore: '210 all out (46.2 ov)',
-      outcome: 'St. Michael Won by 38 runs',
+      outcome: 'Lions Academy Won by 38 runs',
       recordedAt: '2026-09-24 17:30'
     }
   },
@@ -916,83 +916,83 @@ export const initialFixtures: Fixture[] = [
     id: 'fix_03',
     teamId: 'tm_rugby_snr',
     sportName: 'Rugby Football',
-    homeTeam: 'St. Michael Lions',
-    awayTeam: 'Kingswood College',
+    homeTeam: 'Lions Rugby Club',
+    awayTeam: 'Kingswood Academy',
     date: '2026-10-12',
     time: '04:00 PM',
     venue: 'City Stadium Arena',
-    competitionName: 'Schools Rugby League 2026',
+    competitionName: 'Youth Rugby League 2026',
     status: 'scheduled'
   }
 ];
 
 export const initialStandings: Standing[] = [
-  { id: 'st_01', sportName: 'Cricket', teamName: 'St. Michael High School', played: 6, won: 5, drawn: 0, lost: 1, points: 28 },
-  { id: 'st_02', sportName: 'Cricket', teamName: 'Trinity Central College', played: 6, won: 4, drawn: 1, lost: 1, points: 24 },
-  { id: 'st_03', sportName: 'Cricket', teamName: 'Royal Academy Colombo', played: 6, won: 3, drawn: 0, lost: 3, points: 18 },
-  { id: 'st_04', sportName: 'Cricket', teamName: 'Hillwood College', played: 6, won: 1, drawn: 1, lost: 4, points: 8 }
+  { id: 'st_01', sportName: 'Cricket', teamName: 'Lions Cricket Academy', played: 6, won: 5, drawn: 0, lost: 1, points: 28 },
+  { id: 'st_02', sportName: 'Cricket', teamName: 'Trinity Sports Academy', played: 6, won: 4, drawn: 1, lost: 1, points: 24 },
+  { id: 'st_03', sportName: 'Cricket', teamName: 'Royal Titans Academy', played: 6, won: 3, drawn: 0, lost: 3, points: 18 },
+  { id: 'st_04', sportName: 'Cricket', teamName: 'Apex Sports Club', played: 6, won: 1, drawn: 1, lost: 4, points: 8 }
 ];
 
 export const initialTournaments: Tournament[] = [
   {
     id: 'tr_01',
-    name: 'All-Island Inter-School Tier 1 Cricket Championship 2026',
+    name: 'All-Island Inter-Academy Tier 1 Cricket Championship 2026',
     sportId: 'sp_cricket',
     sportName: 'Cricket',
     category: 'Under-19 Division 1',
     format: 'group_stage_knockout',
     startDate: '2026-09-20',
     endDate: '2026-10-28',
-    venue: 'Colombo Colts Grounds & College Main Oval',
-    organizer: 'Sri Lanka Schools Cricket Association (SLSCA)',
+    venue: 'Colombo Colts Grounds & City Sports Oval',
+    organizer: 'Sri Lanka Inter-Academy Cricket Association',
     teamsCount: 8,
     participatingTeams: [
-      'St. Michael High School',
-      'Trinity Central College',
-      'Royal Academy Colombo',
-      'Ananda College',
-      'St. Joseph’s College',
-      'Richmond College Galle',
-      'Dharmaraja College',
-      'St. Anthony’s College'
+      'Lions Cricket Academy',
+      'Trinity Sports Academy',
+      'Royal Titans Academy',
+      'Apex Warriors',
+      'St. Joseph Academy',
+      'Southern Titans',
+      'Central Eagles',
+      'Pioneer Sports Club'
     ],
     status: 'ongoing',
-    trophyTitle: 'Sir Oliver Goonetilleke Challenge Trophy',
-    description: 'Premier 50-over tournament featuring top 8 collegiate teams across the island with live scorecard updates and provincial playoff brackets.',
+    trophyTitle: 'National Challenge Trophy',
+    description: 'Premier 50-over tournament featuring top 8 academy teams across the island with live scorecard updates and provincial playoff brackets.',
     currentRound: 'Quarter Finals',
     rules: '50 overs per side, ICC white-ball rules, DLS calculation in effect for rain delays.'
   },
   {
     id: 'tr_02',
-    name: 'Milo Schools President’s Trophy Rugby Knockout 2026',
+    name: 'President’s Trophy Inter-Club Rugby Knockout 2026',
     sportId: 'sp_rugby',
     sportName: 'Rugby Football',
     category: 'Under-19 Senior XV',
     format: 'knockout',
     startDate: '2026-10-15',
     endDate: '2026-11-04',
-    venue: 'Royal College Sports Complex / Sugathadasa Stadium',
-    organizer: 'Sri Lanka Schools Rugby Football Union (SLSRFU)',
+    venue: 'City Stadium Arena / Sugathadasa Stadium',
+    organizer: 'Sri Lanka Youth Rugby Football Union',
     teamsCount: 8,
     participatingTeams: [
-      'St. Michael Lions',
-      'Kingswood College',
-      'Isipathana Green Machine',
-      'Trinity College 1st XV',
-      'St. Peter’s College',
-      'Royal College 1st XV',
-      'Wesley College',
-      'S. Thomas’ Mount Lavinia'
+      'Lions Rugby Club',
+      'Kingswood Academy',
+      'Isipathana Youth',
+      'Trinity Academy 1st XV',
+      'Peters Sports Club',
+      'Royal Titans 1st XV',
+      'Wesley Club',
+      'Southern Sea Hawks'
     ],
     status: 'upcoming',
     trophyTitle: 'President’s Gold Shield',
-    description: 'The pinnacle of school rugby knockouts. Winner proceeds to the All-Island Inter-Collegiate final.',
+    description: 'The pinnacle of youth club rugby knockouts. Winner proceeds to the All-Island Inter-Academy final.',
     currentRound: 'Round of 8 (Quarter-Finals)',
     rules: '35 minutes per half, 10 min extra time in knockout draws, followed by sudden-death drop kicks.'
   },
   {
     id: 'tr_03',
-    name: 'Provincial Inter-School Aquatics & Swimming Gala 2026',
+    name: 'Provincial Inter-Academy Aquatics & Swimming Gala 2026',
     sportId: 'sp_swimming',
     sportName: 'Aquatics & Swimming',
     category: 'Under-15, U-17, U-19',
@@ -1000,25 +1000,25 @@ export const initialTournaments: Tournament[] = [
     startDate: '2026-11-10',
     endDate: '2026-11-12',
     venue: 'Sugathadasa National Aquatic Complex',
-    organizer: 'Western Province Schools Aquatic Association',
+    organizer: 'Western Province Aquatics Association',
     teamsCount: 12,
     participatingTeams: [
-      'St. Michael Aquatic Club',
-      'Royal Colombo Swim Squad',
-      'Musaeus College',
-      'Ladies’ College',
-      'St. Joseph’s Swimmers',
+      'Lions Aquatic Academy',
+      'Royal Titans Swim Squad',
+      'Metropolitan Swim Club',
+      'Coastal Dolphins',
+      'Apex Aquatic Club',
       'Gateway International'
     ],
     status: 'registration_open',
-    trophyTitle: 'Dr. R.L. Spittel Challenge Shield',
+    trophyTitle: 'Provincial Challenge Shield',
     description: '3-day aquatic championship featuring freestyle, breaststroke, backstroke, butterfly, and medley relays across all age brackets.',
     currentRound: 'Team Registration Open',
     rules: 'FINA standard electronic timing and false-start sensors.'
   },
   {
     id: 'tr_04',
-    name: 'National Schools Athletics Track & Field Championship 2026',
+    name: 'National Inter-Academy Athletics Track & Field Championship 2026',
     sportId: 'sp_athletics',
     sportName: 'Track & Field Athletics',
     category: 'All Island Senior',
@@ -1026,19 +1026,19 @@ export const initialTournaments: Tournament[] = [
     startDate: '2026-09-10',
     endDate: '2026-09-14',
     venue: 'Mahinda Rajapaksa International Stadium, Diyagama',
-    organizer: 'Ministry of Education Sports Division',
+    organizer: 'National Athletic Association',
     teamsCount: 24,
     participatingTeams: [
-      'St. Michael High School',
-      'Maris Stella College',
-      'Walala A. Ratnayake Central',
-      'St. Benedict’s College'
+      'Lions Sports Academy',
+      'Maris Sports Club',
+      'Central Track Club',
+      'Southern Striders'
     ],
     status: 'completed',
-    trophyTitle: 'Minister of Education Challenge Trophy',
-    description: 'National track and field meet crowning the best collegiate athletic team in Sri Lanka.',
-    champion: 'St. Michael High School (148 Points)',
-    runnerUp: 'Maris Stella College (132 Points)',
+    trophyTitle: 'National Championship Trophy',
+    description: 'National track and field meet crowning the best academy athletic team in Sri Lanka.',
+    champion: 'Lions Sports Academy (148 Points)',
+    runnerUp: 'Maris Sports Club (132 Points)',
     rules: 'World Athletics standard rules with certified photo-finish camera technology.'
   }
 ];
@@ -1091,72 +1091,42 @@ export const initialEvents: SchoolEvent[] = [
 export const initialAnnouncements: Announcement[] = [
   {
     id: 'ann_01',
-    title: 'Term 2 Final Assessment Schedule & Candidate Guidelines Released',
-    message: `The official examination timetable for Term 2 Combined Mathematics, Physics, and Chemistry examinations is now officially published.
-
-Key Candidate Guidelines & Instructions:
-1. Morning sessions commence sharply at 08:30 AM. Candidates must be seated in the examination hall 15 minutes prior to commencement.
-2. Only approved non-programmable scientific calculators are permitted for Mathematics and Physics papers.
-3. Index numbers and official admit cards must be displayed clearly on candidate desks throughout the session.
-
-Hall Allocations:
-• Physical Science Candidates: Senior Secondary Wing, Examination Hall 04 & 05.
-• Biological Science Candidates: Main Auditorium, Ground Floor.
-
-For timetable inquiries or special accommodation requests, please consult the Examination Unit.`,
+    title: 'Quadratic Equations & Complex Numbers — Chapter 5 Vault Notes',
+    message: 'New masterclass notes uploaded: 20 exam-targeted practice problems with complete step-by-step solutions are now available in your Study Vault. Remember to review before Saturday\'s live paper discussion! 📊',
     publishedAt: '2 hours ago',
-    authorName: 'Dr. K. Rajasingham',
-    authorRole: 'Principal / Admin',
-    targetAudience: 'Students Only',
-    priority: 'high'
-  },
-  {
-    id: 'ann_03',
-    title: 'Faculty Notice: Term 2 Moderation & Continuous Assessment Submission',
-    message: `Confidential memo to all secondary teaching faculty and academic department heads:
-
-1. Graded answer scripts, continuous assessment rubrics, and final term marks sheets must be verified and uploaded via the Faculty Portal before this Friday at 4:00 PM.
-2. Special consideration requests for absent candidates must be attached with valid medical certificates approved by the School Medical Officer.
-3. The Academic Moderation Committee will convene on Monday at 08:30 AM in the Conference Room. Attendance for heads of departments is mandatory.`,
-    publishedAt: '3 hours ago',
-    authorName: 'Dr. K. Rajasingham',
-    authorRole: 'Principal / Admin',
-    targetAudience: 'Teachers Only',
-    priority: 'urgent'
+    authorName: 'Dr. Samantha Perera',
+    authorRole: 'Solo Tutor',
+    targetAudience: 'Target A/L Batch',
+    priority: 'normal'
   },
   {
     id: 'ann_04',
-    title: '118th Annual Inter-House Athletic Championships & Track Meet Schedule',
-    message: `The College Annual Athletic Championships and Track Meet will be hosted at the Main College Oval from October 18th to 20th.
-
-House Assemblies:
-• All students, teachers, and house masters must assemble at 07:45 AM sharply at the respective house tents.
-• Track and field prelims will take place in the morning sessions followed by the relay heats.
-• Parents and alumni are warmly invited for the Grand Closing Ceremony on Saturday afternoon.`,
+    title: '2024 Provincial Model Paper Analysis & Step-by-Step Breakdown',
+    message: 'Full step-by-step video breakdown (45 mins) is now live in your Study Vault. Review all marked questions before this Saturday\'s live session! 🎥',
     publishedAt: 'Yesterday',
-    authorName: 'Mr. Samantha Perera',
-    authorRole: 'Master-in-Charge of Sports',
-    targetAudience: 'Whole School (Everyone)',
+    authorName: 'Dr. Samantha Perera',
+    authorRole: 'Solo Tutor',
+    targetAudience: 'Revision Batch',
     priority: 'high'
   },
   {
     id: 'ann_02',
-    title: 'Cricket Under-17 Match Venue Confirmation',
-    message: 'Saturday fixture against Trinity Central will be held at the Main College Oval at 9:30 AM. Players arrive by 8:15 AM in full team whites.',
+    title: 'Student Package Enrollment & Course Materials Notice',
+    message: 'Students enrolled in active tutor packages can now access downloadable lecture slides, recorded lesson archives, and weekly practice worksheets directly from their Tutor Connect page.',
     publishedAt: '2 days ago',
-    authorName: 'Mr. Samantha Perera',
-    authorRole: 'Cricket Master-in-Charge',
-    targetAudience: 'Students & Sports Squad',
+    authorName: 'Academic Support',
+    authorRole: 'Platform Administrator',
+    targetAudience: 'Students & Subscribers',
     priority: 'normal'
   },
   {
     id: 'ann_05',
-    title: 'STEM Innovation Suite & Robotics Workshop Inauguration',
-    message: 'The new Artificial Intelligence and Robotics lab on the 3rd floor Science Wing will be officially opened this Wednesday at 10:30 AM. Hands-on coding workstations and 3D printing sessions will begin next week for registered students and faculty mentors.',
+    title: 'Scheduled Platform Maintenance: Sunday 01:00 AM - 03:00 AM GMT',
+    message: 'The learning platform will undergo scheduled cloud server optimization and security enhancements this Sunday between 01:00 AM and 03:00 AM. Live classes during this 2-hour maintenance window should be rescheduled accordingly.',
     publishedAt: '3 days ago',
-    authorName: 'Dr. K. Rajasingham',
-    authorRole: 'Principal / Admin',
-    targetAudience: 'Whole School (Everyone)',
+    authorName: 'DevOps & Infrastructure',
+    authorRole: 'System Administrator',
+    targetAudience: 'Platform-Wide (Everyone)',
     priority: 'normal'
   }
 ];

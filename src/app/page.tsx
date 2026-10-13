@@ -107,19 +107,28 @@ export default function HomePage() {
           return <LibraryViews key="past_papers" initialTab="past_papers" />;
         case "library":
           return <LibraryViews key="library_manage" initialTab="manage" />;
-        case "sports":
-          return <SportsView />;
-        case "events":
-          return <EventsView />;
+        case "batches":
         case "announcements":
           return <AnnouncementsView />;
         case "connect_admin":
           return <AdminViews initialTab="connect" />;
+        case "sports":
+        case "sports_admin":
+        case "sports_registrations":
+          return <SportsView initialTab="admin_registrations" />;
         default:
           return <TeacherViews initialTab="grading" />;
       }
     } else if (currentRole === "parent") {
-      return <ParentDashboardView />;
+      switch (currentView) {
+        case "connect":
+          return <ConnectView />;
+        case "sports":
+        case "school_life":
+          return <SportsView />;
+        default:
+          return <ParentDashboardView />;
+      }
     } else if (currentRole === "super_admin") {
       // Platform Owner Super Admin Master Portal
       switch (currentView) {
@@ -158,25 +167,23 @@ export default function HomePage() {
         case "staff_coaches":
           return <AdminViews initialTab="staff" />;
         case "curriculum":
-          return <AdminViews initialTab="subjects" />;
         case "subjects":
-          return <AdminViews initialTab="subjects" />;
+          return <AdminViews initialTab="overview" />;
         case "users":
           return <AdminViews initialTab="users" />;
         case "library":
           return <LibraryViews initialTab="manage" />;
+        case "connect_admin":
+          return <AdminViews initialTab="connect" />;
         case "settings":
         case "admin_settings":
           return <AdminViews initialTab="settings" />;
-        case "campus_operations":
-        case "sports_admin":
-          return <SportsView />;
-        case "events_admin":
-          return <EventsView />;
-        case "timetable_admin":
-          return <TimetableView />;
         case "announcements":
           return <AnnouncementsView />;
+        case "sports":
+        case "sports_admin":
+        case "sports_registrations":
+          return <SportsView initialTab="admin_registrations" />;
         default:
           return <AdminViews initialTab="overview" />;
       }

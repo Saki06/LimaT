@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import {
   Layers,
@@ -46,14 +46,26 @@ export function SyllabusBuilderView() {
     createLesson,
     updateLesson,
     deleteLesson,
-    currentUser
+    currentUser,
+    currentRole
   } = useApp();
 
+  // If viewed by an individual teacher, show only their assigned batches
+  const visibleCourses = useMemo(() => {
+    if (currentRole === "teacher") {
+      const tutorCourses = courses.filter(
+        (c) => c.teacherName === currentUser?.name || c.id === "crs_math_12" || c.title.toLowerCase().includes("math")
+      );
+      return tutorCourses.length > 0 ? tutorCourses : courses.slice(0, 2);
+    }
+    return courses;
+  }, [courses, currentRole, currentUser]);
+
   const [activeCourseId, setActiveCourseId] = useState<string>(
-    selectedCourseId || courses[0]?.id || "crs_math_12"
+    selectedCourseId || visibleCourses[0]?.id || "crs_math_12"
   );
 
-  const activeCourse = courses.find((c) => c.id === activeCourseId) || courses[0];
+  const activeCourse = visibleCourses.find((c) => c.id === activeCourseId) || visibleCourses[0];
 
   // Accordion state for expanded units
   const [expandedUnitIds, setExpandedUnitIds] = useState<Record<string, boolean>>({
@@ -394,7 +406,7 @@ export function SyllabusBuilderView() {
               }}
               className="bg-transparent text-xs font-bold text-[#0d2b26] focus:outline-none cursor-pointer"
             >
-              {courses.map((crs) => (
+              {visibleCourses.map((crs) => (
                 <option key={crs.id} value={crs.id}>
                   {crs.title} ({crs.code})
                 </option>

@@ -30,7 +30,13 @@ import {
   Activity,
   Medal,
   Zap,
-  Briefcase
+  Briefcase,
+  Video,
+  ExternalLink,
+  DollarSign,
+  Building2,
+  Sliders,
+  CreditCard
 } from "lucide-react";
 import { initialExams, initialExamTermResult } from "@/data/mockData";
 
@@ -173,6 +179,51 @@ export function ProfileView() {
       };
     }
 
+    if (currentRole === "super_admin") {
+      return {
+        name: currentUser.name || "SaaS Platform Owner",
+        fullName: "LimaT Platform Owner & Chief Director",
+        preferredName: "Super Admin",
+        studentId: "ROOT-SAAS-001",
+        indexNumber: "SAAS-ROOT/DIR-01",
+        email: currentUser.email || "director@limat.lk",
+        phone: "+94 77 123 4567",
+        altPhone: "+94 11 200 4455",
+        dob: "1982-01-01",
+        gender: "Male",
+        bloodGroup: "O+",
+        medium: "English, Sinhala & Tamil",
+        address: "LimaT Headquarters, Colombo Technology Park",
+        city: "Colombo 02",
+        district: "Colombo",
+        province: "Western Province",
+        postalCode: "00200",
+        bio: "Master Platform Owner & SaaS System Director with root privileges. Controlling multi-tenant deployments, tenant billing, global feature matrix toggles, and creator ecosystems across Sri Lanka.",
+        schoolName: currentUser.schoolName || "LimaT Multi-Tenant Creator Platform",
+        schoolCode: "LIMAT-GLOBAL",
+        grade: "Platform Director Level",
+        classRoom: "Global SaaS Control Center",
+        stream: "Enterprise Multi-Tenant Cloud SaaS Engine",
+        academicYear: "Active Production (2025 - 2028)",
+        house: "Master Operations",
+        classTeacher: "Chief Platform Architect",
+        admittedDate: "January 2025",
+        attendanceRate: "99.98% SLA",
+        gpa: "v2.4.0 Multi-Tenant Engine",
+        guardianName: "Platform Security Directorate",
+        guardianRelationship: "Two-Factor Master Key",
+        guardianPhone: "+94 77 123 4567",
+        guardianEmail: "security@limat.lk",
+        guardianOccupation: "Cloud Infrastructure Directorate",
+        motherName: "LimaT Cloud",
+        motherPhone: "+94 11 200 4455",
+        emergencyContact: "Emergency DevOps NOC (+94 77 999 0000)",
+        transportMode: "Direct Cloud Console",
+        healthNotes: "Root credentials verified. ISO 27001 compliant.",
+        extracurricular: "Global Tenant Onboarding, SaaS Monetization, AI Studio Scaling"
+      };
+    }
+
     return {
       name: currentUser.name || "Sathurjan K.",
       fullName: "Sathurjan Kandasamy",
@@ -225,6 +276,8 @@ export function ProfileView() {
       if (!["personal", "teaching", "schedule"].includes(activeTab)) {
         setActiveTab("personal");
       }
+    } else if (currentRole === "super_admin") {
+      setActiveTab("personal");
     } else {
       if (!["personal", "academic", "timetable", "transcripts", "sports"].includes(activeTab)) {
         setActiveTab("personal");
@@ -233,7 +286,9 @@ export function ProfileView() {
   }, [defaultProfile, currentRole]);
 
   const [avatarPreset, setAvatarPreset] = useState<string>("default");
-  const [selectedScheduleDay, setSelectedScheduleDay] = useState<"Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday">("Monday");
+  const [selectedScheduleDay, setSelectedScheduleDay] = useState<
+    "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"
+  >("Monday");
 
   const handleCopyId = () => {
     navigator.clipboard?.writeText(profileData.studentId);
@@ -241,7 +296,7 @@ export function ProfileView() {
     addToast({
       type: "info",
       title: "ID Copied",
-      message: `${currentRole === "teacher" ? "Faculty ID " : ""}${profileData.studentId} copied to clipboard.`
+      message: `${currentRole === "teacher" ? "Tutor ID " : ""}${profileData.studentId} copied to clipboard.`
     });
     setTimeout(() => setCopiedId(false), 2000);
   };
@@ -249,16 +304,16 @@ export function ProfileView() {
   const handleDownloadTeacherDossier = () => {
     addToast({
       type: "success",
-      title: "Faculty Dossier Downloaded",
-      message: "Official Senior Faculty Dossier & SLTS Service Record (PDF) has been saved."
+      title: "Tutor Profile & Portfolio Downloaded",
+      message: "Verified Solo Tutor Profile, Credentials & Course Catalog (PDF) has been saved."
     });
   };
 
   const handleDownloadTeacherTimetable = () => {
     addToast({
       type: "success",
-      title: "Teaching Schedule Downloaded",
-      message: "Weekly Academic Lecture & Laboratory Master Schedule (PDF) has been saved."
+      title: "Live Class Schedule Downloaded",
+      message: "Weekly Live Streaming Timetable & Google Meet Session Links (PDF) has been saved."
     });
   };
 
@@ -364,7 +419,11 @@ export function ProfileView() {
                 {profileData.fullName}
               </h2>
               <span className="px-2.5 py-0.5 rounded-full bg-[#fef7e6] text-[#b47a16] border border-[#fde4af] text-[11px] font-bold capitalize">
-                {currentRole === "teacher" ? "Senior Faculty / Educator" : currentRole}
+                {currentRole === "teacher"
+                  ? "Verified Solo Tutor & Creator"
+                  : currentRole === "super_admin"
+                  ? "Master Super Admin • Platform Owner"
+                  : currentRole}
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold">
                 {profileData.stream}
@@ -378,7 +437,13 @@ export function ProfileView() {
             <div className="flex flex-wrap items-center gap-y-2 gap-x-4 pt-1 text-xs text-slate-500">
               <div className="flex items-center gap-1.5">
                 <School className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                <span className="font-semibold text-slate-700">{profileData.schoolName}</span>
+                <span className="font-semibold text-slate-700">
+                  {currentRole === "teacher"
+                    ? "Online Tutor Studio & LMS"
+                    : currentRole === "super_admin"
+                    ? "Global Multi-Tenant SaaS Platform"
+                    : profileData.schoolName}
+                </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <BookOpen className="h-3.5 w-3.5 text-[#0d5c4d]" />
@@ -391,9 +456,21 @@ export function ProfileView() {
               <button
                 onClick={handleCopyId}
                 className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors font-mono font-bold text-[11px] text-slate-700 cursor-pointer"
-                title={currentRole === "teacher" ? "Click to copy Faculty ID" : "Click to copy Student ID"}
+                title={
+                  currentRole === "teacher"
+                    ? "Click to copy Tutor ID"
+                    : currentRole === "super_admin"
+                    ? "Click to copy Master Root ID"
+                    : "Click to copy Student ID"
+                }
               >
-                <span>{currentRole === "teacher" ? `Faculty ID: ${profileData.studentId}` : `ID: ${profileData.studentId}`}</span>
+                <span>
+                  {currentRole === "teacher"
+                    ? `Tutor ID: ${profileData.studentId}`
+                    : currentRole === "super_admin"
+                    ? `Root ID: ${profileData.studentId}`
+                    : `ID: ${profileData.studentId}`}
+                </span>
                 {copiedId ? (
                   <Check className="h-3 w-3 text-emerald-600" />
                 ) : (
@@ -404,8 +481,60 @@ export function ProfileView() {
           </div>
         </div>
 
-        {/* Quick Performance Indicators (Student only) */}
-        {currentRole !== "teacher" && (
+        {/* Quick Performance Indicators */}
+        {currentRole === "teacher" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-slate-100">
+            <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enrolled Subscribers</p>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-lg font-black text-[#0d5c4d]">142 Students</span>
+                <span className="text-[10px] text-emerald-600 font-bold">Across 4 Batches</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Monthly Gross Revenue</p>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-lg font-black text-amber-600 font-mono">Rs. 639,000</span>
+                <span className="text-[10px] text-slate-500 font-semibold">90% Tutor Payout</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Weekly Live Hours</p>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-lg font-black text-[#0d2b26]">14 Hours</span>
+                <span className="text-[10px] text-emerald-600 font-bold">Google Meet Active</span>
+              </div>
+            </div>
+          </div>
+        ) : currentRole === "super_admin" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-slate-100">
+            <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Client Tenants</p>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-lg font-black text-[#0d5c4d]">4 Active Clients</span>
+                <span className="text-[10px] text-emerald-600 font-bold">Schools, Tutors &amp; Academies</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Monthly SaaS MRR</p>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-lg font-black text-amber-600 font-mono">LKR 448,000</span>
+                <span className="text-[10px] text-slate-500 font-semibold">Recurring Platform Revenue</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Platform Students</p>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-lg font-black text-[#0d2b26]">9,942 Students</span>
+                <span className="text-[10px] text-emerald-600 font-bold">Across All Tenant Databases</span>
+              </div>
+            </div>
+          </div>
+        ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-slate-100">
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Attendance</p>
@@ -439,9 +568,13 @@ export function ProfileView() {
       <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200">
         {(currentRole === "teacher"
           ? [
-              { id: "personal", label: "Faculty Profile & Info", icon: User },
-              { id: "teaching", label: "Assigned Classes & Workload", icon: BookOpen },
-              { id: "schedule", label: "Weekly Teaching Timetable", icon: Calendar }
+              { id: "personal", label: "Tutor Studio Profile", icon: User },
+              { id: "teaching", label: "Active Batches & Study Packages", icon: BookOpen },
+              { id: "schedule", label: "Live Class Schedule & Meet", icon: Calendar }
+            ]
+          : currentRole === "super_admin"
+          ? [
+              { id: "personal", label: "Platform Director Credentials", icon: User }
             ]
           : [
               { id: "personal", label: "Personal Details", icon: User },
@@ -480,11 +613,19 @@ export function ProfileView() {
               <div>
                 <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
                   <User className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>{currentRole === "teacher" ? "Faculty Official Identification" : "General Information"}</span>
+                  <span>
+                    {currentRole === "teacher"
+                      ? "Faculty Official Identification"
+                      : currentRole === "super_admin"
+                      ? "Platform Directorate Master Credentials"
+                      : "General Information"}
+                  </span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {currentRole === "teacher"
                     ? "Official personal identification and Ministry of Education service registration."
+                    : currentRole === "super_admin"
+                    ? "Master administrator credentials, root authority, and global tenant control specifications."
                     : "Official personal identification as registered with the Ministry of Education."}
                 </p>
               </div>
@@ -533,7 +674,11 @@ export function ProfileView() {
               {/* Student ID */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Teacher Service / Faculty ID" : "Student Admission / Reg Number"}
+                  {currentRole === "teacher"
+                    ? "Teacher Service / Faculty ID"
+                    : currentRole === "super_admin"
+                    ? "Platform Master Root ID"
+                    : "Student Admission / Reg Number"}
                 </label>
                 <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-bold text-[#0d5c4d]">
                   {profileData.studentId}
@@ -543,7 +688,11 @@ export function ProfileView() {
               {/* G.C.E. A/L Index Number */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Sri Lanka Teachers' Service (SLTS) Reg Number" : "Exam Index Number (A/L 2026)"}
+                  {currentRole === "teacher"
+                    ? "Sri Lanka Teachers' Service (SLTS) Reg Number"
+                    : currentRole === "super_admin"
+                    ? "Master Root Authority Identifier"
+                    : "Exam Index Number (A/L 2026)"}
                 </label>
                 {isEditing ? (
                   <input
@@ -851,30 +1000,93 @@ export function ProfileView() {
             </div>
           )}
 
-          {/* NEXT OF KIN & EMERGENCY LIAISON CARD (Teacher) / PARENT & GUARDIAN CARD (Student) */}
-          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-            <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                  <Users className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>
-                    {currentRole === "teacher"
-                      ? "Next of Kin & Emergency Liaison"
-                      : "Parent & Guardian Information"}
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {currentRole === "teacher"
-                    ? "Official contact information for institutional welfare, emergency liaison, and faculty benefits."
-                    : "Contact information for emergencies, parent-teacher conferences, and academic communications."}
-                </p>
-              </div>
-              {isEditing && (
-                <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                  Editing Mode Active
+          {/* NEXT OF KIN & EMERGENCY LIAISON CARD (Teacher) / PARENT & GUARDIAN CARD (Student) / PLATFORM CLOUD OPERATIONS (Super Admin) */}
+          {currentRole === "super_admin" ? (
+            <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+              <div className="pb-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
+                    <span>Multi-Tenant Cloud Operations &amp; Infrastructure</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Root infrastructure health, live tenant nodes, and platform-level master management.
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 self-start sm:self-auto">
+                  Cluster Status: Optimal (99.98% SLA)
                 </span>
-              )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Primary Cloud Region</p>
+                  <p className="text-sm font-extrabold text-slate-900">AWS Colombo &amp; Singapore</p>
+                  <p className="text-[11px] text-slate-500">Cloudflare Edge CDN Active</p>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Security Clearance</p>
+                  <p className="text-sm font-extrabold text-[#0d5c4d]">Tier-1 Root Authority</p>
+                  <p className="text-[11px] text-slate-500">2FA Master Key Enforced</p>
+                </div>
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Engine Version</p>
+                  <p className="text-sm font-extrabold text-slate-900">v2.4.0 Multi-Tenant Engine</p>
+                  <p className="text-[11px] text-slate-500">Automated Daily Backups</p>
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("super_admin_tenants")}
+                  className="px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+                >
+                  <Building2 className="h-4 w-4" />
+                  <span>Open Client Tenants Directory</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("super_admin_matrix")}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <Sliders className="h-4 w-4" />
+                  <span>Configure Granular Feature Matrix</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("super_admin_pricing")}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  <span>SaaS Packages &amp; Pricing</span>
+                </button>
+              </div>
             </div>
+          ) : (
+            <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+              <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                    <Users className="h-4 w-4 text-[#0d5c4d]" />
+                    <span>
+                      {currentRole === "teacher"
+                        ? "Next of Kin & Emergency Liaison"
+                        : "Parent & Guardian Information"}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {currentRole === "teacher"
+                      ? "Official contact information for institutional welfare, emergency liaison, and faculty benefits."
+                      : "Contact information for emergencies, parent-teacher conferences, and academic communications."}
+                  </p>
+                </div>
+                {isEditing && (
+                  <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                    Editing Mode Active
+                  </span>
+                )}
+              </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Primary Contact Name */}
@@ -998,11 +1210,12 @@ export function ProfileView() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    )}
 
       {/* =================================================================== */}
-      {/* TEACHER TAB 2: ASSIGNED CLASSES & WORKLOAD                          */}
+      {/* TEACHER TAB 2: ACTIVE BATCHES & STUDY PACKAGES                      */}
       {/* =================================================================== */}
       {currentRole === "teacher" && activeTab === "teaching" && (
         <div className="space-y-6 animate-in fade-in duration-200">
@@ -1011,103 +1224,113 @@ export function ProfileView() {
               <div>
                 <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
                   <BookOpen className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Teaching Allocation &amp; Academic Workload (2026 Session)</span>
+                  <span>Active Study Packages &amp; Teaching Batches</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Assigned batches, weekly lecture periods, syllabus completion tracking, and student counts.
+                  Published subscription packages, enrolled student counts, monthly fee metrics, and syllabus delivery.
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setCurrentView("teaching")}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-sm transition-colors cursor-pointer self-start sm:self-auto"
-              >
-                <span>Launch Teaching Studio</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("teaching")}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-sm transition-colors cursor-pointer self-start sm:self-auto"
+                >
+                  <Video className="h-3.5 w-3.5" />
+                  <span>Launch Teaching Studio</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Workload Metric KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Weekly Teaching Load</span>
-                <p className="text-2xl font-black text-[#0d5c4d] mt-1 font-mono">28 Periods</p>
-                <p className="text-[10px] text-emerald-700 font-bold mt-1">Full-Time Collegiate Faculty</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Packages</span>
+                <p className="text-2xl font-black text-[#0d5c4d] mt-1 font-mono">4 Packages</p>
+                <p className="text-[10px] text-emerald-700 font-bold mt-1">Open for Enrolment</p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Allocated Batches</span>
-                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">4 Classes</p>
-                <p className="text-[10px] text-slate-500 mt-1">Grade 12 &amp; Grade 13 A/L</p>
-              </div>
-
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Enrolled Students</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Subscribed Students</span>
                 <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">142 Students</p>
-                <p className="text-[10px] text-slate-500 mt-1">Physical Science Stream</p>
+                <p className="text-[10px] text-slate-500 mt-1">Across 4 Active Cohorts</p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Average Class Mastery</span>
-                <p className="text-2xl font-black text-amber-600 mt-1 font-mono">91.4%</p>
-                <p className="text-[10px] text-amber-700 font-bold mt-1">Highest in Science Faculty</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Weekly Live Delivery</span>
+                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">14 Hours</p>
+                <p className="text-[10px] text-slate-500 mt-1">Google Meet &amp; Studio</p>
+              </div>
+
+              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Monthly Batch Gross</span>
+                <p className="text-2xl font-black text-amber-600 mt-1 font-mono">Rs. 639,000</p>
+                <p className="text-[10px] text-emerald-700 font-bold mt-1">90% Tutor Payout Share</p>
               </div>
             </div>
 
-            {/* Allocated Courses Cards */}
+            {/* Active Study Packages Cards */}
             <div className="space-y-3 pt-2">
-              <h4 className="font-bold text-sm text-[#0d2b26]">Official Class Allocations &amp; Delivery Progress</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-sm text-[#0d2b26]">Published Packages &amp; Cohort Deliverables</h4>
+                <span className="text-[11px] font-semibold text-slate-500">Auto-billed monthly per subscriber</span>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
                   {
-                    title: "Combined Mathematics 12 (Pure & Applied)",
-                    code: "CMATH-12A",
-                    className: "Grade 12-Physical Science A",
-                    students: 42,
-                    periods: "8 Periods / Week",
-                    venue: "Hall 04 · Science Wing",
-                    schedule: "Mon (08:00), Wed (08:00), Fri (09:50)",
+                    title: "Combined Mathematics 2026 (Pure & Applied Theory)",
+                    code: "CMATH-26",
+                    tier: "A/L 2026 Comprehensive Theory",
+                    students: 48,
+                    fee: "Rs. 4,500 / mo",
+                    monthlyGross: "Rs. 216,000 / mo",
+                    delivery: "Google Meet Live Studio & HD Recordings",
+                    schedule: "Mon & Wed · 06:30 PM - 08:30 PM",
                     progress: 76,
                     unitsDone: 9,
                     unitsTotal: 12,
                     badgeColor: "border-indigo-200 bg-indigo-50/50 text-indigo-800"
                   },
                   {
-                    title: "Pure Mathematics 13 (Advanced Problem Solving)",
-                    code: "PMATH-13",
-                    className: "Grade 13-Physical Science",
-                    students: 38,
-                    periods: "8 Periods / Week",
-                    venue: "Lecture Hall A · Collegiate Complex",
-                    schedule: "Mon (09:50), Tue (09:50), Thu (08:00)",
+                    title: "Pure Mathematics 2025 (Fast-Track Paper Class)",
+                    code: "PMATH-25",
+                    tier: "A/L 2025 Revision & Model Papers",
+                    students: 42,
+                    fee: "Rs. 3,500 / mo",
+                    monthlyGross: "Rs. 147,000 / mo",
+                    delivery: "Timed Exam Walkthrough & Video Solutions",
+                    schedule: "Tue & Thu · 07:00 PM - 09:00 PM",
                     progress: 88,
                     unitsDone: 14,
                     unitsTotal: 16,
                     badgeColor: "border-emerald-200 bg-emerald-50/50 text-emerald-800"
                   },
                   {
-                    title: "Applied Mathematics Mechanics & Computing",
-                    code: "AMATH-12B",
-                    className: "Grade 12-Physical Science B",
-                    students: 35,
-                    periods: "6 Periods / Week",
-                    venue: "Physics & Computing Lab 02",
-                    schedule: "Tue (08:00), Wed (09:50)",
+                    title: "Applied Mathematics Mechanics & Dynamics Bootcamp",
+                    code: "AMATH-26",
+                    tier: "Mechanics Intensive Topic Series",
+                    students: 32,
+                    fee: "Rs. 4,000 / mo",
+                    monthlyGross: "Rs. 128,000 / mo",
+                    delivery: "Interactive Problem Solving & Whiteboard",
+                    schedule: "Saturday Morning · 08:30 AM - 11:30 AM",
                     progress: 70,
                     unitsDone: 7,
                     unitsTotal: 10,
                     badgeColor: "border-blue-200 bg-blue-50/50 text-blue-800"
                   },
                   {
-                    title: "G.C.E. A/L Model Paper Discussion & Booster",
-                    code: "MC-13",
-                    className: "Combined Science Stream",
-                    students: 27,
-                    periods: "6 Periods / Week",
-                    venue: "Collegiate Auditorium",
-                    schedule: "Fri (08:00), Sat Morning",
+                    title: "G.C.E. A/L Top Rankers Model Paper Masterclass",
+                    code: "MC-BOOST",
+                    tier: "Elite Island-Rank Booster",
+                    students: 20,
+                    fee: "Rs. 5,000 / mo",
+                    monthlyGross: "Rs. 100,000 / mo",
+                    delivery: "Curated Challenge Sets & Individual Feedback",
+                    schedule: "Sunday Evening · 06:00 PM - 09:00 PM",
                     progress: 92,
                     unitsDone: 11,
                     unitsTotal: 12,
@@ -1124,27 +1347,32 @@ export function ProfileView() {
                           <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${course.badgeColor}`}>
                             {course.code}
                           </span>
-                          <span className="text-[11px] font-semibold text-slate-500">{course.className}</span>
+                          <span className="text-[11px] font-semibold text-slate-500">{course.tier}</span>
                         </div>
                         <h4 className="font-extrabold text-sm text-[#0d2b26] mt-1.5">{course.title}</h4>
                       </div>
-                      <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700">
-                        {course.students} Students
-                      </span>
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-mono font-black text-[#0d5c4d] block">
+                          {course.fee}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-semibold">
+                          {course.students} Subscribers
+                        </span>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2.5 text-xs bg-white p-3 rounded-xl border border-slate-100">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Workload</span>
-                        <p className="font-semibold text-slate-800">{course.periods}</p>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Monthly Package Gross</span>
+                        <p className="font-bold text-[#0d2b26] font-mono">{course.monthlyGross}</p>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Assigned Venue</span>
-                        <p className="font-semibold text-slate-800 line-clamp-1">{course.venue}</p>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Delivery Format</span>
+                        <p className="font-semibold text-slate-800 line-clamp-1">{course.delivery}</p>
                       </div>
                       <div className="col-span-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Weekly Time Slot</span>
-                        <p className="font-semibold text-[#0d5c4d]">{course.schedule}</p>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Live Online Time Slot</span>
+                        <p className="font-bold text-[#0d5c4d]">{course.schedule}</p>
                       </div>
                     </div>
 
@@ -1169,7 +1397,7 @@ export function ProfileView() {
                         onClick={() => setCurrentView("syllabus_builder")}
                         className="text-[11px] font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
                       >
-                        <span>Open Syllabus Builder</span>
+                        <span>Manage Syllabus &amp; Notes</span>
                         <ChevronRight className="h-3 w-3" />
                       </button>
                       <button
@@ -1177,7 +1405,7 @@ export function ProfileView() {
                         onClick={() => setCurrentView("assignments")}
                         className="text-[11px] font-bold text-slate-600 hover:text-[#0d5c4d] transition-colors cursor-pointer"
                       >
-                        View Coursework &rarr;
+                        Submissions &amp; Coursework &rarr;
                       </button>
                     </div>
                   </div>
@@ -1189,7 +1417,7 @@ export function ProfileView() {
       )}
 
       {/* =================================================================== */}
-      {/* TEACHER TAB 3: WEEKLY TEACHING TIMETABLE                            */}
+      {/* TEACHER TAB 3: LIVE CLASS SCHEDULE & MEET LINKS                     */}
       {/* =================================================================== */}
       {currentRole === "teacher" && activeTab === "schedule" && (
         <div className="space-y-6 animate-in fade-in duration-200">
@@ -1198,10 +1426,10 @@ export function ProfileView() {
               <div>
                 <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Weekly Faculty Teaching Timetable &amp; Consultation Hours</span>
+                  <span>Weekly Live Class Schedule &amp; Online Studio Sessions</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Daily period allocation, classroom locations, student office hours, and department meetings.
+                  Day-by-day live stream timetable, interactive doubt clearing clinics, and Google Meet room access.
                 </p>
               </div>
 
@@ -1212,19 +1440,19 @@ export function ProfileView() {
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#d6dfd9] text-[#0d5c4d] hover:bg-[#ecf8f5] font-bold text-xs shadow-2xs transition-colors cursor-pointer"
                 >
                   <Printer className="h-3.5 w-3.5" />
-                  <span>Print Timetable</span>
+                  <span>Download Live Schedule</span>
                 </button>
               </div>
             </div>
 
             {/* Day Selector Pills */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] as const).map((day) => (
+              {(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const).map((day) => (
                 <button
                   key={day}
                   type="button"
                   onClick={() => setSelectedScheduleDay(day)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     selectedScheduleDay === day
                       ? "bg-[#0d5c4d] text-white shadow-xs"
                       : "bg-[#f8faf9] text-slate-600 hover:bg-[#ecf8f5] border border-slate-200"
@@ -1236,102 +1464,180 @@ export function ProfileView() {
             </div>
 
             {/* Day Schedule Notice Banner */}
-            <div className="p-3 rounded-2xl bg-[#f6fbf9] border border-[#c4e9e0] flex items-center justify-between gap-3 text-xs text-[#0d5c4d]">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-bold">Schedule for {selectedScheduleDay} · 2026 Academic Term</span>
+            <div className="p-3.5 rounded-2xl bg-[#f6fbf9] border border-[#c4e9e0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#0d5c4d]">
+              <div className="flex items-center gap-2.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="font-bold">Active Live Schedule for {selectedScheduleDay} · Online Teaching Studio</span>
               </div>
-              <span className="font-mono font-bold text-[11px] bg-white px-2.5 py-0.5 rounded-full border border-[#b2e5d9]">
-                Senior Master Schedule
+              <span className="font-mono font-bold text-[11px] bg-white px-2.5 py-1 rounded-full border border-[#b2e5d9] self-start sm:self-auto">
+                Studio Streaming Active
               </span>
             </div>
 
-            {/* Period Cards Grid */}
+            {/* Live Session Cards */}
             <div className="space-y-3">
               {[
                 ...(selectedScheduleDay === "Monday"
                   ? [
-                      { period: "Period 1", time: "08:00 - 08:45", subject: "Combined Mathematics - Differential Calculus", class: "Grade 12-A", venue: "Hall 04 · Science Wing", type: "Lecture" },
-                      { period: "Period 2", time: "08:45 - 09:30", subject: "Combined Mathematics - Calculus Tutorial & Problem Sets", class: "Grade 12-A", venue: "Hall 04 · Science Wing", type: "Tutorial" },
-                      { period: "Recess", time: "09:30 - 09:50", subject: "Morning Interval & Faculty Refreshment", class: "Staff Council", venue: "Faculty Lounge", type: "Break" },
-                      { period: "Period 3", time: "09:50 - 10:35", subject: "Pure Mathematics - Complex Numbers & De Moivre's Theorem", class: "Grade 13-Science", venue: "Lecture Hall A", type: "Lecture" },
-                      { period: "Period 4", time: "10:35 - 11:20", subject: "Pure Mathematics - Advanced Exam Proofs Workshop", class: "Grade 13-Science", venue: "Lecture Hall A", type: "Masterclass" },
-                      { period: "Period 5", time: "11:20 - 12:05", subject: "Staff Office Hours & Student Doubt Clearing", class: "All A/L Students", venue: "HOD Office 12", type: "Consultation" },
-                      { period: "Lunch", time: "12:05 - 12:45", subject: "Lunch Interval", class: "Staff Dining", venue: "Staff Club", type: "Break" },
-                      { period: "Period 6", time: "12:45 - 01:30", subject: "Math Olympiad Elite Coaching Squad", class: "SLMC Selected Team", venue: "Seminar Room 01", type: "Co-Curricular" }
+                      {
+                        time: "06:30 PM - 08:30 PM",
+                        subject: "Combined Mathematics - Differential Calculus & Real Analysis",
+                        cohort: "Batch CMATH-26 · 48 Enrolled Subscribers",
+                        type: "Live Theory Lecture",
+                        platform: "Google Meet Live Studio",
+                        meetCode: "meet.google.com/cmt-26-live",
+                        isLive: true
+                      },
+                      {
+                        time: "08:45 PM - 09:30 PM",
+                        subject: "1-on-1 Student Doubt Clearing & Homework Review",
+                        cohort: "Open Office Hours · All Active Subscribers",
+                        type: "Interactive Clinic",
+                        platform: "Google Meet Video Room",
+                        meetCode: "meet.google.com/tutor-doubt-hub",
+                        isLive: false
+                      }
                     ]
                   : selectedScheduleDay === "Tuesday"
                   ? [
-                      { period: "Period 1", time: "08:00 - 08:45", subject: "Applied Mathematics - Dynamics & Newton's Laws", class: "Grade 12-B", venue: "Room 12-B", type: "Lecture" },
-                      { period: "Period 2", time: "08:45 - 09:30", subject: "Applied Mathematics - Friction & Equilibrium Systems", class: "Grade 12-B", venue: "Room 12-B", type: "Lecture" },
-                      { period: "Recess", time: "09:30 - 09:50", subject: "Morning Interval & Faculty Refreshment", class: "Staff Council", venue: "Faculty Lounge", type: "Break" },
-                      { period: "Period 3", time: "09:50 - 10:35", subject: "Pure Mathematics - Trigonometric Integrals", class: "Grade 13-Science", venue: "Lecture Hall A", type: "Lecture" },
-                      { period: "Period 4", time: "10:35 - 11:20", subject: "Pure Mathematics - Differential Equations & Growth Models", class: "Grade 13-Science", venue: "Lecture Hall A", type: "Lecture" },
-                      { period: "Period 5", time: "11:20 - 12:05", subject: "Curriculum Planning & Scheme of Work Review", class: "Mathematics Faculty", venue: "HOD Office 12", type: "Admin" },
-                      { period: "Lunch", time: "12:05 - 12:45", subject: "Lunch Interval", class: "Staff Dining", venue: "Staff Club", type: "Break" },
-                      { period: "Period 6", time: "12:45 - 02:00", subject: "Department Assessment Moderation", class: "Senior Staff", venue: "Boardroom", type: "Evaluation" }
+                      {
+                        time: "07:00 PM - 09:00 PM",
+                        subject: "Pure Mathematics - 2025 A/L Model Paper Discussion & Time Strategy",
+                        cohort: "Batch PMATH-25 · 42 Enrolled Subscribers",
+                        type: "Live Paper Class",
+                        platform: "Google Meet Live Studio",
+                        meetCode: "meet.google.com/pmt-25-paper",
+                        isLive: true
+                      }
                     ]
                   : selectedScheduleDay === "Wednesday"
                   ? [
-                      { period: "Period 1", time: "08:00 - 08:45", subject: "Combined Mathematics - Polynomials & Roots Theorem", class: "Grade 12-A", venue: "Hall 04 · Science Wing", type: "Lecture" },
-                      { period: "Period 2", time: "08:45 - 09:30", subject: "Combined Mathematics - Quadratic Expressions & Inequalities", class: "Grade 12-A", venue: "Hall 04 · Science Wing", type: "Tutorial" },
-                      { period: "Recess", time: "09:30 - 09:50", subject: "Morning Interval & Faculty Refreshment", class: "Staff Council", venue: "Faculty Lounge", type: "Break" },
-                      { period: "Period 3-4", time: "09:50 - 11:20", subject: "Applied Mathematics Mechanics Practical Lab", class: "Grade 12-B", venue: "Physics & Computing Lab 02", type: "Practical" },
-                      { period: "Period 5", time: "11:20 - 12:05", subject: "Remedial Coaching for Borderline Candidates", class: "Grade 12 Stream", venue: "Hall 04", type: "Mentoring" },
-                      { period: "Lunch", time: "12:05 - 12:45", subject: "Lunch Interval", class: "Staff Dining", venue: "Staff Club", type: "Break" },
-                      { period: "Period 6", time: "12:45 - 02:15", subject: "College Chess Club Practice Session", class: "Inter-School Squad", venue: "College Pavilion", type: "Co-Curricular" }
+                      {
+                        time: "06:30 PM - 08:30 PM",
+                        subject: "Combined Mathematics - Calculus Tutorial & Complex Problem Sets",
+                        cohort: "Batch CMATH-26 · 48 Enrolled Subscribers",
+                        type: "Live Problem Solving",
+                        platform: "Google Meet Live Studio",
+                        meetCode: "meet.google.com/cmt-26-live",
+                        isLive: true
+                      },
+                      {
+                        time: "08:40 PM - 09:15 PM",
+                        subject: "Homework Grading, Solution Upload & PDF Releases",
+                        cohort: "LMS Content Management",
+                        type: "Portal Update",
+                        platform: "Tutor Content Studio",
+                        meetCode: "",
+                        isLive: false
+                      }
                     ]
                   : selectedScheduleDay === "Thursday"
                   ? [
-                      { period: "Period 1-2", time: "08:00 - 09:30", subject: "Pure Mathematics - Vectors in 3D Space & Dot Products", class: "Grade 13-Science", venue: "Lecture Hall A", type: "Double Lecture" },
-                      { period: "Recess", time: "09:30 - 09:50", subject: "Morning Interval & Faculty Refreshment", class: "Staff Council", venue: "Faculty Lounge", type: "Break" },
-                      { period: "Period 3", time: "09:50 - 10:35", subject: "Combined Mathematics - Coordinate Geometry & Straight Lines", class: "Grade 12-A", venue: "Hall 04 · Science Wing", type: "Lecture" },
-                      { period: "Period 4", time: "10:35 - 11:20", subject: "Combined Mathematics - Circles & Tangents Formulation", class: "Grade 12-A", venue: "Hall 04 · Science Wing", type: "Lecture" },
-                      { period: "Period 5", time: "11:20 - 12:05", subject: "Parent Consultations & Student Academic Guidance", class: "By Appointment", venue: "Senior Staff Room", type: "Consultation" },
-                      { period: "Lunch", time: "12:05 - 12:45", subject: "Lunch Interval", class: "Staff Dining", venue: "Staff Club", type: "Break" },
-                      { period: "Period 6", time: "12:45 - 02:00", subject: "Collegiate Academic Council Meeting", class: "Senior Staff", venue: "Principal's Conference Room", type: "Admin" }
+                      {
+                        time: "07:00 PM - 09:00 PM",
+                        subject: "Pure Mathematics - Trigonometry & Complex Numbers Workshop",
+                        cohort: "Batch PMATH-25 · 42 Enrolled Subscribers",
+                        type: "Masterclass Workshop",
+                        platform: "Google Meet Live Studio",
+                        meetCode: "meet.google.com/pmt-25-paper",
+                        isLive: true
+                      }
+                    ]
+                  : selectedScheduleDay === "Friday"
+                  ? [
+                      {
+                        time: "06:30 PM - 07:45 PM",
+                        subject: "Weekly Mathematics Olympiad & Advanced Challenge Seminar",
+                        cohort: "Elite Challenge Cohort · Top Rankers",
+                        type: "Special Masterclass",
+                        platform: "Google Meet Live Studio",
+                        meetCode: "meet.google.com/mth-olym-live",
+                        isLive: true
+                      },
+                      {
+                        time: "08:00 PM - 09:00 PM",
+                        subject: "Study Notes, Video Recording Archival & Week 08 Wrap-up",
+                        cohort: "All Enrolled Batches",
+                        type: "Content Production",
+                        platform: "LMS Cloud Vault",
+                        meetCode: "",
+                        isLive: false
+                      }
+                    ]
+                  : selectedScheduleDay === "Saturday"
+                  ? [
+                      {
+                        time: "08:30 AM - 11:30 AM",
+                        subject: "Applied Mathematics - Mechanics, Equilibrium & Circular Motion Bootcamp",
+                        cohort: "Batch AMATH-26 · 32 Enrolled Subscribers",
+                        type: "3-Hour Intensive",
+                        platform: "Google Meet Live Studio",
+                        meetCode: "meet.google.com/amt-26-mech",
+                        isLive: true
+                      }
                     ]
                   : [
-                      { period: "Period 1-2", time: "08:00 - 09:30", subject: "Grade 13 Exam Booster & Past Paper Workshop", class: "Grade 13-Science", venue: "Lecture Hall A", type: "Workshop" },
-                      { period: "Recess", time: "09:30 - 09:50", subject: "Morning Interval & Faculty Refreshment", class: "Staff Council", venue: "Faculty Lounge", type: "Break" },
-                      { period: "Period 3", time: "09:50 - 10:35", subject: "Grade 12-B Hydrostatics & Fluid Pressure Theory", class: "Grade 12-B", venue: "Room 12-B", type: "Lecture" },
-                      { period: "Period 4", time: "10:35 - 11:20", subject: "Weekly Mathematics Faculty Sync & Briefing", class: "Department Staff", venue: "HOD Office 12", type: "Department Sync" },
-                      { period: "Period 5", time: "11:20 - 12:05", subject: "Teacher Reflection & Digital Lesson Upload", class: "LMS Portal", venue: "Staff IT Suite", type: "LMS Portal" },
-                      { period: "Lunch", time: "12:05 - 12:45", subject: "Lunch Interval", class: "Staff Dining", venue: "Staff Club", type: "Break" },
-                      { period: "Period 6", time: "12:45 - 02:15", subject: "G.C.E. Advanced Level Grading & Feedback Desk", class: "Assignments", venue: "Staff Room", type: "Grading" }
+                      {
+                        time: "06:00 PM - 09:00 PM",
+                        subject: "Top Rankers Model Paper Masterclass - Island Rank Problem Clinic",
+                        cohort: "Batch MC-BOOST · 20 Enrolled Subscribers",
+                        type: "Elite Masterclass",
+                        platform: "Google Meet Live Studio",
+                        meetCode: "meet.google.com/mc-boost-live",
+                        isLive: true
+                      }
                     ])
               ].map((slot, idx) => (
                 <div
                   key={idx}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    slot.type === "Break"
-                      ? "bg-slate-50/60 border-slate-200/60 opacity-80"
-                      : "bg-white border-[#e6ece8] hover:border-[#b2e5d9] shadow-2xs"
-                  }`}
+                  className="p-5 rounded-2xl border border-[#e6ece8] bg-white hover:border-[#b2e5d9] shadow-2xs hover:shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-24 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex flex-col items-center justify-center font-bold shrink-0">
-                      <span className="text-[11px] font-black">{slot.period}</span>
-                      <span className="text-[9px] text-slate-500 font-mono">{slot.time}</span>
+                  <div className="flex items-start sm:items-center gap-3.5">
+                    <div className="h-12 w-28 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex flex-col items-center justify-center font-bold shrink-0">
+                      <span className="text-[11px] font-black">{slot.type}</span>
+                      <span className="text-[9px] text-slate-500 font-mono mt-0.5">{slot.time}</span>
                     </div>
 
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-[#0d2b26]">{slot.subject}</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                          {slot.type}
-                        </span>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-extrabold text-sm text-[#0d2b26]">{slot.subject}</span>
+                        {slot.isLive && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Live Session
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Target: <span className="font-semibold text-slate-700">{slot.class}</span> · Room:{" "}
-                        <span className="font-semibold text-[#0d5c4d]">{slot.venue}</span>
+                      <p className="text-xs text-slate-500">
+                        Target: <span className="font-semibold text-slate-700">{slot.cohort}</span> · Platform:{" "}
+                        <span className="font-semibold text-[#0d5c4d]">{slot.platform}</span>
                       </p>
                     </div>
                   </div>
 
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 self-start sm:self-auto shrink-0">
-                    Scheduled ✓
-                  </span>
+                  <div className="flex items-center gap-2 self-start md:self-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 w-full md:w-auto justify-end">
+                    {slot.meetCode ? (
+                      <a
+                        href={`https://${slot.meetCode}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                      >
+                        <Video className="h-3.5 w-3.5" />
+                        <span>Launch Google Meet</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setCurrentView("content_vault")}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                      >
+                        <span>Open Vault</span>
+                        <ChevronRight className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

@@ -486,6 +486,8 @@ export interface ConnectStudent {
 
 export interface ConnectStudyGroup {
   id: string;
+  teacherId: string;
+  teacherName: string;
   name: string;
   subject: string;
   description: string;
@@ -493,8 +495,9 @@ export interface ConnectStudyGroup {
   maxMembers: number;
   activeTopic: string;
   schedule: string;
+  meetUrl?: string;
   isJoined?: boolean;
-  color: string;
+  color?: string;
 }
 
 export interface ConnectMessage {
@@ -522,6 +525,23 @@ export interface ConnectPurchase {
   paymentMethod: 'Card (Visa/Mastercard)' | 'Bank Deposit (Commercial Bank)' | 'FriMi / PayHere';
   receiptNo: string;
   meetUrl: string;
+}
+
+export interface TutorPackage {
+  id: string;
+  teacherId?: string;
+  title: string;
+  subject: string;
+  grade: string;
+  monthlyFeeLkr: number;
+  billingCycle: 'Monthly' | 'Term (3 Months)' | 'Full Syllabus Pass';
+  description: string;
+  features: string[];
+  liveClassesPerWeek: number;
+  status: 'active' | 'draft' | 'archived';
+  enrolledCount: number;
+  badge?: string;
+  createdAt: string;
 }
 
 export interface TeacherSubscriber {
