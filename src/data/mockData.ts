@@ -24,28 +24,28 @@ export const mockUsers: Record<string, User> = {
   student: {
     id: 'usr_student_01',
     name: 'Sathurjan K.',
-    email: 'sathurjan@school.lk',
+    email: 'sathurjan@gmail.com',
     role: 'student',
-    grade: 'Grade 12',
-    class: '12-Physical Science',
+    grade: 'Grade 12 (A/L 2026/2027)',
+    class: 'Physical Science A/L Masterclass Batch',
     schoolId: 'sch_01',
-    schoolName: 'St. Michael High School'
+    schoolName: 'LimaT Independent Tuition Masterclass'
   },
   teacher: {
     id: 'usr_teacher_01',
-    name: 'Mr. Samantha Perera',
-    email: 'samantha.p@school.lk',
+    name: 'Dr. Samantha Perera',
+    email: 'samantha.perera@limat.lk',
     role: 'teacher',
     schoolId: 'sch_01',
-    schoolName: 'St. Michael High School'
+    schoolName: 'LimaT Independent Tuition & Masterclasses'
   },
   admin: {
     id: 'usr_admin_01',
     name: 'Dr. K. Rajasingham',
-    email: 'principal@school.lk',
+    email: 'academy.admin@limat.lk',
     role: 'admin',
     schoolId: 'sch_01',
-    schoolName: 'St. Michael High School'
+    schoolName: 'LimaT Academy Operations'
   },
   super_admin: {
     id: 'usr_super_admin_01',
@@ -61,15 +61,15 @@ export const mockUsers: Record<string, User> = {
     email: 'priya.k@gmail.com',
     role: 'parent',
     schoolId: 'sch_01',
-    schoolName: 'St. Michael High School'
+    schoolName: 'LimaT Independent Tuition Masterclass'
   }
 };
 
 export const initialSchools: School[] = [
   {
     id: 'sch_01',
-    name: 'St. Michael High School',
-    code: 'SMH-042',
+    name: 'LimaT Independent Tuition Masterclass Hub',
+    code: 'LMT-042',
     district: 'Colombo',
     province: 'Western',
     principal: 'Dr. K. Rajasingham',
@@ -1791,24 +1791,24 @@ export const initialLibraryResources: LibraryResource[] = [
 export const initialExams: ExamItem[] = [
   {
     id: 'ex_math_term2',
-    title: 'Term 2 Formal Assessment: Combined Mathematics (Pure & Applied)',
+    title: 'All-Island Masterclass Assessment: Combined Mathematics (Pure & Applied)',
     subject: 'Combined Mathematics',
     grade: 'Grade 12',
     examType: 'term_final',
     date: '2026-10-14',
     time: '08:30 AM - 11:30 AM',
     durationMinutes: 180,
-    hallName: 'Senior Examination Hall A (Main Campus)',
-    seatNumber: 'Seat A-42',
-    invigilator: 'Dr. K. Rajasingham / Mr. S. Wickramaratne',
+    hallName: 'LimaT Exam Portal (Live Streamed)',
+    seatNumber: 'Online Timed Assessment',
+    invigilator: 'Dr. Samantha Perera (Lead Tutor)',
     totalMarks: 1000,
     status: 'upcoming',
-    candidateIndexNo: 'NWN-2026-12A-042',
+    candidateIndexNo: 'LMT-2026-12A-042',
     rules: [
-      'Candidates must occupy their assigned seats 15 minutes prior to the commencement bell.',
-      'Only blue or black ballpoint pens, geometric instruments, and approved stationery allowed.',
-      'Programmable calculators and electronic communication devices are strictly forbidden.',
-      'Candidate Index Slip (Hall Admission Pass) must remain displayed on the desk at all times.'
+      'Download model question paper PDF 5 minutes prior to scheduled start time.',
+      'Solve on standard A4 papers and write Index Number on each page.',
+      'Upload high-resolution scanned PDF script before portal countdown timer ends.',
+      'Live Google Meet session active throughout paper duration for online invigilation.'
     ],
     parts: [
       {
@@ -1859,72 +1859,73 @@ export const initialExams: ExamItem[] = [
   },
   {
     id: 'ex_phys_term2',
-    title: 'Term 2 Formal Assessment: Advanced Physics (Theory & Structured)',
+    title: 'All-Island Masterclass Assessment: Advanced Physics (Theory & Structured)',
     subject: 'Physics',
     grade: 'Grade 12',
     examType: 'term_final',
     date: '2026-10-18',
     time: '08:30 AM - 11:30 AM',
     durationMinutes: 180,
-    hallName: 'Senior Examination Hall A (Main Campus)',
-    seatNumber: 'Seat A-42',
-    invigilator: 'Dr. H. M. Wickramasinghe',
+    hallName: 'LimaT Exam Portal (Live Streamed)',
+    seatNumber: 'Online Timed Assessment',
+    invigilator: 'Eng. K. Thanushan (Lead Tutor)',
     totalMarks: 1000,
     status: 'upcoming',
-    candidateIndexNo: 'NWN-2026-12A-042',
+    candidateIndexNo: 'LMT-2026-12A-042',
     rules: [
-      'Read all instructions on page 1 of question paper before answering.',
-      'Physical constants sheet provided on the back cover of the script.',
-      'Clearly state all formulas before numerical computation.'
+      'Download model paper PDF from student portal.',
+      'Physical constants sheet provided on page 1 of the paper.',
+      'Submit scanned handwritten PDF via upload module before timer ends.'
     ]
   },
   {
     id: 'ex_chem_term2',
-    title: 'Term 2 Formal Assessment: Chemistry (Physical & Organic)',
+    title: 'All-Island Masterclass Assessment: Chemistry (Physical & Organic)',
     subject: 'Chemistry',
     grade: 'Grade 12',
     examType: 'term_final',
     date: '2026-10-21',
     time: '01:00 PM - 04:00 PM',
     durationMinutes: 180,
-    hallName: 'Senior Chemistry Wing - Room 204',
-    seatNumber: 'Seat C-18',
-    invigilator: 'Prof. Anura Jayawardena',
+    hallName: 'LimaT Exam Portal (Live Streamed)',
+    seatNumber: 'Online Timed Assessment',
+    invigilator: 'Dr. Nilmini Silva (Lead Tutor)',
     totalMarks: 1000,
     status: 'upcoming',
-    candidateIndexNo: 'NWN-2026-12A-042',
+    candidateIndexNo: 'LMT-2026-12A-042',
     rules: [
-      'Periodic table sheet supplied inside the exam booklet.',
-      'Show curved-arrow electron pushing notations clearly for mechanism questions.'
+      'Periodic table sheet provided within the PDF paper.',
+      'Show curved-arrow electron pushing mechanisms clearly for organic questions.',
+      'Upload answer script through student portal before the submission deadline.'
     ]
   },
   {
     id: 'ex_ict_mock',
-    title: 'National G.C.E. Advanced Level Model Exam: ICT & Computing',
+    title: 'All-Island Masterclass Assessment: ICT & Computing',
     subject: 'Information Technology',
     grade: 'Grade 12',
     examType: 'national_model',
     date: '2026-10-25',
     time: '08:30 AM - 11:30 AM',
     durationMinutes: 180,
-    hallName: 'Computer Engineering Complex - Lab 1',
-    seatNumber: 'Terminal PC-14',
-    invigilator: 'Mr. Samantha Perera',
+    hallName: 'LimaT Exam Portal (Live Streamed)',
+    seatNumber: 'Online Timed Assessment',
+    invigilator: 'Eng. S. Wickramasinghe (Lead Tutor)',
     totalMarks: 100,
     status: 'upcoming',
-    candidateIndexNo: 'NWN-2026-12A-042',
+    candidateIndexNo: 'LMT-2026-12A-042',
     rules: [
-      'Computer screen monitoring is active during online theoretical submission.',
-      'SQL schema diagrams must follow relational 3NF criteria.'
+      'Online question paper with code upload slot active during exam time.',
+      'SQL queries must follow standard ANSI SQL criteria.'
     ]
   }
 ];
 
 export const initialExamTermResult: ExamTermResult = {
   id: 'res_term1_2026',
-  termTitle: '2026 First Term Official Academic Evaluation (G.C.E. A/L)',
+  termTitle: 'G.C.E. Advanced Level — All-Island Masterclass Mock Assessment',
   candidateName: 'Sathurjan K.',
-  indexNumber: 'NWN-2026-12A-042',
+  indexNumber: 'AL/2026/89421',
   zScore: 2.1480,
   districtRank: 14,
   islandRank: 128,
@@ -1936,7 +1937,7 @@ export const initialExamTermResult: ExamTermResult = {
       maxMarks: 100,
       grade: 'A',
       rankInClass: 2,
-      teacherRemark: 'Outstanding grasp of differential calculus and vector mechanics.'
+      teacherRemark: 'Outstanding grasp of differential calculus and vector mechanics. Mentored by Dr. Samantha Perera.'
     },
     {
       subjectName: 'Physics',
@@ -1944,7 +1945,7 @@ export const initialExamTermResult: ExamTermResult = {
       maxMarks: 100,
       grade: 'A',
       rankInClass: 4,
-      teacherRemark: 'Strong analytical skills demonstrated in rotational dynamics and waves.'
+      teacherRemark: 'Strong analytical skills demonstrated in rotational dynamics and waves. Mentored by Eng. K. Thanushan.'
     },
     {
       subjectName: 'Chemistry',
@@ -1952,7 +1953,7 @@ export const initialExamTermResult: ExamTermResult = {
       maxMarks: 100,
       grade: 'A',
       rankInClass: 7,
-      teacherRemark: 'Good progress in ionic equilibrium. Pay closer attention to organic synthesis steps.'
+      teacherRemark: 'Good progress in ionic equilibrium. Mentored by Dr. Nilmini Silva.'
     },
     {
       subjectName: 'Information Technology',
@@ -1960,9 +1961,9 @@ export const initialExamTermResult: ExamTermResult = {
       maxMarks: 100,
       grade: 'A',
       rankInClass: 1,
-      teacherRemark: 'Top performer in Python programming and relational database design.'
+      teacherRemark: 'Top performer in Python programming and relational database design. Mentored by Eng. S. Wickramasinghe.'
     }
   ],
-  principalRemark: 'Exemplary academic achievement. Eligible for National Olympiad and Merit Scholarship.',
+  principalRemark: 'Exemplary academic achievement across all 4 Masterclass subjects. Consistently in the top 1% cohort.',
   issuedDate: '2026-05-30'
 };

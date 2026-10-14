@@ -1,3 +1,124 @@
+// Pure Solo Tutor & Tuition SaaS Parent Portal Mock Data Engine
+
+export interface ChildTuitionEnrolment {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  teacherTitle: string;
+  subject: string;
+  avatarColor: string;
+  initials: string;
+  packageName: string;
+  batch: string;
+  monthlyFeeLkr: number;
+  feeStatus: 'paid' | 'pending_slip' | 'overdue';
+  validUntil: string;
+  lastPaymentDate: string;
+  lastPaymentRef: string;
+  paymentBank: string;
+  liveClassSchedule: string;
+  platform: 'Google Meet' | 'Zoom' | 'Microsoft Teams';
+  meetingUrl: string;
+  nextSessionDate: string;
+  nextSessionTopic: string;
+  attendanceRate: number;
+  attendedSessions: number;
+  totalSessions: number;
+  latestPaperMark: number;
+  latestPaperMax: number;
+  batchRank: number;
+  batchTotalStudents: number;
+  whatsappGroupUrl?: string;
+  tutorPhone: string;
+}
+
+export interface TuitionInvoice {
+  id: string;
+  invoiceNumber: string;
+  childId: string;
+  childName: string;
+  teacherName: string;
+  subject: string;
+  month: string;
+  amountLkr: number;
+  status: 'cleared' | 'under_review' | 'overdue';
+  paymentMethod: 'bank_slip' | 'online_card' | 'lanka_qr';
+  slipRefNumber?: string;
+  bankName?: string;
+  branchName?: string;
+  depositedDate?: string;
+  slipImageUrl?: string;
+  approvalDate?: string;
+  tutorNotes?: string;
+}
+
+export interface LiveClassAttendanceLog {
+  id: string;
+  childId: string;
+  sessionTitle: string;
+  tutorName: string;
+  subject: string;
+  date: string;
+  timeSlot: string;
+  platform: 'Google Meet' | 'Zoom' | 'Microsoft Teams';
+  status: 'attended' | 'late' | 'missed';
+  durationMinutes: number;
+  totalDurationMinutes: number;
+  joinTime: string;
+  leaveTime: string;
+  recordingWatched: boolean;
+}
+
+export interface TutorPaperMarkRecord {
+  id: string;
+  childId: string;
+  paperCode: string;
+  title: string;
+  tutorName: string;
+  subject: string;
+  date: string;
+  score: number;
+  maxScore: number;
+  batchAverage: number;
+  highestScore: number;
+  rank: number;
+  batchTotal: number;
+  grade: string;
+  tutorFeedback: string;
+  paperDownloadUrl?: string;
+  markingSchemeUrl?: string;
+}
+
+export interface TutorAnnouncement {
+  id: string;
+  tutorName: string;
+  subject: string;
+  title: string;
+  date: string;
+  priority: 'urgent' | 'regular';
+  category: 'Schedule Change' | 'Paper Class Notice' | 'Courier/Tute Dispatch' | 'Special Seminar';
+  content: string;
+  attachmentName?: string;
+  attachmentSize?: string;
+}
+
+export interface ParentLeaveRequest {
+  id: string;
+  childId: string;
+  childName: string;
+  tutorName?: string;
+  startDate: string;
+  endDate: string;
+  reason: 'Medical Illness' | 'Family Emergency' | 'Religious Observation' | 'Official Competition' | 'School Exam Clashing' | 'Other';
+  note: string;
+  hasMedicalCertificate: boolean;
+  status: 'approved' | 'pending' | 'rejected';
+  submittedDate: string;
+  reviewedBy?: string;
+  reviewComment?: string;
+}
+
+// Backward-compatibility interfaces for legacy types
 export interface SubjectGrade {
   code: string;
   subject: string;
@@ -37,7 +158,7 @@ export interface AttendanceRecord {
 
 export interface ExamScheduleItem {
   id: string;
-  examType: 'Term 3 Final Exam' | 'Mid-Term Evaluation' | 'Practical / Lab Exam' | 'Zonal Trial Paper';
+  examType: string;
   subject: string;
   paperCode: string;
   paperName: string;
@@ -52,7 +173,7 @@ export interface ExamScheduleItem {
   status: 'upcoming' | 'completed';
   obtainedScore?: number;
   grade?: string;
-  admissionStatus: 'Hall Ticket Issued' | 'Confirmed' | 'Completed';
+  admissionStatus: string;
 }
 
 export interface PastTermComparison {
@@ -69,7 +190,7 @@ export interface AcademicYearRecord {
   id: string;
   year: string;
   gradeLevel: string;
-  stage: 'Collegiate A/L' | 'Senior Secondary (G.C.E. O/L)' | 'Junior Secondary';
+  stage: string;
   classSection: string;
   classTeacher: string;
   annualAverage: number;
@@ -79,6 +200,20 @@ export interface AcademicYearRecord {
   promotionStatus: string;
   awardsOrMilestone?: string;
   terms: TermReportCard[];
+}
+
+export interface SchoolCircular {
+  id: string;
+  circularNo: string;
+  title: string;
+  category: 'Academic' | 'Administrative' | 'Safety' | 'Event';
+  date: string;
+  summary: string;
+  content: string;
+  priority: 'high' | 'normal';
+  targetAudience: string;
+  attachmentName?: string;
+  attachmentSize?: string;
 }
 
 export interface ParentChildProfile {
@@ -108,1406 +243,793 @@ export interface ParentChildProfile {
   hallTicketNo: string;
   nextExamDate: string;
   nextExamName: string;
-  termReport: TermReportCard; // Active latest
-  termReports: TermReportCard[]; // Full historical terms archive across all years
-  academicJourney: AcademicYearRecord[]; // Structured Grade 6 to 13 academic dossier
+  
+  // Pure Solo Tutor SaaS Properties
+  enrolments: ChildTuitionEnrolment[];
+  invoices: TuitionInvoice[];
+  attendanceLogs: LiveClassAttendanceLog[];
+  paperMarks: TutorPaperMarkRecord[];
+  announcements: TutorAnnouncement[];
+  monthlyInvestmentLkr: number;
+  activeEnrolmentsCount: number;
+  pendingSlipsCount: number;
+
+  // Legacy fallbacks
+  termReport: TermReportCard;
+  termReports: TermReportCard[];
+  academicJourney: AcademicYearRecord[];
   recentAttendance: AttendanceRecord[];
   examSchedules: ExamScheduleItem[];
   pastTermsHistory: PastTermComparison[];
 }
 
-export interface ParentLeaveRequest {
-  id: string;
-  childId: string;
-  childName: string;
-  startDate: string;
-  endDate: string;
-  reason: 'Medical Illness' | 'Family Emergency' | 'Religious Observation' | 'Official Competition' | 'Other';
-  note: string;
-  hasMedicalCertificate: boolean;
-  status: 'approved' | 'pending' | 'rejected';
-  submittedDate: string;
-  reviewedBy?: string;
-  reviewComment?: string;
-}
+// ----------------------------------------------------------------------
+// DATASET: CHILD 01 - SATHURJAN K. (A/L 2026 Physical Science)
+// ----------------------------------------------------------------------
+export const SATHURJAN_ENROLMENTS: ChildTuitionEnrolment[] = [
+  {
+    id: 'enrol_sat_01',
+    teacherId: 'tutor_sam',
+    teacherName: 'Dr. Samantha Perera',
+    teacherTitle: 'Dr. Samantha Perera (Ph.D. Pure Maths)',
+    subject: 'Combined Mathematics',
+    avatarColor: 'bg-emerald-600',
+    initials: 'SP',
+    packageName: 'A/L 2026 Masterclass: Theory + Revision + Paper Class',
+    batch: 'Batch 2026 - Pure & Applied Science',
+    monthlyFeeLkr: 3500,
+    feeStatus: 'paid',
+    validUntil: '31 Oct 2026',
+    lastPaymentDate: '2026-10-01',
+    lastPaymentRef: 'COMM-984210',
+    paymentBank: 'Commercial Bank',
+    liveClassSchedule: 'Tuesdays 07:00 PM - 09:00 PM & Saturdays 08:30 AM',
+    platform: 'Google Meet',
+    meetingUrl: 'https://meet.google.com/sam-math-live',
+    nextSessionDate: 'Tuesday, 07:00 PM',
+    nextSessionTopic: 'Calculus: Integration by Parts & Definite Integrals',
+    attendanceRate: 96.5,
+    attendedSessions: 8,
+    totalSessions: 8,
+    latestPaperMark: 92,
+    latestPaperMax: 100,
+    batchRank: 3,
+    batchTotalStudents: 142,
+    whatsappGroupUrl: 'https://chat.whatsapp.com/AL-Maths-Samantha-2026',
+    tutorPhone: '+94 77 123 4567'
+  },
+  {
+    id: 'enrol_sat_02',
+    teacherId: 'tutor_phys',
+    teacherName: 'Eng. K. Thanushan',
+    teacherTitle: 'Eng. K. Thanushan (B.Sc. Eng, Moratuwa)',
+    subject: 'Physics',
+    avatarColor: 'bg-purple-600',
+    initials: 'KT',
+    packageName: 'A/L Physics Conceptual Masterclass & Laboratory Practicals',
+    batch: 'Batch 2026 - Advanced Mechanics & Wave Optics',
+    monthlyFeeLkr: 3000,
+    feeStatus: 'pending_slip',
+    validUntil: 'Pending Approval (Slip Uploaded)',
+    lastPaymentDate: '2026-10-12',
+    lastPaymentRef: 'BOC-441920',
+    paymentBank: 'Bank of Ceylon (BOC)',
+    liveClassSchedule: 'Thursdays 07:00 PM - 09:00 PM',
+    platform: 'Zoom',
+    meetingUrl: 'https://zoom.us/j/9876543210',
+    nextSessionDate: 'Thursday, 07:00 PM',
+    nextSessionTopic: 'Wave Optics: Young\'s Double Slit & Diffraction Grating',
+    attendanceRate: 92.0,
+    attendedSessions: 7,
+    totalSessions: 8,
+    latestPaperMark: 88,
+    latestPaperMax: 100,
+    batchRank: 5,
+    batchTotalStudents: 285,
+    whatsappGroupUrl: 'https://chat.whatsapp.com/AL-Physics-Thanushan-2026',
+    tutorPhone: '+94 77 987 6543'
+  },
+  {
+    id: 'enrol_sat_03',
+    teacherId: 'tutor_chem',
+    teacherName: 'Dr. Nilmini Silva',
+    teacherTitle: 'Dr. Nilmini Silva (Ph.D. Chem)',
+    subject: 'Chemistry',
+    avatarColor: 'bg-blue-600',
+    initials: 'NS',
+    packageName: 'A/L Chemistry Studio & Video Lab Masterclass',
+    batch: 'Batch 2026 - Physical & Inorganic Chemistry',
+    monthlyFeeLkr: 3000,
+    feeStatus: 'paid',
+    validUntil: '31 Oct 2026',
+    lastPaymentDate: '2026-10-03',
+    lastPaymentRef: 'HNB-778102',
+    paymentBank: 'Hatton National Bank (HNB)',
+    liveClassSchedule: 'Mondays 06:30 PM - 08:30 PM',
+    platform: 'Google Meet',
+    meetingUrl: 'https://meet.google.com/chem-nilmini-live',
+    nextSessionDate: 'Next Monday, 06:30 PM',
+    nextSessionTopic: 'Chemical Kinetics: Arrhenius Equation & Activation Energy',
+    attendanceRate: 95.0,
+    attendedSessions: 8,
+    totalSessions: 8,
+    latestPaperMark: 90,
+    latestPaperMax: 100,
+    batchRank: 4,
+    batchTotalStudents: 220,
+    whatsappGroupUrl: 'https://chat.whatsapp.com/AL-Chem-Nilmini-2026',
+    tutorPhone: '+94 71 456 7890'
+  }
+];
 
-export interface SchoolCircular {
-  id: string;
-  circularNo: string;
-  title: string;
-  category: 'Academic' | 'Administrative' | 'Safety' | 'Event';
-  date: string;
-  summary: string;
-  content: string;
-  priority: 'high' | 'normal';
-  targetAudience: string;
-  attachmentName?: string;
-  attachmentSize?: string;
-}
+export const SATHURJAN_INVOICES: TuitionInvoice[] = [
+  {
+    id: 'inv_sat_10_01',
+    invoiceNumber: 'INV-2026-10-042',
+    childId: 'child_01',
+    childName: 'Sathurjan K.',
+    teacherName: 'Dr. Samantha Perera',
+    subject: 'Combined Mathematics',
+    month: 'October 2026',
+    amountLkr: 3500,
+    status: 'cleared',
+    paymentMethod: 'bank_slip',
+    slipRefNumber: 'COMM-984210',
+    bankName: 'Commercial Bank of Ceylon',
+    branchName: 'Kollupitiya Branch',
+    depositedDate: '2026-10-01',
+    slipImageUrl: '/images/mock_slips/comm_slip_01.jpg',
+    approvalDate: '2026-10-02',
+    tutorNotes: 'Verified and full masterclass recording access unlocked.'
+  },
+  {
+    id: 'inv_sat_10_02',
+    invoiceNumber: 'INV-2026-10-077',
+    childId: 'child_01',
+    childName: 'Sathurjan K.',
+    teacherName: 'Eng. K. Thanushan',
+    subject: 'Physics',
+    month: 'October 2026',
+    amountLkr: 3000,
+    status: 'under_review',
+    paymentMethod: 'bank_slip',
+    slipRefNumber: 'BOC-441920',
+    bankName: 'Bank of Ceylon (BOC)',
+    branchName: 'Jaffna City Branch',
+    depositedDate: '2026-10-12',
+    slipImageUrl: '/images/mock_slips/boc_slip_02.jpg',
+    tutorNotes: 'Deposit slip submitted. Tutor assistant verification pending (usually within 12 hours).'
+  },
+  {
+    id: 'inv_sat_10_03',
+    invoiceNumber: 'INV-2026-10-112',
+    childId: 'child_01',
+    childName: 'Sathurjan K.',
+    teacherName: 'Dr. Nilmini Silva',
+    subject: 'Chemistry',
+    month: 'October 2026',
+    amountLkr: 3000,
+    status: 'cleared',
+    paymentMethod: 'online_card',
+    slipRefNumber: 'VISA-4242-AUTH9812',
+    approvalDate: '2026-10-03',
+    tutorNotes: 'Instant Online Visa Clearance. Automated Invoice Receipt Issued.'
+  },
+  {
+    id: 'inv_sat_09_01',
+    invoiceNumber: 'INV-2026-09-039',
+    childId: 'child_01',
+    childName: 'Sathurjan K.',
+    teacherName: 'Dr. Samantha Perera',
+    subject: 'Combined Mathematics',
+    month: 'September 2026',
+    amountLkr: 3500,
+    status: 'cleared',
+    paymentMethod: 'bank_slip',
+    slipRefNumber: 'COMM-871234',
+    bankName: 'Commercial Bank of Ceylon',
+    depositedDate: '2026-09-01',
+    approvalDate: '2026-09-02'
+  },
+  {
+    id: 'inv_sat_09_02',
+    invoiceNumber: 'INV-2026-09-082',
+    childId: 'child_01',
+    childName: 'Sathurjan K.',
+    teacherName: 'Eng. K. Thanushan',
+    subject: 'Physics',
+    month: 'September 2026',
+    amountLkr: 3000,
+    status: 'cleared',
+    paymentMethod: 'bank_slip',
+    slipRefNumber: 'BOC-331290',
+    bankName: 'Bank of Ceylon (BOC)',
+    depositedDate: '2026-09-02',
+    approvalDate: '2026-09-03'
+  }
+];
+
+export const SATHURJAN_ATTENDANCE_LOGS: LiveClassAttendanceLog[] = [
+  {
+    id: 'att_sat_01',
+    childId: 'child_01',
+    sessionTitle: 'Pure Maths: Integration by Partial Fractions & Trigonometric Substitutions',
+    tutorName: 'Dr. Samantha Perera',
+    subject: 'Combined Mathematics',
+    date: 'Oct 10, 2026 (Saturday)',
+    timeSlot: '08:30 AM - 11:30 AM',
+    platform: 'Google Meet',
+    status: 'attended',
+    durationMinutes: 178,
+    totalDurationMinutes: 180,
+    joinTime: '08:31 AM',
+    leaveTime: '11:29 AM',
+    recordingWatched: true
+  },
+  {
+    id: 'att_sat_02',
+    childId: 'child_01',
+    sessionTitle: 'Applied Maths: Equilibrium of Rigid Bodies & Rod Friction Systems',
+    tutorName: 'Dr. Samantha Perera',
+    subject: 'Combined Mathematics',
+    date: 'Oct 06, 2026 (Tuesday)',
+    timeSlot: '07:00 PM - 09:00 PM',
+    platform: 'Google Meet',
+    status: 'attended',
+    durationMinutes: 120,
+    totalDurationMinutes: 120,
+    joinTime: '07:00 PM',
+    leaveTime: '09:00 PM',
+    recordingWatched: false
+  },
+  {
+    id: 'att_sat_03',
+    childId: 'child_01',
+    sessionTitle: 'Physics: Electromagnetic Induction, Faraday\'s Law & Lenz\'s Rule Live Lab',
+    tutorName: 'Eng. K. Thanushan',
+    subject: 'Physics',
+    date: 'Oct 08, 2026 (Thursday)',
+    timeSlot: '07:00 PM - 09:00 PM',
+    platform: 'Zoom',
+    status: 'attended',
+    durationMinutes: 115,
+    totalDurationMinutes: 120,
+    joinTime: '07:05 PM',
+    leaveTime: '09:00 PM',
+    recordingWatched: true
+  },
+  {
+    id: 'att_sat_04',
+    childId: 'child_01',
+    sessionTitle: 'Chemistry: Chemical Thermodynamics - Entropy & Gibbs Free Energy',
+    tutorName: 'Dr. Nilmini Silva',
+    subject: 'Chemistry',
+    date: 'Oct 05, 2026 (Monday)',
+    timeSlot: '06:30 PM - 08:30 PM',
+    platform: 'Google Meet',
+    status: 'attended',
+    durationMinutes: 120,
+    totalDurationMinutes: 120,
+    joinTime: '06:30 PM',
+    leaveTime: '08:30 PM',
+    recordingWatched: false
+  },
+  {
+    id: 'att_sat_05',
+    childId: 'child_01',
+    sessionTitle: 'Physics: Alternating Current Circuits & RLC Resonance Problem Breakdown',
+    tutorName: 'Eng. K. Thanushan',
+    subject: 'Physics',
+    date: 'Oct 01, 2026 (Thursday)',
+    timeSlot: '07:00 PM - 09:00 PM',
+    platform: 'Zoom',
+    status: 'late',
+    durationMinutes: 98,
+    totalDurationMinutes: 120,
+    joinTime: '07:22 PM',
+    leaveTime: '09:00 PM',
+    recordingWatched: true
+  }
+];
+
+export const SATHURJAN_PAPER_MARKS: TutorPaperMarkRecord[] = [
+  {
+    id: 'paper_sat_01',
+    childId: 'child_01',
+    paperCode: 'MATH-MOD-05',
+    title: 'Combined Maths: Advanced Calculus & Integration Model Paper 05',
+    tutorName: 'Dr. Samantha Perera',
+    subject: 'Combined Mathematics',
+    date: 'Oct 07, 2026',
+    score: 92,
+    maxScore: 100,
+    batchAverage: 64,
+    highestScore: 98,
+    rank: 3,
+    batchTotal: 142,
+    grade: 'A',
+    tutorFeedback: 'Outstanding algebraic clarity in Question 04 (Trig substitution). Minor sign slip in differential equation integration constant.'
+  },
+  {
+    id: 'paper_sat_02',
+    childId: 'child_01',
+    paperCode: 'PHYS-REV-04',
+    title: 'Physics: Complete Mechanics & Dynamic Equilibrium Timed Assessment',
+    tutorName: 'Eng. K. Thanushan',
+    subject: 'Physics',
+    date: 'Oct 02, 2026',
+    score: 88,
+    maxScore: 100,
+    batchAverage: 61,
+    highestScore: 95,
+    rank: 5,
+    batchTotal: 285,
+    grade: 'A',
+    tutorFeedback: 'Very strong free-body diagram drawing. Revise rotational moment of inertia derivations for composite rods.'
+  },
+  {
+    id: 'paper_sat_03',
+    childId: 'child_01',
+    paperCode: 'CHEM-MOD-03',
+    title: 'Chemistry: Physical Chemistry & Phase Equilibria Structured Evaluation',
+    tutorName: 'Dr. Nilmini Silva',
+    subject: 'Chemistry',
+    date: 'Sep 29, 2026',
+    score: 90,
+    maxScore: 100,
+    batchAverage: 66,
+    highestScore: 96,
+    rank: 4,
+    batchTotal: 220,
+    grade: 'A',
+    tutorFeedback: 'Exemplary explanation of Raoult\'s Law and positive azeotrope distillation curves. Neat calculations.'
+  },
+  {
+    id: 'paper_sat_04',
+    childId: 'child_01',
+    paperCode: 'MATH-PAPER-04',
+    title: 'Pure Maths: Vectors, 3D Geometry & Relative Velocity Paper Class 04',
+    tutorName: 'Dr. Samantha Perera',
+    subject: 'Combined Mathematics',
+    date: 'Sep 21, 2026',
+    score: 86,
+    maxScore: 100,
+    batchAverage: 58,
+    highestScore: 94,
+    rank: 6,
+    batchTotal: 142,
+    grade: 'A',
+    tutorFeedback: 'Good vector dot/cross product application. Review wind-drift relative velocity triangle method.'
+  }
+];
+
+export const SATHURJAN_ANNOUNCEMENTS: TutorAnnouncement[] = [
+  {
+    id: 'not_sat_01',
+    tutorName: 'Dr. Samantha Perera',
+    subject: 'Combined Mathematics',
+    title: 'Special 4-Hour Pure Maths Marathon Session this Sunday (Oct 18)',
+    date: 'Today, 10:30 AM',
+    priority: 'urgent',
+    category: 'Special Seminar',
+    content: 'Dear Parents & Students, we are holding a comprehensive 4-hour live problem solving session on Calculus Area Derivations this Sunday at 08:00 AM via Google Meet. Please ensure your child prints the Paper 06 PDF worksheet sent to WhatsApp.',
+    attachmentName: 'Calculus_Area_Derivations_Worksheet_06.pdf',
+    attachmentSize: '2.4 MB'
+  },
+  {
+    id: 'not_sat_02',
+    tutorName: 'Eng. K. Thanushan',
+    subject: 'Physics',
+    title: 'October Physical Tute Pack Dispatched via Speed Post Courier',
+    date: 'Oct 11, 2026',
+    priority: 'regular',
+    category: 'Courier/Tute Dispatch',
+    content: 'All paid students\' printed theory bound books (Wave Optics & Electronics Module 04) have been handed over to Domex/SpeedPost courier. Tracking numbers sent via SMS to registered parents.'
+  },
+  {
+    id: 'not_sat_03',
+    tutorName: 'Dr. Nilmini Silva',
+    subject: 'Chemistry',
+    title: 'Monthly Chemistry Paper 04 Marks & Detailed Video Solutions Released',
+    date: 'Oct 08, 2026',
+    priority: 'regular',
+    category: 'Paper Class Notice',
+    content: 'Marking for Phase Equilibria paper has been released. The full step-by-step 90-minute video explanation is now accessible in the LMS portal under Video Solutions.'
+  }
+];
 
 // ----------------------------------------------------------------------
-// SATHURJAN K. - COMPLETE ACADEMIC JOURNEY (GRADE 6 TO GRADE 12)
+// DATASET: CHILD 02 - ANANYA K. (Grade 8 Junior Secondary)
 // ----------------------------------------------------------------------
-export const sathurjanAcademicJourney: AcademicYearRecord[] = [
+export const ANANYA_ENROLMENTS: ChildTuitionEnrolment[] = [
   {
-    id: 'yr_sat_2026_gr12',
-    year: '2026',
-    gradeLevel: 'Grade 12',
-    stage: 'Collegiate A/L',
-    classSection: '12-Physical Science (A/L 2026)',
-    classTeacher: 'Mr. Samantha Perera',
-    annualAverage: 87.8,
-    annualRank: 3,
-    totalStudents: 42,
-    attendanceRate: 96.8,
-    promotionStatus: 'Current Ongoing (Candidate for G.C.E. A/L 2027)',
-    awardsOrMilestone: 'Physics Olympiad Semifinalist & Senior Prefect Council',
-    terms: [
-      {
-        id: 'rep_sat_2026_t2',
-        term: '2nd Term Summative Assessment 2026',
-        shortTermLabel: '2026 Term 2 (Latest)',
-        issueDate: 'September 28, 2026',
-        academicYear: '2026 / G.C.E. A/L Stream',
-        gradeLevel: 'Grade 12',
-        classSection: '12-Physical Science (A/L 2026)',
-        overallPercentage: 89.4,
-        classRank: 3,
-        totalStudents: 42,
-        conduct: 'Exemplary & Cooperative',
-        attendancePercentage: 96.5,
-        isLatest: true,
-        principalRemarks:
-          'Demonstrates remarkable analytic consistency and leadership in laboratory experiments. Recommended for advanced national physics seminar.',
-        subjects: [
-          {
-            code: 'PHY-12',
-            subject: 'Physics',
-            teacher: 'Mr. Samantha Perera',
-            score: 88,
-            grade: 'A',
-            classAverage: 67,
-            highestScore: 94,
-            remarks: 'Exceptional comprehension in Wave Optics and Mechanics. Diligent laboratory practical record.'
-          },
-          {
-            code: 'CMTH-12',
-            subject: 'Combined Mathematics',
-            teacher: 'Mrs. K. Jayasundara',
-            score: 92,
-            grade: 'A',
-            classAverage: 62,
-            highestScore: 96,
-            remarks: 'Top-tier problem solving speed in Differential Equations and Trigonometry.'
-          },
-          {
-            code: 'CHM-12',
-            subject: 'Chemistry',
-            teacher: 'Dr. N. Fernando',
-            score: 85,
-            grade: 'A',
-            classAverage: 65,
-            highestScore: 91,
-            remarks: 'Good grasp of Physical and Inorganic Chemistry. Strong conceptual foundation.'
-          },
-          {
-            code: 'ENG-12',
-            subject: 'General English',
-            teacher: 'Ms. T. De Silva',
-            score: 90,
-            grade: 'A',
-            classAverage: 71,
-            highestScore: 95,
-            remarks: 'Fluent academic writing and flawless reading comprehension.'
-          },
-          {
-            code: 'GK-12',
-            subject: 'General Knowledge & IT',
-            teacher: 'Mr. A. Wickremasinghe',
-            score: 86,
-            grade: 'A',
-            classAverage: 74,
-            highestScore: 92,
-            remarks: 'Well-informed about international affairs and applied computing.'
-          }
-        ]
-      },
-      {
-        id: 'rep_sat_2026_t1',
-        term: '1st Term Mid-Year Assessment 2026',
-        shortTermLabel: '2026 Term 1',
-        issueDate: 'April 08, 2026',
-        academicYear: '2026 / G.C.E. A/L Stream',
-        gradeLevel: 'Grade 12',
-        classSection: '12-Physical Science (A/L 2026)',
-        overallPercentage: 86.2,
-        classRank: 4,
-        totalStudents: 42,
-        conduct: 'Very Good & Attentive',
-        attendancePercentage: 97.0,
-        isLatest: false,
-        principalRemarks:
-          'Solid foundational performance in the introductory Advanced Level syllabus. Shows great discipline in theoretical calculus.',
-        subjects: [
-          {
-            code: 'PHY-12',
-            subject: 'Physics',
-            teacher: 'Mr. Samantha Perera',
-            score: 84,
-            grade: 'A',
-            classAverage: 63,
-            highestScore: 92,
-            remarks: 'Strong understanding of Units, Dimensions, and Linear Mechanics.'
-          },
-          {
-            code: 'CMTH-12',
-            subject: 'Combined Mathematics',
-            teacher: 'Mrs. K. Jayasundara',
-            score: 88,
-            grade: 'A',
-            classAverage: 58,
-            highestScore: 95,
-            remarks: 'Excellent algebraic manipulation and polynomial factorisation.'
-          },
-          {
-            code: 'CHM-12',
-            subject: 'Chemistry',
-            teacher: 'Dr. N. Fernando',
-            score: 82,
-            grade: 'A',
-            classAverage: 60,
-            highestScore: 89,
-            remarks: 'Clear grasp of Atomic Structure and Periodic Trends.'
-          },
-          {
-            code: 'ENG-12',
-            subject: 'General English',
-            teacher: 'Ms. T. De Silva',
-            score: 92,
-            grade: 'A',
-            classAverage: 69,
-            highestScore: 94,
-            remarks: 'Very proficient vocabulary and articulate verbal presentations.'
-          },
-          {
-            code: 'GK-12',
-            subject: 'General Knowledge & IT',
-            teacher: 'Mr. A. Wickremasinghe',
-            score: 85,
-            grade: 'A',
-            classAverage: 70,
-            highestScore: 90,
-            remarks: 'Active participant in current affairs quiz.'
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'yr_sat_2025_gr11',
-    year: '2025',
-    gradeLevel: 'Grade 11',
-    stage: 'Senior Secondary (G.C.E. O/L)',
-    classSection: '11-Science A',
-    classTeacher: 'Mrs. K. Jayasundara',
-    annualAverage: 89.8,
-    annualRank: 2,
-    totalStudents: 44,
-    attendanceRate: 98.2,
-    promotionStatus: 'Passed G.C.E. O/L with 9 Distinctions (9 A Grades)',
-    awardsOrMilestone: 'G.C.E. O/L 9A Distinction Honours; Promoted to Collegiate A/L Physical Science',
-    terms: [
-      {
-        id: 'rep_sat_2025_t3',
-        term: '3rd Term Annual Evaluation 2025 (Grade 11)',
-        shortTermLabel: '2025 Term 3 (Grade 11 O/L)',
-        issueDate: 'December 12, 2025',
-        academicYear: '2025 / Secondary O/L',
-        gradeLevel: 'Grade 11',
-        classSection: '11-Science A',
-        overallPercentage: 91.8,
-        classRank: 2,
-        totalStudents: 44,
-        conduct: 'Exemplary Scholar & Senior Prefect',
-        attendancePercentage: 98.2,
-        isLatest: false,
-        principalRemarks:
-          'Graduated Grade 11 with stellar distinction across all core academic disciplines. Fully qualified for the A/L Physical Science stream.',
-        subjects: [
-          {
-            code: 'MTH-11',
-            subject: 'Mathematics',
-            teacher: 'Mrs. K. Jayasundara',
-            score: 96,
-            grade: 'A*',
-            classAverage: 64,
-            highestScore: 98,
-            remarks: 'Flawless performance in Geometry proofs and Trigonometry.'
-          },
-          {
-            code: 'SCI-11',
-            subject: 'Science',
-            teacher: 'Mr. P. Bandara',
-            score: 94,
-            grade: 'A*',
-            classAverage: 66,
-            highestScore: 96,
-            remarks: 'Exceptional answers in Organic Chemistry and Electric Circuits.'
-          },
-          {
-            code: 'ENG-11',
-            subject: 'English Language',
-            teacher: 'Ms. T. De Silva',
-            score: 91,
-            grade: 'A',
-            classAverage: 70,
-            highestScore: 95,
-            remarks: 'Impeccable grammar and creative essay narrative.'
-          },
-          {
-            code: 'HIS-11',
-            subject: 'History & Heritage',
-            teacher: 'Mr. R. Karunaratne',
-            score: 89,
-            grade: 'A',
-            classAverage: 68,
-            highestScore: 92,
-            remarks: 'Detailed historical analytical essays.'
-          },
-          {
-            code: 'ICT-11',
-            subject: 'Information & Communication Tech',
-            teacher: 'Mr. A. Wickremasinghe',
-            score: 95,
-            grade: 'A*',
-            classAverage: 73,
-            highestScore: 97,
-            remarks: 'Top score in database design and Pascal/Python algorithms.'
-          },
-          {
-            code: 'LAN-11',
-            subject: 'Second Language',
-            teacher: 'Mrs. V. Sivalingam',
-            score: 86,
-            grade: 'A',
-            classAverage: 70,
-            highestScore: 92,
-            remarks: 'Strong grammatical competence and reading fluency.'
-          }
-        ]
-      },
-      {
-        id: 'rep_sat_2025_t2',
-        term: '2nd Term Mid-Year Evaluation 2025',
-        shortTermLabel: '2025 Term 2',
-        issueDate: 'August 15, 2025',
-        academicYear: '2025 / Secondary O/L',
-        gradeLevel: 'Grade 11',
-        classSection: '11-Science A',
-        overallPercentage: 89.5,
-        classRank: 3,
-        totalStudents: 44,
-        conduct: 'Very Good',
-        attendancePercentage: 98.0,
-        isLatest: false,
-        principalRemarks: 'Consistent high marks in science and mathematics. Keep up momentum for pre-board exams.',
-        subjects: [
-          {
-            code: 'MTH-11',
-            subject: 'Mathematics',
-            teacher: 'Mrs. K. Jayasundara',
-            score: 94,
-            grade: 'A*',
-            classAverage: 62,
-            highestScore: 97,
-            remarks: 'Excellent progress in quadratic functions.'
-          },
-          {
-            code: 'SCI-11',
-            subject: 'Science',
-            teacher: 'Mr. P. Bandara',
-            score: 91,
-            grade: 'A',
-            classAverage: 65,
-            highestScore: 94,
-            remarks: 'Strong understanding in Light and Reflection.'
-          },
-          {
-            code: 'ENG-11',
-            subject: 'English Language',
-            teacher: 'Ms. T. De Silva',
-            score: 88,
-            grade: 'A',
-            classAverage: 69,
-            highestScore: 93,
-            remarks: 'Well-structured formal letters and comprehension.'
-          },
-          {
-            code: 'ICT-11',
-            subject: 'Information & Communication Tech',
-            teacher: 'Mr. A. Wickremasinghe',
-            score: 92,
-            grade: 'A',
-            classAverage: 71,
-            highestScore: 95,
-            remarks: 'Good handling of spreadsheets.'
-          }
-        ]
-      },
-      {
-        id: 'rep_sat_2025_t1',
-        term: '1st Term Evaluation 2025',
-        shortTermLabel: '2025 Term 1',
-        issueDate: 'April 10, 2025',
-        academicYear: '2025 / Secondary O/L',
-        gradeLevel: 'Grade 11',
-        classSection: '11-Science A',
-        overallPercentage: 88.0,
-        classRank: 3,
-        totalStudents: 44,
-        conduct: 'Disciplined & Studious',
-        attendancePercentage: 98.5,
-        isLatest: false,
-        principalRemarks: 'Strong start to the Grade 11 national exam syllabus.',
-        subjects: [
-          {
-            code: 'MTH-11',
-            subject: 'Mathematics',
-            teacher: 'Mrs. K. Jayasundara',
-            score: 92,
-            grade: 'A',
-            classAverage: 60,
-            highestScore: 96,
-            remarks: 'Accurate algebraic simplifications.'
-          },
-          {
-            code: 'SCI-11',
-            subject: 'Science',
-            teacher: 'Mr. P. Bandara',
-            score: 89,
-            grade: 'A',
-            classAverage: 63,
-            highestScore: 92,
-            remarks: 'Solid grasp of human circulatory system.'
-          },
-          {
-            code: 'ENG-11',
-            subject: 'English Language',
-            teacher: 'Ms. T. De Silva',
-            score: 87,
-            grade: 'A',
-            classAverage: 68,
-            highestScore: 91,
-            remarks: 'Active contributor in reading comprehension.'
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'yr_sat_2024_gr10',
-    year: '2024',
-    gradeLevel: 'Grade 10',
-    stage: 'Senior Secondary (G.C.E. O/L)',
-    classSection: '10-Science A',
-    classTeacher: 'Mr. P. Bandara',
-    annualAverage: 88.6,
-    annualRank: 3,
-    totalStudents: 43,
-    attendanceRate: 97.4,
-    promotionStatus: 'Promoted to Grade 11 (O/L Senior)',
-    awardsOrMilestone: '1st Place Zonal Science Olympiad Junior Division',
-    terms: [
-      {
-        id: 'rep_sat_2024_t3',
-        term: '3rd Term Annual Evaluation 2024 (Grade 10)',
-        shortTermLabel: '2024 Term 3',
-        issueDate: 'December 10, 2024',
-        academicYear: '2024 / Secondary',
-        gradeLevel: 'Grade 10',
-        classSection: '10-Science A',
-        overallPercentage: 90.2,
-        classRank: 2,
-        totalStudents: 43,
-        conduct: 'Outstanding',
-        attendancePercentage: 97.5,
-        isLatest: false,
-        principalRemarks: 'Exemplary achievement in Grade 10 final examinations. Ready for Grade 11 challenge.',
-        subjects: [
-          {
-            code: 'MTH-10',
-            subject: 'Mathematics',
-            teacher: 'Mrs. K. Jayasundara',
-            score: 94,
-            grade: 'A*',
-            classAverage: 61,
-            highestScore: 97,
-            remarks: 'Superior geometrical theorem execution.'
-          },
-          {
-            code: 'SCI-10',
-            subject: 'Science',
-            teacher: 'Mr. P. Bandara',
-            score: 93,
-            grade: 'A*',
-            classAverage: 64,
-            highestScore: 95,
-            remarks: 'Highest laboratory assignment mark.'
-          },
-          {
-            code: 'ENG-10',
-            subject: 'English Language',
-            teacher: 'Ms. T. De Silva',
-            score: 88,
-            grade: 'A',
-            classAverage: 67,
-            highestScore: 92,
-            remarks: 'Well written compositions.'
-          },
-          {
-            code: 'HIS-10',
-            subject: 'History',
-            teacher: 'Mr. R. Karunaratne',
-            score: 86,
-            grade: 'A',
-            classAverage: 65,
-            highestScore: 90,
-            remarks: 'Detailed historical context.'
-          }
-        ]
-      },
-      {
-        id: 'rep_sat_2024_t2',
-        term: '2nd Term Evaluation 2024',
-        shortTermLabel: '2024 Term 2',
-        issueDate: 'August 12, 2024',
-        academicYear: '2024 / Secondary',
-        gradeLevel: 'Grade 10',
-        classSection: '10-Science A',
-        overallPercentage: 88.4,
-        classRank: 4,
-        totalStudents: 43,
-        conduct: 'Very Good',
-        attendancePercentage: 97.0,
-        isLatest: false,
-        principalRemarks: 'Very balanced academic results across all sciences and languages.',
-        subjects: [
-          {
-            code: 'MTH-10',
-            subject: 'Mathematics',
-            teacher: 'Mrs. K. Jayasundara',
-            score: 90,
-            grade: 'A',
-            classAverage: 60,
-            highestScore: 95,
-            remarks: 'Very strong algebra work.'
-          },
-          {
-            code: 'SCI-10',
-            subject: 'Science',
-            teacher: 'Mr. P. Bandara',
-            score: 89,
-            grade: 'A',
-            classAverage: 62,
-            highestScore: 93,
-            remarks: 'Detailed practical record.'
-          }
-        ]
-      },
-      {
-        id: 'rep_sat_2024_t1',
-        term: '1st Term Evaluation 2024',
-        shortTermLabel: '2024 Term 1',
-        issueDate: 'April 05, 2024',
-        academicYear: '2024 / Secondary',
-        gradeLevel: 'Grade 10',
-        classSection: '10-Science A',
-        overallPercentage: 87.1,
-        classRank: 4,
-        totalStudents: 43,
-        conduct: 'Diligent',
-        attendancePercentage: 97.6,
-        isLatest: false,
-        principalRemarks: 'Pleased with transition to secondary science syllabus.',
-        subjects: [
-          {
-            code: 'MTH-10',
-            subject: 'Mathematics',
-            teacher: 'Mrs. K. Jayasundara',
-            score: 88,
-            grade: 'A',
-            classAverage: 59,
-            highestScore: 94,
-            remarks: 'Solid foundation in coordinates.'
-          },
-          {
-            code: 'SCI-10',
-            subject: 'Science',
-            teacher: 'Mr. P. Bandara',
-            score: 87,
-            grade: 'A',
-            classAverage: 61,
-            highestScore: 91,
-            remarks: 'Good chemical equations work.'
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'yr_sat_2023_gr9',
-    year: '2023',
-    gradeLevel: 'Grade 9',
-    stage: 'Junior Secondary',
-    classSection: '9-A',
-    classTeacher: 'Mrs. V. Sivalingam',
-    annualAverage: 88.7,
-    annualRank: 3,
-    totalStudents: 40,
+    id: 'enrol_ana_01',
+    teacherId: 'tutor_nilmini',
+    teacherName: 'Mrs. Nilmini Silva',
+    teacherTitle: 'Mrs. Nilmini Silva (B.Sc. Ed)',
+    subject: 'Science & Environment',
+    avatarColor: 'bg-emerald-600',
+    initials: 'NS',
+    packageName: 'Grade 8 Science Masterclass & Practical Experiments',
+    batch: 'Batch 2026 - Junior Scholars',
+    monthlyFeeLkr: 2000,
+    feeStatus: 'paid',
+    validUntil: '31 Oct 2026',
+    lastPaymentDate: '2026-10-02',
+    lastPaymentRef: 'COMM-119283',
+    paymentBank: 'Commercial Bank',
+    liveClassSchedule: 'Wednesdays 05:00 PM - 07:00 PM',
+    platform: 'Google Meet',
+    meetingUrl: 'https://meet.google.com/science-grade8-live',
+    nextSessionDate: 'Wednesday, 05:00 PM',
+    nextSessionTopic: 'Human Digestive System & Enzyme Action Laboratory Demo',
     attendanceRate: 98.0,
-    promotionStatus: 'Promoted to Grade 10 (Secondary Division)',
-    awardsOrMilestone: 'Junior English Debating Captain; All-Round Academic Medal',
-    terms: [
-      {
-        id: 'rep_sat_2023_t3',
-        term: '3rd Term Annual Assessment 2023 (Grade 9)',
-        shortTermLabel: '2023 Term 3',
-        issueDate: 'December 08, 2023',
-        academicYear: '2023 / Junior Secondary',
-        gradeLevel: 'Grade 9',
-        classSection: '9-A',
-        overallPercentage: 89.8,
-        classRank: 3,
-        totalStudents: 40,
-        conduct: 'Excellent',
-        attendancePercentage: 98.0,
-        isLatest: false,
-        principalRemarks: 'Completed Junior Secondary phase with top ranks. Promoted to Grade 10.',
-        subjects: [
-          {
-            code: 'SCI-09',
-            subject: 'Science',
-            teacher: 'Mr. K. Bandara',
-            score: 93,
-            grade: 'A*',
-            classAverage: 66,
-            highestScore: 95,
-            remarks: 'Mastery in ecology and energy conservation.'
-          },
-          {
-            code: 'MTH-09',
-            subject: 'Mathematics',
-            teacher: 'Mrs. M. Senanayake',
-            score: 91,
-            grade: 'A',
-            classAverage: 62,
-            highestScore: 96,
-            remarks: 'Very neat graph interpretations.'
-          },
-          {
-            code: 'ENG-09',
-            subject: 'English Language',
-            teacher: 'Mrs. Nilmini Silva',
-            score: 90,
-            grade: 'A',
-            classAverage: 71,
-            highestScore: 93,
-            remarks: 'Fluent speech delivery.'
-          }
-        ]
-      },
-      {
-        id: 'rep_sat_2023_t1',
-        term: '1st Term Assessment 2023',
-        shortTermLabel: '2023 Term 1',
-        issueDate: 'April 04, 2023',
-        academicYear: '2023 / Junior Secondary',
-        gradeLevel: 'Grade 9',
-        classSection: '9-A',
-        overallPercentage: 87.5,
-        classRank: 3,
-        totalStudents: 40,
-        conduct: 'Very Good',
-        attendancePercentage: 98.0,
-        isLatest: false,
-        principalRemarks: 'Good continuous evaluation record.',
-        subjects: [
-          {
-            code: 'SCI-09',
-            subject: 'Science',
-            teacher: 'Mr. K. Bandara',
-            score: 90,
-            grade: 'A',
-            classAverage: 64,
-            highestScore: 93,
-            remarks: 'Thorough plant physiology drawings.'
-          },
-          {
-            code: 'MTH-09',
-            subject: 'Mathematics',
-            teacher: 'Mrs. M. Senanayake',
-            score: 89,
-            grade: 'A',
-            classAverage: 60,
-            highestScore: 94,
-            remarks: 'Accurate ratio computations.'
-          }
-        ]
-      }
-    ]
+    attendedSessions: 8,
+    totalSessions: 8,
+    latestPaperMark: 94,
+    latestPaperMax: 100,
+    batchRank: 1,
+    batchTotalStudents: 68,
+    whatsappGroupUrl: 'https://chat.whatsapp.com/Grade8-Science-2026',
+    tutorPhone: '+94 71 889 2211'
   },
   {
-    id: 'yr_sat_2022_gr8',
-    year: '2022',
-    gradeLevel: 'Grade 8',
-    stage: 'Junior Secondary',
-    classSection: '8-A',
-    classTeacher: 'Mr. R. Karunaratne',
-    annualAverage: 90.0,
-    annualRank: 2,
-    totalStudents: 39,
-    attendanceRate: 98.5,
-    promotionStatus: 'Promoted to Grade 9',
-    awardsOrMilestone: 'Junior House Games Athletics Medallist (400m Silver)',
-    terms: [
-      {
-        id: 'rep_sat_2022_t3',
-        term: '3rd Term Annual Promotion Assessment 2022 (Grade 8)',
-        shortTermLabel: '2022 Term 3',
-        issueDate: 'December 09, 2022',
-        academicYear: '2022 / Junior Secondary',
-        gradeLevel: 'Grade 8',
-        classSection: '8-A',
-        overallPercentage: 91.0,
-        classRank: 2,
-        totalStudents: 39,
-        conduct: 'Outstanding Character',
-        attendancePercentage: 98.5,
-        isLatest: false,
-        principalRemarks: 'High distinction across all eight subjects. Exemplary disciplinary and sporting record.',
-        subjects: [
-          {
-            code: 'SCI-08',
-            subject: 'Science',
-            teacher: 'Mr. K. Bandara',
-            score: 94,
-            grade: 'A*',
-            classAverage: 65,
-            highestScore: 96,
-            remarks: 'Passionate and inquisitive learner.'
-          },
-          {
-            code: 'MTH-08',
-            subject: 'Mathematics',
-            teacher: 'Mrs. M. Senanayake',
-            score: 93,
-            grade: 'A*',
-            classAverage: 63,
-            highestScore: 95,
-            remarks: 'Fast mental arithmetic.'
-          },
-          {
-            code: 'ENG-08',
-            subject: 'English Language',
-            teacher: 'Mrs. Nilmini Silva',
-            score: 89,
-            grade: 'A',
-            classAverage: 70,
-            highestScore: 92,
-            remarks: 'Strong vocabulary.'
-          }
-        ]
-      },
-      {
-        id: 'rep_sat_2022_t1',
-        term: '1st Term Evaluation 2022',
-        shortTermLabel: '2022 Term 1',
-        issueDate: 'April 06, 2022',
-        academicYear: '2022 / Junior Secondary',
-        gradeLevel: 'Grade 8',
-        classSection: '8-A',
-        overallPercentage: 88.9,
-        classRank: 2,
-        totalStudents: 39,
-        conduct: 'Very Good',
-        attendancePercentage: 98.5,
-        isLatest: false,
-        principalRemarks: 'Pleasing start to Grade 8.',
-        subjects: [
-          {
-            code: 'SCI-08',
-            subject: 'Science',
-            teacher: 'Mr. K. Bandara',
-            score: 91,
-            grade: 'A',
-            classAverage: 64,
-            highestScore: 94,
-            remarks: 'Well-prepared tests.'
-          },
-          {
-            code: 'MTH-08',
-            subject: 'Mathematics',
-            teacher: 'Mrs. M. Senanayake',
-            score: 90,
-            grade: 'A',
-            classAverage: 61,
-            highestScore: 94,
-            remarks: 'Prompt submission of homework.'
-          }
-        ]
-      }
-    ]
+    id: 'enrol_ana_02',
+    teacherId: 'tutor_siva',
+    teacherName: 'Mr. K. Sivakumar',
+    teacherTitle: 'Mr. K. Sivakumar (Dip. Teaching)',
+    subject: 'Mathematics',
+    avatarColor: 'bg-amber-600',
+    initials: 'KS',
+    packageName: 'Grade 8 Mathematics & Geometry Problem Lab',
+    batch: 'Batch 2026 - Accelerated Math',
+    monthlyFeeLkr: 2200,
+    feeStatus: 'paid',
+    validUntil: '31 Oct 2026',
+    lastPaymentDate: '2026-10-01',
+    lastPaymentRef: 'BOC-992102',
+    paymentBank: 'Bank of Ceylon (BOC)',
+    liveClassSchedule: 'Fridays 05:00 PM - 07:00 PM',
+    platform: 'Zoom',
+    meetingUrl: 'https://zoom.us/j/4455667788',
+    nextSessionDate: 'Friday, 05:00 PM',
+    nextSessionTopic: 'Algebraic Expressions & Factorization of Binomials',
+    attendanceRate: 97.5,
+    attendedSessions: 8,
+    totalSessions: 8,
+    latestPaperMark: 96,
+    latestPaperMax: 100,
+    batchRank: 1,
+    batchTotalStudents: 75,
+    whatsappGroupUrl: 'https://chat.whatsapp.com/Grade8-Math-Sivakumar',
+    tutorPhone: '+94 77 334 5566'
   },
   {
-    id: 'yr_sat_2021_gr7',
-    year: '2021',
-    gradeLevel: 'Grade 7',
-    stage: 'Junior Secondary',
-    classSection: '7-B',
-    classTeacher: 'Mrs. M. Senanayake',
-    annualAverage: 89.5,
-    annualRank: 3,
-    totalStudents: 38,
-    attendanceRate: 97.8,
-    promotionStatus: 'Promoted to Grade 8',
-    awardsOrMilestone: 'Subject Prize for General Science & Mathematics',
-    terms: [
-      {
-        id: 'rep_sat_2021_t3',
-        term: '3rd Term Annual Assessment 2021 (Grade 7)',
-        shortTermLabel: '2021 Term 3',
-        issueDate: 'December 03, 2021',
-        academicYear: '2021 / Junior Secondary',
-        gradeLevel: 'Grade 7',
-        classSection: '7-B',
-        overallPercentage: 89.5,
-        classRank: 3,
-        totalStudents: 38,
-        conduct: 'Polite & Conscientious',
-        attendancePercentage: 97.8,
-        isLatest: false,
-        principalRemarks: 'Successfully completed Grade 7 syllabus with top academic ranking. Promoted to Grade 8.',
-        subjects: [
-          {
-            code: 'SCI-07',
-            subject: 'Science',
-            teacher: 'Mr. K. Bandara',
-            score: 92,
-            grade: 'A',
-            classAverage: 65,
-            highestScore: 94,
-            remarks: 'Good grasp of earth science.'
-          },
-          {
-            code: 'MTH-07',
-            subject: 'Mathematics',
-            teacher: 'Mrs. M. Senanayake',
-            score: 91,
-            grade: 'A',
-            classAverage: 62,
-            highestScore: 95,
-            remarks: 'Very good fractions and decimals work.'
-          },
-          {
-            code: 'ENG-07',
-            subject: 'English Language',
-            teacher: 'Mrs. Nilmini Silva',
-            score: 88,
-            grade: 'A',
-            classAverage: 69,
-            highestScore: 92,
-            remarks: 'Nice handwriting and spellings.'
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'yr_sat_2020_gr6',
-    year: '2020',
-    gradeLevel: 'Grade 6',
-    stage: 'Junior Secondary',
-    classSection: '6-B (Secondary Entry)',
-    classTeacher: 'Mr. K. Bandara',
-    annualAverage: 90.4,
-    annualRank: 2,
-    totalStudents: 38,
-    attendanceRate: 99.1,
-    promotionStatus: 'Promoted to Grade 7',
-    awardsOrMilestone: 'School Entry via Grade 5 Scholarship Merit Scheme (Merit Score: 184/200)',
-    terms: [
-      {
-        id: 'rep_sat_2020_t3',
-        term: '3rd Term Annual Assessment 2020 (Grade 6 Entry Year)',
-        shortTermLabel: '2020 Term 3 (Grade 6 Entry)',
-        issueDate: 'December 04, 2020',
-        academicYear: '2020 / Junior Secondary Entry',
-        gradeLevel: 'Grade 6',
-        classSection: '6-B (Secondary Entry)',
-        overallPercentage: 90.4,
-        classRank: 2,
-        totalStudents: 38,
-        conduct: 'Outstanding Entry Scholar',
-        attendancePercentage: 99.1,
-        isLatest: false,
-        principalRemarks:
-          'Welcome to St. Michael High School. Outstanding first year completed with exemplary merit standing.',
-        subjects: [
-          {
-            code: 'SCI-06',
-            subject: 'Science',
-            teacher: 'Mr. K. Bandara',
-            score: 95,
-            grade: 'A*',
-            classAverage: 66,
-            highestScore: 96,
-            remarks: 'Brilliant understanding in living world topics.'
-          },
-          {
-            code: 'MTH-06',
-            subject: 'Mathematics',
-            teacher: 'Mrs. M. Senanayake',
-            score: 93,
-            grade: 'A*',
-            classAverage: 64,
-            highestScore: 96,
-            remarks: 'Top-tier problem solving speed.'
-          },
-          {
-            code: 'ENG-06',
-            subject: 'English Language',
-            teacher: 'Mrs. Nilmini Silva',
-            score: 89,
-            grade: 'A',
-            classAverage: 68,
-            highestScore: 93,
-            remarks: 'Active and enthusiastic in class.'
-          }
-        ]
-      }
-    ]
+    id: 'enrol_ana_03',
+    teacherId: 'tutor_fonseka',
+    teacherName: 'Ms. Rashmi Fonseka',
+    teacherTitle: 'Ms. Rashmi Fonseka (BA Hons English)',
+    subject: 'English Language & Literature',
+    avatarColor: 'bg-indigo-600',
+    initials: 'RF',
+    packageName: 'Grade 8 English Language, Grammar & Essay Workshop',
+    batch: 'Batch 2026 - Cambridge & National Syllabus',
+    monthlyFeeLkr: 1800,
+    feeStatus: 'paid',
+    validUntil: '31 Oct 2026',
+    lastPaymentDate: '2026-10-04',
+    lastPaymentRef: 'HNB-554411',
+    paymentBank: 'Hatton National Bank (HNB)',
+    liveClassSchedule: 'Saturdays 03:00 PM - 05:00 PM',
+    platform: 'Google Meet',
+    meetingUrl: 'https://meet.google.com/english-fonseka-live',
+    nextSessionDate: 'Saturday, 03:00 PM',
+    nextSessionTopic: 'Creative Narrative Essay Writing & Idiomatic Expressions',
+    attendanceRate: 100.0,
+    attendedSessions: 8,
+    totalSessions: 8,
+    latestPaperMark: 91,
+    latestPaperMax: 100,
+    batchRank: 2,
+    batchTotalStudents: 50,
+    whatsappGroupUrl: 'https://chat.whatsapp.com/Grade8-English-Fonseka',
+    tutorPhone: '+94 76 112 3344'
   }
 ];
 
-export const sathurjanAllTermReports: TermReportCard[] = sathurjanAcademicJourney.flatMap((y) => y.terms);
-
-// ----------------------------------------------------------------------
-// ANANYA K. - COMPLETE ACADEMIC JOURNEY (GRADE 6 TO GRADE 8)
-// ----------------------------------------------------------------------
-export const ananyaAcademicJourney: AcademicYearRecord[] = [
+export const ANANYA_INVOICES: TuitionInvoice[] = [
   {
-    id: 'yr_ana_2026_gr8',
-    year: '2026',
-    gradeLevel: 'Grade 8',
-    stage: 'Junior Secondary',
-    classSection: '8-A (Junior Secondary)',
-    classTeacher: 'Mrs. Nilmini Silva',
-    annualAverage: 92.6,
-    annualRank: 1,
-    totalStudents: 38,
-    attendanceRate: 98.2,
-    promotionStatus: 'Current Ongoing (Junior Secondary)',
-    awardsOrMilestone: 'Western Music & Violin Senior Soloist Gold Medal',
-    terms: [
-      {
-        id: 'rep_ana_2026_t2',
-        term: '2nd Term Summative Assessment 2026',
-        shortTermLabel: '2026 Term 2 (Latest)',
-        issueDate: 'September 28, 2026',
-        academicYear: '2026 / Junior Secondary',
-        gradeLevel: 'Grade 8',
-        classSection: '8-A (Junior Secondary)',
-        overallPercentage: 93.6,
-        classRank: 1,
-        totalStudents: 38,
-        conduct: 'Outstanding & Respectful',
-        attendancePercentage: 98.3,
-        isLatest: true,
-        principalRemarks:
-          'First in class ranking with pristine academic standards and prominent participation in Western Music and Inter-House Debating.',
-        subjects: [
-          {
-            code: 'SCI-08',
-            subject: 'Science',
-            teacher: 'Mr. K. Bandara',
-            score: 96,
-            grade: 'A*',
-            classAverage: 68,
-            highestScore: 96,
-            remarks: 'Highest score in class! Demonstrates brilliant scientific curiosity and thorough lab records.'
-          },
-          {
-            code: 'MTH-08',
-            subject: 'Mathematics',
-            teacher: 'Mrs. M. Senanayake',
-            score: 92,
-            grade: 'A',
-            classAverage: 65,
-            highestScore: 95,
-            remarks: 'Excellent algebraic proficiency and rapid mental arithmetic.'
-          },
-          {
-            code: 'ENG-08',
-            subject: 'English Language & Literature',
-            teacher: 'Mrs. Nilmini Silva',
-            score: 97,
-            grade: 'A*',
-            classAverage: 73,
-            highestScore: 97,
-            remarks: 'Outstanding creative composition and impeccable oratory skills.'
-          },
-          {
-            code: 'HIS-08',
-            subject: 'History & Civics',
-            teacher: 'Mr. P. Rathnayake',
-            score: 90,
-            grade: 'A',
-            classAverage: 70,
-            highestScore: 94,
-            remarks: 'Passionate interest in Sri Lankan archaeological heritage and civic structures.'
-          },
-          {
-            code: 'LAN-08',
-            subject: 'Second Language',
-            teacher: 'Mrs. V. Sivalingam',
-            score: 94,
-            grade: 'A',
-            classAverage: 72,
-            highestScore: 96,
-            remarks: 'Flawless grammatical clarity and rich vocabulary.'
-          },
-          {
-            code: 'MUS-08',
-            subject: 'Western Music & Arts',
-            teacher: 'Mr. G. Mendis',
-            score: 98,
-            grade: 'A*',
-            classAverage: 78,
-            highestScore: 98,
-            remarks: 'Gifted violinist in the school junior ensemble; exceptional ear for harmony.'
-          }
-        ]
-      },
-      {
-        id: 'rep_ana_2026_t1',
-        term: '1st Term Summative Assessment 2026',
-        shortTermLabel: '2026 Term 1',
-        issueDate: 'April 08, 2026',
-        academicYear: '2026 / Junior Secondary',
-        gradeLevel: 'Grade 8',
-        classSection: '8-A (Junior Secondary)',
-        overallPercentage: 91.5,
-        classRank: 2,
-        totalStudents: 38,
-        conduct: 'Pleasant & Highly Diligent',
-        attendancePercentage: 98.0,
-        isLatest: false,
-        principalRemarks:
-          'Superb performance in the first term. Ananya shows genuine passion for investigative science and creative literature.',
-        subjects: [
-          {
-            code: 'SCI-08',
-            subject: 'Science',
-            teacher: 'Mr. K. Bandara',
-            score: 93,
-            grade: 'A',
-            classAverage: 66,
-            highestScore: 96,
-            remarks: 'Very diligent and neat in experiment records.'
-          },
-          {
-            code: 'MTH-08',
-            subject: 'Mathematics',
-            teacher: 'Mrs. M. Senanayake',
-            score: 90,
-            grade: 'A',
-            classAverage: 63,
-            highestScore: 94,
-            remarks: 'Very accurate in geometry.'
-          },
-          {
-            code: 'ENG-08',
-            subject: 'English Language',
-            teacher: 'Mrs. Nilmini Silva',
-            score: 95,
-            grade: 'A*',
-            classAverage: 71,
-            highestScore: 96,
-            remarks: 'Captivating short story essay.'
-          },
-          {
-            code: 'MUS-08',
-            subject: 'Western Music & Arts',
-            teacher: 'Mr. G. Mendis',
-            score: 96,
-            grade: 'A*',
-            classAverage: 76,
-            highestScore: 97,
-            remarks: 'Grade 3 violin distinction standard.'
-          }
-        ]
-      }
-    ]
+    id: 'inv_ana_10_01',
+    invoiceNumber: 'INV-2026-10-801',
+    childId: 'child_02',
+    childName: 'Ananya K.',
+    teacherName: 'Mrs. Nilmini Silva',
+    subject: 'Science & Environment',
+    month: 'October 2026',
+    amountLkr: 2000,
+    status: 'cleared',
+    paymentMethod: 'bank_slip',
+    slipRefNumber: 'COMM-119283',
+    bankName: 'Commercial Bank of Ceylon',
+    depositedDate: '2026-10-02',
+    approvalDate: '2026-10-02'
   },
   {
-    id: 'yr_ana_2025_gr7',
-    year: '2025',
-    gradeLevel: 'Grade 7',
-    stage: 'Junior Secondary',
-    classSection: '7-A',
-    classTeacher: 'Mr. G. Mendis',
-    annualAverage: 91.2,
-    annualRank: 1,
-    totalStudents: 36,
-    attendanceRate: 98.8,
-    promotionStatus: 'Promoted to Grade 8',
-    awardsOrMilestone: '1st in Class Academic General Standing; Inter-House Violin Winner',
-    terms: [
-      {
-        id: 'rep_ana_2025_t3',
-        term: '3rd Term Annual Assessment 2025 (Grade 7)',
-        shortTermLabel: '2025 Term 3 (Grade 7)',
-        issueDate: 'December 12, 2025',
-        academicYear: '2025 / Primary-Junior',
-        gradeLevel: 'Grade 7',
-        classSection: '7-A',
-        overallPercentage: 92.4,
-        classRank: 1,
-        totalStudents: 36,
-        conduct: 'Outstanding All-Round Student',
-        attendancePercentage: 99.0,
-        isLatest: false,
-        principalRemarks:
-          'Completed Grade 7 ranking first in class. A natural leader in school co-curricular music and inter-house athletics.',
-        subjects: [
-          {
-            code: 'SCI-07',
-            subject: 'Science',
-            teacher: 'Mr. K. Bandara',
-            score: 94,
-            grade: 'A*',
-            classAverage: 67,
-            highestScore: 95,
-            remarks: 'Thorough project record on environmental conservation.'
-          },
-          {
-            code: 'MTH-07',
-            subject: 'Mathematics',
-            teacher: 'Mrs. M. Senanayake',
-            score: 91,
-            grade: 'A',
-            classAverage: 64,
-            highestScore: 95,
-            remarks: 'Very quick with mathematical word problems.'
-          },
-          {
-            code: 'ENG-07',
-            subject: 'English Language',
-            teacher: 'Mrs. Nilmini Silva',
-            score: 96,
-            grade: 'A*',
-            classAverage: 72,
-            highestScore: 96,
-            remarks: 'Pristine spelling and captivating narrative stories.'
-          },
-          {
-            code: 'HIS-07',
-            subject: 'History & Civics',
-            teacher: 'Mr. P. Rathnayake',
-            score: 89,
-            grade: 'A',
-            classAverage: 67,
-            highestScore: 92,
-            remarks: 'Well-researched project on medieval kingdoms.'
-          },
-          {
-            code: 'LAN-07',
-            subject: 'Second Language',
-            teacher: 'Mrs. V. Sivalingam',
-            score: 92,
-            grade: 'A',
-            classAverage: 69,
-            highestScore: 94,
-            remarks: 'Very good oral presentation marks.'
-          },
-          {
-            code: 'MUS-07',
-            subject: 'Western Music',
-            teacher: 'Mr. G. Mendis',
-            score: 95,
-            grade: 'A*',
-            classAverage: 75,
-            highestScore: 96,
-            remarks: 'Featured junior soloist at College Carol Service.'
-          }
-        ]
-      },
-      {
-        id: 'rep_ana_2025_t1',
-        term: '1st Term Evaluation 2025',
-        shortTermLabel: '2025 Term 1',
-        issueDate: 'April 09, 2025',
-        academicYear: '2025 / Primary-Junior',
-        gradeLevel: 'Grade 7',
-        classSection: '7-A',
-        overallPercentage: 90.2,
-        classRank: 2,
-        totalStudents: 36,
-        conduct: 'Pleasant & Studious',
-        attendancePercentage: 98.6,
-        isLatest: false,
-        principalRemarks: 'Superb start to Grade 7 studies.',
-        subjects: [
-          {
-            code: 'SCI-07',
-            subject: 'Science',
-            teacher: 'Mr. K. Bandara',
-            score: 91,
-            grade: 'A',
-            classAverage: 65,
-            highestScore: 94,
-            remarks: 'Very attentive in science lab.'
-          },
-          {
-            code: 'MTH-07',
-            subject: 'Mathematics',
-            teacher: 'Mrs. M. Senanayake',
-            score: 89,
-            grade: 'A',
-            classAverage: 62,
-            highestScore: 93,
-            remarks: 'Very good fractions calculation.'
-          }
-        ]
-      }
-    ]
+    id: 'inv_ana_10_02',
+    invoiceNumber: 'INV-2026-10-802',
+    childId: 'child_02',
+    childName: 'Ananya K.',
+    teacherName: 'Mr. K. Sivakumar',
+    subject: 'Mathematics',
+    month: 'October 2026',
+    amountLkr: 2200,
+    status: 'cleared',
+    paymentMethod: 'bank_slip',
+    slipRefNumber: 'BOC-992102',
+    bankName: 'Bank of Ceylon (BOC)',
+    depositedDate: '2026-10-01',
+    approvalDate: '2026-10-02'
   },
   {
-    id: 'yr_ana_2024_gr6',
-    year: '2024',
-    gradeLevel: 'Grade 6',
-    stage: 'Junior Secondary',
-    classSection: '6-A (Secondary Entry)',
-    classTeacher: 'Mrs. M. Senanayake',
-    annualAverage: 92.5,
-    annualRank: 1,
-    totalStudents: 35,
-    attendanceRate: 99.0,
-    promotionStatus: 'Promoted to Grade 7',
-    awardsOrMilestone: 'Admitted to St. Michael High School; Junior Choir Concertmistress',
-    terms: [
-      {
-        id: 'rep_ana_2024_t3',
-        term: '3rd Term Annual Assessment 2024 (Grade 6 Entry Year)',
-        shortTermLabel: '2024 Term 3 (Grade 6 Entry)',
-        issueDate: 'December 06, 2024',
-        academicYear: '2024 / Junior Secondary Entry',
-        gradeLevel: 'Grade 6',
-        classSection: '6-A (Secondary Entry)',
-        overallPercentage: 93.1,
-        classRank: 1,
-        totalStudents: 35,
-        conduct: 'Outstanding',
-        attendancePercentage: 99.0,
-        isLatest: false,
-        principalRemarks:
-          'First in class ranking across all terminal evaluations. Exceptional first year in secondary school.',
-        subjects: [
-          {
-            code: 'SCI-06',
-            subject: 'Science',
-            teacher: 'Mr. K. Bandara',
-            score: 95,
-            grade: 'A*',
-            classAverage: 66,
-            highestScore: 96,
-            remarks: 'Highest marks in science projects.'
-          },
-          {
-            code: 'MTH-06',
-            subject: 'Mathematics',
-            teacher: 'Mrs. M. Senanayake',
-            score: 92,
-            grade: 'A',
-            classAverage: 63,
-            highestScore: 95,
-            remarks: 'Flawless arithmetic.'
-          },
-          {
-            code: 'ENG-06',
-            subject: 'English Language',
-            teacher: 'Mrs. Nilmini Silva',
-            score: 96,
-            grade: 'A*',
-            classAverage: 70,
-            highestScore: 96,
-            remarks: 'Outstanding reading and creative writing.'
-          }
-        ]
-      }
-    ]
+    id: 'inv_ana_10_03',
+    invoiceNumber: 'INV-2026-10-803',
+    childId: 'child_02',
+    childName: 'Ananya K.',
+    teacherName: 'Ms. Rashmi Fonseka',
+    subject: 'English Language',
+    month: 'October 2026',
+    amountLkr: 1800,
+    status: 'cleared',
+    paymentMethod: 'online_card',
+    slipRefNumber: 'HNB-554411',
+    approvalDate: '2026-10-04'
   }
 ];
 
-export const ananyaAllTermReports: TermReportCard[] = ananyaAcademicJourney.flatMap((y) => y.terms);
+export const ANANYA_ATTENDANCE_LOGS: LiveClassAttendanceLog[] = [
+  {
+    id: 'att_ana_01',
+    childId: 'child_02',
+    sessionTitle: 'Science: Respiratory Systems & Gas Exchange in Living Cells',
+    tutorName: 'Mrs. Nilmini Silva',
+    subject: 'Science & Environment',
+    date: 'Oct 07, 2026 (Wednesday)',
+    timeSlot: '05:00 PM - 07:00 PM',
+    platform: 'Google Meet',
+    status: 'attended',
+    durationMinutes: 120,
+    totalDurationMinutes: 120,
+    joinTime: '05:00 PM',
+    leaveTime: '07:00 PM',
+    recordingWatched: false
+  },
+  {
+    id: 'att_ana_02',
+    childId: 'child_02',
+    sessionTitle: 'Maths: Algebraic Equations, Perimeter & Circumference Calculations',
+    tutorName: 'Mr. K. Sivakumar',
+    subject: 'Mathematics',
+    date: 'Oct 09, 2026 (Friday)',
+    timeSlot: '05:00 PM - 07:00 PM',
+    platform: 'Zoom',
+    status: 'attended',
+    durationMinutes: 120,
+    totalDurationMinutes: 120,
+    joinTime: '04:58 PM',
+    leaveTime: '07:00 PM',
+    recordingWatched: false
+  },
+  {
+    id: 'att_ana_03',
+    childId: 'child_02',
+    sessionTitle: 'English: Direct & Indirect Speech Rules and Dialogue Writing',
+    tutorName: 'Ms. Rashmi Fonseka',
+    subject: 'English Language',
+    date: 'Oct 10, 2026 (Saturday)',
+    timeSlot: '03:00 PM - 05:00 PM',
+    platform: 'Google Meet',
+    status: 'attended',
+    durationMinutes: 120,
+    totalDurationMinutes: 120,
+    joinTime: '03:00 PM',
+    leaveTime: '05:00 PM',
+    recordingWatched: false
+  }
+];
 
+export const ANANYA_PAPER_MARKS: TutorPaperMarkRecord[] = [
+  {
+    id: 'paper_ana_01',
+    childId: 'child_02',
+    paperCode: 'SCI-08-MOD-04',
+    title: 'Grade 8 Science: Cell Biology, Organs & Human Body Systems Test',
+    tutorName: 'Mrs. Nilmini Silva',
+    subject: 'Science & Environment',
+    date: 'Oct 04, 2026',
+    score: 94,
+    maxScore: 100,
+    batchAverage: 71,
+    highestScore: 98,
+    rank: 1,
+    batchTotal: 68,
+    grade: 'A*',
+    tutorFeedback: 'Exemplary cellular diagram labelling. Clear distinction between artery and vein structures.'
+  },
+  {
+    id: 'paper_ana_02',
+    childId: 'child_02',
+    paperCode: 'MTH-08-REV-03',
+    title: 'Grade 8 Mathematics: Perimeter, Area & Angles of Polygons Speed Drill',
+    tutorName: 'Mr. K. Sivakumar',
+    subject: 'Mathematics',
+    date: 'Oct 02, 2026',
+    score: 96,
+    maxScore: 100,
+    batchAverage: 68,
+    highestScore: 98,
+    rank: 1,
+    batchTotal: 75,
+    grade: 'A*',
+    tutorFeedback: 'Faultless geometric theorem proofs. Quick and accurate computation.'
+  },
+  {
+    id: 'paper_ana_03',
+    childId: 'child_02',
+    paperCode: 'ENG-08-ESS-03',
+    title: 'Grade 8 English: Narrative Essay Composition & Advanced Grammar',
+    tutorName: 'Ms. Rashmi Fonseka',
+    subject: 'English Language',
+    date: 'Sep 27, 2026',
+    score: 91,
+    maxScore: 100,
+    batchAverage: 65,
+    highestScore: 95,
+    rank: 2,
+    batchTotal: 50,
+    grade: 'A',
+    tutorFeedback: 'Vivid imagery and descriptive adjectives. Excellent vocabulary range.'
+  }
+];
+
+export const ANANYA_ANNOUNCEMENTS: TutorAnnouncement[] = [
+  {
+    id: 'not_ana_01',
+    tutorName: 'Mrs. Nilmini Silva',
+    subject: 'Science & Environment',
+    title: 'Printed Term 3 Science Model Paper Booklets Ready for Pickup / Delivery',
+    date: 'Oct 11, 2026',
+    priority: 'regular',
+    category: 'Paper Class Notice',
+    content: 'All Grade 8 students will be receiving 5 model assessment booklets before next Wednesday\'s revision class.'
+  },
+  {
+    id: 'not_ana_02',
+    tutorName: 'Mr. K. Sivakumar',
+    subject: 'Mathematics',
+    title: 'Friday Class Timing Reminder: Starts sharp at 05:00 PM on Zoom',
+    date: 'Oct 08, 2026',
+    priority: 'regular',
+    category: 'Schedule Change',
+    content: 'Please ensure students have their geometry instrument box and blank graph paper ready for Friday\'s session.'
+  }
+];
+
+// Fallback legacy structure for backwards compatibility
+const legacyTermReport: TermReportCard = {
+  id: 'rep_sat_2026_t2',
+  term: '2nd Term Evaluation 2026',
+  shortTermLabel: '2026 Term 2',
+  issueDate: 'October 01, 2026',
+  academicYear: '2026',
+  gradeLevel: 'Grade 12',
+  classSection: '12-Physical Science',
+  overallPercentage: 89.4,
+  classRank: 3,
+  totalStudents: 42,
+  conduct: 'Exemplary',
+  attendancePercentage: 96.5,
+  principalRemarks: 'Superb academic focus in advanced mathematics and physics.',
+  subjects: [
+    { code: 'MATH', subject: 'Combined Mathematics', teacher: 'Dr. Samantha Perera', score: 92, grade: 'A', classAverage: 64, highestScore: 98, remarks: 'Top 3 percentile in batch.' },
+    { code: 'PHYS', subject: 'Physics', teacher: 'Eng. K. Thanushan', score: 88, grade: 'A', classAverage: 61, highestScore: 95, remarks: 'Strong theoretical and practical skills.' },
+    { code: 'CHEM', subject: 'Chemistry', teacher: 'Dr. Nilmini Silva', score: 90, grade: 'A', classAverage: 66, highestScore: 96, remarks: 'Excellent in physical kinetics.' }
+  ]
+};
+
+// ----------------------------------------------------------------------
+// EXPORTED PROFILES
+// ----------------------------------------------------------------------
 export const mockChildrenProfiles: ParentChildProfile[] = [
   {
     id: 'child_01',
     studentId: 'usr_student_01',
     name: 'Sathurjan K.',
-    admissionNo: 'STU-1204',
-    grade: 'Grade 12',
-    classSection: '12-Physical Science (A/L 2026)',
+    admissionNo: 'TUT-1204',
+    grade: 'Grade 12 (A/L 2026/2027)',
+    classSection: 'Physical Science (Maths, Physics, Chem)',
     avatarText: 'SK',
-    schoolName: 'St. Michael High School',
-    enrolledSinceYear: '2020 (Grade 6 Admission)',
-    admissionGrade: 'Grade 6',
-    currentStage: 'Collegiate A/L (Grades 12–13)',
-    cumulativeCareerAverage: 89.6,
-    totalYearsEnrolled: 7,
-    classTeacher: 'Mr. Samantha Perera',
-    classTeacherEmail: 'samantha.p@school.lk',
+    schoolName: 'Solo Tutor & Masterclass Network',
+    enrolledSinceYear: '2025',
+    admissionGrade: 'Grade 12',
+    currentStage: 'G.C.E. A/L Masterclass Batch',
+    cumulativeCareerAverage: 90.0,
+    totalYearsEnrolled: 2,
+    classTeacher: 'Dr. Samantha Perera',
+    classTeacherEmail: 'sam.maths@combinedmaths.lk',
     classTeacherPhone: '+94 77 123 4567',
-    attendanceRate: 96.5,
-    presentDays: 116,
-    totalDays: 120,
-    overallAverage: 89.4,
+    attendanceRate: 94.5,
+    presentDays: 23,
+    totalDays: 24,
+    overallAverage: 90.0,
     classRank: 3,
-    totalStudents: 42,
-    upcomingExamsCount: 4,
-    hallTicketNo: 'HT-2026-AL-0842',
+    totalStudents: 142,
+    upcomingExamsCount: 3,
+    hallTicketNo: 'TUT-PASS-2026-0842',
     nextExamDate: 'Oct 28, 2026',
-    nextExamName: 'Physics Advanced Practical Lab Examination',
-    termReport: sathurjanAllTermReports[0],
-    termReports: sathurjanAllTermReports,
-    academicJourney: sathurjanAcademicJourney,
+    nextExamName: 'A/L Combined Maths Paper Class 05',
+
+    // Pure Solo Tutor SaaS Properties
+    enrolments: SATHURJAN_ENROLMENTS,
+    invoices: SATHURJAN_INVOICES,
+    attendanceLogs: SATHURJAN_ATTENDANCE_LOGS,
+    paperMarks: SATHURJAN_PAPER_MARKS,
+    announcements: SATHURJAN_ANNOUNCEMENTS,
+    monthlyInvestmentLkr: 9500,
+    activeEnrolmentsCount: 3,
+    pendingSlipsCount: 1,
+
+    // Legacy fallbacks
+    termReport: legacyTermReport,
+    termReports: [legacyTermReport],
+    academicJourney: [
+      {
+        id: 'yr_01',
+        year: '2026',
+        gradeLevel: 'Grade 12',
+        stage: 'G.C.E. A/L',
+        classSection: 'A/L Combined Maths & Physics',
+        classTeacher: 'Dr. Samantha Perera',
+        annualAverage: 90.0,
+        annualRank: 3,
+        totalStudents: 142,
+        attendanceRate: 94.5,
+        promotionStatus: 'Active Masterclass Enrolment',
+        terms: [legacyTermReport]
+      }
+    ],
     recentAttendance: [
-      { date: '2026-10-09', day: 'Friday', status: 'present', checkInTime: '07:42 AM', note: 'On time' },
-      { date: '2026-10-08', day: 'Thursday', status: 'present', checkInTime: '07:38 AM', note: 'On time' },
-      { date: '2026-10-07', day: 'Wednesday', status: 'present', checkInTime: '07:45 AM', note: 'On time' },
-      { date: '2026-10-06', day: 'Tuesday', status: 'excused', note: 'Medical certificate submitted (Fever recovery)' },
-      { date: '2026-10-05', day: 'Monday', status: 'present', checkInTime: '07:40 AM', note: 'On time' },
-      { date: '2026-10-02', day: 'Friday', status: 'present', checkInTime: '07:35 AM', note: 'Prefect duty check-in' },
-      { date: '2026-10-01', day: 'Thursday', status: 'present', checkInTime: '07:44 AM', note: 'On time' },
-      { date: '2026-09-30', day: 'Wednesday', status: 'present', checkInTime: '07:39 AM', note: 'On time' }
+      { date: '2026-10-10', day: 'Saturday', status: 'present', checkInTime: '08:31 AM', note: 'Joined Google Meet live on time' },
+      { date: '2026-10-08', day: 'Thursday', status: 'present', checkInTime: '07:05 PM', note: 'Joined Zoom live on time' },
+      { date: '2026-10-06', day: 'Tuesday', status: 'present', checkInTime: '07:00 PM', note: 'Full attendance recorded' }
     ],
     examSchedules: [
       {
         id: 'ex_01',
-        examType: 'Practical / Lab Exam',
-        subject: 'Physics',
-        paperCode: 'PHY-12-PRAC',
-        paperName: 'Physics Laboratory Practical Assessment & Error Analysis',
+        examType: 'Tutor Model Paper',
+        subject: 'Combined Mathematics',
+        paperCode: 'MATH-MOD-05',
+        paperName: 'Advanced Calculus Model Paper 05',
         date: 'October 28, 2026',
-        day: 'Wednesday',
-        timeSlot: '01:30 PM - 04:30 PM',
-        duration: '3 Hours',
-        hallNumber: 'Physics Advanced Research Lab 2',
-        seatNumber: 'Bench Station #07',
-        syllabusCoverage: 'Spectrometer Refraction, Sonometer Resonant Harmonics, Surface Tension & Viscosity',
+        day: 'Tuesday',
+        timeSlot: '07:00 PM - 09:30 PM',
+        duration: '2.5 Hours',
+        hallNumber: 'Google Meet Virtual Classroom',
+        seatNumber: 'Online Roll #42',
+        syllabusCoverage: 'Definite Integrals & Area Calculations',
         maxMarks: 100,
         status: 'upcoming',
         admissionStatus: 'Hall Ticket Issued'
-      },
-      {
-        id: 'ex_02',
-        examType: 'Term 3 Final Exam',
-        subject: 'Combined Mathematics',
-        paperCode: 'CMTH-12-P1',
-        paperName: 'Paper I: Pure Mathematics (Algebra, Calculus, Geometry)',
-        date: 'November 16, 2026',
-        day: 'Monday',
-        timeSlot: '08:00 AM - 11:15 AM',
-        duration: '3 Hours 15 Mins',
-        hallNumber: 'College Auditorium Main Hall',
-        seatNumber: 'Desk #42 (Row D)',
-        syllabusCoverage: 'Complex Numbers, Integration by Parts, Matrices, Conic Sections & Differential Equations',
-        maxMarks: 100,
-        status: 'upcoming',
-        admissionStatus: 'Hall Ticket Issued'
-      },
-      {
-        id: 'ex_03',
-        examType: 'Term 3 Final Exam',
-        subject: 'Physics',
-        paperCode: 'PHY-12-P2',
-        paperName: 'Paper II: Structured Essay & Theoretical Physics',
-        date: 'November 18, 2026',
-        day: 'Wednesday',
-        timeSlot: '08:00 AM - 11:15 AM',
-        duration: '3 Hours 15 Mins',
-        hallNumber: 'Science Complex Examination Hall 03',
-        seatNumber: 'Desk #18 (Row B)',
-        syllabusCoverage: 'Wave Optics, Doppler Effect, Current Electricity, Gravitational & Electric Fields',
-        maxMarks: 100,
-        status: 'upcoming',
-        admissionStatus: 'Hall Ticket Issued'
-      },
-      {
-        id: 'ex_04',
-        examType: 'Term 3 Final Exam',
-        subject: 'Chemistry',
-        paperCode: 'CHM-12-P2',
-        paperName: 'Paper II: Physical & Inorganic Chemistry',
-        date: 'November 20, 2026',
-        day: 'Friday',
-        timeSlot: '08:00 AM - 11:15 AM',
-        duration: '3 Hours 15 Mins',
-        hallNumber: 'Chemistry Lecture Theatre Wing',
-        seatNumber: 'Desk #29 (Row C)',
-        syllabusCoverage: 'Chemical Kinetics, Dynamic Equilibrium, Phase Equilibria, d-Block Transition Elements',
-        maxMarks: 100,
-        status: 'upcoming',
-        admissionStatus: 'Hall Ticket Issued'
-      },
-      {
-        id: 'ex_05',
-        examType: 'Mid-Term Evaluation',
-        subject: 'Combined Mathematics',
-        paperCode: 'CMTH-12-MID',
-        paperName: '2nd Mid-Term Progressive Calculus Assessment',
-        date: 'October 02, 2026',
-        day: 'Friday',
-        timeSlot: '08:30 AM - 10:30 AM',
-        duration: '2 Hours',
-        hallNumber: 'Hall 12-Physical Science',
-        seatNumber: 'Desk #04',
-        syllabusCoverage: 'Limits, Continuity & Standard Derivatives',
-        maxMarks: 100,
-        status: 'completed',
-        obtainedScore: 92,
-        grade: 'A',
-        admissionStatus: 'Completed'
       }
     ],
     pastTermsHistory: [
       {
-        termName: '1st Term Evaluation',
+        termName: 'September 2026 Batch Assessment',
         academicYear: '2026',
-        aggregateAverage: 86.2,
+        aggregateAverage: 88.5,
         classRank: 4,
-        totalStudents: 42,
-        attendanceRate: 97.0,
-        gradeClassification: 'Distinction (Grade A)'
-      },
-      {
-        termName: '2nd Term Evaluation',
-        academicYear: '2026',
-        aggregateAverage: 89.4,
-        classRank: 3,
-        totalStudents: 42,
-        attendanceRate: 96.5,
-        gradeClassification: 'Distinction (Grade A)'
-      },
-      {
-        termName: '3rd Term Evaluation (Target)',
-        academicYear: '2026',
-        aggregateAverage: 92.0,
-        classRank: 2,
-        totalStudents: 42,
-        attendanceRate: 98.0,
-        gradeClassification: 'Target: Island Top Tier'
+        totalStudents: 142,
+        attendanceRate: 95.0,
+        gradeClassification: 'Distinction'
       }
     ]
   },
@@ -1515,129 +1037,65 @@ export const mockChildrenProfiles: ParentChildProfile[] = [
     id: 'child_02',
     studentId: 'usr_student_02',
     name: 'Ananya K.',
-    admissionNo: 'STU-2415',
-    grade: 'Grade 8',
-    classSection: '8-A (Junior Secondary)',
+    admissionNo: 'TUT-1420',
+    grade: 'Grade 8 (Junior Secondary)',
+    classSection: 'Junior Scholars Batch',
     avatarText: 'AK',
-    schoolName: 'St. Michael High School',
-    enrolledSinceYear: '2024 (Grade 6 Admission)',
-    admissionGrade: 'Grade 6',
-    currentStage: 'Junior Secondary (Grades 6–9)',
-    cumulativeCareerAverage: 92.4,
-    totalYearsEnrolled: 3,
+    schoolName: 'Solo Tutor & Masterclass Network',
+    enrolledSinceYear: '2026',
+    admissionGrade: 'Grade 8',
+    currentStage: 'Junior Secondary Scholars',
+    cumulativeCareerAverage: 93.6,
+    totalYearsEnrolled: 1,
     classTeacher: 'Mrs. Nilmini Silva',
     classTeacherEmail: 'nilmini.s@school.lk',
     classTeacherPhone: '+94 71 889 2211',
-    attendanceRate: 98.3,
-    presentDays: 118,
-    totalDays: 120,
+    attendanceRate: 98.5,
+    presentDays: 24,
+    totalDays: 24,
     overallAverage: 93.6,
     classRank: 1,
-    totalStudents: 38,
-    upcomingExamsCount: 4,
-    hallTicketNo: 'HT-2026-JS-1420',
-    nextExamDate: 'October 29, 2026',
-    nextExamName: 'Western Music & Violin Practical Performance',
-    termReport: ananyaAllTermReports[0],
-    termReports: ananyaAllTermReports,
-    academicJourney: ananyaAcademicJourney,
+    totalStudents: 68,
+    upcomingExamsCount: 2,
+    hallTicketNo: 'TUT-PASS-2026-1420',
+    nextExamDate: 'October 30, 2026',
+    nextExamName: 'Grade 8 Science Monthly Test',
+
+    // Pure Solo Tutor SaaS Properties
+    enrolments: ANANYA_ENROLMENTS,
+    invoices: ANANYA_INVOICES,
+    attendanceLogs: ANANYA_ATTENDANCE_LOGS,
+    paperMarks: ANANYA_PAPER_MARKS,
+    announcements: ANANYA_ANNOUNCEMENTS,
+    monthlyInvestmentLkr: 6000,
+    activeEnrolmentsCount: 3,
+    pendingSlipsCount: 0,
+
+    // Legacy fallbacks
+    termReport: legacyTermReport,
+    termReports: [legacyTermReport],
+    academicJourney: [
+      {
+        id: 'yr_02',
+        year: '2026',
+        gradeLevel: 'Grade 8',
+        stage: 'Junior Secondary',
+        classSection: 'Junior Scholars',
+        classTeacher: 'Mrs. Nilmini Silva',
+        annualAverage: 93.6,
+        annualRank: 1,
+        totalStudents: 68,
+        attendanceRate: 98.5,
+        promotionStatus: 'Active Junior Enrolment',
+        terms: [legacyTermReport]
+      }
+    ],
     recentAttendance: [
-      { date: '2026-10-09', day: 'Friday', status: 'present', checkInTime: '07:35 AM', note: 'On time' },
-      { date: '2026-10-08', day: 'Thursday', status: 'present', checkInTime: '07:32 AM', note: 'On time' },
-      { date: '2026-10-07', day: 'Wednesday', status: 'present', checkInTime: '07:40 AM', note: 'On time' },
-      { date: '2026-10-06', day: 'Tuesday', status: 'present', checkInTime: '07:36 AM', note: 'On time' },
-      { date: '2026-10-05', day: 'Monday', status: 'present', checkInTime: '07:34 AM', note: 'On time' }
+      { date: '2026-10-09', day: 'Friday', status: 'present', checkInTime: '04:58 PM', note: 'Joined Zoom live on time' },
+      { date: '2026-10-07', day: 'Wednesday', status: 'present', checkInTime: '05:00 PM', note: 'Full attendance recorded' }
     ],
-    examSchedules: [
-      {
-        id: 'ex_06',
-        examType: 'Practical / Lab Exam',
-        subject: 'Western Music',
-        paperCode: 'MUS-08-PRAC',
-        paperName: 'Violin Solo Performance & Sight Reading Recital',
-        date: 'October 29, 2026',
-        day: 'Thursday',
-        timeSlot: '10:00 AM - 11:30 AM',
-        duration: '1 Hour 30 Mins',
-        hallNumber: 'Auditorium Music Conservatory Studio',
-        seatNumber: 'Performance Stage #01',
-        syllabusCoverage: 'Baroque Concerto in A Minor, Scales & Arpeggios Grade 4 Standard',
-        maxMarks: 100,
-        status: 'upcoming',
-        admissionStatus: 'Hall Ticket Issued'
-      },
-      {
-        id: 'ex_07',
-        examType: 'Term 3 Final Exam',
-        subject: 'Science',
-        paperCode: 'SCI-08-T3',
-        paperName: 'Science Theory & Investigative Experiments',
-        date: 'November 17, 2026',
-        day: 'Tuesday',
-        timeSlot: '08:30 AM - 10:30 AM',
-        duration: '2 Hours',
-        hallNumber: 'Junior Wing Examination Hall B',
-        seatNumber: 'Desk #12',
-        syllabusCoverage: 'Ecosystems, Chemical Changes, Electrical Current & Reflection of Light',
-        maxMarks: 100,
-        status: 'upcoming',
-        admissionStatus: 'Hall Ticket Issued'
-      },
-      {
-        id: 'ex_08',
-        examType: 'Term 3 Final Exam',
-        subject: 'Mathematics',
-        paperCode: 'MTH-08-T3',
-        paperName: 'Mathematics Paper I & II',
-        date: 'November 19, 2026',
-        day: 'Thursday',
-        timeSlot: '08:30 AM - 10:30 AM',
-        duration: '2 Hours',
-        hallNumber: 'Junior Wing Examination Hall B',
-        seatNumber: 'Desk #12',
-        syllabusCoverage: 'Algebraic Fractions, Linear Equations, Geometric Theorems & Sets',
-        maxMarks: 100,
-        status: 'upcoming',
-        admissionStatus: 'Hall Ticket Issued'
-      },
-      {
-        id: 'ex_09',
-        examType: 'Term 3 Final Exam',
-        subject: 'English Language',
-        paperCode: 'ENG-08-T3',
-        paperName: 'English Language & Literary Appreciation',
-        date: 'November 23, 2026',
-        day: 'Monday',
-        timeSlot: '08:30 AM - 10:30 AM',
-        duration: '2 Hours',
-        hallNumber: 'Junior Wing Examination Hall B',
-        seatNumber: 'Desk #12',
-        syllabusCoverage: 'Essay Composition, Comprehension, Poetry Analysis & Grammatical Structures',
-        maxMarks: 100,
-        status: 'upcoming',
-        admissionStatus: 'Hall Ticket Issued'
-      }
-    ],
-    pastTermsHistory: [
-      {
-        termName: '1st Term Evaluation',
-        academicYear: '2026',
-        aggregateAverage: 91.5,
-        classRank: 2,
-        totalStudents: 38,
-        attendanceRate: 98.0,
-        gradeClassification: 'Distinction (Grade A*)'
-      },
-      {
-        termName: '2nd Term Evaluation',
-        academicYear: '2026',
-        aggregateAverage: 93.6,
-        classRank: 1,
-        totalStudents: 38,
-        attendanceRate: 98.3,
-        gradeClassification: 'First in Class Standing'
-      }
-    ]
+    examSchedules: [],
+    pastTermsHistory: []
   }
 ];
 
@@ -1646,73 +1104,31 @@ export const initialParentLeaveRequests: ParentLeaveRequest[] = [
     id: 'leave_req_01',
     childId: 'child_01',
     childName: 'Sathurjan K.',
-    startDate: '2026-10-06',
-    endDate: '2026-10-06',
-    reason: 'Medical Illness',
-    note: 'Viral fever recovery and post-infection clinical blood checkup at Asiri Central Hospital.',
-    hasMedicalCertificate: true,
-    status: 'approved',
-    submittedDate: '2026-10-05',
-    reviewedBy: 'Dr. K. Rajasingham (Principal)',
-    reviewComment: 'Approved with medical slip. Excused attendance granted.'
-  },
-  {
-    id: 'leave_req_02',
-    childId: 'child_01',
-    childName: 'Sathurjan K.',
-    startDate: '2026-08-14',
-    endDate: '2026-08-15',
-    reason: 'Official Competition',
-    note: 'Representing school at the National Junior Badminton Championship zonal trials.',
+    tutorName: 'Dr. Samantha Perera',
+    startDate: '2026-10-17',
+    endDate: '2026-10-17',
+    reason: 'School Exam Clashing',
+    note: 'Term exam on Monday morning, requesting to watch recording instead of live session.',
     hasMedicalCertificate: false,
     status: 'approved',
-    submittedDate: '2026-08-10',
-    reviewedBy: 'Mr. Samantha Perera (Class Teacher)',
-    reviewComment: 'Sports council confirmation verified. Approved with full attendance honors.'
+    submittedDate: '2026-10-14',
+    reviewedBy: 'Dr. Samantha Perera',
+    reviewComment: 'Approved. Session recording and paper will remain unlocked for 7 days.'
   }
 ];
 
 export const initialSchoolCirculars: SchoolCircular[] = [
   {
     id: 'circ_01',
-    circularNo: 'CIR/2026/042',
-    title: '3rd Term Summative Evaluation Timetable & Guidelines',
+    circularNo: 'TUT-CIR-2026-08',
+    title: 'October A/L Theory & Paper Class Master Schedule Notice',
     category: 'Academic',
-    date: 'October 08, 2026',
+    date: 'Oct 01, 2026',
+    summary: 'Comprehensive monthly timetable and revision masterclasses published for all A/L batches.',
+    content: 'All live Google Meet and Zoom class links for October are active. Please ensure monthly deposit slips are uploaded by the 10th to prevent automated link locking.',
     priority: 'high',
-    targetAudience: 'Parents of Grades 6 - 13',
-    summary: 'Official notification regarding the schedule, paper durations, and study leave intervals for Term 3.',
-    content:
-      'Dear Parents & Guardians, The 3rd Term final examinations will commence on November 16, 2026. Hall tickets will be issued through the student portal on November 05. Please ensure all project portfolios and practical records are submitted prior to November 02. Morning sessions commence sharply at 08:00 AM.',
-    attachmentName: 'Term3_Exam_Schedule_Timetable.pdf',
-    attachmentSize: '1.4 MB'
-  },
-  {
-    id: 'circ_02',
-    circularNo: 'CIR/2026/039',
-    title: 'Annual Parent-Teacher Consultation Day (PTM) Appointment Schedule',
-    category: 'Administrative',
-    date: 'October 04, 2026',
-    priority: 'high',
-    targetAudience: 'All Parents',
-    summary: 'One-on-one consultation slots with subject educators and class teachers on Saturday, October 24.',
-    content:
-      'We warmly invite all parents for the Term 2 Academic Review Conference on Saturday, October 24, 2026, from 08:30 AM to 02:00 PM. Parents may discuss term report cards, syllabus pacing, and personal developmental plans directly with subject teachers. Time-slot bookings will open on the Parent Portal this Monday.',
-    attachmentName: 'PTM_Hall_Layout_Slots.pdf',
-    attachmentSize: '820 KB'
-  },
-  {
-    id: 'circ_03',
-    circularNo: 'CIR/2026/035',
-    title: 'School Transport & Bus Fleet Monsoon Safety Advisory',
-    category: 'Safety',
-    date: 'September 29, 2026',
-    priority: 'normal',
-    targetAudience: 'Parents using School Transport',
-    summary: 'Updated departure timings and safety measures during heavy monsoon rain showers.',
-    content:
-      'In view of the forecasted inter-monsoon rain bands in the Western and Southern provinces, our school transport management committee has issued enhanced precautionary guidelines. Drivers will adhere strictly to 40 km/h limits with GPS tracking monitored real-time in the school operations center.',
-    attachmentName: 'Bus_Route_Monsoon_Guidelines.pdf',
-    attachmentSize: '450 KB'
+    targetAudience: 'All Enrolled Parents & Students',
+    attachmentName: 'October_Master_Schedule_Tutors.pdf',
+    attachmentSize: '1.8 MB'
   }
 ];

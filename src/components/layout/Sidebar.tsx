@@ -37,7 +37,9 @@ import {
   Package,
   UserCheck,
   Globe,
-  X
+  Sparkles,
+  X,
+  Search
 } from "lucide-react";
 
 interface SidebarProps {
@@ -67,7 +69,8 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     my_learning: true,
-    school_life: false
+    school_life: false,
+    sports: true
   });
   const [selectedStreakDate, setSelectedStreakDate] = useState<number>(2);
   const [miniCalMonth, setMiniCalMonth] = useState<number>(9); // 9 = October
@@ -151,14 +154,43 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
         ]
       : []),
 
-    // Sports & Tournaments (Always Available for Students)
+    // Sports & Tournaments with Sub-headings
     {
       id: "sports",
       label: "Sports Tournaments & Leagues",
       icon: Trophy,
-      badge: "League",
+      badge: "5 Hubs",
       badgeVariant: "gold" as const,
-      group: "Sports & Academy"
+      group: "Sports & Academy",
+      children: [
+        {
+          id: "sports_tournaments",
+          label: "Tournaments & Championships",
+          icon: Trophy,
+          badge: "Live"
+        },
+        {
+          id: "sports_registration",
+          label: "Online Registration",
+          icon: Sparkles,
+          badge: "Open"
+        },
+        {
+          id: "sports_check",
+          label: "Check My Registration",
+          icon: Search
+        },
+        {
+          id: "sports_fixtures",
+          label: "Fixtures & Schedule",
+          icon: Calendar
+        },
+        {
+          id: "sports_standings",
+          label: "League Standings",
+          icon: TrendingUp
+        }
+      ]
     },
 
     // Account & Profile
@@ -220,15 +252,6 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
           }
         ]
       : []),
-    // Sports & Championship Registrations
-    {
-      id: "sports_admin",
-      label: "Sports & Championship",
-      icon: Trophy,
-      badge: "Meet",
-      badgeVariant: "gold" as const,
-      group: "Teaching Studio"
-    },
     // Personal Account & Studio Profile
     { id: "profile", label: "Tutor Profile & Studio", icon: User, group: "Personal Account" }
   ];
@@ -285,12 +308,37 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
       : []),
     // Sports & Championship Registrations Admin Desk
     {
-      id: "sports_admin",
-      label: "Sports & Athlete Registrations",
+      id: "sports",
+      label: "Sports Tournaments & Leagues",
       icon: Trophy,
-      badge: "Championship",
+      badge: "Admin Desk",
       badgeVariant: "gold" as const,
-      group: "Campus & Sports"
+      group: "Campus & Sports",
+      children: [
+        {
+          id: "sports_tournaments",
+          label: "Manage Tournaments",
+          icon: Trophy,
+          badge: "Setup"
+        },
+        {
+          id: "sports_registrations",
+          label: "Registrations & Approvals",
+          icon: ClipboardCheck,
+          badge: "Desk"
+        },
+        {
+          id: "sports_fixtures",
+          label: "Fixtures & Live Scoring",
+          icon: Calendar,
+          badge: "Scorecard"
+        },
+        {
+          id: "sports_standings",
+          label: "League Standings",
+          icon: TrendingUp
+        }
+      ]
     }
   ];
 
@@ -322,19 +370,56 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
   ];
 
   const parentNav: NavItem[] = [
-    { id: "dashboard", label: "Parent Overview", icon: Home, group: "Parent Portal" },
+    { id: "dashboard", label: "Tuition Overview", icon: Home, group: "Parent Portal" },
+    { id: "tuition_classes", label: "Enrolled Tutors", icon: GraduationCap, badge: "3 Active", badgeVariant: "gold" as const, group: "Tuition & Academics" },
+    { id: "fees", label: "Fees & Bank Slips", icon: CreditCard, badge: "1 Review", badgeVariant: "warning" as const, group: "Tuition & Billing" },
+    { id: "progress", label: "Model Paper Marks", icon: Award, group: "Monitoring & Logs" },
+    { id: "circulars", label: "Tutor Announcements", icon: Bell, badge: "Notice", badgeVariant: "default" as const, group: "Communication" },
     {
       id: "connect",
-      label: "Find Teachers",
-      icon: GraduationCap,
-      badge: "Tutors",
+      label: "Find More Tutors",
+      icon: Sparkles,
+      badge: "Explore",
       badgeVariant: "gold" as const,
-      group: "Learning & Tutors"
+      group: "Tuition Marketplace"
     },
-    { id: "report_card", label: "Term Report Cards", icon: Award, group: "Academic Tracking" },
-    { id: "exams", label: "Exam Schedules & Timetables", icon: FileText, badge: "Upcoming", badgeVariant: "warning" as const, group: "Academic Tracking" },
-    { id: "sports", label: "Sports Tournaments", icon: Trophy, group: "Campus & Sports" },
-    { id: "circulars", label: "School Circulars", icon: Bell, badge: "3 New", badgeVariant: "default" as const, group: "Communication" }
+    {
+      id: "sports",
+      label: "Sports Tournaments & Leagues",
+      icon: Trophy,
+      badge: "5 Hubs",
+      badgeVariant: "gold" as const,
+      group: "Campus & Sports",
+      children: [
+        {
+          id: "sports_tournaments",
+          label: "Tournaments & Championships",
+          icon: Trophy,
+          badge: "Live"
+        },
+        {
+          id: "sports_registration",
+          label: "Online Registration",
+          icon: Sparkles,
+          badge: "Open"
+        },
+        {
+          id: "sports_check",
+          label: "Check My Registration",
+          icon: Search
+        },
+        {
+          id: "sports_fixtures",
+          label: "Fixtures & Schedule",
+          icon: Calendar
+        },
+        {
+          id: "sports_standings",
+          label: "League Standings",
+          icon: TrendingUp
+        }
+      ]
+    }
   ];
 
   const currentNavItems: NavItem[] = {

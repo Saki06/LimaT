@@ -23,7 +23,8 @@ import {
   Info,
   ShieldCheck,
   FileText,
-  Download
+  Download,
+  ClipboardCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -311,140 +312,165 @@ export function SportsView({
               </div>
             </div>
 
-            {/* Action Buttons: Register for Sports + Admin Actions */}
+            {/* Action Buttons: Admin Management vs Student Actions */}
             <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-              <Button
-                onClick={() => setActiveTab("registration")}
-                className="bg-[#f3b738] hover:bg-[#dfa224] text-[#0d2b26] font-black text-xs shadow-md flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl cursor-pointer"
-              >
-                <Sparkles className="h-4 w-4 text-[#0d2b26]" />
-                <span>+ Register for Championship</span>
-              </Button>
-
-              {isAdminOrTeacher && (
+              {isAdminOrTeacher ? (
+                <>
+                  <Button
+                    onClick={() => setActiveTab("admin_registrations")}
+                    variant="outline"
+                    className="bg-white/10 hover:bg-white/20 border-white/30 text-white font-bold text-xs h-10 px-3.5 rounded-xl cursor-pointer"
+                  >
+                    <ClipboardCheck className="h-4 w-4 mr-1 text-[#a5f3df]" />
+                    <span>Approvals Desk</span>
+                  </Button>
+                  <Button
+                    onClick={() => setIsScheduleFixtureModalOpen(true)}
+                    variant="outline"
+                    className="bg-white/10 hover:bg-white/20 border-white/30 text-white font-bold text-xs h-10 px-3.5 rounded-xl cursor-pointer"
+                  >
+                    <Calendar className="h-4 w-4 mr-1 text-[#a5f3df]" />
+                    <span>Schedule Match</span>
+                  </Button>
+                  <Button
+                    onClick={() => setIsCreateTournamentModalOpen(true)}
+                    className="bg-[#f3b738] hover:bg-[#dfa224] text-[#0d2b26] font-black text-xs shadow-md flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl cursor-pointer"
+                  >
+                    <Plus className="h-4 w-4 text-[#0d2b26]" />
+                    <span>{t.sports.createTournament || "New Tournament"}</span>
+                  </Button>
+                </>
+              ) : (
                 <Button
-                  onClick={() => setIsCreateTournamentModalOpen(true)}
-                  variant="outline"
-                  className="bg-white/10 hover:bg-white/20 border-white/30 text-white font-bold text-xs h-10 px-3.5 rounded-xl"
+                  onClick={() => setActiveTab("registration")}
+                  className="bg-[#f3b738] hover:bg-[#dfa224] text-[#0d2b26] font-black text-xs shadow-md flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl cursor-pointer"
                 >
-                  <Plus className="h-4 w-4 mr-1" />
-                  <span>{t.sports.createTournament || "New Tournament"}</span>
+                  <Sparkles className="h-4 w-4 text-[#0d2b26]" />
+                  <span>+ Register for Championship</span>
                 </Button>
               )}
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Tab Navigation Navigation Bar */}
-        <div className="mt-8 pt-4 border-t border-white/15 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+      {/* Navigation Tabs (Admin Management vs Student) */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-[#e6ece8]">
+        {isAdminOrTeacher ? (
+          <>
             <button
               onClick={() => setActiveTab("tournaments")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
                 activeTab === "tournaments"
-                  ? "bg-white text-[#0d5c4d] shadow-sm scale-102"
-                  : "bg-white/10 hover:bg-white/20 text-white"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-[#ecf8f5] hover:text-[#0d5c4d] border border-slate-200"
               }`}
             >
-              <Trophy className="h-3.5 w-3.5 text-amber-400" />
-              <span>{t.sports.tournaments || "Tournaments"}</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/20 text-white">
-                {tournaments.length}
-              </span>
+              <Trophy className="h-4 w-4" />
+              <span>Tournaments & Brackets</span>
             </button>
-
-            {/* Online Registration Wizard Tab */}
             <button
-              onClick={() => setActiveTab("registration")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === "registration"
-                  ? "bg-white text-[#0d5c4d] shadow-sm scale-102 font-black"
-                  : "bg-[#f3b738] text-slate-950 font-black hover:bg-[#dfa224]"
+              onClick={() => setActiveTab("admin_registrations")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab === "admin_registrations"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-[#ecf8f5] hover:text-[#0d5c4d] border border-slate-200"
               }`}
             >
-              <Sparkles className="h-3.5 w-3.5 text-slate-950" />
-              <span>Online Registration</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-800 text-white font-mono">
-                10-Step
-              </span>
-            </button>
-
-            {/* Check My Registration Tab */}
-            <button
-              onClick={() => setActiveTab("check_registration")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === "check_registration"
-                  ? "bg-white text-[#0d5c4d] shadow-sm scale-102"
-                  : "bg-white/10 hover:bg-white/20 text-white"
-              }`}
-            >
-              <Search className="h-3.5 w-3.5" />
-              <span>Check My Registration</span>
-            </button>
-
-            {/* Admin Registrations Desk Tab */}
-            {isAdminOrTeacher && (
-              <button
-                onClick={() => setActiveTab("admin_registrations")}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              <ClipboardCheck className="h-4 w-4" />
+              <span>Registrations & Approvals Desk</span>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
                   activeTab === "admin_registrations"
-                    ? "bg-white text-[#0d5c4d] shadow-sm scale-102"
-                    : "bg-white/10 hover:bg-white/20 text-white"
+                    ? "bg-white/20 text-white"
+                    : "bg-emerald-100 text-[#0d5c4d]"
                 }`}
               >
-                <ShieldCheck className="h-3.5 w-3.5 text-amber-300" />
-                <span>Registrations Desk</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500 text-white font-bold">
-                  {athleteRegistrations.length}
-                </span>
-              </button>
-            )}
-
-            <button
-              onClick={() => setActiveTab("fixtures")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === "fixtures"
-                  ? "bg-white text-[#0d5c4d] shadow-sm scale-102"
-                  : "bg-white/10 hover:bg-white/20 text-white"
-              }`}
-            >
-              <Calendar className="h-3.5 w-3.5" />
-              <span>{t.sports.fixtures || "Match Fixtures"}</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/20 text-white">
-                {fixtures.length}
+                {athleteRegistrations.length}
               </span>
             </button>
-
             <button
-              onClick={() => setActiveTab("standings")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === "standings"
-                  ? "bg-white text-[#0d5c4d] shadow-sm scale-102"
-                  : "bg-white/10 hover:bg-white/20 text-white"
+              onClick={() => setActiveTab("fixtures")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab === "fixtures"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-[#ecf8f5] hover:text-[#0d5c4d] border border-slate-200"
               }`}
             >
-              <Award className="h-3.5 w-3.5" />
-              <span>{t.sports.standings || "League Table"}</span>
+              <Calendar className="h-4 w-4" />
+              <span>Fixtures & Match Scoring</span>
             </button>
-          </div>
-
-          {/* Quick Sport Filter Dropdown / Pills */}
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-emerald-200/80 font-semibold hidden sm:inline">Sport:</span>
-            <select
-              value={selectedSport}
-              onChange={(e) => setSelectedSport(e.target.value)}
-              className="bg-white/15 border border-white/25 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none"
+            <button
+              onClick={() => setActiveTab("standings")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab === "standings"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-[#ecf8f5] hover:text-[#0d5c4d] border border-slate-200"
+              }`}
             >
-              <option value="All" className="text-slate-900">All Disciplines</option>
-              {sports.map((sp) => (
-                <option key={sp.id} value={sp.name} className="text-slate-900">
-                  {sp.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+              <Award className="h-4 w-4" />
+              <span>League Standings</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => setActiveTab("tournaments")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab === "tournaments"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-[#ecf8f5] hover:text-[#0d5c4d] border border-slate-200"
+              }`}
+            >
+              <Trophy className="h-4 w-4" />
+              <span>Tournaments & Championships</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("registration")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab === "registration"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-[#ecf8f5] hover:text-[#0d5c4d] border border-slate-200"
+              }`}
+            >
+              <Sparkles className="h-4 w-4 text-amber-500" />
+              <span>Online Registration</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("check_registration")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab === "check_registration"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-[#ecf8f5] hover:text-[#0d5c4d] border border-slate-200"
+              }`}
+            >
+              <Search className="h-4 w-4" />
+              <span>Check My Registration</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("fixtures")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab === "fixtures"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-[#ecf8f5] hover:text-[#0d5c4d] border border-slate-200"
+              }`}
+            >
+              <Calendar className="h-4 w-4" />
+              <span>Fixtures & Schedule</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("standings")}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+                activeTab === "standings"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-white text-slate-600 hover:bg-[#ecf8f5] hover:text-[#0d5c4d] border border-slate-200"
+              }`}
+            >
+              <Award className="h-4 w-4" />
+              <span>League Standings</span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -468,6 +494,22 @@ export function SportsView({
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
                 <Filter className="h-3.5 w-3.5 text-slate-400" />
+                <span>Sport:</span>
+                <select
+                  value={selectedSport}
+                  onChange={(e) => setSelectedSport(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-[#fbfcfb] text-slate-700 text-xs font-semibold focus:outline-none"
+                >
+                  <option value="All">All Disciplines</option>
+                  {sports.map((sp) => (
+                    <option key={sp.id} value={sp.name}>
+                      {sp.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
                 <span>Status:</span>
                 <select
                   value={selectedStatus}
@@ -481,7 +523,6 @@ export function SportsView({
                   <option value="completed">Completed</option>
                 </select>
               </div>
-
             </div>
           </div>
 

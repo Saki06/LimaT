@@ -49,23 +49,23 @@ export type PortalType = "gateway" | "student" | "parent" | "staff";
 const BANNER_SLIDES = [
   {
     image: "/images/school_banner_1.jpg",
-    alt: "High School Students in Modern Classroom - Evolve Beyond",
-    caption: "Smart High School Classrooms & Dedicated Teachers"
+    alt: "Interactive Tuition Classroom - Evolve Beyond",
+    caption: "Smart Interactive Tuition Classes & Dedicated Tutors"
   },
   {
     image: "/images/school_banner_2.jpg",
-    alt: "School Students with Science Faculty - Evolve Beyond",
-    caption: "Interactive Science Lab Practical & Guided Studies"
+    alt: "Science Practical & Guided Discussions - Evolve Beyond",
+    caption: "Interactive Science Practical & Guided Model Paper Discussions"
   },
   {
     image: "/images/school_banner_3.jpg",
-    alt: "School Students Studying in Library - Evolve Beyond",
-    caption: "Trilingual Term Revision & Past Exam Library"
+    alt: "Revision Batches & Study Library - Evolve Beyond",
+    caption: "Trilingual Revision Batches & Past Exam Library"
   },
   {
     image: "/images/student_banner_evolve.jpg",
     alt: "Sri Lankan Students Campus Learning - Evolve Beyond",
-    caption: "Holistic Academics, Sports & Leadership"
+    caption: "Holistic Academics, Sports Championships & Leadership"
   }
 ];
 
@@ -113,7 +113,6 @@ export function LandingView({
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPhone, setSignupPhone] = useState("");
-  const [signupBatch, setSignupBatch] = useState("2026 A/L Theory (English / Tamil)");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(true);
@@ -282,34 +281,36 @@ export function LandingView({
   // =========================================================================
   const renderAuthContent = () => (
     <div className="space-y-4">
-      {/* Active Role Dedicated Badge Header */}
-      <div className={`p-3 rounded-2xl flex items-center justify-between border ${
-        selectedRole === "student"
-          ? "bg-[#ecf8f5] border-[#c4e9e0] text-[#0d5c4d]"
-          : selectedRole === "parent"
-          ? "bg-[#f0f5fa] border-[#cbdfe8] text-[#1e3a5f]"
-          : "bg-[#fef7e6] border-[#fde4af] text-[#b47a16]"
-      }`}>
-        <div className="flex items-center gap-2">
-          {selectedRole === "student" ? (
-            <GraduationCap className="h-4 w-4" />
-          ) : selectedRole === "parent" ? (
-            <Users className="h-4 w-4" />
-          ) : (
-            <Sparkles className="h-4 w-4" />
-          )}
-          <span className="text-xs font-black uppercase tracking-wider">
-            {selectedRole === "student"
-              ? "Student Portal"
-              : selectedRole === "parent"
-              ? "Parent & Guardian Portal"
-              : "Tutor Cockpit"}
+      {/* Active Role Dedicated Badge Header (Hidden on Parent Registration) */}
+      {!(selectedRole === "parent" && authTab === "signup") && (
+        <div className={`p-3 rounded-2xl flex items-center justify-between border ${
+          selectedRole === "student"
+            ? "bg-[#ecf8f5] border-[#c4e9e0] text-[#0d5c4d]"
+            : selectedRole === "parent"
+            ? "bg-[#f0f5fa] border-[#cbdfe8] text-[#1e3a5f]"
+            : "bg-[#fef7e6] border-[#fde4af] text-[#b47a16]"
+        }`}>
+          <div className="flex items-center gap-2">
+            {selectedRole === "student" ? (
+              <GraduationCap className="h-4 w-4" />
+            ) : selectedRole === "parent" ? (
+              <Users className="h-4 w-4" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            <span className="text-xs font-black uppercase tracking-wider">
+              {selectedRole === "student"
+                ? "Student Portal"
+                : selectedRole === "parent"
+                ? "Parent & Guardian Portal"
+                : "Tutor Cockpit"}
+            </span>
+          </div>
+          <span className="text-[10px] font-bold opacity-75">
+            {selectedRole === "student" ? "Direct Enrollment" : selectedRole === "parent" ? "Fee & Attendance" : "Course Creator"}
           </span>
         </div>
-        <span className="text-[10px] font-bold opacity-75">
-          {selectedRole === "student" ? "Direct Enrollment" : selectedRole === "parent" ? "Fee & Attendance" : "Course Creator"}
-        </span>
-      </div>
+      )}
 
       {/* Tab Switcher: Sign In vs Create Account */}
       <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 text-xs font-bold">
@@ -558,16 +559,6 @@ export function LandingView({
           {/* SPECIALIZED PARENT REGISTRATION FORM */}
           {selectedRole === "parent" ? (
             <div className="space-y-4">
-              <div className="p-3.5 rounded-xl bg-[#f0f5fa] border border-[#cbdfe8] text-xs text-[#1e3a5f] flex items-start gap-2.5">
-                <Shield className="h-4 w-4 text-[#1e3a5f] shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-black">Tuition Guardian Portal • Sri Lanka</p>
-                  <p className="text-[11px] text-[#2d4a6f] leading-relaxed mt-0.5">
-                    Link with your child&apos;s tuition class profile to track monthly fees, class attendance, and test ranks.
-                  </p>
-                </div>
-              </div>
-
               {/* SECTION 1: GUARDIAN PERSONAL DETAILS */}
               <div className="space-y-3 pt-1">
                 <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -575,28 +566,23 @@ export function LandingView({
                   <span>1. Guardian Information</span>
                 </p>
 
-                {/* Title + Full Name */}
-                <div className="flex gap-2">
-                  <div className="w-24 shrink-0">
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Title
-                    </label>
+                {/* Title + Full Name as single unified row */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Guardian Full Name *
+                  </label>
+                  <div className="flex gap-2">
                     <select
                       value={parentTitle}
                       onChange={(e) => setParentTitle(e.target.value)}
-                      className="w-full h-10 px-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-bold focus:outline-none focus:border-[#1e3a5f] cursor-pointer"
+                      className="w-24 h-10 px-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-bold focus:outline-none focus:border-[#1e3a5f] cursor-pointer shrink-0"
                     >
                       <option value="Mrs.">Mrs.</option>
                       <option value="Mr.">Mr.</option>
                       <option value="Dr.">Dr.</option>
                       <option value="Rev.">Rev.</option>
                     </select>
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Guardian Full Name *
-                    </label>
-                    <div className="relative">
+                    <div className="relative flex-1 min-w-0">
                       <UserIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
@@ -610,11 +596,11 @@ export function LandingView({
                   </div>
                 </div>
 
-                {/* Relationship & Mobile Phone */}
+                {/* Relationship & Mobile Phone (perfect 2-col alignment with single-line labels) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Relationship to Student *
+                      Relationship *
                     </label>
                     <select
                       value={parentRelation}
@@ -630,7 +616,7 @@ export function LandingView({
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Mobile Number (For Fee Slips & SMS) *
+                      Mobile No (WhatsApp) *
                     </label>
                     <div className="relative">
                       <Phone className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -651,37 +637,41 @@ export function LandingView({
               <div className="space-y-3 pt-3 border-t border-slate-100">
                 <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                   <GraduationCap className="h-3.5 w-3.5 text-[#1e3a5f]" />
-                  <span>2. Student Linking & Verification</span>
+                  <span>2. Student Linking &amp; Verification</span>
                 </p>
 
-
-                {/* Student Full Name & WhatsApp / Student ID */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Child&apos;s Full Name *
-                    </label>
+                {/* Child Full Name */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Child&apos;s Full Name *
+                  </label>
+                  <div className="relative">
+                    <UserIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       required
                       value={childName}
                       onChange={(e) => setChildName(e.target.value)}
                       placeholder="e.g. Sathurjan Kaveen"
-                      className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
+                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Student WhatsApp No / Student ID *
-                    </label>
+                {/* Student WhatsApp No / Student ID */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Student WhatsApp No / Student ID *
+                  </label>
+                  <div className="relative">
+                    <Phone className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       required
                       value={childPhoneOrId}
                       onChange={(e) => setChildPhoneOrId(e.target.value)}
                       placeholder="e.g. 077 987 6543 or STU-2026-042"
-                      className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
+                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-mono placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
                     />
                   </div>
                 </div>
@@ -699,28 +689,34 @@ export function LandingView({
                     <label className="text-xs font-bold text-slate-700 block mb-1">
                       Create Password *
                     </label>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={signupPassword}
-                      onChange={(e) => setSignupPassword(e.target.value)}
-                      placeholder="Min 6 characters"
-                      className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
-                    />
+                    <div className="relative">
+                      <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={signupPassword}
+                        onChange={(e) => setSignupPassword(e.target.value)}
+                        placeholder="Min 6 chars"
+                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
+                      />
+                    </div>
                   </div>
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
                       Confirm Password *
                     </label>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={signupConfirmPassword}
-                      onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                      placeholder="Repeat password"
-                      className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
-                    />
+                    <div className="relative">
+                      <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={signupConfirmPassword}
+                        onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                        placeholder="Repeat password"
+                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -802,23 +798,6 @@ export function LandingView({
                   </div>
                 </div>
               </div>
-
-              {/* SUBJECT SPECIALIZATION (Only for Tutor) */}
-              {selectedRole === "teacher" && (
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Subject Specialization / Class Brand *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={signupBatch}
-                    onChange={(e) => setSignupBatch(e.target.value)}
-                    placeholder="e.g. Combined Maths & Physics (Theory & Revision)"
-                    className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium"
-                  />
-                </div>
-              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
@@ -1494,7 +1473,7 @@ export function LandingView({
             <div className="lg:col-span-7 space-y-6">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-xs font-black shadow-2xs">
                 <span className="h-2 w-2 rounded-full bg-[#0d5c4d] animate-pulse" />
-                <span>Student & Parent Portal • Sri Lankan Schools</span>
+                <span>Student & Parent Portal • Sri Lankan Tuition & Academics</span>
               </div>
 
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.15]">
@@ -1503,7 +1482,7 @@ export function LandingView({
               </h1>
 
               <p className="text-sm sm:text-base lg:text-lg text-slate-600 max-w-xl leading-relaxed">
-                Study curriculum units, download past papers with marking schemes, submit assignments, take timed exams, and track your house sports team.
+                Study curriculum units, download past papers with marking schemes, submit assignments, take timed exams, and join sports championships.
               </p>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 w-full">
@@ -1537,7 +1516,7 @@ export function LandingView({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Check className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                  <span>House Athletic Standings</span>
+                  <span>Sports Championship & Tournaments</span>
                 </div>
               </div>
             </div>
@@ -1556,7 +1535,7 @@ export function LandingView({
 
                   <div>
                     <h3 className="text-2xl font-black text-white">Interactive Learning Desk</h3>
-                    <p className="text-xs text-slate-200">National Curriculum • Term Exams • Digital Classroom</p>
+                    <p className="text-xs text-slate-200">National Curriculum • Model Paper Classes • Digital Classroom</p>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 pt-2">
@@ -1640,7 +1619,7 @@ export function LandingView({
                 <div className="lg:col-span-5 p-6 sm:p-10 space-y-3">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[11px] font-black text-cyan-200 tracking-wider uppercase">
                     <Sparkles className="h-3 w-3 text-[#f3b738]" />
-                    <span>Collegiate Academic Portal</span>
+                    <span>Tuition & Learning Hub</span>
                   </div>
 
                   <h2 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-none uppercase drop-shadow-md">
@@ -1649,7 +1628,7 @@ export function LandingView({
                   </h2>
 
                   <p className="text-xs sm:text-sm text-cyan-100/90 font-medium max-w-sm leading-relaxed">
-                    Unleash your academic brilliance. Interactive digital coursework, trilingual lessons, and continuous exam preparation designed for Sri Lankan students.
+                    Unleash your academic brilliance. Interactive digital coursework, trilingual tuition lessons, and continuous exam preparation designed for Sri Lankan students.
                   </p>
 
                   <div className="pt-2 flex items-center gap-2">
@@ -1744,7 +1723,7 @@ export function LandingView({
                   addToast({
                     type: "info",
                     title: "Student Service",
-                    message: "Sign in to view student services, sports house points, and campus activities."
+                    message: "Sign in to access your enrolled tuition batches, sports championship events, and exam schedules."
                   });
                   openAuth("login", "student", "drawer");
                 }}
@@ -1761,7 +1740,7 @@ export function LandingView({
                 <h4 className="text-xs font-black text-amber-700 group-hover:text-amber-600 transition-colors">
                   Student Service
                 </h4>
-                <p className="text-[10px] text-slate-500 mt-0.5">House & Campus Desk</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Batch & Student Support Desk</p>
               </div>
 
               {/* Card 3: Online Library */}
@@ -1851,7 +1830,7 @@ export function LandingView({
                 Student Experience
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26] mt-2">
-                Everything for School Success in One Place
+                Everything for Exam & Sports Success in One Place
               </h2>
             </div>
 
@@ -1862,7 +1841,7 @@ export function LandingView({
                 </div>
                 <h3 className="font-black text-sm text-[#0d2b26]">Structured Lessons</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Video units, downloadable PDF notes, and chapter summaries aligned with school term syllabus.
+                  Video units, downloadable PDF notes, and chapter summaries aligned with G.C.E. O/L, A/L & revision batches.
                 </p>
               </div>
 
@@ -1890,9 +1869,9 @@ export function LandingView({
                 <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
                   <Trophy className="h-5 w-5" />
                 </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Sports & Houses</h3>
+                <h3 className="font-black text-sm text-[#0d2b26]">Sports & Championship</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Inter-house athletics standings, football and cricket match fixtures, and house leaderboard.
+                  Eezhagam championship fixtures, athletic registrations, cricket & football match schedules, and leaderboards.
                 </p>
               </div>
             </div>
@@ -1912,7 +1891,7 @@ export function LandingView({
             <div className="lg:col-span-7 space-y-6">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#f0f5fa] text-[#1e3a5f] border border-[#cbdfe8] text-xs font-black shadow-2xs">
                 <span className="h-2 w-2 rounded-full bg-[#1e3a5f] animate-pulse" />
-                <span>Parent & Guardian Desk • Sri Lankan Schools</span>
+                <span>Parent & Guardian Desk • Sri Lankan Tuition & Classes</span>
               </div>
 
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.15]">
@@ -1921,7 +1900,7 @@ export function LandingView({
               </h1>
 
               <p className="text-sm sm:text-base lg:text-lg text-slate-600 max-w-xl leading-relaxed">
-                Track morning attendance, examine term test rankings, chat with class teachers, review homework completion, and upload official school payment slips.
+                Track class attendance, examine test rankings, chat with tutors, review homework completion, and upload monthly tuition payment slips.
               </p>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 w-full">
@@ -1956,7 +1935,7 @@ export function LandingView({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Check className="h-4 w-4 text-[#1e3a5f] shrink-0" />
-                  <span>Direct Teacher Consultations</span>
+                  <span>Direct Tutor Consultations</span>
                 </div>
               </div>
             </div>
@@ -1984,12 +1963,12 @@ export function LandingView({
                   <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
                     <p className="text-[10px] uppercase font-bold text-slate-400">Term Attendance</p>
                     <p className="text-xl font-black text-emerald-400">98.4%</p>
-                    <p className="text-[10px] text-slate-400">Daily morning gate check-in</p>
+                    <p className="text-[10px] text-slate-400">Daily class entry check-in</p>
                   </div>
                   <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
                     <p className="text-[10px] uppercase font-bold text-slate-400">Academic Standing</p>
                     <p className="text-xl font-black text-[#7ba9d6]">Honor Roll</p>
-                    <p className="text-[10px] text-slate-400">Continuous term assessment</p>
+                    <p className="text-[10px] text-slate-400">Monthly test &amp; paper class ranking</p>
                   </div>
                 </div>
 
@@ -1998,14 +1977,14 @@ export function LandingView({
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="font-bold text-[#9bbddf] flex items-center gap-1.5">
                       <Mail className="h-3.5 w-3.5 text-[#7ba9d6]" />
-                      Direct Teacher Feedback &amp; Reports
+                      Direct Tutor Feedback &amp; Reports
                     </span>
                     <span className="text-[10px] text-slate-400">Official Desk</span>
                   </div>
                   <p className="text-xs text-slate-200 leading-relaxed italic">
-                    &quot;Review continuous homework submissions, verified term test grades, and real-time remarks directly from subject teachers.&quot;
+                    &quot;Review continuous homework submissions, verified term test grades, and real-time remarks directly from course tutors.&quot;
                   </p>
-                  <p className="text-[10px] text-slate-400 font-bold">— Class Teachers &amp; School Administration</p>
+                  <p className="text-[10px] text-slate-400 font-bold">— Tutors &amp; Academy Administration</p>
                 </div>
 
                 <button
@@ -2038,7 +2017,7 @@ export function LandingView({
                 </div>
                 <h3 className="font-black text-sm text-[#0d2b26]">Attendance & Leave</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Real-time morning check-in status, official leave request submissions, and term attendance reports.
+                  Real-time class entry check-in status, official leave request submissions, and monthly attendance reports.
                 </p>
               </div>
 
@@ -2048,7 +2027,7 @@ export function LandingView({
                 </div>
                 <h3 className="font-black text-sm text-[#0d2b26]">Term Report Cards</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Download certified term examination report cards with subject rankings, teacher remarks, and grade trends.
+                  Download certified term examination report cards with subject rankings, tutor remarks, and grade trends.
                 </p>
               </div>
 
@@ -2056,9 +2035,9 @@ export function LandingView({
                 <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
                   <Mail className="h-5 w-5" />
                 </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Teacher Communications</h3>
+                <h3 className="font-black text-sm text-[#0d2b26]">Tutor Communications</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Secure two-way messaging with subject teachers and schedule parent-teacher conference meetings.
+                  Secure two-way messaging with course tutors and sports coaches to monitor academic and athletic progress.
                 </p>
               </div>
 
@@ -2068,7 +2047,7 @@ export function LandingView({
                 </div>
                 <h3 className="font-black text-sm text-[#0d2b26]">Fee Receipts & Slips</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Upload bank deposit slips or pay school facility fees online with verified digital receipt tracking.
+                  Upload bank deposit slips or pay tuition fees online with verified digital receipt tracking.
                 </p>
               </div>
             </div>
@@ -2082,7 +2061,7 @@ export function LandingView({
               className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back to All School Portals</span>
+              <span>Back to All Portals</span>
             </button>
           </div>
         </main>

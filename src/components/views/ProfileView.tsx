@@ -108,15 +108,15 @@ export function ProfileView() {
         district: "Colombo",
         province: "Western Province",
         postalCode: "00500",
-        bio: "Senior Master & Head of Department for Combined Mathematics (A/L). 14 years of teaching excellence preparing students for G.C.E. Advanced Level with distinction.",
-        schoolName: currentUser.schoolName || "St. Michael High School",
-        schoolCode: "SMH-042",
+        bio: "Lead Specialist Educator & Department Chair for Combined Mathematics (A/L). 14 years of teaching excellence preparing students for G.C.E. Advanced Level with distinction.",
+        schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
+        schoolCode: "LMT-COLOMBO",
         grade: "A/L Faculty (Grade 12 & 13)",
         classRoom: "Advanced Level Mathematics Faculty",
         stream: "Combined Mathematics & Pure Sciences",
         academicYear: "Faculty Member (2012 - Present)",
-        house: "Vijaya House Patron",
-        classTeacher: "Head of Department (Mathematics)",
+        house: "Lions Sports Academy Mentor",
+        classTeacher: "Head of Faculty (Mathematics)",
         admittedDate: "September 2012",
         attendanceRate: "99.1%",
         gpa: "Faculty Rating 4.9/5.0",
@@ -127,7 +127,7 @@ export function ProfileView() {
         guardianOccupation: "Senior Banking Executive",
         motherName: "M. Perera",
         motherPhone: "+94 11 234 5678",
-        emergencyContact: "Staff Council Welfare (+94 11 258 0042)",
+        emergencyContact: "Faculty Support (+94 11 258 0042)",
         transportMode: "Faculty Parking (Pass #FC-42)",
         healthNotes: "Normal health clearance. First-aid certified.",
         extracurricular: "Master-in-Charge Mathematics Olympiad, Senior Chess Club Patron"
@@ -153,16 +153,16 @@ export function ProfileView() {
         district: "Colombo",
         province: "Western Province",
         postalCode: "00600",
-        bio: "Parent & Guardian of Sathurjan K. (Grade 12 - Physical Science) and Ananya K. (Grade 8-A). Active executive member of the Parent-Teacher Association (PTA).",
-        schoolName: currentUser.schoolName || "St. Michael High School",
-        schoolCode: "SMH-042",
-        grade: "Registered PTA Member",
-        classRoom: "Guardian of 2 Enrolled Students",
-        stream: "Parent-Teacher Council",
-        academicYear: "2021 - Present",
-        house: "Vijaya House Supporter",
-        classTeacher: "Mr. Samantha Perera & Mrs. Nilmini Silva",
-        admittedDate: "January 2021",
+        bio: "Parent & Guardian of Sathurjan K. (Physical Science A/L Masterclass Batch). Active member of the Masterclass Parent-Mentor Council.",
+        schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
+        schoolCode: "LMT-COLOMBO",
+        grade: "Registered Parent Council Member",
+        classRoom: "Guardian of Enrolled Student",
+        stream: "Parent-Mentor Council",
+        academicYear: "2024 - Present",
+        house: "Lions Sports Academy Supporter",
+        classTeacher: "Dr. Samantha Perera & Eng. K. Thanushan",
+        admittedDate: "January 2024",
         attendanceRate: "100% PTM Attendance",
         gpa: "Verified Guardian Status",
         guardianName: "Mrs. Priyadarshani Kulatunga",
@@ -230,7 +230,7 @@ export function ProfileView() {
       preferredName: "Sathu",
       studentId: "STU-2026-0842",
       indexNumber: "AL/2026/89421",
-      email: currentUser.email || "sathurjan@school.lk",
+      email: currentUser.email || "sathurjan@gmail.com",
       phone: "+94 77 123 4567",
       altPhone: "+94 11 234 5678",
       dob: "2008-03-14",
@@ -242,16 +242,16 @@ export function ProfileView() {
       district: "Colombo",
       province: "Western Province",
       postalCode: "00600",
-      bio: "Passionate Advanced Level Physical Science student with keen interest in Pure Mathematics, Quantum Mechanics, and Software Engineering. Aspiring to enter the Faculty of Engineering.",
-      schoolName: currentUser.schoolName || "St. Michael High School",
-      schoolCode: "SMH-042",
-      grade: currentUser.grade || "Grade 12",
-      classRoom: currentUser.class || "12-Physical Science",
+      bio: "Passionate Advanced Level Physical Science student preparing for G.C.E. A/L under leading private educators in Pure Maths, Quantum Physics, Chemistry and Software Architecture.",
+      schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
+      schoolCode: "LMT-COLOMBO",
+      grade: (currentUser.grade && currentUser.grade !== "Grade 12") ? currentUser.grade : "Grade 12 (A/L 2026/2027)",
+      classRoom: (currentUser.class && currentUser.class !== "12-Physical Science") ? currentUser.class : "Physical Science A/L Masterclass Batch",
       stream: "Physical Science (G.C.E. Advanced Level)",
-      academicYear: "2024 - 2026",
-      house: "Vijaya House (Yellow)",
-      classTeacher: "Mr. Samantha Perera",
-      admittedDate: "January 2021",
+      academicYear: "Batch 2026 - 2027",
+      house: "Lions Sports & Athletics Academy",
+      classTeacher: "Dr. Samantha Perera (Lead Combined Maths Specialist)",
+      admittedDate: "January 2024",
       attendanceRate: "96.4%",
       gpa: "3.84 / 4.0",
       guardianName: "K. Kandasamy",
@@ -262,9 +262,9 @@ export function ProfileView() {
       motherName: "S. Kandasamy",
       motherPhone: "+94 77 555 8912",
       emergencyContact: "K. Kandasamy (+94 71 888 4321)",
-      transportMode: "School Van (Route 04 - Wellawatte / Bambalapitiya)",
-      healthNotes: "No known allergies. Normal health clearance.",
-      extracurricular: "Member of ICT Society, Cricket 2nd XI, Science Club"
+      transportMode: "Independent Transport / Online Live Stream",
+      healthNotes: "No known allergies. Normal athletic health clearance.",
+      extracurricular: "Vice Captain Lions Cricket 1st XI, Senior Athletic Squad, Science Club"
     };
   }, [currentRole, currentUser]);
 
@@ -534,33 +534,7 @@ export function ProfileView() {
               </div>
             </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-slate-100">
-            <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Attendance</p>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d5c4d]">{profileData.attendanceRate}</span>
-                <span className="text-[10px] text-slate-500 font-semibold">82 / 85 days</span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Term GPA</p>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-amber-600">3.84</span>
-                <span className="text-[10px] text-slate-500 font-semibold">Rank #3 in Stream</span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active Subjects</p>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d2b26]">4 Enrolled</span>
-                <span className="text-[10px] text-emerald-600 font-bold">19 Completed</span>
-              </div>
-            </div>
-          </div>
-        )}
+        ) : null}
       </div>
 
 
@@ -579,8 +553,8 @@ export function ProfileView() {
           : [
               { id: "personal", label: "Personal Details", icon: User },
               { id: "academic", label: "Academic & Subjects", icon: GraduationCap },
-              { id: "timetable", label: "Examination Timetable", icon: Calendar },
-              { id: "transcripts", label: "Official Term Transcripts", icon: FileCheck },
+              { id: "timetable", label: "Online Assessment Schedule", icon: Calendar },
+              { id: "transcripts", label: "Tutor Progress Reports", icon: FileCheck },
               { id: "sports", label: "Sports & Achievements", icon: Trophy }
             ]
         ).map((tab) => {
@@ -1664,80 +1638,68 @@ export function ProfileView() {
               </p>
             </div>
 
-            {/* School & Stream Details Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Tuition Hub & Stream Details Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Institution</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tuition Ecosystem</span>
                 <p className="font-black text-sm text-[#0d2b26]">{profileData.schoolName}</p>
-                <p className="text-[11px] text-slate-500">School Code: {profileData.schoolCode} · Western</p>
+                <p className="text-[11px] text-slate-500">Center Code: {profileData.schoolCode} · Colombo</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Class &amp; Stream</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Masterclass Cohort</span>
                 <p className="font-black text-sm text-[#0d2b26]">{profileData.classRoom}</p>
                 <p className="text-[11px] text-slate-500">{profileData.stream}</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Class Teacher</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lead Academic Mentor</span>
                 <p className="font-black text-sm text-[#0d2b26]">{profileData.classTeacher}</p>
-                <p className="text-[11px] text-slate-500">Senior Faculty · Science Division</p>
+                <p className="text-[11px] text-slate-500">Senior Faculty &bull; Pure &amp; Applied Maths</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sports House</span>
-                <p className="font-black text-sm text-[#0d2b26]">{profileData.house}</p>
-                <p className="text-[11px] text-amber-600 font-semibold">House Captain Nominee</p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Academic Term</span>
-                <p className="font-black text-sm text-[#0d2b26]">Term 2 (2026 Session)</p>
-                <p className="text-[11px] text-emerald-600 font-semibold">Mid-Term Completed</p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Extracurriculars</span>
-                <p className="font-black text-sm text-[#0d2b26]">ICT Society &amp; Cricket</p>
-                <p className="text-[11px] text-slate-500">Active member</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Syllabus Cycle</span>
+                <p className="font-black text-sm text-[#0d2b26]">A/L 2026/2027 Full Syllabus Pass</p>
+                <p className="text-[11px] text-emerald-600 font-semibold">Active Masterclass Subscription</p>
               </div>
             </div>
 
             {/* Enrolled Subjects List */}
             <div className="space-y-3 pt-4 border-t border-slate-100">
-              <h4 className="font-bold text-sm text-[#0d2b26]">Active Subjects for G.C.E. Advanced Level</h4>
+              <h4 className="font-bold text-sm text-[#0d2b26]">Active Subjects</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {[
                   {
                     name: "Combined Mathematics",
                     code: "CM-AL-2026",
-                    teacher: "Mrs. Kavitha Rajan",
-                    progress: "72% Complete",
-                    grade: "94% (A+)",
+                    teacher: "Dr. Samantha Perera",
+                    progress: "Module 7 of 10 Complete",
+                    grade: "A+ (94)",
                     color: "border-emerald-200 bg-emerald-50/40"
                   },
                   {
                     name: "Physics (Theory & Practicals)",
                     code: "PHY-AL-2026",
-                    teacher: "Mr. Thuvaragan S.",
-                    progress: "68% Complete",
-                    grade: "88% (A)",
+                    teacher: "Eng. K. Thanushan",
+                    progress: "Module 6 of 10 Complete",
+                    grade: "A (88)",
                     color: "border-blue-200 bg-blue-50/40"
                   },
                   {
                     name: "Chemistry",
                     code: "CHEM-AL-2026",
-                    teacher: "Dr. Sarath Perera",
-                    progress: "65% Complete",
-                    grade: "91% (A)",
+                    teacher: "Dr. Nilmini Silva",
+                    progress: "Module 6 of 10 Complete",
+                    grade: "A (91)",
                     color: "border-purple-200 bg-purple-50/40"
                   },
                   {
                     name: "Information & Communication Technology",
                     code: "ICT-AL-2026",
-                    teacher: "Mr. P. Selvakumar",
-                    progress: "80% Complete",
-                    grade: "96% (A+)",
+                    teacher: "Eng. S. Wickramasinghe",
+                    progress: "Module 8 of 10 Complete",
+                    grade: "A+ (96)",
                     color: "border-amber-200 bg-amber-50/40"
                   }
                 ].map((subject, idx) => (
@@ -1750,7 +1712,7 @@ export function ProfileView() {
                         <span className="font-extrabold text-xs text-slate-900">{subject.name}</span>
                         <span className="text-[10px] font-mono text-slate-400">{subject.code}</span>
                       </div>
-                      <p className="text-[11px] text-slate-500">Instructor: {subject.teacher}</p>
+                      <p className="text-[11px] text-slate-500">Lead Educator: {subject.teacher}</p>
                       <p className="text-[10px] text-emerald-700 font-bold">{subject.progress}</p>
                     </div>
 
@@ -1768,7 +1730,7 @@ export function ProfileView() {
       )}
 
       {/* =================================================================== */}
-      {/* TAB: EXAMINATION TIMETABLE                                         */}
+      {/* TAB: ONLINE ASSESSMENT SCHEDULE & MODEL PAPERS                     */}
       {/* =================================================================== */}
       {activeTab === "timetable" && (
         <div className="space-y-6 animate-in fade-in duration-200">
@@ -1777,32 +1739,29 @@ export function ProfileView() {
               <div>
                 <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Second Term Final Examination Schedule · Grade 12</span>
+                  <span>Online Masterclass Assessments &amp; Model Paper Schedule</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Official dates, session timings, assigned examination halls, seat numbers, and invigilator details.
+                  Scheduled online model paper dates, timed portal submission windows, proctoring details, and live mentor discussion slots.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={handleDownloadHallTicket}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#d6dfd9] text-[#0d5c4d] hover:bg-[#ecf8f5] font-bold text-xs shadow-2xs transition-colors self-start sm:self-auto cursor-pointer"
-              >
-                <Printer className="h-4 w-4" />
-                <span>Print Hall Admission Pass</span>
-              </button>
+
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] font-bold text-xs border border-[#b2e5d9] self-start sm:self-auto">
+                <Video className="h-3.5 w-3.5" />
+                <span>Live Online Proctored</span>
+              </div>
             </div>
 
-            {/* Candidate Notice Banner */}
-            <div className="p-3.5 rounded-2xl bg-[#f6fbf9] border border-[#c4e9e0] flex items-center justify-between gap-3 text-xs text-[#0d5c4d]">
+            {/* Candidate Online Notice Banner */}
+            <div className="p-3.5 rounded-2xl bg-[#f6fbf9] border border-[#c4e9e0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#0d5c4d]">
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-bold">Candidate Index: {profileData.indexNumber}</span>
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="font-bold">Candidate Index: {profileData.indexNumber || "LMT-2026-12A-042"}</span>
                 <span className="hidden sm:inline text-slate-400">|</span>
-                <span className="hidden sm:inline text-slate-600">Report 30 mins prior to commencement</span>
+                <span className="hidden sm:inline text-slate-600">Online Submission Timer Active &bull; Upload scanned PDF scripts</span>
               </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#b2e5d9] font-extrabold text-[10px] text-[#0d5c4d] shadow-2xs">
-                Term 2 Finals
+              <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#b2e5d9] font-extrabold text-[10px] text-[#0d5c4d] shadow-2xs self-start sm:self-auto">
+                Webcam &amp; Portal Monitored ✓
               </span>
             </div>
 
@@ -1840,34 +1799,34 @@ export function ProfileView() {
                     <div className="flex items-center gap-2 text-slate-700">
                       <Clock className="h-4 w-4 text-[#0d5c4d] shrink-0" />
                       <div>
-                        <p className="text-[10px] text-slate-400 font-medium">Time</p>
+                        <p className="text-[10px] text-slate-400 font-medium">Time Window</p>
                         <p className="font-bold">{exam.time}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 text-slate-700">
-                      <MapPin className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                      <Video className="h-4 w-4 text-[#0d5c4d] shrink-0" />
                       <div>
-                        <p className="text-[10px] text-slate-400 font-medium">Allocated Venue</p>
+                        <p className="text-[10px] text-slate-400 font-medium">Exam Platform</p>
                         <p className="font-bold line-clamp-1">{exam.hallName}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 text-slate-700">
-                      <UserCheck className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                      <ShieldCheck className="h-4 w-4 text-[#0d5c4d] shrink-0" />
                       <div>
-                        <p className="text-[10px] text-slate-400 font-medium">Seat Number</p>
+                        <p className="text-[10px] text-slate-400 font-medium">Mode</p>
                         <p className="font-bold text-[#0d5c4d]">{exam.seatNumber}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-[#f0f4f1] text-xs">
-                    <span className="text-slate-400 text-[11px]">
-                      Invigilator: <span className="text-slate-700 font-semibold">{exam.invigilator}</span>
+                    <span className="text-slate-500 text-[11px]">
+                      Conducting Mentor: <span className="text-slate-800 font-bold">{exam.invigilator}</span>
                     </span>
                     <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      Scheduled ✓
+                      Online Scheduled ✓
                     </span>
                   </div>
                 </div>
@@ -1878,7 +1837,7 @@ export function ProfileView() {
       )}
 
       {/* =================================================================== */}
-      {/* TAB: OFFICIAL TERM TRANSCRIPTS                                     */}
+      {/* TAB: TUTOR PROGRESS REPORTS & ASSESSMENT CARDS                     */}
       {/* =================================================================== */}
       {activeTab === "transcripts" && (
         <div className="space-y-6 animate-in fade-in duration-200">
@@ -1887,116 +1846,150 @@ export function ProfileView() {
               <div>
                 <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
                   <FileCheck className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Certified Academic Transcript &amp; G.C.E. Advanced Level Evaluation</span>
+                  <span>Solo Tutor Assessment Reports &amp; Progress Cards</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Official statement of marks, standardized Z-Scores, district rankings, and examiner remarks.
+                  Individual mock paper evaluations, personalized mentor remarks, cohort ranks, and verified teacher feedback from each enrolled tutor.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={handleDownloadTranscript}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-md transition-colors self-start sm:self-auto cursor-pointer"
-              >
-                <Download className="h-4 w-4" />
-                <span>Download Official Transcript (PDF)</span>
-              </button>
-            </div>
 
-            {/* Transcript KPI Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Standardized Z-Score</span>
-                <p className="text-2xl font-black text-[#0d5c4d] mt-1 font-mono">
-                  {initialExamTermResult.zScore.toFixed(4)}
-                </p>
-                <p className="text-[10px] text-emerald-600 font-bold mt-1">National Benchmark A/L</p>
-              </div>
-
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">District Merit Rank</span>
-                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">
-                  #{initialExamTermResult.districtRank}
-                </p>
-                <p className="text-[10px] text-slate-500 mt-1">Colombo Educational District</p>
-              </div>
-
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">All-Island Rank</span>
-                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">
-                  #{initialExamTermResult.islandRank}
-                </p>
-                <p className="text-[10px] text-slate-500 mt-1">Physical Science Stream</p>
-              </div>
-
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Term Evaluation GPA</span>
-                <p className="text-2xl font-black text-amber-600 mt-1 font-mono">
-                  {initialExamTermResult.gpa.toFixed(2)}
-                </p>
-                <p className="text-[10px] text-amber-700 font-bold mt-1">First Class Standing</p>
-              </div>
-            </div>
-
-            {/* Official Grade Table */}
-            <div className="bg-white rounded-2xl border border-[#e6ece8] shadow-xs overflow-hidden">
-              <div className="p-4 bg-[#f8faf9] border-b border-[#e6ece8] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26]">
-                    {initialExamTermResult.termTitle}
-                  </h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Candidate: <span className="font-bold text-slate-800">{initialExamTermResult.candidateName}</span> (
-                    {profileData.indexNumber || initialExamTermResult.indexNumber})
-                  </p>
-                </div>
-                <span className="text-xs font-semibold text-slate-500 bg-white px-3 py-1 rounded-xl border border-slate-200">
-                  Issued: {initialExamTermResult.issuedDate}
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] text-xs font-bold border border-[#b2e5d9]">
+                  4 Enrolled Tutors Active
                 </span>
               </div>
+            </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-[#fcfdfc] border-b border-[#e6ece8] text-slate-400 font-bold uppercase text-[10px]">
-                    <tr>
-                      <th className="py-3 px-4">Subject</th>
-                      <th className="py-3 px-4 text-center">Marks (100)</th>
-                      <th className="py-3 px-4 text-center">Grade</th>
-                      <th className="py-3 px-4 text-center">Class Rank</th>
-                      <th className="py-3 px-4">Teacher Remark</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#f0f4f1]">
-                    {initialExamTermResult.subjects.map((sub, idx) => (
-                      <tr key={idx} className="hover:bg-[#f9fbf9] transition-colors">
-                        <td className="py-3.5 px-4 font-bold text-slate-900">{sub.subjectName}</td>
-                        <td className="py-3.5 px-4 text-center font-mono font-bold text-[#0d5c4d]">
-                          {sub.marksObtained}%
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {sub.grade}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-center font-bold text-slate-600">
-                          #{sub.rankInClass}
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-500 italic max-w-xs">{sub.teacherRemark}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* Individual Solo Tutor Progress Cards Grid */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
+                  <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
+                  <span>Enrolled Solo Tutors &bull; Monthly Progress &amp; Assessment Reports</span>
+                </h4>
+                <span className="text-[11px] text-slate-500 font-medium">May 2026 Evaluation Cycle</span>
               </div>
 
-              <div className="p-4 bg-[#f8faf9] border-t border-[#e6ece8] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                <p className="text-slate-600">
-                  <span className="font-bold text-slate-800">Principal&apos;s Endorsement:</span>{" "}
-                  <span className="italic">{initialExamTermResult.principalRemark}</span>
-                </p>
-                <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#0d5c4d] bg-white px-3 py-1 rounded-xl border border-[#c4e9e0] shrink-0">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  <span>Ministry Certified</span>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  {
+                    subject: "Combined Mathematics",
+                    tutorName: "Dr. Samantha Perera",
+                    tutorTitle: "Lead Combined Maths Specialist · Pure & Applied",
+                    tutorAvatar: "SP",
+                    assessmentTitle: "Differential Calculus & Vector Mechanics Mock Paper",
+                    marks: 89,
+                    grade: "A",
+                    batchRank: 2,
+                    totalStudents: 120
+                  },
+                  {
+                    subject: "Physics",
+                    tutorName: "Eng. K. Thanushan",
+                    tutorTitle: "Lead Physics Specialist & Engineer · Mechanics & Optics",
+                    tutorAvatar: "KT",
+                    assessmentTitle: "Rotational Dynamics & Wave Mechanics Evaluation",
+                    marks: 85,
+                    grade: "A",
+                    batchRank: 4,
+                    totalStudents: 95
+                  },
+                  {
+                    subject: "Chemistry",
+                    tutorName: "Dr. Nilmini Silva",
+                    tutorTitle: "Doctor of Chemistry & Lead Educator · Physical & Inorganic",
+                    tutorAvatar: "NS",
+                    assessmentTitle: "Ionic Equilibrium & Organic Reaction Mechanisms",
+                    marks: 78,
+                    grade: "A",
+                    batchRank: 7,
+                    totalStudents: 110
+                  },
+                  {
+                    subject: "Information Technology",
+                    tutorName: "Eng. S. Wickramasinghe",
+                    tutorTitle: "Lead Systems Architect & ICT Faculty · Algorithms & Database",
+                    tutorAvatar: "SW",
+                    assessmentTitle: "Python Programming & Relational Database Design",
+                    marks: 94,
+                    grade: "A",
+                    batchRank: 1,
+                    totalStudents: 85
+                  }
+                ].map((card, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-[#fcfdfc] rounded-2xl border border-[#e2eae5] p-4 sm:p-5 shadow-2xs hover:shadow-md hover:border-[#b2e5d9] transition-all space-y-3"
+                  >
+                    {/* Tutor Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] font-black text-sm flex items-center justify-center border border-[#b2e5d9] shrink-0">
+                          {card.tutorAvatar}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-extrabold uppercase">
+                              {card.subject}
+                            </span>
+                            {card.batchRank === 1 && (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold">
+                                Batch Topper ★
+                              </span>
+                            )}
+                          </div>
+                          <h5 className="font-extrabold text-sm text-[#0d2b26] mt-0.5">
+                            {card.tutorName}
+                          </h5>
+                          <p className="text-[10px] text-slate-500">{card.tutorTitle}</p>
+                        </div>
+                      </div>
+
+                      {/* Grade Badge */}
+                      <div className="text-right shrink-0">
+                        <span className="inline-block px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 font-black text-base border border-emerald-200">
+                          {card.grade}
+                        </span>
+                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">Grade</p>
+                      </div>
+                    </div>
+
+                    {/* Assessment & Marks Details */}
+                    <div className="bg-white p-3 rounded-xl border border-[#edf3f0] flex items-center justify-between gap-3">
+                      <div className="space-y-0.5 min-w-0">
+                        <p className="text-[10px] uppercase font-bold text-slate-400">Assessment</p>
+                        <p className="text-xs font-bold text-slate-800 truncate">
+                          {card.assessmentTitle}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <div className="bg-[#f8faf9] px-3 py-1.5 rounded-lg border border-slate-100 text-center">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">Marks</p>
+                          <p className="font-black text-sm text-[#0d5c4d]">{card.marks}</p>
+                        </div>
+                        <div className="bg-[#f8faf9] px-3 py-1.5 rounded-lg border border-slate-100 text-center">
+                          <p className="text-[9px] font-bold text-slate-400 uppercase">Batch Rank</p>
+                          <p className="font-black text-sm text-slate-800">
+                            #{card.batchRank}{" "}
+                            <span className="text-[10px] font-normal text-slate-400">/ {card.totalStudents}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card Footer / Verification */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500 flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                        <span className="font-bold text-slate-700">Verified by {card.tutorName}</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                        Signed &amp; Approved ✓
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -2042,7 +2035,7 @@ export function ProfileView() {
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">College Honours</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Academy Honours</span>
                 <p className="text-lg font-black text-[#0d2b26] mt-1">Double Colorsman</p>
                 <p className="text-[10px] text-emerald-600 font-bold mt-1">Cricket &amp; Track Athletics</p>
               </div>
@@ -2078,14 +2071,14 @@ export function ProfileView() {
                       <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-extrabold">
                         Major Sport
                       </span>
-                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Under-17 &amp; First XI Cricket</h5>
+                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Lions Academy First XI Cricket</h5>
                     </div>
                     <span className="text-xl">🏏</span>
                   </div>
                   <div className="text-xs space-y-1 text-slate-600">
                     <p><span className="font-bold text-slate-800">Role:</span> All-Rounder / Vice Captain</p>
                     <p><span className="font-bold text-slate-800">Specialty:</span> Right-Hand Bat, Right-Arm Medium Fast</p>
-                    <p><span className="font-bold text-slate-800">Coach:</span> Mr. Samantha Perera</p>
+                    <p><span className="font-bold text-slate-800">Coach:</span> Coach Samantha Perera</p>
                     <p><span className="font-bold text-slate-800">Schedule:</span> Mon, Wed, Fri (3:30 - 5:30 PM)</p>
                   </div>
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
@@ -2101,19 +2094,19 @@ export function ProfileView() {
                       <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-extrabold">
                         Track &amp; Field
                       </span>
-                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Senior Track &amp; Sprint Squad</h5>
+                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Lions Senior Track &amp; Sprint Squad</h5>
                     </div>
                     <span className="text-xl">🏃</span>
                   </div>
                   <div className="text-xs space-y-1 text-slate-600">
                     <p><span className="font-bold text-slate-800">Events:</span> 100m, 200m &amp; 4x100m Relay Anchor</p>
                     <p><span className="font-bold text-slate-800">Personal Best:</span> 100m: 11.02s | 200m: 22.45s</p>
-                    <p><span className="font-bold text-slate-800">Coach:</span> Mr. M. Faizal</p>
+                    <p><span className="font-bold text-slate-800">Coach:</span> Coach M. Faizal</p>
                     <p><span className="font-bold text-slate-800">Schedule:</span> Tue, Thu (6:00 - 7:30 AM)</p>
                   </div>
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
                     <span className="text-emerald-700 font-bold">National Qualifier</span>
-                    <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-bold">School Record Holder</span>
+                    <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-bold">Championship Record Holder</span>
                   </div>
                 </div>
 
@@ -2122,21 +2115,21 @@ export function ProfileView() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-800 text-[10px] font-extrabold">
-                        Inter-House
+                        Academy League
                       </span>
-                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Vijaya House Athletics</h5>
+                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Lions Academy Gold Squad</h5>
                     </div>
                     <span className="text-xl">🏆</span>
                   </div>
                   <div className="text-xs space-y-1 text-slate-600">
-                    <p><span className="font-bold text-slate-800">Role:</span> Senior Boys House Sports Captain</p>
+                    <p><span className="font-bold text-slate-800">Role:</span> Senior Academy Sports Captain</p>
                     <p><span className="font-bold text-slate-800">Meet Points:</span> 28 Individual Championship Points</p>
-                    <p><span className="font-bold text-slate-800">House Master:</span> Mr. K. Sivakumar</p>
-                    <p><span className="font-bold text-slate-800">House Rank:</span> 1st Place Overall (2026)</p>
+                    <p><span className="font-bold text-slate-800">Squad Mentor:</span> Eng. K. Thanushan</p>
+                    <p><span className="font-bold text-slate-800">Squad Rank:</span> 1st Place Overall (2026)</p>
                   </div>
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
                     <span className="text-purple-700 font-bold">Best Senior Athlete</span>
-                    <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-bold">House Shield ✓</span>
+                    <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-bold">Academy Shield ✓</span>
                   </div>
                 </div>
               </div>
@@ -2165,22 +2158,22 @@ export function ProfileView() {
                     <tbody className="divide-y divide-[#f0f4f1]">
                       {[
                         {
-                          tournament: "All-Island Inter-School Tier 1 Tournament (Finals)",
+                          tournament: "All-Island Academy & Club Tier 1 Tournament (Finals)",
                           sport: "Cricket",
                           medal: "Gold Medal & Man of the Match",
                           medalType: "gold",
                           level: "National Tier 1",
                           date: "Sept 2026",
-                          highlights: "Scored 78* (62 balls) & took 4/28 vs Royal Academy. St. Michael won by 38 runs."
+                          highlights: "Scored 78* (62 balls) & took 4/28 vs Colombo CC. Lions Academy won by 38 runs."
                         },
                         {
-                          tournament: "Sri Lanka All-Island Schools Athletics Meet",
+                          tournament: "Sri Lanka All-Island Academy Athletics Meet",
                           sport: "Athletics",
                           medal: "Gold Medal (New Record)",
                           medalType: "gold",
                           level: "All-Island National",
                           date: "July 2025",
-                          highlights: "4x100m Relay Anchor Leg (School Record: 42.18s)."
+                          highlights: "4x100m Relay Anchor Leg (Championship Record: 42.18s)."
                         },
                         {
                           tournament: "Western Provincial Track & Field Championship",
@@ -2192,22 +2185,22 @@ export function ProfileView() {
                           highlights: "200m Sprint Final: 22.45 seconds (PB)."
                         },
                         {
-                          tournament: "College Annual Colors Night 2025/2026",
+                          tournament: "Lions Sports Academy Annual Awards Night 2025/2026",
                           sport: "Multi-Sport",
-                          medal: "College Double Colors Award",
+                          medal: "Academy Double Colors Award",
                           medalType: "colors",
                           level: "Institutional",
                           date: "Feb 2026",
-                          highlights: "Honoured with St. Michael Golden Crest for cricket and sprint athletics excellence."
+                          highlights: "Honoured with Lions Golden Emblem for cricket and sprint athletics excellence."
                         },
                         {
-                          tournament: "Annual Inter-House Sports Championship",
+                          tournament: "Annual Academy Championship League",
                           sport: "Athletics",
                           medal: "Senior Champion Trophy",
                           medalType: "trophy",
-                          level: "Inter-House",
+                          level: "Academy League",
                           date: "Feb 2026",
-                          highlights: "Gold in 100m, Gold in 200m, Gold in 4x100m Relay. Total 28 Points for Vijaya House."
+                          highlights: "Gold in 100m, Gold in 200m, Gold in 4x100m Relay. Total 28 Points for Lions Gold Squad."
                         },
                         {
                           tournament: "All-Island Junior Badminton Championship",
@@ -2294,15 +2287,15 @@ export function ProfileView() {
                 <div>
                   <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
                     <ShieldCheck className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                    <span>Prefect of Games &amp; Coach Endorsement</span>
+                    <span>Head Coach &amp; Academy Director Endorsement</span>
                   </h5>
                   <p className="text-xs text-slate-600 italic mt-2 leading-relaxed bg-white p-3 rounded-xl border border-slate-200">
-                    &ldquo;Sathurjan is an exemplary natural leader on the field. His tactical awareness as Vice Captain in our First XI cricket team and explosive anchor leg in athletics reflect exceptional dedication, balancing top physical fitness with academic brilliance.&rdquo;
+                    &ldquo;Sathurjan is an exemplary natural leader on the field. His tactical awareness as Vice Captain in our Lions First XI cricket squad and explosive anchor leg in athletics reflect exceptional dedication, balancing top physical fitness with academic brilliance.&rdquo;
                   </p>
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60">
-                  <span className="font-bold text-slate-700">Mr. Samantha Perera (Prefect of Games)</span>
+                  <span className="font-bold text-slate-700">Coach Samantha Perera (Academy Sports Director)</span>
                   <span className="px-2 py-0.5 rounded-full bg-white border border-[#c4e9e0] text-[#0d5c4d] font-bold">
                     Official Stamp Verified ✓
                   </span>

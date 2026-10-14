@@ -72,7 +72,16 @@ export default function HomePage() {
           return <LibraryViews key="library" initialTab="all" />;
         case "school_life":
         case "sports":
-          return <SportsView />;
+        case "sports_tournaments":
+          return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_registration":
+          return <SportsView key="registration" initialTab="registration" />;
+        case "sports_check":
+          return <SportsView key="check_registration" initialTab="check_registration" />;
+        case "sports_fixtures":
+          return <SportsView key="fixtures" initialTab="fixtures" />;
+        case "sports_standings":
+          return <SportsView key="standings" initialTab="standings" />;
         case "events":
           return <EventsView />;
         case "live_schedule":
@@ -113,9 +122,19 @@ export default function HomePage() {
         case "connect_admin":
           return <AdminViews initialTab="connect" />;
         case "sports":
+        case "sports_tournaments":
+          return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_registration":
+          return <SportsView key="registration" initialTab="registration" />;
+        case "sports_check":
+          return <SportsView key="check_registration" initialTab="check_registration" />;
+        case "sports_fixtures":
+          return <SportsView key="fixtures" initialTab="fixtures" />;
+        case "sports_standings":
+          return <SportsView key="standings" initialTab="standings" />;
         case "sports_admin":
         case "sports_registrations":
-          return <SportsView initialTab="admin_registrations" />;
+          return <SportsView key="admin_reg" initialTab="admin_registrations" />;
         default:
           return <TeacherViews initialTab="grading" />;
       }
@@ -123,9 +142,18 @@ export default function HomePage() {
       switch (currentView) {
         case "connect":
           return <ConnectView />;
-        case "sports":
         case "school_life":
-          return <SportsView />;
+        case "sports":
+        case "sports_tournaments":
+          return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_registration":
+          return <SportsView key="registration" initialTab="registration" />;
+        case "sports_check":
+          return <SportsView key="check_registration" initialTab="check_registration" />;
+        case "sports_fixtures":
+          return <SportsView key="fixtures" initialTab="fixtures" />;
+        case "sports_standings":
+          return <SportsView key="standings" initialTab="standings" />;
         default:
           return <ParentDashboardView />;
       }
@@ -181,9 +209,19 @@ export default function HomePage() {
         case "announcements":
           return <AnnouncementsView />;
         case "sports":
+        case "sports_tournaments":
+          return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_registration":
+          return <SportsView key="registration" initialTab="registration" />;
+        case "sports_check":
+          return <SportsView key="check_registration" initialTab="check_registration" />;
+        case "sports_fixtures":
+          return <SportsView key="fixtures" initialTab="fixtures" />;
+        case "sports_standings":
+          return <SportsView key="standings" initialTab="standings" />;
         case "sports_admin":
         case "sports_registrations":
-          return <SportsView initialTab="admin_registrations" />;
+          return <SportsView key="admin_reg" initialTab="admin_registrations" />;
         default:
           return <AdminViews initialTab="overview" />;
       }
