@@ -311,7 +311,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       status: "Active",
       lastLogin: "2026-10-01 07:30",
       enrolledTutors: [] as string[],
-      subscriptionStatus: "Solo Tutor (284 Students)"
+      subscriptionStatus: "Tutor (284 Students)"
     },
     {
       id: "usr_teacher_02",
@@ -323,11 +323,11 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       status: "Active",
       lastLogin: "2026-09-30 15:20",
       enrolledTutors: [] as string[],
-      subscriptionStatus: "Solo Tutor (197 Students)"
+      subscriptionStatus: "Tutor (197 Students)"
     }
   ]);
 
-  // Solo Tutors Management State
+  // Tutors Management State
   const [soloTutors, setSoloTutors] = useState<ConnectTeacher[]>(initialConnectTeachers);
   const [tutorPackages, setTutorPackages] = useState<TutorPackage[]>(initialTutorPackages);
   const [staffSubTab, setStaffSubTab] = useState<"solo_tutors" | "coaches">("solo_tutors");
@@ -364,7 +364,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     enrolledTutor: "Ms. Kavitha Rajan (Combined Maths)"
   });
 
-  // Filtered Solo Tutors
+  // Filtered Tutors
   const filteredSoloTutors = useMemo(() => {
     return soloTutors.filter((t) => {
       const matchSearch =
@@ -428,14 +428,14 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     setSoloTutors((prev) => [newTutor, ...prev]);
     setIsAddTutorModalOpen(false);
     setNewTutorForm(initialNewTutorForm);
-    addToast({ type: "success", title: "Solo Tutor Registered!", message: `${newTutor.name} is now enrolled in the LMS.` });
+    addToast({ type: "success", title: "Tutor Registered!", message: `${newTutor.name} is now enrolled in the LMS.` });
   };
 
   const handleConfirmDeleteTutor = () => {
     if (!deletingTutor) return;
     setSoloTutors((prev) => prev.filter((t) => t.id !== deletingTutor.id));
     setDeletingTutor(null);
-    addToast({ type: "info", title: "Tutor Removed", message: "Solo Tutor profile deleted from platform." });
+    addToast({ type: "info", title: "Tutor Removed", message: "Tutor profile deleted from platform." });
   };
 
   const handleManualEnrollSubmit = (e: React.FormEvent) => {
@@ -679,7 +679,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
         <div className="space-y-6">
           {/* SaaS Operational Quick-Action Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Solo Tutors Card */}
+            {/* Tutors Card */}
             <Card className="border-[#c4e9e0] bg-linear-to-br from-[#f2fbf8] to-white shadow-2xs hover:shadow-xs transition-shadow">
               <CardContent className="p-5 flex flex-col justify-between h-full space-y-4">
                 <div className="flex items-start justify-between">
@@ -692,7 +692,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 </div>
                 <div>
                   <p className="text-2xl font-black text-[#0d2b26]">{soloTutors.length}</p>
-                  <p className="text-xs font-bold text-[#0d5c4d] mt-0.5">Solo Tutors Hub (தனிப்பட்ட ஆசிரியர்கள்)</p>
+                  <p className="text-xs font-bold text-[#0d5c4d] mt-0.5">Tutors Hub (தனிப்பட்ட ஆசிரியர்கள்)</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Manage tutor verification, fee packages, Google Meet classroom links, and subscriber counts.
                   </p>
@@ -706,7 +706,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                     }}
                     className="w-full bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold"
                   >
-                    Manage Solo Tutors →
+                    Manage Tutors →
                   </Button>
                 </div>
               </CardContent>
@@ -811,7 +811,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             <Card className="border-[#e6ece8] bg-white shadow-2xs">
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500 font-semibold">Solo Tutors</p>
+                  <p className="text-xs text-slate-500 font-semibold">Tutors</p>
                   <p className="text-2xl font-black text-[#0d5c4d] mt-1">{soloTutors.length}</p>
                   <p className="text-[10px] text-slate-400 font-bold mt-0.5">{soloTutors.filter((t) => t.verified).length} verified instructors</p>
                 </div>
@@ -1092,7 +1092,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
         </div>
       )}
 
-      {/* TAB: Manage Solo Tutors & Sports Coaches */}
+      {/* TAB: Manage Tutors & Sports Coaches */}
       {activeAdminTab === "staff" && (
         <div className="space-y-4">
           <div className="flex flex-col gap-4 border-b border-[#e6ece8] pb-5 sm:flex-row sm:items-end sm:justify-between">
@@ -1101,7 +1101,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 {staffSubTab === "solo_tutors" ? "LimaT Independent Tutor Network" : "LimaT Athletics & Sports Coaching"}
               </p>
               <h2 className="mt-1 text-2xl font-black text-[#0d2b26]">
-                {staffSubTab === "solo_tutors" ? "Solo Tutors Management (தனிப்பட்ட ஆசிரியர்கள்)" : "Sports Coaches Management (விளையாட்டு பயிற்றுநர்கள்)"}
+                {staffSubTab === "solo_tutors" ? "Tutors Management (தனிப்பட்ட ஆசிரியர்கள்)" : "Sports Coaches Management (விளையாட்டு பயிற்றுநர்கள்)"}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
                 {staffSubTab === "solo_tutors"
@@ -1115,7 +1115,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   onClick={() => setIsAddTutorModalOpen(true)}
                   className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-2 text-xs shadow-xs"
                 >
-                  <Plus className="h-4 w-4" /> Enroll New Solo Tutor
+                  <Plus className="h-4 w-4" /> Enroll New Tutor
                 </Button>
               ) : (
                 <>
@@ -1141,7 +1141,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   : "bg-white text-slate-600 hover:bg-[#ecf8f5] border border-slate-200"
               }`}
             >
-              <Sparkles className="h-3.5 w-3.5" /> Solo Tutors ({soloTutors.length})
+              <Sparkles className="h-3.5 w-3.5" /> Tutors ({soloTutors.length})
             </button>
             <button
               type="button"
@@ -1160,7 +1160,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             </button>
           </div>
 
-          {/* SUBTAB 1: SOLO TUTORS DIRECTORY & CONTROLS */}
+          {/* SUBTAB 1: TUTORS DIRECTORY & CONTROLS */}
           {staffSubTab === "solo_tutors" && (
             <div className="space-y-4">
               {/* Quick KPI Strip */}
@@ -1229,7 +1229,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   </div>
                 </div>
 
-                {/* Solo Tutors Table */}
+                {/* Tutors Table */}
                 <div className="overflow-x-auto border-t border-[#e6ece8]">
                   <table className="w-full min-w-[840px] text-left text-xs">
                     <thead className="bg-[#f8faf9] text-slate-500 uppercase text-[10px] font-bold tracking-wider">
@@ -1375,7 +1375,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                       {filteredSoloTutors.length === 0 && (
                         <tr>
                           <td colSpan={6} className="p-8 text-center text-slate-500">
-                            No solo tutors matching your criteria found.
+                            No tutors matching your criteria found.
                           </td>
                         </tr>
                       )}
@@ -1643,7 +1643,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 Platform User & Student Directory
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Manage student subscriptions, solo tutor enrollments, teaching staff, and administrator accounts.
+                Manage student subscriptions, tutor enrollments, teaching staff, and administrator accounts.
               </p>
             </div>
 
@@ -1672,7 +1672,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                         : "text-slate-600 hover:text-[#0d5c4d]"
                     }`}
                   >
-                    {role === "teacher" ? "Solo Tutors" : role}
+                    {role === "teacher" ? "Tutors" : role}
                   </button>
                 ))}
               </div>
@@ -1712,7 +1712,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   <p className="text-xl font-black text-[#0d2b26]">
                     {soloTutors.length}
                   </p>
-                  <p className="text-[10px] text-slate-500 font-bold">Solo Tutors</p>
+                  <p className="text-[10px] text-slate-500 font-bold">Tutors</p>
                 </div>
               </CardContent>
             </Card>
@@ -1740,7 +1740,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                     <th className="p-4">User Profile</th>
                     <th className="p-4">Stream & School</th>
                     <th className="p-4">Role & Subscription</th>
-                    <th className="p-4">Enrolled Solo Tutors</th>
+                    <th className="p-4">Enrolled Tutors</th>
                     <th className="p-4">Status</th>
                     <th className="p-4 text-right">Actions</th>
                   </tr>
@@ -1777,7 +1777,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                             }
                             className="text-[10px] capitalize"
                           >
-                            {user.role === "teacher" ? "Solo Tutor" : user.role}
+                            {user.role === "teacher" ? "Tutor" : user.role}
                           </Badge>
                           {user.subscriptionStatus && (
                             <span
@@ -1840,7 +1840,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                                 variant="outline"
                                 onClick={() => setSelectedStudentForEnroll(user)}
                                 className="h-7 px-2 text-[11px] font-bold text-[#0d5c4d] border-[#c4e9e0] hover:bg-[#ecf8f5]"
-                                title="Enroll student in Solo Tutor class"
+                                title="Enroll student in Tutor class"
                               >
                                 <Plus className="h-3 w-3 mr-1" /> Enroll
                               </Button>
@@ -1948,7 +1948,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 Platform Monetization & Settings
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Configure solo tutor commissions, student package checkout gateways, payout cycles, and marketplace policies.
+                Configure tutor commissions, student package checkout gateways, payout cycles, and marketplace policies.
               </p>
             </div>
 
@@ -1976,7 +1976,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                     Tutor Package Monetization & Revenue Split
                   </CardTitle>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    How student subscription fees are collected and split between Solo Tutors and the Platform.
+                    How student subscription fees are collected and split between Tutors and the Platform.
                   </p>
                 </div>
                 <Badge variant="success" className="text-[10px] font-bold">
@@ -2012,7 +2012,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 <div className="p-3.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] space-y-1.5">
                   <p className="text-[11px] font-bold text-[#0d5c4d] uppercase tracking-wider">Revenue Split Preview (Rs. 5,000 Package):</p>
                   <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                    <span>Solo Tutor Payout:</span>
+                    <span>Tutor Payout:</span>
                     <span className="text-[#0d5c4d] font-black font-mono">
                       Rs. {(5000 * ((100 - platformCommissionRate) / 100)).toLocaleString()} ({100 - platformCommissionRate}%)
                     </span>
@@ -2181,12 +2181,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             </CardContent>
           </Card>
 
-          {/* Section 3: Solo Tutor Onboarding & Studio Policies */}
+          {/* Section 3: Tutor Onboarding & Studio Policies */}
           <Card className="border-[#e6ece8] bg-white shadow-2xs">
             <CardHeader className="p-5 pb-3 border-b border-[#e6ece8] bg-[#fbfdfc] rounded-t-xl">
               <CardTitle className="text-sm font-black text-[#0d2b26] flex items-center gap-2">
                 <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
-                Solo Tutor Studio & Marketplace Governance
+                Tutor Studio & Marketplace Governance
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-4">
@@ -2734,12 +2734,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       </Modal>
 
       {/* =================================================================== */}
-      {/* MODAL 1: VIEW SOLO TUTOR PACKAGES & SUBSCRIBERS                     */}
+      {/* MODAL 1: VIEW TUTOR PACKAGES & SUBSCRIBERS                          */}
       {/* =================================================================== */}
       <Modal
         isOpen={Boolean(selectedTutorForView)}
         onClose={() => setSelectedTutorForView(null)}
-        title="Solo Tutor Packages & Subscription Details"
+        title="Tutor Packages & Subscription Details"
         description="Review tuition fee tiers, live meeting rooms, and subscriber breakdown."
       >
         {selectedTutorForView && (
@@ -2872,12 +2872,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       </Modal>
 
       {/* =================================================================== */}
-      {/* MODAL 2: REGISTER NEW SOLO TUTOR                                   */}
+      {/* MODAL 2: REGISTER NEW TUTOR                                        */}
       {/* =================================================================== */}
       <Modal
         isOpen={isAddTutorModalOpen}
         onClose={() => setIsAddTutorModalOpen(false)}
-        title="Enroll New Solo Tutor"
+        title="Enroll New Tutor"
         description="Register an independent tutor profile with custom subject and monthly fees."
       >
         <form onSubmit={handleSaveAddTutor} className="space-y-4 pt-2">
@@ -2985,12 +2985,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       </Modal>
 
       {/* =================================================================== */}
-      {/* MODAL 3: DELETE SOLO TUTOR CONFIRMATION                             */}
+      {/* MODAL 3: DELETE TUTOR CONFIRMATION                                  */}
       {/* =================================================================== */}
       <Modal
         isOpen={Boolean(deletingTutor)}
         onClose={() => setDeletingTutor(null)}
-        title="Remove Solo Tutor"
+        title="Remove Tutor"
         description="Are you sure you want to delete this tutor from the platform?"
       >
         <div className="space-y-4 pt-2">
@@ -3030,7 +3030,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
         isOpen={Boolean(selectedStudentForDossier)}
         onClose={() => setSelectedStudentForDossier(null)}
         title="Student Profile & Enrollment Dossier"
-        description="View enrolled solo tutors, academic stream, and active subscriptions."
+        description="View enrolled tutors, academic stream, and active subscriptions."
       >
         {selectedStudentForDossier && (
           <div className="space-y-4 pt-2">
@@ -3053,7 +3053,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             {/* Enrolled Tutors Section */}
             <div>
               <h4 className="text-xs font-extrabold text-[#0d2b26] uppercase tracking-wider mb-2">
-                Enrolled Solo Tutors & Subscriptions
+                Enrolled Tutors & Subscriptions
               </h4>
               <div className="space-y-2">
                 {selectedStudentForDossier.enrolledTutors && selectedStudentForDossier.enrolledTutors.length > 0 ? (
@@ -3078,7 +3078,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   ))
                 ) : (
                   <p className="text-xs text-slate-500 p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
-                    This student is not yet enrolled with any solo tutor.
+                    This student is not yet enrolled with any tutor.
                   </p>
                 )}
               </div>
@@ -3106,7 +3106,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       </Modal>
 
       {/* =================================================================== */}
-      {/* MODAL 5: MANUAL ENROLL STUDENT IN SOLO TUTOR                       */}
+      {/* MODAL 5: MANUAL ENROLL STUDENT IN TUTOR                            */}
       {/* =================================================================== */}
       <Modal
         isOpen={Boolean(selectedStudentForEnroll)}
@@ -3124,7 +3124,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Choose Solo Tutor to Enroll In *
+                Choose Tutor to Enroll In *
               </label>
               <select
                 value={manualEnrollTutorName}
@@ -3167,7 +3167,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
         isOpen={isAddStudentModalOpen}
         onClose={() => setIsAddStudentModalOpen(false)}
         title="Register New Student"
-        description="Add a new student profile and allocate to a solo tutor curriculum."
+        description="Add a new student profile and allocate to a tutor curriculum."
       >
         <form onSubmit={handleSaveAddStudent} className="space-y-4 pt-2">
           <div className="space-y-3">
@@ -3224,7 +3224,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Assign Initial Solo Tutor (Optional)
+                Assign Initial Tutor (Optional)
               </label>
               <select
                 value={newStudentForm.enrolledTutor}

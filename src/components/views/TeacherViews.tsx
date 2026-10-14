@@ -79,7 +79,7 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
     activeTenant
   } = useApp();
 
-  // Filter courses strictly for this individual Solo Tutor's workspace
+  // Filter courses strictly for this individual Tutor's workspace
   const teacherCourses: Course[] = useMemo(() => {
     const tutorCourses = courses.filter(
       (c) => c.teacherName === currentUser?.name || c.id === "crs_math_12" || c.title.toLowerCase().includes("math")
@@ -380,7 +380,7 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
       targetAudience: annAudience,
       priority: annPriority,
       authorName: activeTenant?.adminName || currentUser.name || "Dr. Samantha Perera",
-      authorRole: "Solo Tutor"
+      authorRole: "Tutor"
     });
     setIsCreateAnnouncementModalOpen(false);
     setAnnTitle("");
@@ -985,7 +985,7 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
                 </div>
               </Card>
 
-              {/* 4. Learning Feed Broadcasts & Notices (Solo Tutor Feed Management) */}
+              {/* 4. Learning Feed Broadcasts & Notices (Tutor Feed Management) */}
               <Card className="border-[#e6ece8] bg-white shadow-2xs">
                 <CardHeader className="p-5 pb-3 border-b border-[#e6ece8] flex flex-row items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -1154,7 +1154,7 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
 
 
 
-              {/* Solo Tutor 1-on-1 Consultation Hours Card */}
+              {/* Tutor 1-on-1 Consultation Hours Card */}
               <Card className="border-[#e6ece8] bg-white shadow-2xs">
                 <CardContent className="p-5 space-y-2">
                   <div className="flex items-center gap-2">

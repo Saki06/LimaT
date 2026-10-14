@@ -297,10 +297,10 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                Global Creator &amp; Solo Tutor Management Portal
+                Global Creator &amp; Tutor Management Portal
               </h1>
               <p className="text-xs sm:text-sm text-slate-200 max-w-3xl leading-relaxed">
-                Manage all registered educators (Solo Tutors and Tuition Coaching Studios). Turn specific parent modules and granular sub-features ON/OFF per creator, assign custom plan presets, and simulate any tutor&apos;s live workspace experience.
+                Manage all registered educators (Tutors and Tuition Coaching Studios). Turn specific parent modules and granular sub-features ON/OFF per creator, assign custom plan presets, and simulate any tutor&apos;s live workspace experience.
               </p>
             </div>
           </div>
@@ -342,7 +342,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
           >
             {tenants.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name} (Solo Tutor)
+                {t.name} (Tutor)
               </option>
             ))}
           </select>
@@ -354,8 +354,8 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
         <Card className="border-[#e6ece8] bg-white shadow-2xs">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 font-semibold">Total Registered Solo Tutors</p>
-              <p className="text-2xl font-black text-[#0d2b26] mt-1">{tenants.length} Solo Tutors</p>
+              <p className="text-xs text-slate-500 font-semibold">Total Registered Tutors</p>
+              <p className="text-2xl font-black text-[#0d2b26] mt-1">{tenants.length} Tutors</p>
               <p className="text-[10px] text-emerald-600 font-bold mt-0.5">{activeTenantsCount} active educator studios</p>
             </div>
             <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
@@ -402,7 +402,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
           }`}
         >
           <Building2 className="h-4 w-4" />
-          <span>Solo Tutor Directory</span>
+          <span>Tutor Directory</span>
           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white">
             {tenants.length}
           </span>
@@ -445,7 +445,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
               {[
-                { key: "all", label: "👨‍🏫 All Solo Tutors" },
+                { key: "all", label: "👨‍🏫 All Tutors" },
                 { key: "maths", label: "📐 Combined Maths" },
                 { key: "phys", label: "⚡ Physics" },
                 { key: "chem", label: "🧪 Chemistry" },
@@ -1004,7 +1004,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
                   </Badge>
                   <div>
                     <p className="text-2xl font-black text-[#0d2b26]">LKR 8,500</p>
-                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Solo Tutor License</p>
+                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Tutor License</p>
                   </div>
                   <ul className="space-y-1.5 text-xs text-slate-700">
                     <li className="flex items-center gap-1.5">
@@ -1058,7 +1058,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
                   </div>
                   <div>
                     <p className="text-2xl font-black text-[#0d2b26]">LKR 18,000</p>
-                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Solo Tutor License</p>
+                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Tutor License</p>
                   </div>
                   <ul className="space-y-1.5 text-xs text-slate-700">
                     <li className="flex items-center gap-1.5">
@@ -1107,7 +1107,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
                   </Badge>
                   <div>
                     <p className="text-2xl font-black text-[#0d2b26]">LKR 28,000</p>
-                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Solo Tutor License</p>
+                    <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Tutor License</p>
                   </div>
                   <ul className="space-y-1.5 text-xs text-slate-700">
                     <li className="flex items-center gap-1.5">
@@ -1153,12 +1153,12 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
       )}
 
       {/* =================================================================== */}
-      {/* MODAL 1: ONBOARD NEW SOLO TUTOR                                     */}
+      {/* MODAL 1: ONBOARD NEW TUTOR                                          */}
       {/* =================================================================== */}
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        title="Onboard New Solo Tutor"
+        title="Onboard New Tutor"
         description="Add a new independent educator to the platform and assign their initial study packages and live studio."
       >
         <form onSubmit={handleAddTenantSubmit} className="space-y-4 pt-2">

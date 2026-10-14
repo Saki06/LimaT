@@ -305,7 +305,7 @@ export function ProfileView() {
     addToast({
       type: "success",
       title: "Tutor Profile & Portfolio Downloaded",
-      message: "Verified Solo Tutor Profile, Credentials & Course Catalog (PDF) has been saved."
+      message: "Verified Tutor Profile, Credentials & Course Catalog (PDF) has been saved."
     });
   };
 
@@ -420,7 +420,7 @@ export function ProfileView() {
               </h2>
               <span className="px-2.5 py-0.5 rounded-full bg-[#fef7e6] text-[#b47a16] border border-[#fde4af] text-[11px] font-bold capitalize">
                 {currentRole === "teacher"
-                  ? "Verified Solo Tutor & Creator"
+                  ? "Verified Tutor & Creator"
                   : currentRole === "super_admin"
                   ? "Master Super Admin • Platform Owner"
                   : currentRole}

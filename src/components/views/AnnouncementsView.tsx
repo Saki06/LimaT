@@ -91,8 +91,8 @@ export function AnnouncementsView() {
 
   // Available audience choices for publishing
   const audienceOptions = [
-    { value: "Platform-Wide (Everyone)", label: "Platform-Wide (Everyone)", desc: "Visible to all students, solo tutors, coaches & admins" },
-    { value: "Solo Tutors & Coaches", label: "Solo Tutors & Coaches", desc: "Confidential notices, payout updates & tutor guidelines" },
+    { value: "Platform-Wide (Everyone)", label: "Platform-Wide (Everyone)", desc: "Visible to all students, tutors, coaches & admins" },
+    { value: "Tutors & Coaches", label: "Tutors & Coaches", desc: "Confidential notices, payout updates & tutor guidelines" },
     { value: "Students & Subscribers", label: "Students & Subscribers", desc: "Course materials, subscription alerts & student notices" },
     { value: "Sports Squad & Coaches", label: "Sports Squad & Coaches", desc: "Tournament fixtures, match schedules & athletic updates" },
     { value: "Parents & Guardians", label: "Parents & Guardians", desc: "Subscription invoices & progress reports" }
@@ -223,7 +223,7 @@ export function AnnouncementsView() {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
           <Lock className="h-3.5 w-3.5 text-indigo-600" />
-          Solo Tutors & Coaches
+          Tutors & Coaches
         </span>
       );
     }
@@ -426,7 +426,7 @@ export function AnnouncementsView() {
             Platform-Wide ({wholeSchoolCount})
           </button>
 
-          {/* Solo Tutors tab */}
+          {/* Tutors tab */}
           {(!isStudent || isAdmin) && (
             <button
               onClick={() => setFilterAudience("teachers")}
@@ -437,7 +437,7 @@ export function AnnouncementsView() {
               }`}
             >
               <Lock className="h-3 w-3" />
-              Solo Tutors & Coaches ({teachersCount})
+              Tutors & Coaches ({teachersCount})
             </button>
           )}
 

@@ -59,7 +59,7 @@ export function StudentDashboard() {
 
   const feedPosts = useMemo(() => {
     return announcements.filter((a) => {
-      if (a.targetAudience === "Solo Tutors & Coaches") return false;
+      if (a.targetAudience === "Tutors & Coaches") return false;
       return true;
     });
   }, [announcements]);

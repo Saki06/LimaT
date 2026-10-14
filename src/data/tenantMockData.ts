@@ -2,7 +2,7 @@ import { Tenant, TenantModuleConfig, TenantPreset } from '@/types/tenant';
 
 export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
   // =========================================================================
-  // 1. BATCH MANAGEMENT & ANNOUNCEMENTS (Solo Tutor Batches)
+  // 1. BATCH MANAGEMENT & ANNOUNCEMENTS (Tutor Batches)
   // =========================================================================
   {
     key: 'batch_management',
@@ -41,7 +41,7 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
   },
 
   // =========================================================================
-  // 2. TUITION & COMMERCIAL BILLING (Solo Tutors)
+  // 2. TUITION & COMMERCIAL BILLING (Tutors)
   // =========================================================================
   {
     key: 'tuition_subscriptions',
@@ -294,7 +294,7 @@ export const TENANT_PRESETS: TenantPreset[] = [
     id: 'preset_tutor_pro',
     name: 'Solo Educator Pro Edition',
     type: 'individual_teacher',
-    description: 'Full live studio for solo tutors: Live Google Meet classes, Study Packages, Bank Slip Approvals, Student Subscriptions, and Syllabus Builder.',
+    description: 'Full live studio for tutors: Live Google Meet classes, Study Packages, Bank Slip Approvals, Student Subscriptions, and Syllabus Builder.',
     icon: 'GraduationCap',
     features: buildFullFeatures({
       batch_management: true,
@@ -326,7 +326,7 @@ export const TENANT_PRESETS: TenantPreset[] = [
     id: 'preset_tutor_starter',
     name: 'Solo Creator Starter Edition',
     type: 'individual_teacher',
-    description: 'Affordable setup for emerging solo tutors: Pre-recorded Video Courses, Model Papers & PDF Library, Homework Submissions, and Basic Subscriptions.',
+    description: 'Affordable setup for emerging tutors: Pre-recorded Video Courses, Model Papers & PDF Library, Homework Submissions, and Basic Subscriptions.',
     icon: 'Sparkles',
     features: buildFullFeatures({
       batch_management: true,

@@ -157,7 +157,7 @@ export function PrototypeBar() {
               <span>Student</span>
             </button>
 
-            {/* Solo Tutor */}
+            {/* Tutor */}
             <button
               type="button"
               onClick={() => handleRoleChange("teacher")}
@@ -168,7 +168,7 @@ export function PrototypeBar() {
               }`}
             >
               <School className={`h-3.5 w-3.5 ${currentRole === "teacher" ? "text-slate-950" : "text-slate-300"}`} />
-              <span>Solo Tutor</span>
+              <span>Tutor</span>
             </button>
 
             {/* Platform Admin */}

@@ -1095,7 +1095,7 @@ export const initialAnnouncements: Announcement[] = [
     message: 'New masterclass notes uploaded: 20 exam-targeted practice problems with complete step-by-step solutions are now available in your Study Vault. Remember to review before Saturday\'s live paper discussion! 📊',
     publishedAt: '2 hours ago',
     authorName: 'Dr. Samantha Perera',
-    authorRole: 'Solo Tutor',
+    authorRole: 'Tutor',
     targetAudience: 'Target A/L Batch',
     priority: 'normal'
   },
@@ -1105,7 +1105,7 @@ export const initialAnnouncements: Announcement[] = [
     message: 'Full step-by-step video breakdown (45 mins) is now live in your Study Vault. Review all marked questions before this Saturday\'s live session! 🎥',
     publishedAt: 'Yesterday',
     authorName: 'Dr. Samantha Perera',
-    authorRole: 'Solo Tutor',
+    authorRole: 'Tutor',
     targetAudience: 'Revision Batch',
     priority: 'high'
   },

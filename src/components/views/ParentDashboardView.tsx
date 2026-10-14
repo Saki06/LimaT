@@ -509,7 +509,7 @@ export function ParentDashboardView() {
                     Find Teachers &amp; Tuition Packages for {activeChild.name}
                   </h3>
                   <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase">
-                    Verified Solo Tutors
+                    Verified Tutors
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">

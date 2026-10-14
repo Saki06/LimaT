@@ -659,7 +659,7 @@ export function ConnectView() {
                   Find Teachers
                 </h1>
                 <span className="text-xs font-medium text-slate-500">
-                  {currentRole === "parent" ? "Browse solo tutors & enroll your child" : "Pay to unlock full access & live classes"}
+                  {currentRole === "parent" ? "Browse tutors & enroll your child" : "Pay to unlock full access & live classes"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">

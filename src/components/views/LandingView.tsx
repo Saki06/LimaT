@@ -132,7 +132,7 @@ export function LandingView({
   const [childBatch, setChildBatch] = useState("2026 A/L Theory (English / Tamil)");
   const [parentConsent, setParentConsent] = useState(true);
 
-  // Pre-fill credentials based on role (Solo Tutor Platform)
+  // Pre-fill credentials based on role (Tutor Platform)
   const rolePresetCredentials = {
     student: {
       name: "Sathurjan K.",
@@ -186,7 +186,7 @@ export function LandingView({
     setAuthMode("closed");
     addToast({
       type: "success",
-      title: `Signed in as ${role === "student" ? "Student" : role === "parent" ? "Parent" : "Solo Tutor"}`,
+      title: `Signed in as ${role === "student" ? "Student" : role === "parent" ? "Parent" : "Tutor"}`,
       message: `Welcome back, ${rolePresetCredentials[role].name}!`
     });
     onEnterApp();
@@ -221,7 +221,7 @@ export function LandingView({
       message: selectedRole === "parent"
         ? "Welcome to Parent Guardian Desk! Live attendance and fee receipts loaded."
         : selectedRole === "teacher"
-        ? "Welcome to Solo Tutor Cockpit! Course creator desk loaded."
+        ? "Welcome to Tutor Cockpit! Course creator desk loaded."
         : "Welcome back to LimaT Smart Book! Learning feed loaded."
     });
     onEnterApp();
@@ -303,7 +303,7 @@ export function LandingView({
               ? "Student Portal"
               : selectedRole === "parent"
               ? "Parent & Guardian Portal"
-              : "Solo Tutor Cockpit"}
+              : "Tutor Cockpit"}
           </span>
         </div>
         <span className="text-[10px] font-bold opacity-75">
@@ -803,7 +803,7 @@ export function LandingView({
                 </div>
               </div>
 
-              {/* SUBJECT SPECIALIZATION (Only for Solo Tutor) */}
+              {/* SUBJECT SPECIALIZATION (Only for Tutor) */}
               {selectedRole === "teacher" && (
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -877,7 +877,7 @@ export function LandingView({
                 }`}
               >
                 <UserPlus className="h-4 w-4" />
-                <span>Create Account & Join as {selectedRole === "student" ? "Student" : "Solo Tutor"}</span>
+                <span>Create Account & Join as {selectedRole === "student" ? "Student" : "Tutor"}</span>
               </button>
             </>
           )}
@@ -937,7 +937,7 @@ export function LandingView({
             <div className="lg:col-span-5 space-y-5 hidden lg:block">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-xs font-black">
                 <span className="h-2 w-2 rounded-full bg-[#0d5c4d]" />
-                <span>{selectedRole === "student" ? "Student Learning Portal" : selectedRole === "parent" ? "Parent & Guardian Desk" : "Solo Tutor Cockpit"}</span>
+                <span>{selectedRole === "student" ? "Student Learning Portal" : selectedRole === "parent" ? "Parent & Guardian Desk" : "Tutor Cockpit"}</span>
               </div>
 
               <h2 className="text-3xl font-black text-[#0d2b26] leading-tight">
@@ -945,7 +945,7 @@ export function LandingView({
                   ? "Welcome to your digital tuition classroom."
                   : selectedRole === "parent"
                   ? "Monitor tuition fee receipts and attendance."
-                  : "Empowering solo tutors & course creators."}
+                  : "Empowering tutors & course creators."}
               </h2>
 
               <p className="text-sm text-slate-600 leading-relaxed">
@@ -982,7 +982,7 @@ export function LandingView({
                       {authTab === "login" ? "Sign In to LimaT" : "Create Account"}
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      {selectedRole === "student" ? "Student Learning Portal" : selectedRole === "parent" ? "Parent & Guardian Desk" : "Solo Tutor Portal"}
+                      {selectedRole === "student" ? "Student Learning Portal" : selectedRole === "parent" ? "Parent & Guardian Desk" : "Tutor Portal"}
                     </p>
                   </div>
 
@@ -1055,7 +1055,7 @@ export function LandingView({
               className="text-xs font-bold text-amber-800 hover:text-amber-950 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-              <span>Solo Tutor Hub →</span>
+              <span>Tutor Hub →</span>
             </button>
           </div>
         </nav>
@@ -1172,7 +1172,7 @@ export function LandingView({
         </nav>
       )}
 
-      {/* ----------------- 3. SOLO TUTOR / STAFF PORTAL NAVIGATION ----------------- */}
+      {/* ----------------- 3. TUTOR / STAFF PORTAL NAVIGATION ----------------- */}
       {portalType === "staff" && (
         <nav className="h-16 sm:h-20 border-b border-[#e6ece8] bg-white/95 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
@@ -1186,7 +1186,7 @@ export function LandingView({
                 </span>
                 <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#fef8eb] text-[#b47a16] border border-[#fbd38d] text-[10px] font-extrabold shrink-0">
                   <Sparkles className="h-3 w-3 text-[#b47a16]" />
-                  Solo Tutor Cockpit
+                  Tutor Cockpit
                 </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block truncate">
@@ -1291,7 +1291,7 @@ export function LandingView({
               </p>
             </div>
 
-            {/* 3 Clean Role Cards: Student, Parent & Solo Tutor */}
+            {/* 3 Clean Role Cards: Student, Parent & Tutor */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5 lg:gap-6 my-1.5 sm:my-3 max-w-4xl lg:max-w-5xl mx-auto w-full items-stretch">
               {/* CARD 1: STUDENT */}
               <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
@@ -1399,13 +1399,13 @@ export function LandingView({
                 </div>
               </div>
 
-              {/* CARD 3: SOLO TUTOR */}
+              {/* CARD 3: TUTOR */}
               <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-amber-100 hover:border-[#b47a16] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
                 {/* Character Illustration / Mascot */}
                 <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center">
                   <img
                     src="/images/ai_tutor_mascot.jpg"
-                    alt="Solo Tutor and Course Creator"
+                    alt="Tutor and Course Creator"
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 rounded-2xl"
                   />
                 </div>
@@ -1417,7 +1417,7 @@ export function LandingView({
                   className="w-full max-w-xs bg-[#b47a16] hover:bg-[#8d5f10] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
                 >
                   <Sparkles className="h-4 sm:h-5 w-4 sm:w-5" />
-                  <span>Solo Tutor</span>
+                  <span>Tutor</span>
                   <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
                 </button>
 
@@ -1472,7 +1472,7 @@ export function LandingView({
                 className="font-bold text-slate-600 hover:text-[#0d5c4d] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-                <span>Solo Tutor or Course Creator? Access Tutor Cockpit →</span>
+                <span>Tutor or Course Creator? Access Tutor Cockpit →</span>
               </button>
 
               <span className="text-[10px] text-slate-400">
@@ -2089,17 +2089,17 @@ export function LandingView({
       )}
 
       {/* ========================================================================= */}
-      {/* 3. SOLO TUTOR LANDING PAGE (Active when portalType === "staff")           */}
+      {/* 3. TUTOR LANDING PAGE (Active when portalType === "staff")                */}
       {/* ========================================================================= */}
       {portalType === "staff" && (
         <main className="px-4 sm:px-8 lg:px-12 py-10 sm:py-16 max-w-7xl mx-auto w-full space-y-16 animate-in fade-in duration-300">
-          {/* Solo Tutor Hero Section */}
+          {/* Tutor Hero Section */}
           <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
             {/* Left Content */}
             <div className="lg:col-span-7 space-y-6">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#fef8eb] text-[#b47a16] border border-[#fbd38d] text-xs font-black shadow-2xs">
                 <span className="h-2 w-2 rounded-full bg-[#b47a16] animate-pulse" />
-                <span>Solo Tutor Command Center • Independent Educators</span>
+                <span>Tutor Command Center • Independent Educators</span>
               </div>
 
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.15]">
@@ -2156,7 +2156,7 @@ export function LandingView({
                   <div className="flex items-center justify-between">
                     <span className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold flex items-center gap-1.5">
                       <Sparkles className="h-3.5 w-3.5 text-[#f3b738]" />
-                      <span>Solo Tutor Cockpit</span>
+                      <span>Tutor Cockpit</span>
                     </span>
                     <span className="text-xs font-mono font-bold text-[#f3b738]">Live Dashboard</span>
                   </div>
@@ -2368,12 +2368,12 @@ export function LandingView({
                 onClick={() => handlePortalSwitch("staff")}
                 className={`hover:text-[#0d5c4d] cursor-pointer ${portalType === "staff" ? "text-[#b47a16] font-black underline" : "text-[#b47a16] font-bold"}`}
               >
-                Solo Tutor Portal
+                Tutor Portal
               </button>
             </div>
 
             <p className="text-center sm:text-right text-[11px] text-slate-400">
-              Sri Lanka Solo Tutor Platform • Built for English, Sinhala, and Tamil.
+              Sri Lanka Tutor Platform • Built for English, Sinhala, and Tamil.
             </p>
           </div>
         </footer>
@@ -2405,7 +2405,7 @@ export function LandingView({
                       ? "Parent & Guardian Desk"
                       : selectedRole === "student"
                       ? "Student Portal"
-                      : "Solo Tutor Cockpit"}
+                      : "Tutor Cockpit"}
                   </p>
                 </div>
               </div>
