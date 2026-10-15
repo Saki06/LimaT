@@ -356,6 +356,23 @@ export const INITIAL_CHAMPIONSHIP_SPORTS: ChampionshipSportItem[] = [
   }
 ];
 
+export interface SquadPlayer {
+  id: string;
+  name: string;
+  jerseyNumber?: string;
+  role?: string;
+  nicOrStudentId?: string;
+}
+
+export interface TeamSquadDetails {
+  teamName: string;
+  teamCode: string;
+  coachName?: string;
+  coachPhone?: string;
+  isCaptainRegistration: boolean;
+  players: SquadPlayer[];
+}
+
 export interface StoredAthleteRegistration {
   id: string; // e.g. EZG26-ATH-000101
   registrationNumber: string;
@@ -382,6 +399,7 @@ export interface StoredAthleteRegistration {
     fee: number;
   }[];
   isTeamInterest: boolean;
+  teamSquad?: TeamSquadDetails;
   guardianName?: string;
   guardianRelationship?: string;
   guardianMobile?: string;
@@ -508,6 +526,21 @@ export const INITIAL_ATHLETE_REGISTRATIONS: StoredAthleteRegistration[] = [
       { id: "ftb_11s_u18_b", sportName: "Football", eventName: "11-a-side Championship", ageCategory: "U18", gender: "Boys", fee: 5000 }
     ],
     isTeamInterest: true,
+    teamSquad: {
+      teamName: "St. Michael's Batticaloa 1st XI Squad",
+      teamCode: "TEAM-SMC-4920",
+      coachName: "Mr. J. Jude (Master-in-Charge)",
+      coachPhone: "077 443 2211",
+      isCaptainRegistration: true,
+      players: [
+        { id: "1", name: "Mohamed Rilwan", jerseyNumber: "10", role: "Captain / Attacking Midfield", nicOrStudentId: "200823801199" },
+        { id: "2", name: "K. Jerome", jerseyNumber: "01", role: "Goalkeeper", nicOrStudentId: "200829103452" },
+        { id: "3", name: "S. Prasanna", jerseyNumber: "04", role: "Center Back", nicOrStudentId: "200818209312" },
+        { id: "4", name: "M. Aasik", jerseyNumber: "07", role: "Striker / Forward", nicOrStudentId: "200831002341" },
+        { id: "5", name: "T. Danujan", jerseyNumber: "08", role: "Central Midfielder", nicOrStudentId: "200844201889" },
+        { id: "6", name: "A. Riham", jerseyNumber: "03", role: "Left Fullback", nicOrStudentId: "200855301290" }
+      ]
+    },
     guardianName: "Mr. A. Mohamed",
     guardianRelationship: "Father",
     guardianMobile: "0771122334",

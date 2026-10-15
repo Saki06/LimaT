@@ -157,9 +157,8 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
     // Sports & Tournaments with Sub-headings
     {
       id: "sports",
-      label: "Sports Tournaments & Leagues",
+      label: "My Sports",
       icon: Trophy,
-      badge: "5 Hubs",
       badgeVariant: "gold" as const,
       group: "Sports & Academy",
       children: [

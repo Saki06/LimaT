@@ -22,7 +22,6 @@ import {
   Calendar,
   Clock,
   Download,
-  FileCheck,
   UserCheck,
   ShieldCheck,
   Trophy,
@@ -36,15 +35,19 @@ import {
   DollarSign,
   Building2,
   Sliders,
-  CreditCard
+  CreditCard,
+  TrendingUp,
+  BarChart3,
+  Flame,
+  Target
 } from "lucide-react";
 import { initialExams, initialExamTermResult } from "@/data/mockData";
 
 type ProfileTab =
   | "personal"
   | "academic"
+  | "progress"
   | "timetable"
-  | "transcripts"
   | "sports"
   | "teaching"
   | "qualifications"
@@ -68,14 +71,6 @@ export function ProfileView() {
       type: "success",
       title: "Hall Ticket Downloaded",
       message: "Official Examination Admission Card & Timetable (PDF) has been saved."
-    });
-  };
-
-  const handleDownloadTranscript = () => {
-    addToast({
-      type: "success",
-      title: "Transcript Downloaded",
-      message: "Certified Official Academic Transcript with Z-Score downloaded."
     });
   };
 
@@ -111,9 +106,11 @@ export function ProfileView() {
         bio: "Lead Specialist Educator & Department Chair for Combined Mathematics (A/L). 14 years of teaching excellence preparing students for G.C.E. Advanced Level with distinction.",
         schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
         schoolCode: "LMT-COLOMBO",
+        gradeLevel: "Faculty",
         grade: "A/L Faculty (Grade 12 & 13)",
         classRoom: "Advanced Level Mathematics Faculty",
         stream: "Combined Mathematics & Pure Sciences",
+        examYear: "2026",
         academicYear: "Faculty Member (2012 - Present)",
         house: "Lions Sports Academy Mentor",
         classTeacher: "Head of Faculty (Mathematics)",
@@ -156,9 +153,11 @@ export function ProfileView() {
         bio: "Parent & Guardian of Sathurjan K. (Physical Science A/L Masterclass Batch). Active member of the Masterclass Parent-Mentor Council.",
         schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
         schoolCode: "LMT-COLOMBO",
+        gradeLevel: "Parent",
         grade: "Registered Parent Council Member",
         classRoom: "Guardian of Enrolled Student",
         stream: "Parent-Mentor Council",
+        examYear: "2026",
         academicYear: "2024 - Present",
         house: "Lions Sports Academy Supporter",
         classTeacher: "Dr. Samantha Perera & Eng. K. Thanushan",
@@ -201,9 +200,11 @@ export function ProfileView() {
         bio: "Master Platform Owner & SaaS System Director with root privileges. Controlling multi-tenant deployments, tenant billing, global feature matrix toggles, and creator ecosystems across Sri Lanka.",
         schoolName: currentUser.schoolName || "LimaT Multi-Tenant Creator Platform",
         schoolCode: "LIMAT-GLOBAL",
+        gradeLevel: "Platform",
         grade: "Platform Director Level",
         classRoom: "Global SaaS Control Center",
         stream: "Enterprise Multi-Tenant Cloud SaaS Engine",
+        examYear: "2026",
         academicYear: "Active Production (2025 - 2028)",
         house: "Master Operations",
         classTeacher: "Chief Platform Architect",
@@ -242,12 +243,14 @@ export function ProfileView() {
       district: "Colombo",
       province: "Western Province",
       postalCode: "00600",
-      bio: "Passionate Advanced Level Physical Science student preparing for G.C.E. A/L under leading private educators in Pure Maths, Quantum Physics, Chemistry and Software Architecture.",
+      bio: "Passionate Advanced Level student preparing under leading private educators in Pure Maths, Quantum Physics, Chemistry and Software Architecture.",
       schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
       schoolCode: "LMT-COLOMBO",
-      grade: (currentUser.grade && currentUser.grade !== "Grade 12") ? currentUser.grade : "Grade 12 (A/L 2026/2027)",
+      gradeLevel: "12",
+      grade: (currentUser.grade && currentUser.grade !== "Grade 12") ? currentUser.grade : "Grade 12",
       classRoom: (currentUser.class && currentUser.class !== "12-Physical Science") ? currentUser.class : "Physical Science A/L Masterclass Batch",
-      stream: "Physical Science (G.C.E. Advanced Level)",
+      stream: "Physical Science",
+      examYear: "2026",
       academicYear: "Batch 2026 - 2027",
       house: "Lions Sports & Athletics Academy",
       classTeacher: "Dr. Samantha Perera (Lead Combined Maths Specialist)",
@@ -279,7 +282,7 @@ export function ProfileView() {
     } else if (currentRole === "super_admin") {
       setActiveTab("personal");
     } else {
-      if (!["personal", "academic", "timetable", "transcripts", "sports"].includes(activeTab)) {
+      if (!["personal", "academic", "progress", "timetable", "sports"].includes(activeTab)) {
         setActiveTab("personal");
       }
     }
@@ -426,7 +429,13 @@ export function ProfileView() {
                   : currentRole}
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold">
-                {profileData.stream}
+                {currentRole === "student"
+                  ? (profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
+                    ? `${profileData.grade || "Grade 12"} • ${profileData.stream || "Physical Science"}`
+                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
+                    ? `${profileData.grade || "Grade 11"} • G.C.E. O/L`
+                    : `${profileData.grade || "Grade 8"} • Junior Secondary`
+                  : profileData.stream}
               </span>
             </div>
 
@@ -552,9 +561,9 @@ export function ProfileView() {
             ]
           : [
               { id: "personal", label: "Personal Details", icon: User },
-              { id: "academic", label: "Academic & Subjects", icon: GraduationCap },
+              { id: "academic", label: "Enrolled Tutors & Subjects", icon: GraduationCap },
+              { id: "progress", label: "Learning Progress", icon: TrendingUp },
               { id: "timetable", label: "Online Assessment Schedule", icon: Calendar },
-              { id: "transcripts", label: "Tutor Progress Reports", icon: FileCheck },
               { id: "sports", label: "Sports & Achievements", icon: Trophy }
             ]
         ).map((tab) => {
@@ -791,6 +800,124 @@ export function ProfileView() {
                   )}
                 </div>
               </div>
+
+              {/* Academic Grade, Stream & Target Year (Only for Students) */}
+              {currentRole === "student" && (
+                <div className="md:col-span-2 p-4 rounded-2xl bg-[#ecf8f5]/60 border border-[#c4e9e0] space-y-3">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
+                    <span className="font-extrabold text-xs text-[#0d2b26]">
+                      Academic Stage, Grade &amp; Examination Pathway
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Grade Selection */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700">Enrolled Grade</label>
+                      {isEditing ? (
+                        <select
+                          value={profileData.gradeLevel || "12"}
+                          onChange={(e) => {
+                            const newLevel = e.target.value;
+                            const isNewAL = newLevel === "12" || newLevel === "13";
+                            const isNewOL = newLevel === "10" || newLevel === "11";
+                            setProfileData({
+                              ...profileData,
+                              gradeLevel: newLevel,
+                              grade: `Grade ${newLevel}`,
+                              stream: isNewAL
+                                ? (profileData.stream && !profileData.stream.includes("General") && !profileData.stream.includes("O/L") ? profileData.stream : "Physical Science")
+                                : isNewOL
+                                ? "General O/L Curriculum"
+                                : "General Junior Curriculum"
+                            });
+                          }}
+                          className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold text-slate-800"
+                        >
+                          <optgroup label="Junior Secondary (Grade 6 - 9: No Streams)">
+                            <option value="6">Grade 6 (Junior Secondary)</option>
+                            <option value="7">Grade 7 (Junior Secondary)</option>
+                            <option value="8">Grade 8 (Junior Secondary)</option>
+                            <option value="9">Grade 9 (Junior Secondary)</option>
+                          </optgroup>
+                          <optgroup label="G.C.E. Ordinary Level (Grade 10 - 11)">
+                            <option value="10">Grade 10 (G.C.E. O/L)</option>
+                            <option value="11">Grade 11 (G.C.E. O/L)</option>
+                          </optgroup>
+                          <optgroup label="G.C.E. Advanced Level (Grade 12 - 13: Streams)">
+                            <option value="12">Grade 12 (G.C.E. A/L)</option>
+                            <option value="13">Grade 13 (G.C.E. A/L)</option>
+                          </optgroup>
+                        </select>
+                      ) : (
+                        <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
+                          Grade {profileData.gradeLevel || "12"}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Stream Selection - ONLY enabled for Grade 12 or 13! */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700">
+                        {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
+                          ? "A/L Stream Specialization *"
+                          : "Curriculum Stream"}
+                      </label>
+                      {isEditing ? (
+                        (profileData.gradeLevel === "12" || profileData.gradeLevel === "13") ? (
+                          <select
+                            value={profileData.stream || "Physical Science"}
+                            onChange={(e) => setProfileData({ ...profileData, stream: e.target.value })}
+                            className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold text-[#0d5c4d]"
+                          >
+                            <option value="Physical Science">Physical Science (Maths, Physics, Chem, ICT)</option>
+                            <option value="Biological Science">Biological Science (Bio, Chem, Physics, Agri)</option>
+                            <option value="Commerce">Commerce (Accounting, Business, Economics, ICT)</option>
+                            <option value="Technology">Technology (Engineering Tech, Science for Tech, Bio-Tech)</option>
+                            <option value="Arts">Arts (Languages, History, Logic, Political Science)</option>
+                          </select>
+                        ) : (
+                          <div className="h-10 px-3 rounded-xl bg-slate-100 border border-slate-200 text-xs flex items-center text-slate-500 font-medium">
+                            {(profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
+                              ? "General O/L Subjects (No Stream)"
+                              : "General Junior Subjects (No Stream)"}
+                          </div>
+                        )
+                      ) : (
+                        <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
+                          {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
+                            ? profileData.stream
+                            : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
+                            ? "General O/L Subjects (No Stream)"
+                            : "General Junior Subjects (No Stream)"}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Target Examination Year */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700">Target Exam Year</label>
+                      {isEditing ? (
+                        <select
+                          value={profileData.examYear || "2026"}
+                          onChange={(e) => setProfileData({ ...profileData, examYear: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold"
+                        >
+                          <option value="2026">2026 Batch</option>
+                          <option value="2027">2027 Batch</option>
+                          <option value="2028">2028 Batch</option>
+                          <option value="2029">2029 Batch</option>
+                        </select>
+                      ) : (
+                        <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
+                          {profileData.examYear || "2026"} Batch
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Residential Address */}
               <div className="md:col-span-2 space-y-1.5">
@@ -1624,102 +1751,192 @@ export function ProfileView() {
       {/* =================================================================== */}
       {currentRole !== "teacher" && (
         <>
-          {/* TAB 2: ACADEMIC & SUBJECTS                                         */}
+          {/* TAB 2: ENROLLED TUTORS & ACTIVE SUBJECTS                         */}
           {activeTab === "academic" && (
         <div className="space-y-6 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
             <div>
               <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
                 <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
-                <span>Enrolled Curriculum &amp; Faculty Mentors</span>
+                <span>Enrolled Tutors &amp; Active Subject Batches</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Current term academic load, class assignment, and instructor details.
+                Active tuition subscriptions under independent educators, weekly live lecture schedules, and monthly access passes.
               </p>
             </div>
 
-            {/* Tuition Hub & Stream Details Grid */}
+            {/* Tuition Hub & Subscription Details Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tuition Ecosystem</span>
-                <p className="font-black text-sm text-[#0d2b26]">{profileData.schoolName}</p>
-                <p className="text-[11px] text-slate-500">Center Code: {profileData.schoolCode} · Colombo</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Enrolled Tutors</span>
+                <p className="font-black text-sm text-[#0d2b26]">4 Independent Educators</p>
+                <p className="text-[11px] text-slate-500">Pure Maths, Physics, Chem, ICT</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Masterclass Cohort</span>
-                <p className="font-black text-sm text-[#0d2b26]">{profileData.classRoom}</p>
-                <p className="text-[11px] text-slate-500">{profileData.stream}</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
+                    ? "Target Examination"
+                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
+                    ? "Target Examination"
+                    : "Academic Stage"}
+                </span>
+                <p className="font-black text-sm text-[#0d2b26]">
+                  {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
+                    ? `G.C.E. Advanced Level ${profileData.examYear || "2026"}`
+                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
+                    ? `G.C.E. Ordinary Level ${profileData.examYear || "2026"}`
+                    : `Junior Secondary (${profileData.grade || "Grade 8"})`}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
+                    ? `${profileData.stream || "Physical Science"} Masterclass Batch`
+                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
+                    ? `Grade ${profileData.gradeLevel || "11"} O/L Tuition Batches`
+                    : `General Academic Subject Batches`}
+                </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lead Academic Mentor</span>
-                <p className="font-black text-sm text-[#0d2b26]">{profileData.classTeacher}</p>
-                <p className="text-[11px] text-slate-500">Senior Faculty &bull; Pure &amp; Applied Maths</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tuition Subscriptions</span>
+                <p className="font-black text-sm text-[#0d5c4d]">4 Monthly Passes Active</p>
+                <p className="text-[11px] text-emerald-600 font-semibold">Bank Slips Verified &bull; Paid</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Syllabus Cycle</span>
-                <p className="font-black text-sm text-[#0d2b26]">A/L 2026/2027 Full Syllabus Pass</p>
-                <p className="text-[11px] text-emerald-600 font-semibold">Active Masterclass Subscription</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Weekly Live Classes</span>
+                <p className="font-black text-sm text-[#0d2b26]">12 Hours / Week</p>
+                <p className="text-[11px] text-slate-500">Google Meet &amp; Video Vault</p>
               </div>
             </div>
 
-            {/* Enrolled Subjects List */}
+            {/* Enrolled Subjects & Tutors List */}
             <div className="space-y-3 pt-4 border-t border-slate-100">
-              <h4 className="font-bold text-sm text-[#0d2b26]">Active Subjects</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-sm text-[#0d2b26]">Active Tuition Classes &amp; Tutors</h4>
+                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  4 Active Batches
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
                   {
                     name: "Combined Mathematics",
-                    code: "CM-AL-2026",
+                    code: "Batch CMATH-26",
                     teacher: "Dr. Samantha Perera",
-                    progress: "Module 7 of 10 Complete",
-                    grade: "A+ (94)",
-                    color: "border-emerald-200 bg-emerald-50/40"
+                    title: "Lead Mathematics Specialist & Paper Author",
+                    nextSession: "Saturday 08:30 AM – 11:30 AM (Model Paper Class)",
+                    weeklySessions: [
+                      { day: "Tue", time: "07:00 PM – 09:00 PM", label: "Pure Maths Theory" },
+                      { day: "Thu", time: "07:00 PM – 09:00 PM", label: "Applied Mechanics Lab" },
+                      { day: "Sat", time: "08:30 AM – 11:30 AM", label: "Model Paper Discussion" },
+                      { day: "Mon", time: "08:45 PM – 09:30 PM", label: "Doubt Clinic & Homework" }
+                    ],
+                    color: "border-emerald-200 bg-emerald-50/20"
                   },
                   {
                     name: "Physics (Theory & Practicals)",
-                    code: "PHY-AL-2026",
+                    code: "Batch PHY-26",
                     teacher: "Eng. K. Thanushan",
-                    progress: "Module 6 of 10 Complete",
-                    grade: "A (88)",
-                    color: "border-blue-200 bg-blue-50/40"
+                    title: "Senior Physics Educator & Concept Specialist",
+                    nextSession: "Sunday 04:00 PM – 07:00 PM (Model Paper & Practical)",
+                    weeklySessions: [
+                      { day: "Wed", time: "06:30 PM – 08:30 PM", label: "Waves & Optics Theory" },
+                      { day: "Fri", time: "07:00 PM – 09:00 PM", label: "Structured Problem Lab" },
+                      { day: "Sun", time: "04:00 PM – 07:00 PM", label: "Model Paper & Practical" }
+                    ],
+                    color: "border-blue-200 bg-blue-50/20"
                   },
                   {
-                    name: "Chemistry",
-                    code: "CHEM-AL-2026",
+                    name: "Chemistry (Theory & Revision)",
+                    code: "Batch CHEM-26",
                     teacher: "Dr. Nilmini Silva",
-                    progress: "Module 6 of 10 Complete",
-                    grade: "A (91)",
-                    color: "border-purple-200 bg-purple-50/40"
+                    title: "Chemistry Senior Lecturer & Reaction Lab Lead",
+                    nextSession: "Wednesday 06:30 PM – 08:30 PM (Organic Reaction Mechanics)",
+                    weeklySessions: [
+                      { day: "Tue", time: "05:00 PM – 07:00 PM", label: "Inorganic & Physical Chemistry" },
+                      { day: "Wed", time: "06:30 PM – 08:30 PM", label: "Organic Reaction Mechanics" },
+                      { day: "Sun", time: "08:30 AM – 10:30 AM", label: "Model Paper Discussion" }
+                    ],
+                    color: "border-purple-200 bg-purple-50/20"
                   },
                   {
-                    name: "Information & Communication Technology",
-                    code: "ICT-AL-2026",
+                    name: "Information & Communication Tech",
+                    code: "Batch ICT-26",
                     teacher: "Eng. S. Wickramasinghe",
-                    progress: "Module 8 of 10 Complete",
-                    grade: "A+ (96)",
-                    color: "border-amber-200 bg-amber-50/40"
+                    title: "Collegiate ICT Lead & Python Master Trainer",
+                    nextSession: "Friday 07:00 PM – 09:00 PM (Systems & Networking)",
+                    weeklySessions: [
+                      { day: "Thu", time: "05:00 PM – 07:00 PM", label: "Python & Algorithms Lab" },
+                      { day: "Fri", time: "07:00 PM – 09:00 PM", label: "Systems Architecture & Networking" },
+                      { day: "Sat", time: "04:00 PM – 06:00 PM", label: "Model Paper & Code Review" }
+                    ],
+                    color: "border-amber-200 bg-amber-50/20"
                   }
                 ].map((subject, idx) => (
                   <div
                     key={idx}
-                    className={`p-4 rounded-2xl border ${subject.color} flex items-center justify-between transition-all hover:shadow-xs`}
+                    className={`p-4 rounded-2xl border ${subject.color} flex flex-col justify-between gap-3 transition-all hover:shadow-xs bg-white`}
                   >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-xs text-slate-900">{subject.name}</span>
-                        <span className="text-[10px] font-mono text-slate-400">{subject.code}</span>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-extrabold text-sm text-slate-900">{subject.name}</span>
+                        <span className="text-[10px] font-mono font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-[#c4e9e0]">
+                          {subject.code}
+                        </span>
                       </div>
-                      <p className="text-[11px] text-slate-500">Lead Educator: {subject.teacher}</p>
-                      <p className="text-[10px] text-emerald-700 font-bold">{subject.progress}</p>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">{subject.teacher}</p>
+                        <p className="text-[11px] text-slate-500">{subject.title}</p>
+                      </div>
+
+                      {/* Next Upcoming Live Session Banner */}
+                      <div className="p-2.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] flex items-center gap-2 text-xs">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <span className="font-extrabold text-[#0d5c4d]">Next:</span>
+                        <span className="font-bold text-slate-800 truncate">{subject.nextSession}</span>
+                      </div>
+
+                      {/* Multi-Day Weekly Schedule Breakdown */}
+                      <div className="space-y-1 pt-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                          Weekly Live Schedule ({subject.weeklySessions.length} Sessions / Week):
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {subject.weeklySessions.map((slot, sIdx) => (
+                            <div
+                              key={sIdx}
+                              className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px] flex items-center justify-between gap-1 text-slate-700"
+                            >
+                              <div className="flex items-center gap-1 font-bold text-slate-900">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#0d5c4d]" />
+                                <span>{slot.day}</span>
+                                <span className="font-medium text-slate-500">{slot.time}</span>
+                              </div>
+                              <span className="text-[9px] text-slate-400 font-semibold truncate max-w-[85px] text-right">
+                                {slot.label}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="text-right">
-                      <span className="text-sm font-black text-[#0d5c4d] bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs">
-                        {subject.grade}
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                        <CheckCircle2 className="h-3 w-3" />
+                        <span>Monthly Pass: Active</span>
                       </span>
+
+                      <button
+                        type="button"
+                        onClick={() => setCurrentView("live_schedule")}
+                        className="text-xs font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Join Live</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1837,157 +2054,141 @@ export function ProfileView() {
       )}
 
       {/* =================================================================== */}
-      {/* TAB: TUTOR PROGRESS REPORTS & ASSESSMENT CARDS                     */}
+      {/* TAB: LEARNING PROGRESS & SYLLABUS MASTERY                           */}
       {/* =================================================================== */}
-      {activeTab === "transcripts" && (
+      {activeTab === "progress" && (
         <div className="space-y-6 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+            {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
               <div>
                 <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                  <FileCheck className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Solo Tutor Assessment Reports &amp; Progress Cards</span>
+                  <TrendingUp className="h-4 w-4 text-[#0d5c4d]" />
+                  <span>Learning Progress &amp; Syllabus Mastery</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Individual mock paper evaluations, personalized mentor remarks, cohort ranks, and verified teacher feedback from each enrolled tutor.
+                  Real-time tracking of syllabus completion across enrolled tutor masterclasses, weekly study hours, quiz mastery, and unit milestones.
                 </p>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] text-xs font-bold border border-[#b2e5d9]">
-                  4 Enrolled Tutors Active
+                <span className="px-3 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] text-xs font-bold border border-[#b2e5d9] flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Term 2 On-Track &bull; 76% Covered</span>
                 </span>
               </div>
             </div>
 
-            {/* Individual Solo Tutor Progress Cards Grid */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                  <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Enrolled Solo Tutors &bull; Monthly Progress &amp; Assessment Reports</span>
-                </h4>
-                <span className="text-[11px] text-slate-500 font-medium">May 2026 Evaluation Cycle</span>
+            {/* Top Key Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Overall Syllabus</span>
+                  <TrendingUp className="h-4 w-4 text-[#0d5c4d]" />
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <p className="text-2xl font-black text-[#0d5c4d]">76%</p>
+                  <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                    +4% this wk
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
+                  <div className="bg-[#0d5c4d] h-full rounded-full transition-all duration-500" style={{ width: "76%" }} />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1.5">Average across 4 enrolled tutor masterclasses</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Study Hours</span>
+                  <Clock className="h-4 w-4 text-emerald-600" />
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <p className="text-2xl font-black text-slate-800">148.5</p>
+                  <span className="text-xs font-bold text-slate-400">hours</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>108h Live Sessions &bull; 40.5h Replays</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">24.5 hrs logged in past 7 days</p>
+              </div>
+
+              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daily Streak</span>
+                  <Flame className="h-4 w-4 text-amber-500" />
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <p className="text-2xl font-black text-amber-600">19 Days</p>
+                  <span className="text-base">🔥</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-extrabold border border-amber-200">
+                    Consistency Master
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Best streak: 28 days continuous</p>
+              </div>
+
+              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quiz Mastery</span>
+                  <Target className="h-4 w-4 text-teal-600" />
+                </div>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <p className="text-2xl font-black text-[#0d5c4d]">89.2%</p>
+                  <span className="text-[10px] font-bold text-slate-500">Avg Score</span>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-600 font-semibold">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>38 of 42 Practice Sets Passed</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">715 practice problems completed</p>
+              </div>
+            </div>
+
+            {/* Weekly Study Rhythm & Consistency */}
+            <div className="bg-[#fcfdfc] rounded-2xl border border-[#e2eae5] p-5 shadow-2xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-[#0d5c4d]" />
+                  <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26]">
+                    Weekly Study Rhythm &amp; Learning Volume
+                  </h4>
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-slate-500 font-medium">Weekly Goal: <strong className="text-slate-800">25 hrs</strong></span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
+                    24.5 hrs Completed (98%)
+                  </span>
+                </div>
+              </div>
+
+              {/* Day-by-Day Visual Activity Bars */}
+              <div className="grid grid-cols-7 gap-2 pt-2">
                 {[
-                  {
-                    subject: "Combined Mathematics",
-                    tutorName: "Dr. Samantha Perera",
-                    tutorTitle: "Lead Combined Maths Specialist · Pure & Applied",
-                    tutorAvatar: "SP",
-                    assessmentTitle: "Differential Calculus & Vector Mechanics Mock Paper",
-                    marks: 89,
-                    grade: "A",
-                    batchRank: 2,
-                    totalStudents: 120
-                  },
-                  {
-                    subject: "Physics",
-                    tutorName: "Eng. K. Thanushan",
-                    tutorTitle: "Lead Physics Specialist & Engineer · Mechanics & Optics",
-                    tutorAvatar: "KT",
-                    assessmentTitle: "Rotational Dynamics & Wave Mechanics Evaluation",
-                    marks: 85,
-                    grade: "A",
-                    batchRank: 4,
-                    totalStudents: 95
-                  },
-                  {
-                    subject: "Chemistry",
-                    tutorName: "Dr. Nilmini Silva",
-                    tutorTitle: "Doctor of Chemistry & Lead Educator · Physical & Inorganic",
-                    tutorAvatar: "NS",
-                    assessmentTitle: "Ionic Equilibrium & Organic Reaction Mechanisms",
-                    marks: 78,
-                    grade: "A",
-                    batchRank: 7,
-                    totalStudents: 110
-                  },
-                  {
-                    subject: "Information Technology",
-                    tutorName: "Eng. S. Wickramasinghe",
-                    tutorTitle: "Lead Systems Architect & ICT Faculty · Algorithms & Database",
-                    tutorAvatar: "SW",
-                    assessmentTitle: "Python Programming & Relational Database Design",
-                    marks: 94,
-                    grade: "A",
-                    batchRank: 1,
-                    totalStudents: 85
-                  }
-                ].map((card, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-[#fcfdfc] rounded-2xl border border-[#e2eae5] p-4 sm:p-5 shadow-2xs hover:shadow-md hover:border-[#b2e5d9] transition-all space-y-3"
-                  >
-                    {/* Tutor Header */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] font-black text-sm flex items-center justify-center border border-[#b2e5d9] shrink-0">
-                          {card.tutorAvatar}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-extrabold uppercase">
-                              {card.subject}
-                            </span>
-                            {card.batchRank === 1 && (
-                              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold">
-                                Batch Topper ★
-                              </span>
-                            )}
-                          </div>
-                          <h5 className="font-extrabold text-sm text-[#0d2b26] mt-0.5">
-                            {card.tutorName}
-                          </h5>
-                          <p className="text-[10px] text-slate-500">{card.tutorTitle}</p>
-                        </div>
-                      </div>
-
-                      {/* Grade Badge */}
-                      <div className="text-right shrink-0">
-                        <span className="inline-block px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 font-black text-base border border-emerald-200">
-                          {card.grade}
-                        </span>
-                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">Grade</p>
-                      </div>
+                  { day: "Mon", hours: 2.5, percent: 50, active: true },
+                  { day: "Tue", hours: 3.5, percent: 70, active: true },
+                  { day: "Wed", hours: 2.0, percent: 40, active: true },
+                  { day: "Thu", hours: 4.0, percent: 80, active: true },
+                  { day: "Fri", hours: 3.0, percent: 60, active: true },
+                  { day: "Sat", hours: 5.5, percent: 100, active: true, peak: true },
+                  { day: "Sun", hours: 4.0, percent: 80, active: true }
+                ].map((item, idx) => (
+                  <div key={idx} className="flex flex-col items-center gap-2">
+                    <span className="text-[10px] font-extrabold text-[#0d5c4d]">{item.hours}h</span>
+                    <div className="w-full bg-slate-100 h-24 rounded-xl flex items-end p-1 justify-center relative group">
+                      <div
+                        className={`w-full rounded-lg transition-all duration-300 ${
+                          item.peak
+                            ? "bg-gradient-to-t from-[#0d5c4d] to-emerald-400 shadow-xs"
+                            : "bg-[#0d5c4d]/80 hover:bg-[#0d5c4d]"
+                        }`}
+                        style={{ height: `${item.percent}%` }}
+                      />
                     </div>
-
-                    {/* Assessment & Marks Details */}
-                    <div className="bg-white p-3 rounded-xl border border-[#edf3f0] flex items-center justify-between gap-3">
-                      <div className="space-y-0.5 min-w-0">
-                        <p className="text-[10px] uppercase font-bold text-slate-400">Assessment</p>
-                        <p className="text-xs font-bold text-slate-800 truncate">
-                          {card.assessmentTitle}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <div className="bg-[#f8faf9] px-3 py-1.5 rounded-lg border border-slate-100 text-center">
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">Marks</p>
-                          <p className="font-black text-sm text-[#0d5c4d]">{card.marks}</p>
-                        </div>
-                        <div className="bg-[#f8faf9] px-3 py-1.5 rounded-lg border border-slate-100 text-center">
-                          <p className="text-[9px] font-bold text-slate-400 uppercase">Batch Rank</p>
-                          <p className="font-black text-sm text-slate-800">
-                            #{card.batchRank}{" "}
-                            <span className="text-[10px] font-normal text-slate-400">/ {card.totalStudents}</span>
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Card Footer / Verification */}
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-500 flex items-center gap-1">
-                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                        <span className="font-bold text-slate-700">Verified by {card.tutorName}</span>
-                      </span>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                        Signed &amp; Approved ✓
-                      </span>
-                    </div>
+                    <span className="text-[11px] font-bold text-slate-500">{item.day}</span>
                   </div>
                 ))}
               </div>

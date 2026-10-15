@@ -1395,7 +1395,7 @@ export function LandingView({
                   onClick={() => handlePortalSwitch("staff")}
                   className="w-full max-w-xs bg-[#b47a16] hover:bg-[#8d5f10] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
                 >
-                  <Sparkles className="h-4 sm:h-5 w-4 sm:w-5" />
+                  <BookOpen className="h-4 sm:h-5 w-4 sm:w-5" />
                   <span>Tutor</span>
                   <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
                 </button>

@@ -92,6 +92,9 @@ export function AdminSportsRegistrationsDesk({
   const [newEventFee, setNewEventFee] = useState(500);
   const [newEventMax, setNewEventMax] = useState(32);
 
+  // Filter: Squads vs Individual
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<"All" | "Squads" | "Individual">("All");
+
   // KPI Calculations
   const stats = useMemo(() => {
     const totalAthletes = registrations.length;
@@ -104,6 +107,7 @@ export function AdminSportsRegistrationsDesk({
 
     const uniqueSchools = new Set(registrations.map((r) => r.schoolName)).size;
     const uniqueDistricts = new Set(registrations.map((r) => r.district)).size;
+    const teamSquadsCount = registrations.filter((r) => r.teamSquad).length;
 
     return {
       totalAthletes,
@@ -111,7 +115,8 @@ export function AdminSportsRegistrationsDesk({
       paidCount,
       pendingCount,
       uniqueSchools,
-      uniqueDistricts
+      uniqueDistricts,
+      teamSquadsCount
     };
   }, [registrations]);
 
@@ -125,7 +130,12 @@ export function AdminSportsRegistrationsDesk({
         reg.athleteName.toLowerCase().includes(q) ||
         reg.registrationNumber.toLowerCase().includes(q) ||
         reg.schoolName.toLowerCase().includes(q) ||
-        reg.mobile.includes(q);
+        reg.mobile.includes(q) ||
+        (reg.teamSquad && (
+          reg.teamSquad.teamName.toLowerCase().includes(q) ||
+          reg.teamSquad.teamCode.toLowerCase().includes(q) ||
+          (reg.teamSquad.players && reg.teamSquad.players.some((p) => p.name.toLowerCase().includes(q)))
+        ));
 
       // Sport filter
       const matchSport =
@@ -156,6 +166,11 @@ export function AdminSportsRegistrationsDesk({
       const matchPayment =
         selectedPaymentFilter === "All" || reg.paymentStatus === selectedPaymentFilter;
 
+      // Type filter (Squads vs Individual)
+      const matchType =
+        selectedTypeFilter === "All" ||
+        (selectedTypeFilter === "Squads" ? !!reg.teamSquad : !reg.teamSquad);
+
       return (
         matchSearch &&
         matchSport &&
@@ -163,7 +178,8 @@ export function AdminSportsRegistrationsDesk({
         matchAge &&
         matchGender &&
         matchStatus &&
-        matchPayment
+        matchPayment &&
+        matchType
       );
     });
   }, [
@@ -174,7 +190,8 @@ export function AdminSportsRegistrationsDesk({
     selectedAgeFilter,
     selectedGenderFilter,
     selectedStatusFilter,
-    selectedPaymentFilter
+    selectedPaymentFilter,
+    selectedTypeFilter
   ]);
 
   // CSV Export Generator (RFC 4180 compliant with UTF-8 BOM for Excel)
@@ -182,6 +199,10 @@ export function AdminSportsRegistrationsDesk({
     const headers = [
       "Registration ID",
       "Athlete Name",
+      "Team Name",
+      "Team Code",
+      "Squad Size",
+      "Squad Players Roster",
       "DOB",
       "Age",
       "Gender",
@@ -203,6 +224,10 @@ export function AdminSportsRegistrationsDesk({
     const rows = filteredRegistrations.map((r) => [
       `"${r.registrationNumber}"`,
       `"${r.athleteName.replace(/"/g, '""')}"`,
+      `"${r.teamSquad ? r.teamSquad.teamName.replace(/"/g, '""') : "Individual"}"`,
+      `"${r.teamSquad ? r.teamSquad.teamCode : "N/A"}"`,
+      r.teamSquad && r.teamSquad.players ? r.teamSquad.players.length : 0,
+      `"${r.teamSquad && r.teamSquad.players ? r.teamSquad.players.map((p) => `#${p.jerseyNumber || ""} ${p.name} (${p.role || ""})`).join("; ").replace(/"/g, '""') : "N/A"}"`,
       `"${r.dob}"`,
       r.age,
       `"${r.gender}"`,
@@ -281,13 +306,21 @@ export function AdminSportsRegistrationsDesk({
   return (
     <div className="space-y-6">
       {/* KPI METRIC CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <div className="p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-xs">
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Total Athletes
           </p>
           <p className="text-xl font-black text-[#0d2b26] mt-1">{stats.totalAthletes}</p>
           <span className="text-[10px] text-emerald-600 font-bold">Registered</span>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-xs">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Team Squads
+          </p>
+          <p className="text-xl font-black text-[#0d5c4d] mt-1">{stats.teamSquadsCount}</p>
+          <span className="text-[10px] text-emerald-600 font-bold">Rosters Active</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-xs">
@@ -445,6 +478,19 @@ export function AdminSportsRegistrationsDesk({
             </select>
           </div>
 
+          {/* Entry Type Filter */}
+          <div>
+            <select
+              value={selectedTypeFilter}
+              onChange={(e) => setSelectedTypeFilter(e.target.value as any)}
+              className="w-full h-9 px-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-[#fbfcfb]"
+            >
+              <option value="All">All Entry Types</option>
+              <option value="Squads">Team Squads Only</option>
+              <option value="Individual">Individual Only</option>
+            </select>
+          </div>
+
           {/* Status */}
           <div>
             <select
@@ -536,7 +582,14 @@ export function AdminSportsRegistrationsDesk({
                     </td>
 
                     <td className="p-3.5">
-                      <p className="font-extrabold text-slate-900">{reg.athleteName}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="font-extrabold text-slate-900">{reg.athleteName}</p>
+                        {reg.teamSquad && (
+                          <span className="px-1.5 py-0.5 rounded bg-[#ecf8f5] text-[#0d5c4d] border border-[#b2e5d9] text-[9px] font-black">
+                            Squad ({reg.teamSquad.players ? reg.teamSquad.players.length : "Team"})
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-slate-500 font-medium">
                         {reg.age} Yrs &bull; {reg.gender} &bull; {reg.mobile}
                       </span>
@@ -695,6 +748,57 @@ export function AdminSportsRegistrationsDesk({
                 ))}
               </div>
             </div>
+
+            {selectedRegistration.teamSquad && (
+              <div className="p-3.5 rounded-xl bg-[#f8fbf9] border border-[#b2e5d9] space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                      Team Squad Roster
+                    </span>
+                    <p className="font-extrabold text-sm text-[#0d2b26]">
+                      {selectedRegistration.teamSquad.teamName}
+                    </p>
+                  </div>
+                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-white text-[#0d5c4d] border border-[#b2e5d9]">
+                    {selectedRegistration.teamSquad.teamCode}
+                  </span>
+                </div>
+
+                {selectedRegistration.teamSquad.coachName && (
+                  <p className="text-[11px] text-slate-600">
+                    <strong>Coach:</strong> {selectedRegistration.teamSquad.coachName}{" "}
+                    {selectedRegistration.teamSquad.coachPhone ? `(${selectedRegistration.teamSquad.coachPhone})` : ""}
+                  </p>
+                )}
+
+                {selectedRegistration.teamSquad.players && selectedRegistration.teamSquad.players.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    <p className="font-bold text-slate-700 text-[11px]">
+                      Verified Squad Members ({selectedRegistration.teamSquad.players.length} Players):
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                      {selectedRegistration.teamSquad.players.map((p, idx) => (
+                        <div
+                          key={p.id || idx}
+                          className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200 text-[11px]"
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="w-5 h-5 rounded bg-slate-100 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
+                              #{p.jerseyNumber || idx + 1}
+                            </span>
+                            <span className="font-bold text-slate-800 truncate">{p.name}</span>
+                          </div>
+                          <span className="text-[10px] text-[#0d5c4d] font-bold shrink-0 ml-2">
+                            {p.role || "Player"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {selectedRegistration.guardianName && (
               <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900 space-y-1">

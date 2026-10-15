@@ -13,7 +13,8 @@ import {
   Building2,
   Phone,
   User,
-  ArrowRight
+  ArrowRight,
+  Users
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -244,6 +245,63 @@ export function CheckRegistrationView({
                     ))}
                   </div>
                 </div>
+
+                {/* Team Squad Roster Section (if registered as squad) */}
+                {searchedRecord.teamSquad && (
+                  <div className="p-4 rounded-xl border border-[#b2e5d9] bg-[#f8fbf9] space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-200">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                          Team &amp; Squad Information
+                        </span>
+                        <h5 className="font-extrabold text-sm text-[#0d2b26]">
+                          {searchedRecord.teamSquad.teamName}
+                        </h5>
+                      </div>
+                      <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-white text-[#0d5c4d] border border-[#b2e5d9] self-start sm:self-auto">
+                        Code: {searchedRecord.teamSquad.teamCode}
+                      </span>
+                    </div>
+
+                    {searchedRecord.teamSquad.coachName && (
+                      <p className="text-[11px] text-slate-600">
+                        <strong>Coach / Master-in-Charge:</strong> {searchedRecord.teamSquad.coachName}{" "}
+                        {searchedRecord.teamSquad.coachPhone ? `(${searchedRecord.teamSquad.coachPhone})` : ""}
+                      </p>
+                    )}
+
+                    {searchedRecord.teamSquad.players && searchedRecord.teamSquad.players.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-slate-700">
+                            Verified Squad Roster ({searchedRecord.teamSquad.players.length} Players):
+                          </span>
+                          <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
+                            Squad Roster Confirmed ✓
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {searchedRecord.teamSquad.players.map((p, idx) => (
+                            <div
+                              key={p.id || idx}
+                              className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-200 text-[11px]"
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <span className="w-5 h-5 rounded bg-slate-100 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
+                                  #{p.jerseyNumber || idx + 1}
+                                </span>
+                                <span className="font-bold text-slate-800 truncate">{p.name}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-500 font-medium shrink-0 ml-2">
+                                {p.role || "Player"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Gate Entry Pass Verification Mockup */}
                 <div className="p-4 rounded-xl border border-dashed border-[#0d5c4d]/40 bg-[#ecf8f5]/40 flex items-center justify-between gap-4">

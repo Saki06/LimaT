@@ -34,6 +34,8 @@ import { Tournament, TournamentFormat, TournamentStatus, Fixture } from "@/types
 import { SportsRegistrationWizard } from "@/components/sports/SportsRegistrationWizard";
 import { CheckRegistrationView } from "@/components/sports/CheckRegistrationView";
 import { AdminSportsRegistrationsDesk } from "@/components/sports/AdminSportsRegistrationsDesk";
+import { ChampionshipStandingsView } from "@/components/sports/ChampionshipStandingsView";
+import { MatchCenterFixturesView } from "@/components/sports/MatchCenterFixturesView";
 import {
   INITIAL_CHAMPIONSHIP_SPORTS,
   INITIAL_ATHLETE_REGISTRATIONS,
@@ -716,157 +718,26 @@ export function SportsView({
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: MATCH FIXTURES & LIVE RESULTS */}
+      {/* TAB 2: MATCH FIXTURES & LIVE RESULTS (MODERN STADIUM MATCH-CENTER)        */}
       {/* ========================================================================= */}
       {activeTab === "fixtures" && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h3 className="text-base font-bold text-[#0d2b26] flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-[#0d5c4d]" />
-                <span>Inter-School Match Schedule &amp; Scorecards</span>
-              </h3>
-              <p className="text-xs text-slate-500">
-                Official fixtures organized across ongoing tournaments and school friendly ties.
-              </p>
-            </div>
-
-            {isAdminOrTeacher && (
-              <Button
-                onClick={() => setIsScheduleFixtureModalOpen(true)}
-                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-black h-9 px-4 rounded-xl shadow-xs self-start sm:self-auto"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Schedule Match Fixture
-              </Button>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            {filteredFixtures.length === 0 ? (
-              <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-[#d6dfd9] text-slate-400 text-xs">
-                No fixtures found under {selectedSport}.
-              </div>
-            ) : (
-              filteredFixtures.map((fx) => (
-                <div
-                  key={fx.id}
-                  className="bg-white rounded-2xl border border-[#e6ece8] p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-[#c4e9e0] transition-colors"
-                >
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#ecf8f5] text-[#0d5c4d]">
-                        {fx.competitionName}
-                      </span>
-                      <span className="text-xs text-slate-400 font-medium">
-                        {fx.date} • {fx.time}
-                      </span>
-                      <Badge variant="outline" className="text-[10px]">
-                        {fx.sportName}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-center gap-3 text-sm font-extrabold text-[#0d2b26]">
-                      <span className="text-slate-900">{fx.homeTeam}</span>
-                      <span className="text-slate-300 font-normal">vs</span>
-                      <span className="text-slate-900">{fx.awayTeam}</span>
-                    </div>
-
-                    <p className="text-xs text-slate-500 flex items-center gap-1">
-                      <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                      <span>{fx.venue}</span>
-                    </p>
-
-                    {fx.result && (
-                      <div className="mt-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-semibold space-y-0.5">
-                        <p>
-                          {fx.homeTeam}: {fx.result.homeScore} | {fx.awayTeam}: {fx.result.awayScore}
-                        </p>
-                        <p className="text-[11px] font-bold text-emerald-700">
-                          Outcome: {fx.result.outcome}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {isAdminOrTeacher && (
-                    <Button
-                      onClick={() => setSelectedFixtureForScore(fx.id)}
-                      variant="outline"
-                      className="border-[#0d5c4d] text-[#0d5c4d] hover:bg-[#ecf8f5] text-xs font-bold shrink-0"
-                    >
-                      <Edit3 className="w-3.5 h-3.5 mr-1.5" />
-                      Record Scores
-                    </Button>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <MatchCenterFixturesView
+          defaultFixtures={fixtures}
+          isAdminOrTeacher={isAdminOrTeacher}
+          onScheduleNewFixture={() => setIsScheduleFixtureModalOpen(true)}
+          onRecordScore={(fixtureId) => setSelectedFixtureForScore(fixtureId)}
+        />
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 4: LEAGUE STANDINGS */}
+      {/* TAB 4: LEAGUE STANDINGS (MULTI-SPORT & OVERALL CHAMPIONSHIP MEDAL TALLY) */}
       {/* ========================================================================= */}
       {activeTab === "standings" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[#0d2b26] flex items-center gap-2">
-              <Award className="h-4 w-4 text-[#0d5c4d]" />
-              <span>Inter-School League Championship Points</span>
-            </h3>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-[#e6ece8] shadow-xs overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#f8faf9] border-b border-[#e6ece8] text-slate-400 uppercase font-bold text-[10px]">
-                <tr>
-                  <th className="p-3.5">Position / Team</th>
-                  <th className="p-3.5 text-center">Played (P)</th>
-                  <th className="p-3.5 text-center">Won (W)</th>
-                  <th className="p-3.5 text-center">Drawn (D)</th>
-                  <th className="p-3.5 text-center">Lost (L)</th>
-                  <th className="p-3.5 text-center text-[#0d5c4d]">Total Points</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#eef3f0]">
-                {standings.map((st, idx) => (
-                  <tr
-                    key={st.id}
-                    className={`hover:bg-[#fbfcfb] ${
-                      idx === 0 ? "bg-[#ecf8f5]/40 font-bold" : ""
-                    }`}
-                  >
-                    <td className="p-3.5 flex items-center gap-3">
-                      <span
-                        className={`w-6 h-6 rounded-full flex items-center justify-center font-mono font-bold text-xs ${
-                          idx === 0
-                            ? "bg-amber-100 text-amber-800"
-                            : idx === 1
-                            ? "bg-slate-200 text-slate-700"
-                            : idx === 2
-                            ? "bg-orange-100 text-orange-800"
-                            : "bg-slate-50 text-slate-400"
-                        }`}
-                      >
-                        {idx + 1}
-                      </span>
-                      <span className="font-bold text-[#0d2b26]">{st.teamName}</span>
-                    </td>
-                    <td className="p-3.5 text-center text-slate-600">{st.played}</td>
-                    <td className="p-3.5 text-center font-bold text-emerald-600">{st.won}</td>
-                    <td className="p-3.5 text-center text-slate-400">{st.drawn}</td>
-                    <td className="p-3.5 text-center text-rose-500">{st.lost}</td>
-                    <td className="p-3.5 text-center font-black text-[#0d5c4d] text-sm">
-                      {st.points}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <ChampionshipStandingsView
+          defaultStandings={standings}
+          tournaments={tournaments}
+          fixtures={fixtures}
+        />
       )}
 
       {/* ========================================================================= */}

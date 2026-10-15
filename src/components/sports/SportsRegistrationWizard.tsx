@@ -21,7 +21,12 @@ import {
   Edit2,
   X,
   FileText,
-  Download
+  Download,
+  Users,
+  Plus,
+  Trash2,
+  Key,
+  Hash
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,7 +35,9 @@ import {
   SRI_LANKA_SCHOOL_DATA,
   INITIAL_CHAMPIONSHIP_SPORTS,
   ChampionshipSportItem,
-  StoredAthleteRegistration
+  StoredAthleteRegistration,
+  SquadPlayer,
+  TeamSquadDetails
 } from "./sportsRegistrationData";
 
 interface SportsRegistrationWizardProps {
@@ -96,8 +103,88 @@ export function SportsRegistrationWizard({
     "ath_lj_u16_b"
   ]);
 
-  // STEP 7: Team Sport representation
+  // STEP 7: Team Sport Squad Roster States
   const [isTeamInterest, setIsTeamInterest] = useState(false);
+  const [teamRegistrationMode, setTeamRegistrationMode] = useState<"captain" | "join_code" | "individual">("captain");
+  const [teamName, setTeamName] = useState("");
+  const [teamCoachName, setTeamCoachName] = useState("");
+  const [teamCoachPhone, setTeamCoachPhone] = useState("");
+  const [enteredTeamCode, setEnteredTeamCode] = useState("");
+  const [squadPlayers, setSquadPlayers] = useState<SquadPlayer[]>([
+    { id: "1", name: "Sathurjan Kavinathan", jerseyNumber: "10", role: "Captain", nicOrStudentId: "200813504921" },
+    { id: "2", name: "K. Thuvaragan", jerseyNumber: "07", role: "Vice Captain / Striker", nicOrStudentId: "200814902134" },
+    { id: "3", name: "V. Nivethan", jerseyNumber: "01", role: "Goalkeeper / Wicket Keeper", nicOrStudentId: "200821009843" },
+    { id: "4", name: "S. Mithuran", jerseyNumber: "04", role: "Defender / Bowler", nicOrStudentId: "200833201452" },
+    { id: "5", name: "R. Aravinth", jerseyNumber: "09", role: "Midfielder / All-Rounder", nicOrStudentId: "200844109823" }
+  ]);
+
+  // Sync Captain (Player 1) with athlete registrant's name & ID
+  React.useEffect(() => {
+    const fullName = `${firstName} ${lastName}`.trim();
+    if (fullName) {
+      setSquadPlayers((prev) => {
+        if (prev.length === 0) {
+          return [{ id: "1", name: fullName, jerseyNumber: "10", role: "Captain", nicOrStudentId }];
+        }
+        return prev.map((pl, idx) => (idx === 0 ? { ...pl, name: fullName, nicOrStudentId } : pl));
+      });
+    }
+  }, [firstName, lastName, nicOrStudentId]);
+
+  // Set default team name from selected school
+  React.useEffect(() => {
+    if (selectedSchool && !teamName) {
+      setTeamName(`${selectedSchool} Championship Squad`);
+    }
+  }, [selectedSchool]);
+
+  const hasTeamSportSelected = useMemo(() => {
+    return selectedSportIds.some((id) => {
+      const sp = INITIAL_CHAMPIONSHIP_SPORTS.find((s) => s.id === id);
+      return sp?.isTeamSport;
+    });
+  }, [selectedSportIds]);
+
+  const handleAddSquadPlayer = () => {
+    const nextNum = squadPlayers.length + 1;
+    setSquadPlayers((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        name: "",
+        jerseyNumber: nextNum < 10 ? `0${nextNum}` : `${nextNum}`,
+        role: "Squad Player",
+        nicOrStudentId: ""
+      }
+    ]);
+  };
+
+  const handleUpdateSquadPlayer = (id: string, field: keyof SquadPlayer, value: string) => {
+    setSquadPlayers((prev) =>
+      prev.map((pl) => (pl.id === id ? { ...pl, [field]: value } : pl))
+    );
+  };
+
+  const handleRemoveSquadPlayer = (id: string) => {
+    if (squadPlayers.length <= 1) return;
+    setSquadPlayers((prev) => prev.filter((pl) => pl.id !== id));
+  };
+
+  const handleFillStandard11Squad = () => {
+    setSquadPlayers([
+      { id: "1", name: `${firstName} ${lastName}`.trim(), jerseyNumber: "10", role: "Captain", nicOrStudentId },
+      { id: "2", name: "K. Thuvaragan", jerseyNumber: "07", role: "Vice Captain / Striker", nicOrStudentId: "STU-2026-012" },
+      { id: "3", name: "V. Nivethan", jerseyNumber: "01", role: "Goalkeeper / Wicket Keeper", nicOrStudentId: "STU-2026-014" },
+      { id: "4", name: "S. Mithuran", jerseyNumber: "04", role: "Center Back / Fast Bowler", nicOrStudentId: "STU-2026-018" },
+      { id: "5", name: "R. Aravinth", jerseyNumber: "09", role: "Midfielder / All-Rounder", nicOrStudentId: "STU-2026-022" },
+      { id: "6", name: "M. Danushan", jerseyNumber: "03", role: "Left Back / Opening Batsman", nicOrStudentId: "STU-2026-025" },
+      { id: "7", name: "A. Jeron", jerseyNumber: "02", role: "Right Back / Spin Bowler", nicOrStudentId: "STU-2026-028" },
+      { id: "8", name: "T. Kavin", jerseyNumber: "06", role: "Defensive Midfield / Wicket Keeper", nicOrStudentId: "STU-2026-031" },
+      { id: "9", name: "P. Sanjeev", jerseyNumber: "08", role: "Central Midfielder", nicOrStudentId: "STU-2026-035" },
+      { id: "10", name: "K. Riham", jerseyNumber: "11", role: "Left Winger / Middle Order", nicOrStudentId: "STU-2026-039" },
+      { id: "11", name: "S. Abishek", jerseyNumber: "05", role: "Striker / Middle Order Batsman", nicOrStudentId: "STU-2026-042" }
+    ]);
+  };
 
   // STEP 8: Parent / Guardian Details (Mandatory for minors < 18)
   const [guardianName, setGuardianName] = useState("Mrs. K. Priyadarshani");
@@ -211,6 +298,12 @@ export function SportsRegistrationWizard({
       case 6:
         return eligibilityErrors.length === 0;
       case 7:
+        if (teamRegistrationMode === "captain") {
+          return squadPlayers.length >= 1 && squadPlayers.every((p) => p.name.trim() !== "");
+        }
+        if (teamRegistrationMode === "join_code") {
+          return enteredTeamCode.trim().length >= 3;
+        }
         return true;
       case 8:
         if (calculatedAge < 18) {
@@ -228,6 +321,22 @@ export function SportsRegistrationWizard({
   const handleConfirmRegistration = () => {
     const randomSeq = Math.floor(100000 + Math.random() * 900000);
     const regId = `EZG26-ATH-${randomSeq}`;
+    const generatedTeamCode =
+      teamRegistrationMode === "captain"
+        ? `#TEAM-${(selectedSchool || "SCH").slice(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`
+        : enteredTeamCode || `#TEAM-REF-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const teamSquadData: TeamSquadDetails | undefined =
+      hasTeamSportSelected || teamRegistrationMode !== "individual"
+        ? {
+            teamName: teamName.trim() || `${selectedSchool} Squad`,
+            teamCode: generatedTeamCode,
+            coachName: teamCoachName.trim() || undefined,
+            coachPhone: teamCoachPhone.trim() || undefined,
+            isCaptainRegistration: teamRegistrationMode === "captain",
+            players: teamRegistrationMode === "captain" ? squadPlayers : []
+          }
+        : undefined;
 
     const newRecord: StoredAthleteRegistration = {
       id: regId,
@@ -250,7 +359,8 @@ export function SportsRegistrationWizard({
         return sp ? sp.name : id;
       }),
       selectedEvents: allChosenEvents,
-      isTeamInterest,
+      isTeamInterest: teamRegistrationMode === "individual",
+      teamSquad: teamSquadData,
       guardianName: calculatedAge < 18 ? guardianName : undefined,
       guardianRelationship: calculatedAge < 18 ? guardianRelationship : undefined,
       guardianMobile: calculatedAge < 18 ? guardianMobile : undefined,
@@ -832,63 +942,275 @@ export function SportsRegistrationWizard({
           )}
 
           {/* ========================================================================= */}
-          {/* STEP 7: TEAM SPORTS OPTION */}
+          {/* ========================================================================= */}
+          {/* STEP 7: TEAM SPORTS & SQUAD ROSTER REGISTRATION */}
           {/* ========================================================================= */}
           {currentStep === 7 && (
-            <div className="space-y-4 max-w-xl mx-auto py-2">
+            <div className="space-y-5 max-w-2xl mx-auto py-2">
               <div className="space-y-1">
                 <h3 className="text-base font-bold text-[#0d2b26] flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Team Sports Registration Mode</span>
+                  <span>Team Sports &amp; Squad Roster Registration</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  For Football, Cricket, Basketball or Volleyball entries.
+                  Select your registration mode for team competitions (Football, Cricket, Basketball, Volleyball).
                 </p>
               </div>
 
-              <div className="space-y-3 pt-2">
-                <label
-                  onClick={() => setIsTeamInterest(false)}
-                  className={`p-4 rounded-xl border-2 cursor-pointer block select-none transition-all ${
-                    !isTeamInterest
-                      ? "border-[#0d5c4d] bg-[#ecf8f5]"
+              {/* Mode Selection Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div
+                  onClick={() => {
+                    setTeamRegistrationMode("captain");
+                    setIsTeamInterest(false);
+                  }}
+                  className={`p-3.5 rounded-2xl border-2 cursor-pointer select-none transition-all ${
+                    teamRegistrationMode === "captain"
+                      ? "border-[#0d5c4d] bg-[#ecf8f5] shadow-xs"
                       : "border-slate-200 hover:bg-slate-50"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <p className="font-extrabold text-sm text-[#0d2b26]">
-                      Option A: Official School / Academy Squad Entry
-                    </p>
-                    <Badge variant={!isTeamInterest ? "default" : "outline"} className="text-[10px]">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-base">🏆</span>
+                    <Badge variant={teamRegistrationMode === "captain" ? "default" : "outline"} className="text-[9px]">
                       Recommended
                     </Badge>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Athlete is officially drafted by {selectedSchool} sports master or teacher in-charge.
+                  <p className="font-extrabold text-xs text-[#0d2b26]">Team Captain / Full Squad</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Register as captain &amp; add your complete 11–15 player squad roster.
                   </p>
-                </label>
+                </div>
 
-                <label
-                  onClick={() => setIsTeamInterest(true)}
-                  className={`p-4 rounded-xl border-2 cursor-pointer block select-none transition-all ${
-                    isTeamInterest
-                      ? "border-[#0d5c4d] bg-[#ecf8f5]"
+                <div
+                  onClick={() => {
+                    setTeamRegistrationMode("join_code");
+                    setIsTeamInterest(false);
+                  }}
+                  className={`p-3.5 rounded-2xl border-2 cursor-pointer select-none transition-all ${
+                    teamRegistrationMode === "join_code"
+                      ? "border-[#0d5c4d] bg-[#ecf8f5] shadow-xs"
                       : "border-slate-200 hover:bg-slate-50"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <p className="font-extrabold text-sm text-[#0d2b26]">
-                      Option B: Individual Open Pool Interest
-                    </p>
-                    <Badge variant={isTeamInterest ? "default" : "outline"} className="text-[10px]">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-base">🔑</span>
+                    <Badge variant={teamRegistrationMode === "join_code" ? "default" : "outline"} className="text-[9px]">
+                      Join Team
+                    </Badge>
+                  </div>
+                  <p className="font-extrabold text-xs text-[#0d2b26]">Join via Team Code</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Your captain already registered? Enter team code to join that squad roster.
+                  </p>
+                </div>
+
+                <div
+                  onClick={() => {
+                    setTeamRegistrationMode("individual");
+                    setIsTeamInterest(true);
+                  }}
+                  className={`p-3.5 rounded-2xl border-2 cursor-pointer select-none transition-all ${
+                    teamRegistrationMode === "individual"
+                      ? "border-[#0d5c4d] bg-[#ecf8f5] shadow-xs"
+                      : "border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-base">👤</span>
+                    <Badge variant={teamRegistrationMode === "individual" ? "default" : "outline"} className="text-[9px]">
                       Open Pool
                     </Badge>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Register individual interest to be placed into combined district or zone trial squads.
+                  <p className="font-extrabold text-xs text-[#0d2b26]">Individual Open Pool</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    No school team? Enter open player pool for district trial selections.
                   </p>
-                </label>
+                </div>
               </div>
+
+              {/* MODE A: CAPTAIN SQUAD BUILDER */}
+              {teamRegistrationMode === "captain" && (
+                <div className="p-4 sm:p-5 rounded-2xl border border-[#b2e5d9] bg-[#f8fbf9] space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+                    <div>
+                      <h4 className="font-black text-sm text-[#0d2b26] flex items-center gap-1.5">
+                        <Users className="h-4 w-4 text-[#0d5c4d]" />
+                        <span>Squad Details &amp; Players Roster</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Player 1 is the Team Captain ({firstName} {lastName}). Add team members below.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-xl bg-white text-[#0d5c4d] font-bold text-xs border border-[#b2e5d9]">
+                        Squad Count: <strong>{squadPlayers.length} Players</strong>
+                      </span>
+                      <Button
+                        type="button"
+                        onClick={handleFillStandard11Squad}
+                        variant="outline"
+                        size="sm"
+                        className="text-[10px] h-7 font-bold border-slate-300"
+                      >
+                        Auto-fill 11
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Team Metadata */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Official Team Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={teamName}
+                        onChange={(e) => setTeamName(e.target.value)}
+                        placeholder="e.g. Jaffna Central College 1st XI"
+                        className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Coach / Teacher-in-Charge Name
+                      </label>
+                      <input
+                        type="text"
+                        value={teamCoachName}
+                        onChange={(e) => setTeamCoachName(e.target.value)}
+                        placeholder="e.g. Mr. K. Sivakumar (Sports Master)"
+                        className="w-full h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Dynamic Players Table */}
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                        Squad Players Roster List
+                      </span>
+                      <Button
+                        type="button"
+                        onClick={handleAddSquadPlayer}
+                        size="sm"
+                        className="h-7 text-xs bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold rounded-lg cursor-pointer"
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Add Player
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {squadPlayers.map((player, idx) => (
+                        <div
+                          key={player.id}
+                          className="p-2.5 rounded-xl bg-white border border-slate-200 grid grid-cols-12 gap-2 items-center text-xs shadow-2xs"
+                        >
+                          <div className="col-span-1 text-center font-bold text-slate-400">
+                            #{idx + 1}
+                          </div>
+
+                          <div className="col-span-4">
+                            <input
+                              type="text"
+                              value={player.name}
+                              onChange={(e) => handleUpdateSquadPlayer(player.id, "name", e.target.value)}
+                              placeholder={`Player ${idx + 1} Full Name *`}
+                              className={`w-full h-8 px-2.5 rounded-lg border text-xs font-bold text-slate-800 ${
+                                player.name.trim() === "" ? "border-amber-400 bg-amber-50/30" : "border-slate-200"
+                              }`}
+                            />
+                          </div>
+
+                          <div className="col-span-2">
+                            <input
+                              type="text"
+                              value={player.jerseyNumber || ""}
+                              onChange={(e) => handleUpdateSquadPlayer(player.id, "jerseyNumber", e.target.value)}
+                              placeholder="Jersey #"
+                              className="w-full h-8 px-2 rounded-lg border border-slate-200 text-center font-mono font-bold text-xs text-slate-700"
+                            />
+                          </div>
+
+                          <div className="col-span-3">
+                            <input
+                              type="text"
+                              value={player.role || ""}
+                              onChange={(e) => handleUpdateSquadPlayer(player.id, "role", e.target.value)}
+                              placeholder="Role / Position"
+                              className="w-full h-8 px-2 rounded-lg border border-slate-200 text-xs text-slate-700"
+                            />
+                          </div>
+
+                          <div className="col-span-2 flex items-center justify-end gap-1">
+                            {idx === 0 ? (
+                              <Badge className="bg-[#ecf8f5] text-[#0d5c4d] border border-[#b2e5d9] text-[9px] font-black">
+                                Captain ★
+                              </Badge>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveSquadPlayer(player.id)}
+                                className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 rounded-lg cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* MODE B: JOIN VIA TEAM CODE */}
+              {teamRegistrationMode === "join_code" && (
+                <div className="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-white space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Key className="h-4 w-4 text-[#0d5c4d]" />
+                    <h4 className="font-black text-sm text-[#0d2b26]">Enter Official Team Code</h4>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Ask your team captain or sports coach for the 8-character Team Code.
+                  </p>
+                  <div>
+                    <input
+                      type="text"
+                      value={enteredTeamCode}
+                      onChange={(e) => setEnteredTeamCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. #TEAM-JCC-2601"
+                      className="w-full h-11 px-3.5 rounded-xl border-2 border-slate-200 font-mono font-extrabold text-sm text-[#0d5c4d] tracking-wider focus:outline-none focus:border-[#0d5c4d]"
+                    />
+                  </div>
+                  {enteredTeamCode.trim().length >= 4 && (
+                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>Valid Team Code. You will be automatically added to this team roster upon confirmation.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* MODE C: INDIVIDUAL OPEN POOL */}
+              {teamRegistrationMode === "individual" && (
+                <div className="p-4 rounded-2xl border border-slate-200 bg-[#fbfcfb] space-y-2 text-xs text-slate-600">
+                  <div className="flex items-center gap-2 font-bold text-slate-800">
+                    <CheckCircle2 className="h-4 w-4 text-[#0d5c4d]" />
+                    <span>Individual Open Trial Pool Entry</span>
+                  </div>
+                  <p>
+                    You are registering as an individual athlete. The championship technical committee will evaluate your entry and assign you to district trial squads during open trials.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -1062,6 +1384,33 @@ export function SportsRegistrationWizard({
                   </Button>
                 </div>
 
+                {/* Team & Squad Section */}
+                {(hasTeamSportSelected || teamRegistrationMode !== "individual") && (
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-slate-400">Team / Squad Roster</span>
+                      <p className="font-extrabold text-[#0d2b26]">
+                        {teamName || `${selectedSchool} Squad`}
+                      </p>
+                      <p className="text-[11px] text-[#0d5c4d] font-bold mt-0.5">
+                        {teamRegistrationMode === "captain"
+                          ? `Captain Entry • ${squadPlayers.length} Players on Roster`
+                          : teamRegistrationMode === "join_code"
+                          ? `Joining Squad with Code: ${enteredTeamCode}`
+                          : "Individual Open Player Pool"}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentStep(7)}
+                      className="h-8 text-[11px] font-bold"
+                    >
+                      <Edit2 className="h-3 w-3 mr-1" /> Edit
+                    </Button>
+                  </div>
+                )}
+
                 {/* Guardian Section */}
                 {calculatedAge < 18 && (
                   <div className="flex items-center justify-between pb-3 border-b border-slate-200">
@@ -1190,6 +1539,26 @@ export function SportsRegistrationWizard({
                         {confirmedRecord.selectedEvents.map((e) => e.eventName).join(", ")}
                       </span>
                     </div>
+
+                    {confirmedRecord.teamSquad && (
+                      <div className="p-2.5 rounded-xl bg-[#ecf8f5] border border-[#b2e5d9] space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-[11px] text-[#0d5c4d]">
+                            Team: {confirmedRecord.teamSquad.teamName}
+                          </span>
+                          <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-white text-[#0d5c4d] border border-[#b2e5d9]">
+                            {confirmedRecord.teamSquad.teamCode}
+                          </span>
+                        </div>
+                        {confirmedRecord.teamSquad.players && confirmedRecord.teamSquad.players.length > 0 && (
+                          <p className="text-[10px] text-slate-600">
+                            <strong>Squad ({confirmedRecord.teamSquad.players.length}):</strong>{" "}
+                            {confirmedRecord.teamSquad.players.map((p) => `#${p.jerseyNumber} ${p.name.split(" ")[0]}`).slice(0, 4).join(", ")}
+                            {confirmedRecord.teamSquad.players.length > 4 ? ` +${confirmedRecord.teamSquad.players.length - 4} more` : ""}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* QR Code graphic mockup */}
