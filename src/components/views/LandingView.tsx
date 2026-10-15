@@ -1380,11 +1380,11 @@ export function LandingView({
 
               {/* CARD 3: TUTOR */}
               <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-amber-100 hover:border-[#b47a16] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
-                {/* Character Illustration / Mascot */}
+                {/* Teacher / Educator Character Illustration */}
                 <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center">
                   <img
-                    src="/images/ai_tutor_mascot.jpg"
-                    alt="Tutor and Course Creator"
+                    src="/images/tutor_brush_portrait.jpg"
+                    alt="Teacher and Tutor educator"
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 rounded-2xl"
                   />
                 </div>
