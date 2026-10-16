@@ -381,43 +381,6 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
       badge: "Explore",
       badgeVariant: "gold" as const,
       group: "Tuition Marketplace"
-    },
-    {
-      id: "sports",
-      label: "Sports Tournaments & Leagues",
-      icon: Trophy,
-      badge: "5 Hubs",
-      badgeVariant: "gold" as const,
-      group: "Campus & Sports",
-      children: [
-        {
-          id: "sports_tournaments",
-          label: "Tournaments & Championships",
-          icon: Trophy,
-          badge: "Live"
-        },
-        {
-          id: "sports_registration",
-          label: "Online Registration",
-          icon: Sparkles,
-          badge: "Open"
-        },
-        {
-          id: "sports_check",
-          label: "Check My Registration",
-          icon: Search
-        },
-        {
-          id: "sports_fixtures",
-          label: "Fixtures & Schedule",
-          icon: Calendar
-        },
-        {
-          id: "sports_standings",
-          label: "League Standings",
-          icon: TrendingUp
-        }
-      ]
     }
   ];
 

@@ -45,6 +45,155 @@ import { Modal } from "@/components/ui/modal";
 
 type TeacherConnectTab = "packages" | "groups" | "subscribers" | "slips";
 
+// Comprehensive Sri Lankan curriculum subjects grouped by streams
+const PREDEFINED_SUBJECT_GROUPS = [
+  {
+    group: "A/L Science & Mathematics",
+    subjects: [
+      "Combined Mathematics",
+      "Higher Mathematics",
+      "Physics",
+      "Chemistry",
+      "Biology",
+      "Agricultural Science"
+    ]
+  },
+  {
+    group: "A/L Commerce",
+    subjects: [
+      "Accounting",
+      "Business Studies",
+      "Economics",
+      "Business Statistics"
+    ]
+  },
+  {
+    group: "A/L Technology Stream",
+    subjects: [
+      "Engineering Technology (ET)",
+      "Biosystems Technology (BST)",
+      "Science for Technology (SFT)",
+      "Information & Communication Technology (ICT)"
+    ]
+  },
+  {
+    group: "A/L Arts & Humanities",
+    subjects: [
+      "Tamil Language & Literature",
+      "Sinhala Language & Literature",
+      "English Literature",
+      "Political Science",
+      "Logic & Scientific Method",
+      "History",
+      "Geography",
+      "Media & Communication Studies",
+      "Civilization (Buddhist / Hindu / Islam / Christian)"
+    ]
+  },
+  {
+    group: "G.C.E. O/L (Grades 10 – 11)",
+    subjects: [
+      "O/L Mathematics",
+      "O/L Science",
+      "O/L English",
+      "O/L Tamil Language",
+      "O/L Sinhala Language",
+      "O/L History",
+      "O/L Commerce & Accounting",
+      "O/L Information Technology (ICT)",
+      "O/L Health & Physical Education",
+      "O/L Geography",
+      "O/L Civic Education",
+      "O/L Art / Music / Drama"
+    ]
+  },
+  {
+    group: "Junior Secondary (Grades 6 – 9)",
+    subjects: [
+      "Grade 6–9 Mathematics",
+      "Grade 6–9 Science",
+      "Grade 6–9 English",
+      "Grade 6–9 Tamil",
+      "Grade 6–9 Sinhala",
+      "Grade 6–9 History",
+      "Grade 6–9 Geography",
+      "Grade 6–9 ICT"
+    ]
+  },
+  {
+    group: "Primary & Scholarship (Grades 1 – 5)",
+    subjects: [
+      "Grade 5 Scholarship (புலமைப்பரிசில்)",
+      "Primary Mathematics",
+      "Primary English",
+      "Primary Tamil / Sinhala",
+      "Environmental Studies (சுற்றாடல்)"
+    ]
+  },
+  {
+    group: "Languages & Special Skills",
+    subjects: [
+      "General & Spoken English",
+      "French Language",
+      "Japanese Language",
+      "German Language",
+      "Coding & Robotics",
+      "Art & Graphic Design"
+    ]
+  }
+];
+
+const ALL_PREDEFINED_SUBJECTS = PREDEFINED_SUBJECT_GROUPS.flatMap((g) => g.subjects);
+
+const PREDEFINED_GRADE_GROUPS = [
+  {
+    group: "General / Multi-Grade",
+    grades: [
+      "All Grades (Grades 1 – 13)",
+      "Grades 10 – 13 (Secondary & A/L)",
+      "Grades 6 – 9 (Junior Secondary)",
+      "Grades 1 – 5 (Primary)"
+    ]
+  },
+  {
+    group: "G.C.E. A/L",
+    grades: [
+      "Grade 12 & 13 (A/L)",
+      "Grade 13 (A/L)",
+      "Grade 12 (A/L)",
+      "A/L Revision (Repeaters)",
+      "2025 A/L Batch",
+      "2026 A/L Batch",
+      "2027 A/L Batch"
+    ]
+  },
+  {
+    group: "G.C.E. O/L",
+    grades: [
+      "Grade 10 & 11 (O/L)",
+      "Grade 11 (O/L)",
+      "Grade 10 (O/L)",
+      "O/L Revision"
+    ]
+  },
+  {
+    group: "Junior Secondary & Primary",
+    grades: [
+      "Grade 9",
+      "Grade 8",
+      "Grade 7",
+      "Grade 6",
+      "Grade 5 Scholarship",
+      "Grade 4",
+      "Grade 3",
+      "Grade 2",
+      "Grade 1"
+    ]
+  }
+];
+
+const ALL_PREDEFINED_GRADES = PREDEFINED_GRADE_GROUPS.flatMap((g) => g.grades);
+
 export function TeacherConnectView() {
   const { currentUser, t } = useApp();
   const hubSettings = useHubSettings();
@@ -1338,38 +1487,107 @@ export function TeacherConnectView() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Subject</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">Subject</label>
+                {!ALL_PREDEFINED_SUBJECTS.includes(packageFormData.subject) && (
+                  <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    Custom Subject
+                  </span>
+                )}
+              </div>
               <select
-                value={packageFormData.subject}
-                onChange={(e) => setPackageFormData({ ...packageFormData, subject: e.target.value })}
+                value={ALL_PREDEFINED_SUBJECTS.includes(packageFormData.subject) ? packageFormData.subject : "__custom__"}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    setPackageFormData({ ...packageFormData, subject: "" });
+                  } else {
+                    setPackageFormData({ ...packageFormData, subject: e.target.value });
+                  }
+                }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                <option value="Combined Mathematics">Combined Mathematics</option>
-                <option value="Pure Mathematics">Pure Mathematics</option>
-                <option value="Applied Mathematics">Applied Mathematics</option>
-                <option value="Physics">Physics</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="Biology">Biology</option>
-                <option value="Information Technology (ICT)">Information Technology (ICT)</option>
+                {PREDEFINED_SUBJECT_GROUPS.map((grp) => (
+                  <optgroup key={grp.group} label={grp.group}>
+                    {grp.subjects.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+                <optgroup label="Custom / Other">
+                  <option value="__custom__">✍️ Other / Custom Subject (Type manually)...</option>
+                </optgroup>
               </select>
+
+              {(!ALL_PREDEFINED_SUBJECTS.includes(packageFormData.subject) || packageFormData.subject === "") && (
+                <div className="mt-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Type your exact subject (e.g. History, Economics, Tamil...)"
+                    value={packageFormData.subject}
+                    onChange={(e) => setPackageFormData({ ...packageFormData, subject: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-amber-50/50 border-2 border-amber-300 text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:bg-white shadow-2xs"
+                  />
+                  <p className="text-[10px] text-amber-800 mt-1">
+                    💡 You can enter any custom subject or specialized course name.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Target Grade</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">Target Grade</label>
+                {!ALL_PREDEFINED_GRADES.includes(packageFormData.grade) && (
+                  <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    Custom Grade
+                  </span>
+                )}
+              </div>
               <select
-                value={packageFormData.grade}
-                onChange={(e) => setPackageFormData({ ...packageFormData, grade: e.target.value })}
+                value={ALL_PREDEFINED_GRADES.includes(packageFormData.grade) ? packageFormData.grade : "__custom__"}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    setPackageFormData({ ...packageFormData, grade: "" });
+                  } else {
+                    setPackageFormData({ ...packageFormData, grade: e.target.value });
+                  }
+                }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                <option value="Grade 12 & 13 (A/L)">Grade 12 &amp; 13 (A/L)</option>
-                <option value="Grade 12 (A/L)">Grade 12 (A/L)</option>
-                <option value="Grade 13 (A/L)">Grade 13 (A/L)</option>
-                <option value="Grade 11 (O/L)">Grade 11 (O/L)</option>
-                <option value="Grade 10">Grade 10</option>
-                <option value="A/L Revision">A/L Revision</option>
+                {PREDEFINED_GRADE_GROUPS.map((grp) => (
+                  <optgroup key={grp.group} label={grp.group}>
+                    {grp.grades.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+                <optgroup label="Custom / Other">
+                  <option value="__custom__">✍️ Other / Custom Grade (Type manually)...</option>
+                </optgroup>
               </select>
+
+              {(!ALL_PREDEFINED_GRADES.includes(packageFormData.grade) || packageFormData.grade === "") && (
+                <div className="mt-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Type custom grade/batch (e.g. 2028 A/L, Open for All...)"
+                    value={packageFormData.grade}
+                    onChange={(e) => setPackageFormData({ ...packageFormData, grade: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-amber-50/50 border-2 border-amber-300 text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:bg-white shadow-2xs"
+                  />
+                  <p className="text-[10px] text-amber-800 mt-1">
+                    💡 Specify your target batch, grade range, or student audience.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1544,38 +1762,107 @@ export function TeacherConnectView() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Subject</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">Subject</label>
+                {!ALL_PREDEFINED_SUBJECTS.includes(packageFormData.subject) && (
+                  <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    Custom Subject
+                  </span>
+                )}
+              </div>
               <select
-                value={packageFormData.subject}
-                onChange={(e) => setPackageFormData({ ...packageFormData, subject: e.target.value })}
+                value={ALL_PREDEFINED_SUBJECTS.includes(packageFormData.subject) ? packageFormData.subject : "__custom__"}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    setPackageFormData({ ...packageFormData, subject: "" });
+                  } else {
+                    setPackageFormData({ ...packageFormData, subject: e.target.value });
+                  }
+                }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                <option value="Combined Mathematics">Combined Mathematics</option>
-                <option value="Pure Mathematics">Pure Mathematics</option>
-                <option value="Applied Mathematics">Applied Mathematics</option>
-                <option value="Physics">Physics</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="Biology">Biology</option>
-                <option value="Information Technology (ICT)">Information Technology (ICT)</option>
+                {PREDEFINED_SUBJECT_GROUPS.map((grp) => (
+                  <optgroup key={grp.group} label={grp.group}>
+                    {grp.subjects.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+                <optgroup label="Custom / Other">
+                  <option value="__custom__">✍️ Other / Custom Subject (Type manually)...</option>
+                </optgroup>
               </select>
+
+              {(!ALL_PREDEFINED_SUBJECTS.includes(packageFormData.subject) || packageFormData.subject === "") && (
+                <div className="mt-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Type your exact subject (e.g. History, Economics, Tamil...)"
+                    value={packageFormData.subject}
+                    onChange={(e) => setPackageFormData({ ...packageFormData, subject: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-amber-50/50 border-2 border-amber-300 text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:bg-white shadow-2xs"
+                  />
+                  <p className="text-[10px] text-amber-800 mt-1">
+                    💡 You can enter any custom subject or specialized course name.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Target Grade</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">Target Grade</label>
+                {!ALL_PREDEFINED_GRADES.includes(packageFormData.grade) && (
+                  <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    Custom Grade
+                  </span>
+                )}
+              </div>
               <select
-                value={packageFormData.grade}
-                onChange={(e) => setPackageFormData({ ...packageFormData, grade: e.target.value })}
+                value={ALL_PREDEFINED_GRADES.includes(packageFormData.grade) ? packageFormData.grade : "__custom__"}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    setPackageFormData({ ...packageFormData, grade: "" });
+                  } else {
+                    setPackageFormData({ ...packageFormData, grade: e.target.value });
+                  }
+                }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                <option value="Grade 12 & 13 (A/L)">Grade 12 &amp; 13 (A/L)</option>
-                <option value="Grade 12 (A/L)">Grade 12 (A/L)</option>
-                <option value="Grade 13 (A/L)">Grade 13 (A/L)</option>
-                <option value="Grade 11 (O/L)">Grade 11 (O/L)</option>
-                <option value="Grade 10">Grade 10</option>
-                <option value="A/L Revision">A/L Revision</option>
+                {PREDEFINED_GRADE_GROUPS.map((grp) => (
+                  <optgroup key={grp.group} label={grp.group}>
+                    {grp.grades.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+                <optgroup label="Custom / Other">
+                  <option value="__custom__">✍️ Other / Custom Grade (Type manually)...</option>
+                </optgroup>
               </select>
+
+              {(!ALL_PREDEFINED_GRADES.includes(packageFormData.grade) || packageFormData.grade === "") && (
+                <div className="mt-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Type custom grade/batch (e.g. 2028 A/L, Open for All...)"
+                    value={packageFormData.grade}
+                    onChange={(e) => setPackageFormData({ ...packageFormData, grade: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-amber-50/50 border-2 border-amber-300 text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:bg-white shadow-2xs"
+                  />
+                  <p className="text-[10px] text-amber-800 mt-1">
+                    💡 Specify your target batch, grade range, or student audience.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1791,18 +2078,51 @@ export function TeacherConnectView() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Subject</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">Subject</label>
+                {!ALL_PREDEFINED_SUBJECTS.includes(groupFormData.subject) && (
+                  <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    Custom Subject
+                  </span>
+                )}
+              </div>
               <select
-                value={groupFormData.subject}
-                onChange={(e) => setGroupFormData({ ...groupFormData, subject: e.target.value })}
+                value={ALL_PREDEFINED_SUBJECTS.includes(groupFormData.subject) ? groupFormData.subject : "__custom__"}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    setGroupFormData({ ...groupFormData, subject: "" });
+                  } else {
+                    setGroupFormData({ ...groupFormData, subject: e.target.value });
+                  }
+                }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                <option value="Combined Mathematics">Combined Mathematics</option>
-                <option value="Physics">Physics</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="Biology">Biology</option>
-                <option value="Information & Communication Technology">Information & Communication Technology</option>
+                {PREDEFINED_SUBJECT_GROUPS.map((grp) => (
+                  <optgroup key={grp.group} label={grp.group}>
+                    {grp.subjects.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+                <optgroup label="Custom / Other">
+                  <option value="__custom__">✍️ Other / Custom Subject (Type manually)...</option>
+                </optgroup>
               </select>
+
+              {(!ALL_PREDEFINED_SUBJECTS.includes(groupFormData.subject) || groupFormData.subject === "") && (
+                <div className="mt-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Type subject (e.g. History, Economics, Tamil...)"
+                    value={groupFormData.subject}
+                    onChange={(e) => setGroupFormData({ ...groupFormData, subject: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-amber-50/50 border-2 border-amber-300 text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:bg-white shadow-2xs"
+                  />
+                </div>
+              )}
             </div>
 
             <div>
@@ -1925,18 +2245,51 @@ export function TeacherConnectView() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Subject</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700">Subject</label>
+                {!ALL_PREDEFINED_SUBJECTS.includes(groupFormData.subject) && (
+                  <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    Custom Subject
+                  </span>
+                )}
+              </div>
               <select
-                value={groupFormData.subject}
-                onChange={(e) => setGroupFormData({ ...groupFormData, subject: e.target.value })}
+                value={ALL_PREDEFINED_SUBJECTS.includes(groupFormData.subject) ? groupFormData.subject : "__custom__"}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    setGroupFormData({ ...groupFormData, subject: "" });
+                  } else {
+                    setGroupFormData({ ...groupFormData, subject: e.target.value });
+                  }
+                }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                <option value="Combined Mathematics">Combined Mathematics</option>
-                <option value="Physics">Physics</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="Biology">Biology</option>
-                <option value="Information & Communication Technology">Information & Communication Technology</option>
+                {PREDEFINED_SUBJECT_GROUPS.map((grp) => (
+                  <optgroup key={grp.group} label={grp.group}>
+                    {grp.subjects.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+                <optgroup label="Custom / Other">
+                  <option value="__custom__">✍️ Other / Custom Subject (Type manually)...</option>
+                </optgroup>
               </select>
+
+              {(!ALL_PREDEFINED_SUBJECTS.includes(groupFormData.subject) || groupFormData.subject === "") && (
+                <div className="mt-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Type subject (e.g. History, Economics, Tamil...)"
+                    value={groupFormData.subject}
+                    onChange={(e) => setGroupFormData({ ...groupFormData, subject: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-amber-50/50 border-2 border-amber-300 text-xs text-slate-900 font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:bg-white shadow-2xs"
+                  />
+                </div>
+              )}
             </div>
 
             <div>

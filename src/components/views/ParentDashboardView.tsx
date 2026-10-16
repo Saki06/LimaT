@@ -315,44 +315,6 @@ export function ParentDashboardView() {
             </div>
           </div>
         </div>
-
-        {/* Quick Navigation Tabs inside the portal */}
-        <div className="relative z-10 mt-6 pt-5 border-t border-white/15 flex items-center gap-2 overflow-x-auto no-scrollbar">
-          {[
-            { id: "overview", label: "Executive Overview", icon: Sparkles },
-            { id: "tuition_classes", label: "Enrolled Tutors", icon: GraduationCap, badge: `${activeChild.enrolments.length}` },
-            { id: "fees", label: "Fees & Bank Slips", icon: CreditCard, badge: activeChild.pendingSlipsCount > 0 ? "1 Review" : undefined },
-            { id: "progress", label: "Paper Marks & Feedback", icon: Award },
-            { id: "circulars", label: "Tutor Announcements", icon: Bell }
-          ].map((tab) => {
-            const isActive = activeTab === tab.id;
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handleTabChange(tab.id as ParentTab)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  isActive
-                    ? "bg-[#f3b738] text-slate-950 shadow-md font-black"
-                    : "bg-white/10 text-emerald-100 hover:bg-white/20 hover:text-white"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span>{tab.label}</span>
-                {tab.badge && (
-                  <span
-                    className={`ml-1 px-1.5 py-0.2 rounded-full text-[9px] font-black ${
-                      isActive ? "bg-slate-950 text-white" : "bg-[#f3b738] text-slate-950"
-                    }`}
-                  >
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {/* ========================================================= */}

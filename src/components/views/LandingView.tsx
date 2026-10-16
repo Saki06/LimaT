@@ -38,7 +38,6 @@ import {
   ChevronRight,
   BarChart3,
   CreditCard,
-  QrCode,
   Send
 } from "lucide-react";
 
@@ -1001,7 +1000,7 @@ export function LandingView({
     <div className={`${portalType === "gateway" ? "h-screen overflow-hidden" : "min-h-screen"} bg-[#fbfcfb] text-[#0d2b26] flex flex-col justify-between selection:bg-[#0d5c4d] selection:text-white`}>
       {/* ----------------- 0. GATEWAY PORTAL NAVIGATION ----------------- */}
       {portalType === "gateway" && (
-        <nav className="h-14 sm:h-16 border-b border-[#e6ece8] bg-white/95 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 shrink-0">
+        <nav className="h-14 sm:h-16 border-b border-emerald-100/60 bg-[#ebf8f4]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 shrink-0 transition-colors">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#f3b738] flex items-center justify-center text-slate-950 font-black text-base sm:text-xl shadow-xs font-sans shrink-0">
               L
@@ -1042,7 +1041,7 @@ export function LandingView({
 
       {/* ----------------- 1. STUDENT PORTAL NAVIGATION ----------------- */}
       {portalType === "student" && (
-        <nav className="h-16 sm:h-20 border-b border-[#e6ece8] bg-white/95 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40">
+        <nav className="h-16 sm:h-20 border-b border-emerald-100/60 bg-[#ebf8f4]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#f3b738] flex items-center justify-center text-slate-950 font-black text-base sm:text-xl shadow-xs font-sans shrink-0">
               L
@@ -1052,7 +1051,7 @@ export function LandingView({
                 <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
                   LimaT Smart Book
                 </span>
-                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-[10px] font-extrabold shrink-0">
+                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/80 text-[#0d5c4d] border border-emerald-200/80 text-[10px] font-extrabold shrink-0 shadow-2xs">
                   <GraduationCap className="h-3 w-3" />
                   Student Portal
                 </span>
@@ -1068,7 +1067,7 @@ export function LandingView({
             <button
               type="button"
               onClick={() => handlePortalSwitch("gateway")}
-              className="text-xs font-bold text-slate-600 hover:text-[#0d5c4d] px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-slate-600 hover:text-[#0d5c4d] px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
               title="All Portals"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
@@ -1078,7 +1077,7 @@ export function LandingView({
             <button
               type="button"
               onClick={() => openAuth("login", "student", "drawer")}
-              className="text-xs font-bold text-slate-700 hover:text-[#0d5c4d] px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-slate-700 hover:text-[#0d5c4d] px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
             >
               <LogIn className="h-3.5 w-3.5 text-[#0d5c4d]" />
               <span>Sign In</span>
@@ -1087,7 +1086,7 @@ export function LandingView({
             <button
               type="button"
               onClick={() => openAuth("signup", "student", "drawer")}
-              className="text-xs font-black bg-[#0d5c4d] hover:bg-[#083e34] text-white rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2.5 transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+              className="text-xs font-black bg-[#0d5c4d] hover:bg-[#083e34] text-white rounded-full px-3.5 sm:px-5 py-2 sm:py-2.5 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <UserPlus className="h-3.5 w-3.5" />
               <span><span className="hidden sm:inline">Join as </span>Student</span>
@@ -1098,9 +1097,9 @@ export function LandingView({
 
       {/* ----------------- 2. PARENT PORTAL NAVIGATION ----------------- */}
       {portalType === "parent" && (
-        <nav className="h-16 sm:h-20 border-b border-[#e6ece8] bg-white/95 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40">
+        <nav className="h-16 sm:h-20 border-b border-sky-100/60 bg-[#f0f6fc]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#082a24] flex items-center justify-center text-[#f3b738] font-black text-base sm:text-xl shadow-xs font-sans shrink-0">
+            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#1e3a5f] flex items-center justify-center text-[#f3b738] font-black text-base sm:text-xl shadow-xs font-sans shrink-0">
               L
             </div>
             <div className="min-w-0">
@@ -1108,7 +1107,7 @@ export function LandingView({
                 <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
                   LimaT Smart Book
                 </span>
-                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#f0f5fa] text-[#1e3a5f] border border-[#cbdfe8] text-[10px] font-extrabold shrink-0">
+                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/80 text-[#1e3a5f] border border-sky-200/80 text-[10px] font-extrabold shrink-0 shadow-2xs">
                   <Users className="h-3 w-3 text-[#1e3a5f]" />
                   Parent Portal
                 </span>
@@ -1123,7 +1122,7 @@ export function LandingView({
             <button
               type="button"
               onClick={() => handlePortalSwitch("gateway")}
-              className="text-xs font-bold text-slate-600 hover:text-[#1e3a5f] px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-slate-600 hover:text-[#1e3a5f] px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
               title="All Portals"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
@@ -1133,7 +1132,7 @@ export function LandingView({
             <button
               type="button"
               onClick={() => openAuth("login", "parent", "drawer")}
-              className="text-xs font-bold text-slate-700 hover:text-[#1e3a5f] px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-slate-700 hover:text-[#1e3a5f] px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
             >
               <LogIn className="h-3.5 w-3.5 text-[#1e3a5f]" />
               <span><span className="hidden sm:inline">Guardian </span>Sign In</span>
@@ -1142,7 +1141,7 @@ export function LandingView({
             <button
               type="button"
               onClick={() => openAuth("signup", "parent", "drawer")}
-              className="text-xs font-black bg-[#1e3a5f] hover:bg-[#152a45] text-white rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2.5 transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+              className="text-xs font-black bg-[#1e3a5f] hover:bg-[#152a45] text-white rounded-full px-3.5 sm:px-5 py-2 sm:py-2.5 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <UserPlus className="h-3.5 w-3.5" />
               <span><span className="hidden sm:inline">Register </span>Guardian</span>
@@ -1153,7 +1152,7 @@ export function LandingView({
 
       {/* ----------------- 3. TUTOR / STAFF PORTAL NAVIGATION ----------------- */}
       {portalType === "staff" && (
-        <nav className="h-16 sm:h-20 border-b border-[#e6ece8] bg-white/95 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40">
+        <nav className="h-16 sm:h-20 border-b border-amber-200/50 bg-[#fef8eb]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#0d5c4d] flex items-center justify-center text-[#f3b738] font-black text-base sm:text-xl shadow-xs font-sans shrink-0">
               L
@@ -1163,7 +1162,7 @@ export function LandingView({
                 <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
                   LimaT Smart Book
                 </span>
-                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#fef8eb] text-[#b47a16] border border-[#fbd38d] text-[10px] font-extrabold shrink-0">
+                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/80 text-[#b47a16] border border-amber-200/80 text-[10px] font-extrabold shrink-0 shadow-2xs">
                   <Sparkles className="h-3 w-3 text-[#b47a16]" />
                   Tutor Cockpit
                 </span>
@@ -1178,7 +1177,7 @@ export function LandingView({
             <button
               type="button"
               onClick={() => handlePortalSwitch("gateway")}
-              className="text-xs font-bold text-slate-600 hover:text-[#0d5c4d] px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-slate-600 hover:text-[#0d5c4d] px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
               title="All Portals"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
@@ -1188,7 +1187,7 @@ export function LandingView({
             <button
               type="button"
               onClick={() => openAuth("login", "teacher", "drawer")}
-              className="text-xs font-bold text-slate-700 hover:text-[#0d5c4d] px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-xs font-bold text-slate-700 hover:text-[#0d5c4d] px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
             >
               <LogIn className="h-3.5 w-3.5 text-[#0d5c4d]" />
               <span>Tutor Sign In</span>
@@ -1197,7 +1196,7 @@ export function LandingView({
             <button
               type="button"
               onClick={() => openAuth("signup", "teacher", "drawer")}
-              className="text-xs font-black bg-[#0d5c4d] hover:bg-[#083e34] text-white rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2.5 transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+              className="text-xs font-black bg-[#b47a16] hover:bg-[#8d5f10] text-white rounded-full px-3.5 sm:px-5 py-2 sm:py-2.5 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <UserPlus className="h-3.5 w-3.5" />
               <span>Register as Tutor</span>
@@ -1464,848 +1463,954 @@ export function LandingView({
 
       {/* ========================================================================= */}
       {/* 1. STUDENT LANDING PAGE (Active when portalType === "student")           */}
+      {/* Creative, Modern, Atmospheric & Attractive (Inheriting Gateway DNA)     */}
       {/* ========================================================================= */}
       {portalType === "student" && (
-        <main className="px-4 sm:px-8 lg:px-12 py-10 sm:py-16 max-w-7xl mx-auto w-full space-y-16">
-          {/* Student Hero Section */}
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-            {/* Left Content */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-xs font-black shadow-2xs">
-                <span className="h-2 w-2 rounded-full bg-[#0d5c4d] animate-pulse" />
-                <span>Student & Parent Portal • Sri Lankan Tuition & Academics</span>
+        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#ebf8f4] via-[#ffffff] to-[#fef8eb] overflow-hidden">
+          {/* Luminous Ambient Lighting Orbs (Same as Gateway) */}
+          <div className="absolute -top-24 -left-20 w-[500px] h-[500px] rounded-full bg-emerald-300/35 blur-3xl pointer-events-none" />
+          <div className="absolute top-1/4 -right-20 w-[500px] h-[500px] rounded-full bg-[#38bdf8]/25 blur-3xl pointer-events-none" />
+          <div className="absolute bottom-40 left-10 w-[450px] h-[450px] rounded-full bg-[#fde047]/35 blur-3xl pointer-events-none" />
+
+          {/* Cheerful Background Doodles & Accents */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
+            <div className="absolute top-8 left-10 text-amber-400 font-black text-2xl animate-pulse">✦</div>
+            <div className="absolute top-28 left-32 text-emerald-500/50 font-black text-sm">★</div>
+            <div className="absolute top-12 right-16 text-amber-400 font-black text-xl">✦</div>
+            <div className="absolute top-36 right-36 text-sky-400/50 font-black text-sm">●</div>
+            <div className="absolute top-1/3 left-6 w-14 h-14 rounded-full border-2 border-dashed border-emerald-400/25" />
+            <div className="absolute top-2/3 right-8 w-16 h-16 rounded-full border-2 border-dashed border-amber-400/25" />
+          </div>
+
+          <div className="relative z-10 px-4 sm:px-8 lg:px-12 py-8 sm:py-12 max-w-7xl mx-auto w-full space-y-16">
+            {/* HERO SECTION WITH IMMERSIVE MODERN CLASSROOM BACKDROP */}
+            <section className="relative rounded-3xl sm:rounded-[36px] overflow-hidden border-2 border-emerald-100/80 shadow-lg min-h-[480px] lg:min-h-[540px] flex items-center">
+              {/* Full Background Image: Real Sri Lankan Students */}
+              <div className="absolute inset-0 z-0">
+                <img
+                  src="/images/student_card_hero.jpg"
+                  alt="Sri Lankan Students Studying Collaboratively"
+                  className="w-full h-full object-cover object-right sm:object-center"
+                />
+                {/* Modern Directional Gradient Overlay (ensures 100% text readability on left while showing students on right) */}
+                <div className="absolute inset-0 bg-gradient-to-r from-[#ebf8f4] via-[#ebf8f4]/95 sm:via-[#ebf8f4]/90 md:via-55% to-white/30 lg:to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#ebf8f4]/80 via-transparent to-transparent sm:hidden" />
               </div>
 
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.15]">
-                Learn, practice & excel <br className="hidden sm:inline" />
-                <span className="text-[#0d5c4d]">in every term test.</span>
-              </h1>
-
-              <p className="text-sm sm:text-base lg:text-lg text-slate-600 max-w-xl leading-relaxed">
-                Study curriculum units, download past papers with marking schemes, submit assignments, take timed exams, and join sports championships.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 w-full">
-                <button
-                  type="button"
-                  onClick={() => openAuth("signup", "student", "drawer")}
-                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-sm px-6 py-3.5 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
-                >
-                  <span>Join as Student</span>
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => openAuth("login", "student", "drawer")}
-                  className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-extrabold text-sm px-6 py-3.5 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
-                >
-                  <span>Sign in to student account</span>
-                </button>
-              </div>
-
-              {/* Student Features Bar */}
-              <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2.5 sm:gap-4 text-xs font-bold text-slate-600 pt-2">
-                <div className="flex items-center gap-1.5">
-                  <Check className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                  <span>G.C.E. O/L & A/L Past Papers</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                  <span>Timed Online Exams</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                  <span>Sports Championship & Tournaments</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Student Card (Generic Platform Overview) */}
-            <div className="lg:col-span-5">
-              <div className="rounded-3xl overflow-hidden border border-[#e6ece8] bg-white shadow-xl">
-                <div className="bg-gradient-to-br from-[#0d5c4d] to-[#082a24] p-7 text-white space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold flex items-center gap-1.5">
-                      <GraduationCap className="h-3.5 w-3.5 text-[#f3b738]" />
-                      <span>Student Academic Hub</span>
-                    </span>
-                    <span className="text-xs font-mono font-bold text-[#f3b738]">Grades 6 — 13</span>
+              {/* Foreground Content */}
+              <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center p-6 sm:p-10 lg:p-14 w-full">
+                {/* Left Column: Typography & CTAs (Crisp & High-Contrast) */}
+                <div className="lg:col-span-7 space-y-6 max-w-2xl">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md text-[#0d5c4d] border border-emerald-200/80 text-xs font-black shadow-xs">
+                    <span className="h-2 w-2 rounded-full bg-[#0d5c4d] animate-pulse" />
+                    <span>🎓 Student Learning Station • Sri Lankan Tuition &amp; Academics (Grades 1–13)</span>
                   </div>
 
-                  <div>
-                    <h3 className="text-2xl font-black text-white">Interactive Learning Desk</h3>
-                    <p className="text-xs text-slate-200">National Curriculum • Model Paper Classes • Digital Classroom</p>
+                  <div className="space-y-2">
+                    <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.12]">
+                      Learn anytime, anywhere. <br />
+                      <span className="text-[#0d5c4d] relative inline-block">
+                        Grow your future.
+                        <span className="absolute left-0 bottom-1.5 w-full h-3 bg-amber-300/40 -z-10 rounded-full" />
+                      </span>
+                    </h1>
+
+                    <p className="text-sm sm:text-base lg:text-lg text-slate-700 font-medium max-w-xl leading-relaxed pt-1">
+                      Master national curriculum chapters, practice with 12,000+ past papers with official marking schemes, take timed online exams, and compete in all-island sports championships.
+                    </p>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 pt-2">
-                    <div className="p-2.5 rounded-xl bg-white/10 text-center">
-                      <p className="text-base font-black text-white">All Streams</p>
-                      <p className="text-[10px] text-slate-300">Sci / Art / Com / Tech</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-white/10 text-center">
-                      <p className="text-base font-black text-[#f3b738]">100%</p>
-                      <p className="text-[10px] text-slate-300">Syllabus Aligned</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-white/10 text-center">
-                      <p className="text-base font-black text-emerald-300">Trilingual</p>
-                      <p className="text-[10px] text-slate-300">Notes & Papers</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-5 bg-white space-y-3.5">
-                  <p className="text-xs font-bold text-slate-700">Student Portal Capabilities:</p>
-
-                  <div className="space-y-2 text-xs">
-                    <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0">
-                        <BookOpen className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-[#0d2b26]">Lesson Notes & Past Papers</p>
-                        <p className="text-[10px] text-slate-500">Downloadable PDFs, videos, and term revision guides</p>
-                      </div>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0">
-                        <FileText className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-[#0d2b26]">Assignments & Online Quizzes</p>
-                        <p className="text-[10px] text-slate-500">Submit homework and receive teacher feedback with marks</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => openAuth("login", "student", "drawer")}
-                      className="w-full bg-[#0d5c4d] hover:bg-[#0a483c] text-white font-extrabold text-xs py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-                    >
-                      <LogIn className="h-3.5 w-3.5" />
-                      <span>Student Sign In</span>
-                    </button>
-
+                  {/* Main Action Buttons */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1 w-full">
                     <button
                       type="button"
                       onClick={() => openAuth("signup", "student", "drawer")}
-                      className="w-full bg-[#ecf8f5] hover:bg-[#d8f1ea] text-[#0d5c4d] border border-[#c4e9e0] font-extrabold text-xs py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-sm px-7 py-3.5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto group"
                     >
-                      <UserPlus className="h-3.5 w-3.5" />
-                      <span>Register Account</span>
+                      <GraduationCap className="h-4 sm:h-5 w-4 sm:w-5" />
+                      <span>Join as Student</span>
+                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                     </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
 
-          {/* ========================================================= */}
-          {/* EVOLVE BEYOND SHOWCASE BANNER & 5 QUICK ACCESS CARDS      */}
-          {/* ========================================================= */}
-          <section className="space-y-4">
-            {/* Visual Banner */}
-            <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-[#031d28] via-[#083e47] to-[#0284c7] text-white shadow-2xl border border-cyan-400/20">
-              {/* Dynamic Wave Background Accents */}
-              <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-teal-200 via-transparent to-transparent" />
-              <div className="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
-              <div className="absolute right-0 top-0 w-96 h-96 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 items-center relative z-10 min-h-[260px] sm:min-h-[300px]">
-                {/* Left Typography Block */}
-                <div className="lg:col-span-5 p-6 sm:p-10 space-y-3">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[11px] font-black text-cyan-200 tracking-wider uppercase">
-                    <Sparkles className="h-3 w-3 text-[#f3b738]" />
-                    <span>Tuition & Learning Hub</span>
-                  </div>
-
-                  <h2 className="text-4xl sm:text-6xl font-black tracking-tight text-white leading-none uppercase drop-shadow-md">
-                    <span className="block text-sky-200">EVOLVE</span>
-                    <span className="block text-white">BEYOND</span>
-                  </h2>
-
-                  <p className="text-xs sm:text-sm text-cyan-100/90 font-medium max-w-sm leading-relaxed">
-                    Unleash your academic brilliance. Interactive digital coursework, trilingual tuition lessons, and continuous exam preparation designed for Sri Lankan students.
-                  </p>
-
-                  <div className="pt-2 flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => openAuth("login", "student", "drawer")}
-                      className="px-5 py-2.5 rounded-xl bg-white text-[#083e47] hover:bg-cyan-50 font-black text-xs transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                      className="bg-white/95 backdrop-blur-md border-2 border-emerald-100 hover:border-[#0d5c4d] text-slate-800 font-extrabold text-sm px-6 py-3.5 rounded-full shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
                     >
-                      <span>Explore Student Hub</span>
-                      <ArrowRight className="h-3.5 w-3.5 text-cyan-600" />
+                      <LogIn className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>Student Sign In</span>
                     </button>
-                    <span className="text-[11px] font-semibold text-cyan-200/80">Grades 6 – 13</span>
                   </div>
-                </div>
 
-                {/* Right Students Photography (Auto-Rotating School Students Slideshow) */}
-                <div className="lg:col-span-7 h-full flex items-end justify-center lg:justify-end relative pr-0 lg:pr-6 overflow-hidden">
-                  <div className="relative w-full max-h-[340px] flex items-end justify-center">
-                    <div className="relative w-full h-[240px] sm:h-[300px] rounded-2xl lg:rounded-l-2xl overflow-hidden shadow-2xl border border-white/10 bg-slate-900">
-                      {BANNER_SLIDES.map((slide, idx) => (
-                        <img
-                          key={idx}
-                          src={slide.image}
-                          alt={slide.alt}
-                          className={`absolute inset-0 w-full h-full object-cover object-center transition-all duration-1000 ease-in-out ${
-                            idx === currentSlideIndex
-                              ? "opacity-100 scale-100"
-                              : "opacity-0 scale-105 pointer-events-none"
-                          }`}
-                        />
-                      ))}
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#031d28]/70 via-transparent to-transparent lg:hidden pointer-events-none" />
-
-                      {/* Floating Caption & Dots */}
-                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-black/45 backdrop-blur-md text-[11px] text-white border border-white/15 pointer-events-auto">
-                        <span className="truncate font-semibold text-cyan-200">
-                          {BANNER_SLIDES[currentSlideIndex].caption}
-                        </span>
-                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                          {BANNER_SLIDES.map((_, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => setCurrentSlideIndex(idx)}
-                              aria-label={`Go to slide ${idx + 1}`}
-                              className={`h-2 rounded-full transition-all cursor-pointer ${
-                                idx === currentSlideIndex
-                                  ? "w-5 bg-cyan-400"
-                                  : "w-2 bg-white/40 hover:bg-white/70"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </div>
+                  {/* High-Trust Benefit Pills */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px] font-bold text-slate-700">
+                    <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-emerald-100/90 shadow-2xs">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-[#0d5c4d] shrink-0" />
+                      <span>12,000+ Past Papers</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-emerald-100/90 shadow-2xs">
+                      <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                      <span>Timed Online Exams</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-emerald-100/90 shadow-2xs">
+                      <Trophy className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <span>Sports League</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-emerald-100/90 shadow-2xs">
+                      <Globe className="h-3.5 w-3.5 text-sky-500 shrink-0" />
+                      <span>Trilingual Medium</span>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* 5 Quick Access Cards (Direct Visual Links - Verified Local Images) */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4 pt-1">
-              {/* Card 1: Student Help Desk */}
-              <div
-                onClick={() => {
-                  addToast({
-                    type: "info",
-                    title: "Student Help Desk",
-                    message: "Sign in to access academic counseling, query tickets, and teacher mentorship."
-                  });
-                  openAuth("login", "student", "drawer");
-                }}
-                className="group bg-white rounded-2xl p-3 border border-[#e6ece8] shadow-sm hover:shadow-xl hover:border-amber-400 -translate-y-0 hover:-translate-y-1 transition-all duration-300 cursor-pointer text-center flex flex-col items-center"
-              >
-                <div className="w-full aspect-[4/3] rounded-xl overflow-hidden mb-2.5 relative bg-slate-100">
-                  <img
-                    src="/images/card_helpdesk.jpg"
-                    alt="Student Help Desk"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                {/* Right Column: Floating Modern Glass Badges Over Classroom Scene */}
+                <div className="lg:col-span-5 hidden lg:flex flex-col items-end justify-between h-full min-h-[360px] py-4 pointer-events-none">
+                  {/* Top Floating Badge */}
+                  <div className="bg-white/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-emerald-100 shadow-lg flex items-center gap-2 text-xs font-black text-[#0d2b26] animate-in fade-in slide-in-from-top-4 duration-500">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Smart Interactive Tuition Classroom</span>
+                  </div>
+
+                  {/* Middle Floating Badge */}
+                  <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-amber-200 shadow-lg flex items-center gap-2 text-xs font-black text-amber-900">
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    <span>Grades 1 – 13 All Streams</span>
+                  </div>
+
+                  {/* Bottom Floating Badge */}
+                  <div className="bg-white/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-emerald-100 shadow-lg flex items-center gap-2 text-xs font-black text-[#0d5c4d]">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span>National Syllabus &amp; Model Papers</span>
+                  </div>
                 </div>
-                <h4 className="text-xs font-black text-amber-700 group-hover:text-amber-600 transition-colors">
-                  Student Help Desk
-                </h4>
-                <p className="text-[10px] text-slate-500 mt-0.5">Advising & Support</p>
               </div>
+            </section>
 
-              {/* Card 2: Student Service */}
-              <div
-                onClick={() => {
-                  addToast({
-                    type: "info",
-                    title: "Student Service",
-                    message: "Sign in to access your enrolled tuition batches, sports championship events, and exam schedules."
-                  });
-                  openAuth("login", "student", "drawer");
-                }}
-                className="group bg-white rounded-2xl p-3 border border-[#e6ece8] shadow-sm hover:shadow-xl hover:border-amber-400 -translate-y-0 hover:-translate-y-1 transition-all duration-300 cursor-pointer text-center flex flex-col items-center"
-              >
-                <div className="w-full aspect-[4/3] rounded-xl overflow-hidden mb-2.5 relative bg-slate-100">
-                  <img
-                    src="/images/card_service.jpg"
-                    alt="Student Service"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <h4 className="text-xs font-black text-amber-700 group-hover:text-amber-600 transition-colors">
-                  Student Service
-                </h4>
-                <p className="text-[10px] text-slate-500 mt-0.5">Batch & Student Support Desk</p>
-              </div>
-
-              {/* Card 3: Online Library */}
-              <div
-                onClick={() => {
-                  addToast({
-                    type: "info",
-                    title: "Online Library",
-                    message: "Access trilingual textbooks, unit notes, and digital study packs."
-                  });
-                  openAuth("login", "student", "drawer");
-                }}
-                className="group bg-white rounded-2xl p-3 border border-[#e6ece8] shadow-sm hover:shadow-xl hover:border-amber-400 -translate-y-0 hover:-translate-y-1 transition-all duration-300 cursor-pointer text-center flex flex-col items-center"
-              >
-                <div className="w-full aspect-[4/3] rounded-xl overflow-hidden mb-2.5 relative bg-slate-100">
-                  <img
-                    src="/images/card_library.jpg"
-                    alt="Online Library"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <h4 className="text-xs font-black text-amber-700 group-hover:text-amber-600 transition-colors">
-                  Online Library
-                </h4>
-                <p className="text-[10px] text-slate-500 mt-0.5">Digital Notes & Books</p>
-              </div>
-
-              {/* Card 4: Video Repository */}
-              <div
-                onClick={() => {
-                  addToast({
-                    type: "info",
-                    title: "Video Repository",
-                    message: "Watch recorded classroom video lessons and lab practical explanations."
-                  });
-                  openAuth("login", "student", "drawer");
-                }}
-                className="group bg-white rounded-2xl p-3 border border-[#e6ece8] shadow-sm hover:shadow-xl hover:border-amber-400 -translate-y-0 hover:-translate-y-1 transition-all duration-300 cursor-pointer text-center flex flex-col items-center"
-              >
-                <div className="w-full aspect-[4/3] rounded-xl overflow-hidden mb-2.5 relative bg-slate-100">
-                  <img
-                    src="/images/card_video.jpg"
-                    alt="Video Repository"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <h4 className="text-xs font-black text-amber-700 group-hover:text-amber-600 transition-colors">
-                  Video Repository
-                </h4>
-                <p className="text-[10px] text-slate-500 mt-0.5">Recorded Class Units</p>
-              </div>
-
-              {/* Card 5: Research Archive */}
-              <div
-                onClick={() => {
-                  addToast({
-                    type: "info",
-                    title: "Research Archive",
-                    message: "Official G.C.E O/L and A/L Past Examination Papers & Marking Schemes."
-                  });
-                  openAuth("login", "student", "drawer");
-                }}
-                className="group bg-white rounded-2xl p-3 border border-[#e6ece8] shadow-sm hover:shadow-xl hover:border-amber-400 -translate-y-0 hover:-translate-y-1 transition-all duration-300 cursor-pointer text-center flex flex-col items-center"
-              >
-                <div className="w-full aspect-[4/3] rounded-xl overflow-hidden mb-2.5 relative bg-slate-100">
-                  <img
-                    src="/images/card_archive.jpg"
-                    alt="Research Archive"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <h4 className="text-xs font-black text-amber-700 group-hover:text-amber-600 transition-colors">
-                  Research Archive
-                </h4>
-                <p className="text-[10px] text-slate-500 mt-0.5">Past Papers & Marking</p>
-              </div>
-            </div>
-          </section>
-
-          {/* Student Key Learning Highlights */}
-          <section className="space-y-6">
-            <div className="text-center max-w-xl mx-auto">
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#0d5c4d] bg-[#ecf8f5] px-3 py-1 rounded-full border border-[#c4e9e0]">
-                Student Experience
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26] mt-2">
-                Everything for Exam & Sports Success in One Place
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
-                  <BookOpen className="h-5 w-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Structured Lessons</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Video units, downloadable PDF notes, and chapter summaries aligned with G.C.E. O/L, A/L & revision batches.
+            {/* ========================================================= */}
+            {/* 5 CREATIVE "STUDY STATIONS" (VISUAL DISCOVERY CARDS)      */}
+            {/* ========================================================= */}
+            <section className="space-y-6 pt-4">
+              <div className="text-center max-w-xl mx-auto space-y-1.5">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[#0d5c4d] bg-white px-3.5 py-1 rounded-full border border-emerald-200 shadow-2xs">
+                  <Sparkles className="h-3 w-3 text-amber-500" />
+                  <span>Student Exploration Stations</span>
+                </span>
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0d2b26]">
+                  Your Complete Digital Learning Studio
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600">
+                  Explore notes, video archives, past paper marking schemes, and student services.
                 </p>
               </div>
 
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center">
-                  <Layers className="h-5 w-5" />
+              {/* 5 Clean, Tactile Cards (Using local photos) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                {/* Card 1: Research Archive */}
+                <div
+                  onClick={() => {
+                    addToast({
+                      type: "info",
+                      title: "Past Papers & Marking Archive",
+                      message: "Official G.C.E. O/L & A/L past papers with verified step-by-step schemes."
+                    });
+                    openAuth("login", "student", "drawer");
+                  }}
+                  className="group bg-white rounded-3xl p-3 border-2 border-emerald-100/70 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl -translate-y-0 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
+                >
+                  <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden mb-3 relative bg-slate-100 shadow-inner">
+                    <img
+                      src="/images/card_archive.jpg"
+                      alt="Research Archive"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-black text-[#0d2b26] group-hover:text-[#0d5c4d] transition-colors">
+                    Research Archive
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Past Papers &amp; Schemes</p>
+                  <span className="text-[10px] font-black text-[#0d5c4d] mt-2 group-hover:underline flex items-center gap-0.5">
+                    Browse Papers →
+                  </span>
                 </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Past Papers Library</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  National examination past papers and official marking schemes for G.C.E. O/L and A/L.
-                </p>
+
+                {/* Card 2: Video Repository */}
+                <div
+                  onClick={() => {
+                    addToast({
+                      type: "info",
+                      title: "Video Masterclasses",
+                      message: "Rewatch recorded classroom units, theory explanations & science practicals."
+                    });
+                    openAuth("login", "student", "drawer");
+                  }}
+                  className="group bg-white rounded-3xl p-3 border-2 border-emerald-100/70 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl -translate-y-0 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
+                >
+                  <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden mb-3 relative bg-slate-100 shadow-inner">
+                    <img
+                      src="/images/card_video.jpg"
+                      alt="Video Repository"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-black text-[#0d2b26] group-hover:text-[#0d5c4d] transition-colors">
+                    Video Repository
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Recorded Lessons</p>
+                  <span className="text-[10px] font-black text-[#0d5c4d] mt-2 group-hover:underline flex items-center gap-0.5">
+                    Watch Lessons →
+                  </span>
+                </div>
+
+                {/* Card 3: Online Library */}
+                <div
+                  onClick={() => {
+                    addToast({
+                      type: "info",
+                      title: "Digital Study Library",
+                      message: "Access trilingual textbooks, unit notes, mind maps and chapter tutes."
+                    });
+                    openAuth("login", "student", "drawer");
+                  }}
+                  className="group bg-white rounded-3xl p-3 border-2 border-emerald-100/70 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl -translate-y-0 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
+                >
+                  <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden mb-3 relative bg-slate-100 shadow-inner">
+                    <img
+                      src="/images/card_library.jpg"
+                      alt="Online Library"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-black text-[#0d2b26] group-hover:text-[#0d5c4d] transition-colors">
+                    Online Library
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Books, Tutes &amp; Notes</p>
+                  <span className="text-[10px] font-black text-[#0d5c4d] mt-2 group-hover:underline flex items-center gap-0.5">
+                    Read Notes →
+                  </span>
+                </div>
+
+                {/* Card 4: Student Help Desk */}
+                <div
+                  onClick={() => {
+                    addToast({
+                      type: "info",
+                      title: "Student Help Desk",
+                      message: "Ask academic questions, submit query tickets, and get teacher guidance."
+                    });
+                    openAuth("login", "student", "drawer");
+                  }}
+                  className="group bg-white rounded-3xl p-3 border-2 border-emerald-100/70 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl -translate-y-0 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
+                >
+                  <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden mb-3 relative bg-slate-100 shadow-inner">
+                    <img
+                      src="/images/card_helpdesk.jpg"
+                      alt="Student Help Desk"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-black text-[#0d2b26] group-hover:text-[#0d5c4d] transition-colors">
+                    Student Help Desk
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Advising &amp; Guidance</p>
+                  <span className="text-[10px] font-black text-[#0d5c4d] mt-2 group-hover:underline flex items-center gap-0.5">
+                    Ask Mentors →
+                  </span>
+                </div>
+
+                {/* Card 5: Sports & Championship Hub */}
+                <div
+                  onClick={() => {
+                    addToast({
+                      type: "info",
+                      title: "Eezhagam Sports Hub",
+                      message: "Check inter-school match schedules, team rosters, and championship standings."
+                    });
+                    openAuth("login", "student", "drawer");
+                  }}
+                  className="group bg-white rounded-3xl p-3 border-2 border-emerald-100/70 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl -translate-y-0 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col items-center text-center col-span-2 sm:col-span-1"
+                >
+                  <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden mb-3 relative bg-slate-100 shadow-inner">
+                    <img
+                      src="/images/card_service.jpg"
+                      alt="Sports Championship"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <h4 className="text-xs sm:text-sm font-black text-[#0d2b26] group-hover:text-[#0d5c4d] transition-colors">
+                    Sports &amp; Games
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Scores &amp; Tournaments</p>
+                  <span className="text-[10px] font-black text-[#0d5c4d] mt-2 group-hover:underline flex items-center gap-0.5">
+                    View Match Hub →
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            {/* ========================================================= */}
+            {/* WHY STUDENTS LOVE LEARNING HERE (CREATIVE 4 PILLARS)      */}
+            {/* ========================================================= */}
+            <section className="space-y-6 pt-2">
+              <div className="text-center max-w-xl mx-auto space-y-1.5">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100/80 px-3 py-1 rounded-full border border-amber-300/60 shadow-2xs">
+                  <span>★</span>
+                  <span>Engineered For Sri Lankan Students</span>
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26]">
+                  Everything You Need to Succeed
+                </h2>
               </div>
 
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center">
-                  <FileText className="h-5 w-5" />
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-5">
+                <div className="p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100/80 hover:border-[#0d5c4d] transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center font-black">
+                    <BookOpen className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Syllabus-Aligned Units</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    National curriculum chapters broken into bite-sized 15-minute lessons with summaries for all school grades (Grades 1–13).
+                  </p>
                 </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Homework Submission</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Upload homework files easily and receive clear scores, written teacher feedback, and rubrics.
+
+                <div className="p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-amber-100/80 hover:border-[#b47a16] transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center font-black">
+                    <Zap className="h-5 w-5 text-amber-500" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Real Exam Simulations</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Timed online tests with automatic mark calculation, answer keys, and district leaderboard standings.
+                  </p>
+                </div>
+
+                <div className="p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-sky-100/80 hover:border-sky-600 transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center font-black">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Teacher Homework Markings</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Upload homework files easily and receive verified marks, written teacher feedback, and rubrics.
+                  </p>
+                </div>
+
+                <div className="p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100/80 hover:border-emerald-600 transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black">
+                    <Trophy className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Sports &amp; Academics Balance</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Participate in inter-school tournaments, register athletic squads, track live fixtures, and celebrate medal tallies.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* ========================================================= */}
+            {/* CHEERFUL CLOSING CALLOUT & ROLE SWITCHER (GATEWAY DNA)    */}
+            {/* ========================================================= */}
+            <section className="text-center pt-6 pb-2 space-y-4">
+              <div className="flex items-center justify-center gap-2 text-amber-500 font-black text-xs sm:text-sm tracking-widest">
+                <span>˗ˏˋ</span>
+                <p className="font-extrabold text-sm sm:text-base text-slate-800 tracking-wide">
+                  Together for a Smarter Tomorrow
                 </p>
+                <span>ˎˊ˗</span>
               </div>
 
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                  <Trophy className="h-5 w-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Sports & Championship</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Eezhagam championship fixtures, athletic registrations, cricket & football match schedules, and leaderboards.
-                </p>
-              </div>
-            </div>
-          </section>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => openAuth("signup", "student", "drawer")}
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-sm py-3 px-8 rounded-full shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer group"
+                >
+                  <GraduationCap className="h-4 w-4" />
+                  <span>Join LimaT Student Station Now</span>
+                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </button>
 
-        </main>
+                <button
+                  type="button"
+                  onClick={() => handlePortalSwitch("gateway")}
+                  className="bg-white/90 border border-slate-300 hover:bg-slate-50 text-slate-700 font-extrabold text-xs py-3 px-5 rounded-full shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
+                  <span>← Back to Role Gateway</span>
+                </button>
+              </div>
+            </section>
+          </div>
+
+          {/* Bottom Dual-Tone Wave Curves (Exact Same as Gateway) */}
+          <div className="relative pointer-events-none overflow-hidden leading-none z-0 mt-8">
+            <svg
+              viewBox="0 0 1440 220"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-full h-20 sm:h-28 lg:h-32"
+              preserveAspectRatio="none"
+            >
+              <path
+                d="M0,60 C320,150 480,20 820,100 C1100,170 1300,70 1440,110 L1440,220 L0,220 Z"
+                fill="#38bdf8"
+                fillOpacity="0.4"
+              />
+              <path
+                d="M0,100 C260,180 540,60 880,130 C1160,190 1340,90 1440,130 L1440,220 L0,220 Z"
+                fill="#6ee7b7"
+                fillOpacity="0.45"
+              />
+              <path
+                d="M0,135 C300,70 640,190 980,100 C1220,40 1380,150 1440,120 L1440,220 L0,220 Z"
+                fill="#fde047"
+                fillOpacity="0.6"
+              />
+              <path
+                d="M0,180 C360,140 720,210 1080,165 C1260,145 1380,195 1440,180 L1440,220 L0,220 Z"
+                fill="#fef8eb"
+                fillOpacity="0.85"
+              />
+            </svg>
+          </div>
+        </div>
       )}
 
       {/* ========================================================================= */}
       {/* 2. PARENT LANDING PAGE (Active when portalType === "parent")              */}
+      {/* Creative, Modern, Atmospheric & Attractive (Inheriting Gateway DNA)     */}
       {/* ========================================================================= */}
       {portalType === "parent" && (
-        <main className="px-4 sm:px-8 lg:px-12 py-10 sm:py-16 max-w-7xl mx-auto w-full space-y-16 animate-in fade-in duration-300">
-          {/* Parent Hero Section */}
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-            {/* Left Content */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#f0f5fa] text-[#1e3a5f] border border-[#cbdfe8] text-xs font-black shadow-2xs">
-                <span className="h-2 w-2 rounded-full bg-[#1e3a5f] animate-pulse" />
-                <span>Parent & Guardian Desk • Sri Lankan Tuition & Classes</span>
+        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#f0f6fc] via-[#ffffff] to-[#eef5fc] overflow-hidden">
+          {/* Luminous Ambient Lighting Orbs */}
+          <div className="absolute -top-24 -left-20 w-[500px] h-[500px] rounded-full bg-sky-300/35 blur-3xl pointer-events-none" />
+          <div className="absolute top-1/4 -right-20 w-[500px] h-[500px] rounded-full bg-indigo-300/25 blur-3xl pointer-events-none" />
+          <div className="absolute bottom-40 left-10 w-[450px] h-[450px] rounded-full bg-emerald-300/25 blur-3xl pointer-events-none" />
+
+          {/* Cheerful Background Doodles & Accents */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
+            <div className="absolute top-8 left-10 text-sky-400 font-black text-2xl animate-pulse">✦</div>
+            <div className="absolute top-28 left-32 text-indigo-400/50 font-black text-sm">★</div>
+            <div className="absolute top-12 right-16 text-sky-400 font-black text-xl">✦</div>
+            <div className="absolute top-36 right-36 text-emerald-400/50 font-black text-sm">●</div>
+            <div className="absolute top-1/3 left-6 w-14 h-14 rounded-full border-2 border-dashed border-sky-300/30" />
+            <div className="absolute top-2/3 right-8 w-16 h-16 rounded-full border-2 border-dashed border-indigo-300/30" />
+          </div>
+
+          <div className="relative z-10 px-4 sm:px-8 lg:px-12 py-8 sm:py-12 max-w-7xl mx-auto w-full space-y-16">
+            {/* HERO SECTION */}
+            <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+              {/* Left Column: Typography & CTAs */}
+              <div className="lg:col-span-7 space-y-6">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md text-[#1e3a5f] border border-sky-200/80 text-xs font-black shadow-xs">
+                  <span className="h-2 w-2 rounded-full bg-[#1e3a5f] animate-pulse" />
+                  <span>👨‍👩‍👧 Parent &amp; Guardian Desk • Sri Lankan Tuition &amp; Classes</span>
+                </div>
+
+                <div className="space-y-2">
+                  <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.12]">
+                    Stay connected with your <br />
+                    <span className="text-[#1e3a5f] relative inline-block">
+                      child&apos;s daily learning.
+                      <span className="absolute left-0 bottom-1.5 w-full h-3 bg-sky-200/50 -z-10 rounded-full" />
+                    </span>
+                  </h1>
+
+                  <p className="text-sm sm:text-base lg:text-lg text-slate-600 max-w-xl leading-relaxed pt-1">
+                    Track class attendance, examine test rankings, chat with tutors, review homework completion, and upload monthly tuition payment slips with complete peace of mind.
+                  </p>
+                </div>
+
+                {/* Main Action Buttons */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1 w-full">
+                  <button
+                    type="button"
+                    onClick={() => openAuth("login", "parent", "drawer")}
+                    className="bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-sm px-7 py-3.5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto group"
+                  >
+                    <LogIn className="h-4 sm:h-5 w-4 sm:w-5" />
+                    <span>Guardian Sign In</span>
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openAuth("signup", "parent", "drawer")}
+                    className="bg-white/90 backdrop-blur-xs border-2 border-sky-100 hover:border-[#1e3a5f] text-slate-800 font-extrabold text-sm px-6 py-3.5 rounded-full shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
+                  >
+                    <UserPlus className="h-4 w-4 text-[#1e3a5f]" />
+                    <span>Register Parent Account</span>
+                  </button>
+                </div>
+
+                {/* High-Trust Benefit Pills */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px] font-bold text-slate-700">
+                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-sky-100/80">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#1e3a5f] shrink-0" />
+                    <span>SMS Attendance Alerts</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-sky-100/80">
+                    <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <span>Term Report Cards</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-sky-100/80">
+                    <Mail className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                    <span>Tutor Consultations</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-sky-100/80">
+                    <Shield className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <span>Tuition Fee Receipts</span>
+                  </div>
+                </div>
               </div>
 
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.15]">
-                Stay connected with your <br className="hidden sm:inline" />
-                <span className="text-[#1e3a5f]">child&apos;s daily learning.</span>
-              </h1>
+              {/* Right Column: Clean, Cheerful Parent Illustration Card (Matching Gateway DNA) */}
+              <div className="lg:col-span-5 flex items-center justify-center">
+                <div className="group relative w-full max-w-sm rounded-3xl bg-white/95 backdrop-blur-md border-2 border-sky-100 hover:border-[#1e3a5f] shadow-sm hover:shadow-xl transition-all duration-300 p-6 sm:p-8 flex flex-col items-center justify-between text-center overflow-hidden">
+                  {/* Floating Tag */}
+                  <div className="absolute top-4 right-4 bg-sky-50 text-[#1e3a5f] text-[10px] font-black px-2.5 py-1 rounded-full border border-sky-200 shadow-2xs">
+                    Guardian Desk
+                  </div>
 
-              <p className="text-sm sm:text-base lg:text-lg text-slate-600 max-w-xl leading-relaxed">
-                Track class attendance, examine test rankings, chat with tutors, review homework completion, and upload monthly tuition payment slips.
-              </p>
+                  {/* Brush-Splash Character Illustration */}
+                  <div className="relative w-40 h-40 sm:w-48 sm:h-48 lg:w-52 lg:h-52 flex items-center justify-center my-2">
+                    <img
+                      src="/images/parent_brush_portrait.jpg"
+                      alt="Parent monitoring student progress"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 w-full">
-                <button
-                  type="button"
-                  onClick={() => openAuth("login", "parent", "drawer")}
-                  className="bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-sm px-6 py-3.5 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
-                >
-                  <LogIn className="h-4 w-4" />
-                  <span>Guardian Sign In</span>
-                </button>
+                  {/* Clean Caption & Badge */}
+                  <div className="space-y-1 mt-2">
+                    <h3 className="text-base sm:text-lg font-black text-[#0d2b26]">
+                      Parent &amp; Guardian Portal
+                    </h3>
+                    <p className="text-xs text-slate-600 font-medium max-w-xs">
+                      Monitor progress, attendance &amp; fees with real-time confidence.
+                    </p>
+                  </div>
 
+                  {/* Clean Feature Highlights (No duplicate buttons) */}
+                  <div className="w-full grid grid-cols-2 gap-2 pt-3 mt-1 border-t border-sky-100/70 text-[11px] font-bold text-slate-700">
+                    <div className="bg-[#f0f6fc] px-2.5 py-2 rounded-xl text-[#1e3a5f] border border-sky-100/80 flex items-center justify-center gap-1.5 shadow-2xs">
+                      <BarChart3 className="h-3.5 w-3.5 text-[#1e3a5f] shrink-0" />
+                      <span>Term Reports</span>
+                    </div>
+                    <div className="bg-[#ecf8f5] px-2.5 py-2 rounded-xl text-emerald-800 border border-emerald-100/80 flex items-center justify-center gap-1.5 shadow-2xs">
+                      <Shield className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <span>Fee Slips</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* 4 FEATURE PILLARS FOR PARENTS */}
+            <section className="space-y-6 pt-2">
+              <div className="text-center max-w-xl mx-auto space-y-1.5">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[#1e3a5f] bg-sky-100/80 px-3 py-1 rounded-full border border-sky-300/60 shadow-2xs">
+                  <span>★</span>
+                  <span>Engineered For Sri Lankan Parents</span>
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26]">
+                  Designed for Sri Lankan Parents &amp; Guardians
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-5">
+                <div className="p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-sky-100/80 hover:border-[#1e3a5f] transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-[#f0f6fc] text-[#1e3a5f] flex items-center justify-center font-black">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Attendance &amp; Leave</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Real-time class entry check-in status, official leave request submissions, and monthly attendance reports.
+                  </p>
+                </div>
+
+                <div className="p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100/80 hover:border-emerald-600 transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-[#ecf8f5] text-emerald-700 flex items-center justify-center font-black">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Term Report Cards</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Download certified term examination report cards with subject rankings, tutor remarks, and grade trends.
+                  </p>
+                </div>
+
+                <div className="p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-indigo-100/80 hover:border-indigo-600 transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-black">
+                    <Mail className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Tutor Communications</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Secure two-way messaging with course tutors and sports coaches to monitor academic and athletic progress.
+                  </p>
+                </div>
+
+                <div className="p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-amber-100/80 hover:border-[#b47a16] transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-[#fef8eb] text-[#b47a16] flex items-center justify-center font-black">
+                    <Shield className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Fee Receipts &amp; Slips</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Upload bank deposit slips or pay tuition fees online with verified digital receipt tracking.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* CHEERFUL CLOSING CALLOUT & ROLE SWITCHER (GATEWAY DNA) */}
+            <section className="text-center pt-6 pb-2 space-y-4">
+              <div className="flex items-center justify-center gap-2 text-sky-500 font-black text-xs sm:text-sm tracking-widest">
+                <span>˗ˏˋ</span>
+                <p className="font-extrabold text-sm sm:text-base text-slate-800 tracking-wide">
+                  Together for a Smarter Tomorrow
+                </p>
+                <span>ˎˊ˗</span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <button
                   type="button"
                   onClick={() => openAuth("signup", "parent", "drawer")}
-                  className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-extrabold text-sm px-6 py-3.5 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
+                  className="bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-sm py-3 px-8 rounded-full shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer group"
                 >
-                  <UserPlus className="h-4 w-4 text-[#1e3a5f]" />
-                  <span>Register Parent Account</span>
+                  <Users className="h-4 w-4" />
+                  <span>Join LimaT Guardian Desk Now</span>
+                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </button>
-              </div>
-
-              {/* Trust badges */}
-              <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2.5 sm:gap-4 text-xs font-bold text-slate-600 pt-2">
-                <div className="flex items-center gap-1.5">
-                  <Check className="h-4 w-4 text-[#1e3a5f] shrink-0" />
-                  <span>Daily SMS Attendance Alerts</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="h-4 w-4 text-[#1e3a5f] shrink-0" />
-                  <span>Verified Term Report Cards</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="h-4 w-4 text-[#1e3a5f] shrink-0" />
-                  <span>Direct Tutor Consultations</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Interactive Live Parent Card Preview */}
-            <div className="lg:col-span-5">
-              <div className="relative rounded-3xl bg-gradient-to-b from-[#0f243a] via-[#0c1c2e] to-[#071320] p-6 sm:p-7 text-white shadow-2xl border border-[#1e3a5f]/40 space-y-6">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-11 w-11 rounded-2xl bg-[#1e3a5f]/40 border border-[#335d8a]/40 text-[#f3b738] flex items-center justify-center font-black text-sm">
-                      <Users className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-black text-sm text-white">Parent &amp; Guardian Portal</h3>
-                      <p className="text-[11px] text-[#9bbddf]">Connected Student Profile • Grades 1–13</p>
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black uppercase">
-                    Active Portal
-                  </span>
-                </div>
-
-                {/* Quick Metric Cards */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                    <p className="text-[10px] uppercase font-bold text-slate-400">Term Attendance</p>
-                    <p className="text-xl font-black text-emerald-400">98.4%</p>
-                    <p className="text-[10px] text-slate-400">Daily class entry check-in</p>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                    <p className="text-[10px] uppercase font-bold text-slate-400">Academic Standing</p>
-                    <p className="text-xl font-black text-[#7ba9d6]">Honor Roll</p>
-                    <p className="text-[10px] text-slate-400">Monthly test &amp; paper class ranking</p>
-                  </div>
-                </div>
-
-                {/* Teacher Remark Snippet */}
-                <div className="p-4 rounded-2xl bg-[#0b1c2d]/80 border border-[#244b72]/40 space-y-2">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-bold text-[#9bbddf] flex items-center gap-1.5">
-                      <Mail className="h-3.5 w-3.5 text-[#7ba9d6]" />
-                      Direct Tutor Feedback &amp; Reports
-                    </span>
-                    <span className="text-[10px] text-slate-400">Official Desk</span>
-                  </div>
-                  <p className="text-xs text-slate-200 leading-relaxed italic">
-                    &quot;Review continuous homework submissions, verified term test grades, and real-time remarks directly from course tutors.&quot;
-                  </p>
-                  <p className="text-[10px] text-slate-400 font-bold">— Tutors &amp; Academy Administration</p>
-                </div>
 
                 <button
                   type="button"
-                  onClick={() => openAuth("login", "parent", "drawer")}
-                  className="w-full bg-[#1e3a5f] hover:bg-[#284a73] text-white font-black text-xs py-3.5 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                  onClick={() => handlePortalSwitch("gateway")}
+                  className="bg-white/90 border border-slate-300 hover:bg-slate-50 text-slate-700 font-extrabold text-xs py-3 px-5 rounded-full shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
                 >
-                  <LogIn className="h-4 w-4" />
-                  <span>Guardian Sign In</span>
+                  <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
+                  <span>← Back to Role Gateway</span>
                 </button>
               </div>
-            </div>
-          </section>
-
-          {/* 4 Feature Pillars for Parents */}
-          <section className="space-y-6">
-            <div className="text-center max-w-xl mx-auto">
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#1e3a5f] bg-[#f0f5fa] px-3 py-1 rounded-full border border-[#cbdfe8]">
-                Guardian Features
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26] mt-2">
-                Designed for Sri Lankan Parents & Guardians
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#1e3a5f] transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-[#f0f5fa] text-[#1e3a5f] flex items-center justify-center">
-                  <Calendar className="h-5 w-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Attendance & Leave</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Real-time class entry check-in status, official leave request submissions, and monthly attendance reports.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#1e3a5f] transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Term Report Cards</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Download certified term examination report cards with subject rankings, tutor remarks, and grade trends.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#1e3a5f] transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
-                  <Mail className="h-5 w-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Tutor Communications</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Secure two-way messaging with course tutors and sports coaches to monitor academic and athletic progress.
-                </p>
-              </div>
-
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#1e3a5f] transition-all space-y-3 shadow-2xs">
-                <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
-                  <Shield className="h-5 w-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Fee Receipts & Slips</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Upload bank deposit slips or pay tuition fees online with verified digital receipt tracking.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Quick Return to Splitter */}
-          <div className="text-center pt-4">
-            <button
-              type="button"
-              onClick={() => handlePortalSwitch("gateway")}
-              className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back to All Portals</span>
-            </button>
+            </section>
           </div>
-        </main>
+
+          {/* Bottom Dual-Tone Wave Curves */}
+          <div className="relative pointer-events-none overflow-hidden leading-none z-0 mt-8">
+            <svg
+              viewBox="0 0 1440 220"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-full h-20 sm:h-28 lg:h-32"
+              preserveAspectRatio="none"
+            >
+              <path
+                d="M0,60 C320,150 480,20 820,100 C1100,170 1300,70 1440,110 L1440,220 L0,220 Z"
+                fill="#38bdf8"
+                fillOpacity="0.4"
+              />
+              <path
+                d="M0,100 C260,180 540,60 880,130 C1160,190 1340,90 1440,130 L1440,220 L0,220 Z"
+                fill="#60a5fa"
+                fillOpacity="0.4"
+              />
+              <path
+                d="M0,135 C300,70 640,190 980,100 C1220,40 1380,150 1440,120 L1440,220 L0,220 Z"
+                fill="#93c5fd"
+                fillOpacity="0.5"
+              />
+              <path
+                d="M0,180 C360,140 720,210 1080,165 C1260,145 1380,195 1440,180 L1440,220 L0,220 Z"
+                fill="#eef5fc"
+                fillOpacity="0.85"
+              />
+            </svg>
+          </div>
+        </div>
       )}
 
       {/* ========================================================================= */}
       {/* 3. TUTOR LANDING PAGE (Active when portalType === "staff")                */}
+      {/* Creative, Modern, Atmospheric & Attractive (Inheriting Gateway DNA)     */}
       {/* ========================================================================= */}
       {portalType === "staff" && (
-        <main className="px-4 sm:px-8 lg:px-12 py-10 sm:py-16 max-w-7xl mx-auto w-full space-y-16 animate-in fade-in duration-300">
-          {/* Tutor Hero Section */}
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-            {/* Left Content */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#fef8eb] text-[#b47a16] border border-[#fbd38d] text-xs font-black shadow-2xs">
-                <span className="h-2 w-2 rounded-full bg-[#b47a16] animate-pulse" />
-                <span>Tutor Command Center • Independent Educators</span>
-              </div>
+        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#fef8eb] via-[#ffffff] to-[#ebf8f4] overflow-hidden">
+          {/* Luminous Ambient Lighting Orbs */}
+          <div className="absolute -top-24 -left-20 w-[500px] h-[500px] rounded-full bg-amber-300/35 blur-3xl pointer-events-none" />
+          <div className="absolute top-1/4 -right-20 w-[500px] h-[500px] rounded-full bg-emerald-300/30 blur-3xl pointer-events-none" />
+          <div className="absolute bottom-40 left-10 w-[450px] h-[450px] rounded-full bg-sky-300/25 blur-3xl pointer-events-none" />
 
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.15]">
-                Lead your private tuition <br className="hidden sm:inline" />
-                <span className="text-[#0d5c4d]">with total autonomy.</span>
-              </h1>
+          {/* Cheerful Background Doodles & Accents */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
+            <div className="absolute top-8 left-10 text-amber-500 font-black text-2xl animate-pulse">✦</div>
+            <div className="absolute top-28 left-32 text-emerald-500/50 font-black text-sm">★</div>
+            <div className="absolute top-12 right-16 text-amber-500 font-black text-xl">✦</div>
+            <div className="absolute top-36 right-36 text-sky-400/50 font-black text-sm">●</div>
+            <div className="absolute top-1/3 left-6 w-14 h-14 rounded-full border-2 border-dashed border-amber-300/30" />
+            <div className="absolute top-2/3 right-8 w-16 h-16 rounded-full border-2 border-dashed border-emerald-300/30" />
+          </div>
 
-              <p className="text-sm sm:text-base lg:text-lg text-slate-600 max-w-xl leading-relaxed">
-                Everything an independent tuition master needs: publish courses, broadcast announcements directly to students&apos; learning feeds, run timed quizzes, verify bank fee slips, and monitor live attendance.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 w-full">
-                <button
-                  type="button"
-                  onClick={() => handle1ClickDemoLogin("teacher")}
-                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-sm px-6 py-3.5 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
-                >
-                  <Sparkles className="h-4 w-4 text-[#f3b738]" />
-                  <span>Launch Tutor Cockpit</span>
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => openAuth("signup", "teacher", "drawer")}
-                  className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-extrabold text-sm px-6 py-3.5 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
-                >
-                  <UserPlus className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Register New Tutor Account</span>
-                </button>
-              </div>
-
-              {/* Tutor Features Bar */}
-              <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2.5 sm:gap-4 text-xs font-bold text-slate-600 pt-2">
-                <div className="flex items-center gap-1.5">
-                  <Check className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                  <span>Interactive Learning Feed Broadcaster</span>
+          <div className="relative z-10 px-4 sm:px-8 lg:px-12 py-8 sm:py-12 max-w-7xl mx-auto w-full space-y-16">
+            {/* HERO SECTION */}
+            <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+              {/* Left Column: Typography & CTAs */}
+              <div className="lg:col-span-7 space-y-6">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md text-[#b47a16] border border-amber-200/80 text-xs font-black shadow-xs">
+                  <span className="h-2 w-2 rounded-full bg-[#b47a16] animate-pulse" />
+                  <span>🧑‍🏫 Tutor Command Center • Independent Educators &amp; Academies</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                  <span>Automated Quiz & MCQ Grading</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Check className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                  <span>Bank Slip Verification & Fee Receipts</span>
-                </div>
-              </div>
-            </div>
 
-            {/* Right Tutor Card (Cockpit Interactive Preview) */}
-            <div className="lg:col-span-5">
-              <div className="rounded-3xl overflow-hidden border border-[#e6ece8] bg-white shadow-xl">
-                <div className="bg-gradient-to-br from-[#082a24] via-[#0d5c4d] to-[#14473e] p-7 text-white space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5 text-[#f3b738]" />
-                      <span>Tutor Cockpit</span>
+                <div className="space-y-2">
+                  <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.12]">
+                    Lead your private tuition <br />
+                    <span className="text-[#b47a16] relative inline-block">
+                      with total autonomy.
+                      <span className="absolute left-0 bottom-1.5 w-full h-3 bg-amber-200/50 -z-10 rounded-full" />
                     </span>
-                    <span className="text-xs font-mono font-bold text-[#f3b738]">Live Dashboard</span>
-                  </div>
+                  </h1>
 
-                  <div>
-                    <h3 className="text-2xl font-black text-white">Dr. K. Arulnesan</h3>
-                    <p className="text-xs text-emerald-200">A/L Combined Mathematics & Physics Specialist</p>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 pt-2">
-                    <div className="p-2.5 rounded-xl bg-white/10 text-center">
-                      <p className="text-base font-black text-white">480+</p>
-                      <p className="text-[10px] text-slate-300">Enrolled Students</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-white/10 text-center">
-                      <p className="text-base font-black text-[#f3b738]">94%</p>
-                      <p className="text-[10px] text-slate-300">Fee Settled</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-white/10 text-center">
-                      <p className="text-base font-black text-emerald-300">98.4%</p>
-                      <p className="text-[10px] text-slate-300">Attendance</p>
-                    </div>
-                  </div>
+                  <p className="text-sm sm:text-base lg:text-lg text-slate-600 max-w-xl leading-relaxed pt-1">
+                    Everything an independent tuition master needs: publish courses, broadcast announcements directly to students&apos; learning feeds, run timed quizzes, verify bank fee slips, and monitor live attendance.
+                  </p>
                 </div>
 
-                <div className="p-5 bg-white space-y-3.5">
-                  <p className="text-xs font-bold text-slate-700">Educator Workspace Modules:</p>
-
-                  <div className="space-y-2 text-xs">
-                    <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-[#fef8eb] text-[#b47a16] flex items-center justify-center shrink-0">
-                        <Send className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-[#0d2b26]">Direct Learning Feed Broadcaster</p>
-                        <p className="text-[10px] text-slate-500">Post announcements, notices, zoom links, & study tips directly to student feeds</p>
-                      </div>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0">
-                        <BookOpen className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-[#0d2b26]">Syllabus & Video Lesson Studio</p>
-                        <p className="text-[10px] text-slate-500">Curate lessons, PDF handouts, past exam papers, and video lectures</p>
-                      </div>
-                    </div>
-
-                    <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-[#f0f5fa] text-[#1e3a5f] flex items-center justify-center shrink-0">
-                        <CreditCard className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-[#0d2b26]">Fee Slip Verification & QR Tracking</p>
-                        <p className="text-[10px] text-slate-500">Approve tuition bank deposits and track classroom attendance with instant SMS</p>
-                      </div>
-                    </div>
-                  </div>
-
+                {/* Main Action Buttons */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1 w-full">
                   <button
                     type="button"
                     onClick={() => handle1ClickDemoLogin("teacher")}
-                    className="w-full bg-[#f8faf9] hover:bg-[#ecf8f5] border border-slate-200 hover:border-[#0d5c4d] text-[#0d5c4d] font-bold text-xs py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                    className="bg-[#b47a16] hover:bg-[#8d5f10] text-white font-black text-sm px-7 py-3.5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto group"
                   >
-                    <span>Enter Tutor Workspace Demo</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
+                    <Sparkles className="h-4 sm:h-5 w-4 sm:w-5 text-[#fde047]" />
+                    <span>Launch Tutor Cockpit</span>
+                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openAuth("signup", "teacher", "drawer")}
+                    className="bg-white/90 backdrop-blur-xs border-2 border-amber-100 hover:border-[#b47a16] text-slate-800 font-extrabold text-sm px-6 py-3.5 rounded-full shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
+                  >
+                    <UserPlus className="h-4 w-4 text-[#b47a16]" />
+                    <span>Register as Tutor</span>
                   </button>
                 </div>
-              </div>
-            </div>
-          </section>
 
-          {/* Section 2: Tutor Core Capabilities Grid */}
-          <section className="space-y-8 pt-4">
-            <div className="text-center max-w-2xl mx-auto space-y-2">
-              <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26] tracking-tight">
-                Designed Exclusively for Independent Educators
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500">
-                Replace fragmented WhatsApp groups, paper receipt books, and scattered drive links with a unified, professional tuition academy system.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {/* Feature 1 */}
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
-                <div className="h-10 w-10 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
-                  <Send className="h-5 w-5" />
+                {/* High-Trust Benefit Pills */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px] font-bold text-slate-700">
+                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-amber-100/80">
+                    <Send className="h-3.5 w-3.5 text-[#b47a16] shrink-0" />
+                    <span>Feed Broadcaster</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-amber-100/80">
+                    <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <span>Auto Quiz Grading</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-amber-100/80">
+                    <CreditCard className="h-3.5 w-3.5 text-[#0d5c4d] shrink-0" />
+                    <span>Fee Reconciliation</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-amber-100/80">
+                    <BarChart3 className="h-3.5 w-3.5 text-sky-600 shrink-0" />
+                    <span>Progress Insights</span>
+                  </div>
                 </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Live Student Noticeboard</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Post high-priority announcements, homework tasks, and class notices with edit, pin, and delete controls directly visible to all students.
+              </div>
+
+              {/* Right Column: Clean, Cheerful Tutor Illustration Card (Matching Gateway DNA) */}
+              <div className="lg:col-span-5 flex items-center justify-center">
+                <div className="group relative w-full max-w-sm rounded-3xl bg-white/95 backdrop-blur-md border-2 border-amber-100 hover:border-[#b47a16] shadow-sm hover:shadow-xl transition-all duration-300 p-6 sm:p-8 flex flex-col items-center justify-between text-center overflow-hidden">
+                  {/* Floating Tag */}
+                  <div className="absolute top-4 right-4 bg-amber-50 text-amber-900 text-[10px] font-black px-2.5 py-1 rounded-full border border-amber-200 shadow-2xs">
+                    Tutor Studio
+                  </div>
+
+                  {/* Brush-Splash Character Illustration */}
+                  <div className="relative w-40 h-40 sm:w-48 sm:h-48 lg:w-52 lg:h-52 flex items-center justify-center my-2">
+                    <img
+                      src="/images/tutor_brush_portrait.jpg"
+                      alt="Tutor educator"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+
+                  {/* Clean Caption & Badge */}
+                  <div className="space-y-1 mt-2">
+                    <h3 className="text-base sm:text-lg font-black text-[#0d2b26]">
+                      Tutor Command Center
+                    </h3>
+                    <p className="text-xs text-slate-600 font-medium max-w-xs">
+                      Manage students, batches, notices &amp; fee settlements seamlessly.
+                    </p>
+                  </div>
+
+                  {/* Clean Feature Highlights (No duplicate buttons) */}
+                  <div className="w-full grid grid-cols-2 gap-2 pt-3 mt-1 border-t border-amber-100/70 text-[11px] font-bold text-slate-700">
+                    <div className="bg-[#fef8eb] px-2.5 py-2 rounded-xl text-[#b47a16] border border-amber-200/80 flex items-center justify-center gap-1.5 shadow-2xs">
+                      <Send className="h-3.5 w-3.5 text-[#b47a16] shrink-0" />
+                      <span>Direct Broadcasts</span>
+                    </div>
+                    <div className="bg-[#ecf8f5] px-2.5 py-2 rounded-xl text-emerald-800 border border-emerald-100/80 flex items-center justify-center gap-1.5 shadow-2xs">
+                      <Zap className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <span>Auto Grading</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* 6 EDUCATOR CAPABILITIES GRID */}
+            <section className="space-y-6 pt-2">
+              <div className="text-center max-w-2xl mx-auto space-y-1.5">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-900 bg-amber-100/80 px-3 py-1 rounded-full border border-amber-300/60 shadow-2xs">
+                  <span>★</span>
+                  <span>Exclusively For Educators</span>
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26]">
+                  Everything You Need to Run Your Classes
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600">
+                  Replace fragmented WhatsApp groups and paper receipts with a unified, professional academy system.
                 </p>
               </div>
 
-              {/* Feature 2 */}
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
-                <div className="h-10 w-10 rounded-xl bg-[#fef8eb] text-[#b47a16] flex items-center justify-center">
-                  <BookOpen className="h-5 w-5" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 sm:gap-5">
+                {/* Feature 1 */}
+                <div className="lg:col-span-2 p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-amber-100/80 hover:border-[#b47a16] transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-[#fef8eb] text-[#b47a16] flex items-center justify-center font-black">
+                    <Send className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Live Student Noticeboard</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Post high-priority announcements, homework tasks, and class notices with edit, pin, and delete controls directly visible to all students.
+                  </p>
                 </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Course & Lesson Studio</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Organize theory, revision, and paper class materials into Units and Topics with downloadable PDFs, video tutorials, and past papers.
+
+                {/* Feature 2 */}
+                <div className="lg:col-span-2 p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100/80 hover:border-[#0d5c4d] transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center font-black">
+                    <BookOpen className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Course &amp; Lesson Studio</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Organize theory, revision, and paper class materials into Units and Topics with downloadable PDFs, video tutorials, and past papers.
+                  </p>
+                </div>
+
+                {/* Feature 3 */}
+                <div className="lg:col-span-2 p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-sky-100/80 hover:border-sky-600 transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center font-black">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Online Quizzes &amp; Ranking</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Build timed MCQ practice tests with automated mark calculation, answer reviews, and batch leaderboard standings.
+                  </p>
+                </div>
+
+                {/* Feature 4 */}
+                <div className="lg:col-span-2 lg:col-start-2 p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100/80 hover:border-emerald-600 transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black">
+                    <CreditCard className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Tuition Fee Reconciliation</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Review student/parent bank deposit slips with 1-click approvals, digital payment receipts, and real-time payment status lists.
+                  </p>
+                </div>
+
+                {/* Feature 5 */}
+                <div className="sm:col-span-2 sm:max-w-md sm:mx-auto w-full lg:col-span-2 lg:max-w-none lg:mx-0 p-5 sm:p-6 rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-purple-100/80 hover:border-purple-600 transition-all space-y-3 shadow-xs hover:shadow-lg">
+                  <div className="h-11 w-11 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center font-black">
+                    <BarChart3 className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-black text-sm text-[#0d2b26]">Performance Insights</h3>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Spot students falling behind early with clear charts on assignment completion, quiz averages, and class consistency.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            {/* CHEERFUL CLOSING CALLOUT & ROLE SWITCHER (GATEWAY DNA) */}
+            <section className="text-center pt-6 pb-2 space-y-4">
+              <div className="flex items-center justify-center gap-2 text-amber-500 font-black text-xs sm:text-sm tracking-widest">
+                <span>˗ˏˋ</span>
+                <p className="font-extrabold text-sm sm:text-base text-slate-800 tracking-wide">
+                  Together for a Smarter Tomorrow
                 </p>
+                <span>ˎˊ˗</span>
               </div>
 
-              {/* Feature 3 */}
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
-                <div className="h-10 w-10 rounded-xl bg-[#f0f5fa] text-[#1e3a5f] flex items-center justify-center">
-                  <FileText className="h-5 w-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Online Quizzes & Ranking</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Build timed MCQ practice tests with automated mark calculation, answer reviews, and batch leaderboard standings.
-                </p>
-              </div>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => openAuth("signup", "teacher", "drawer")}
+                  className="bg-[#b47a16] hover:bg-[#8d5f10] text-white font-black text-sm py-3 px-8 rounded-full shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer group"
+                >
+                  <Sparkles className="h-4 w-4 text-[#fde047]" />
+                  <span>Register Tutor Account Now</span>
+                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </button>
 
-              {/* Feature 4 */}
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
-                <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                  <CreditCard className="h-5 w-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Tuition Fee Reconciliation</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Review student/parent bank deposit slips with 1-click approvals, digital payment receipts, and real-time payment status lists.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => handlePortalSwitch("gateway")}
+                  className="bg-white/90 border border-slate-300 hover:bg-slate-50 text-slate-700 font-extrabold text-xs py-3 px-5 rounded-full shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
+                  <span>← Back to Role Gateway</span>
+                </button>
               </div>
-
-              {/* Feature 5 */}
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
-                <div className="h-10 w-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center">
-                  <QrCode className="h-5 w-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Smart QR Attendance</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Scan student IDs or mark attendance in seconds. Parents receive instant notification that their child has checked into class.
-                </p>
-              </div>
-
-              {/* Feature 6 */}
-              <div className="p-6 rounded-2xl bg-white border border-[#e6ece8] hover:border-[#0d5c4d] shadow-2xs hover:shadow-md transition-all space-y-3">
-                <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
-                  <BarChart3 className="h-5 w-5" />
-                </div>
-                <h3 className="font-black text-sm text-[#0d2b26]">Student Performance Insights</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Spot students falling behind early with clear charts on assignment completion, quiz averages, and class consistency.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Quick Return to Splitter */}
-          <div className="text-center pt-4">
-            <button
-              type="button"
-              onClick={() => handlePortalSwitch("gateway")}
-              className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back to Portal Selection</span>
-            </button>
+            </section>
           </div>
-        </main>
+
+          {/* Bottom Dual-Tone Wave Curves */}
+          <div className="relative pointer-events-none overflow-hidden leading-none z-0 mt-8">
+            <svg
+              viewBox="0 0 1440 220"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-full h-20 sm:h-28 lg:h-32"
+              preserveAspectRatio="none"
+            >
+              <path
+                d="M0,60 C320,150 480,20 820,100 C1100,170 1300,70 1440,110 L1440,220 L0,220 Z"
+                fill="#fde047"
+                fillOpacity="0.4"
+              />
+              <path
+                d="M0,100 C260,180 540,60 880,130 C1160,190 1340,90 1440,130 L1440,220 L0,220 Z"
+                fill="#fbbf24"
+                fillOpacity="0.4"
+              />
+              <path
+                d="M0,135 C300,70 640,190 980,100 C1220,40 1380,150 1440,120 L1440,220 L0,220 Z"
+                fill="#6ee7b7"
+                fillOpacity="0.45"
+              />
+              <path
+                d="M0,180 C360,140 720,210 1080,165 C1260,145 1380,195 1440,180 L1440,220 L0,220 Z"
+                fill="#ebf8f4"
+                fillOpacity="0.85"
+              />
+            </svg>
+          </div>
+        </div>
       )}
 
       {/* Footer - only shown on Portal landing pages, Gateway has its own compact footer */}
       {portalType !== "gateway" && (
-        <footer className="border-t border-[#e6ece8] bg-white py-10 px-6 text-center text-xs text-slate-500">
+        <footer className={`py-8 px-6 text-center text-xs transition-colors ${
+          portalType === "student"
+            ? "border-t border-amber-200/50 bg-[#fef8eb] text-slate-600"
+            : portalType === "parent"
+            ? "border-t border-sky-200/50 bg-[#eef5fc] text-slate-600"
+            : portalType === "staff"
+            ? "border-t border-emerald-100/60 bg-[#ebf8f4] text-slate-600"
+            : "border-t border-[#e6ece8] bg-white text-slate-500"
+        }`}>
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 rounded-lg bg-[#f3b738] flex items-center justify-center text-slate-950 font-black text-base">
