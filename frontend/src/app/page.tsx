@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { useApp } from "@/context/AppContext";
-import { PrototypeBar } from "@/components/layout/PrototypeBar";
 import { Navbar } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ToastContainer } from "@/components/ui/toast";
@@ -43,7 +42,6 @@ export default function HomePage() {
   if (isLanding) {
     return (
       <div className={theme === "dark" ? "dark bg-slate-950" : "bg-slate-50"}>
-        <PrototypeBar />
         <LandingView onEnterApp={() => setIsLanding(false)} />
         <ToastContainer />
       </div>
@@ -237,9 +235,6 @@ export default function HomePage() {
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-[#fbfcfb] text-[#0d2b26]">
-      {/* Top Prototype Controls */}
-      <PrototypeBar />
-
       {/* Navbar - Permanently Anchored & Fixed at top */}
       <Navbar onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} />
 
