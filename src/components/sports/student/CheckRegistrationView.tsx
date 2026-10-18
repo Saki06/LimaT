@@ -19,7 +19,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { StoredAthleteRegistration } from "./sportsRegistrationData";
+import { StoredAthleteRegistration } from "@/components/sports/sportsRegistrationData";
 
 interface CheckRegistrationViewProps {
   registrations: StoredAthleteRegistration[];

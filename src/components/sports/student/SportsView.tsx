@@ -31,11 +31,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { Tournament, TournamentFormat, TournamentStatus, Fixture } from "@/types/lms";
-import { SportsRegistrationWizard } from "@/components/sports/SportsRegistrationWizard";
-import { CheckRegistrationView } from "@/components/sports/CheckRegistrationView";
-import { AdminSportsRegistrationsDesk } from "@/components/sports/AdminSportsRegistrationsDesk";
-import { ChampionshipStandingsView } from "@/components/sports/ChampionshipStandingsView";
-import { MatchCenterFixturesView } from "@/components/sports/MatchCenterFixturesView";
+import { SportsRegistrationWizard } from "./SportsRegistrationWizard";
+import { CheckRegistrationView } from "./CheckRegistrationView";
+import { AdminSportsRegistrationsDesk } from "../admin/AdminSportsRegistrationsDesk";
+import { ChampionshipStandingsView } from "./ChampionshipStandingsView";
+import { MatchCenterFixturesView } from "./MatchCenterFixturesView";
 import {
   INITIAL_CHAMPIONSHIP_SPORTS,
   INITIAL_ATHLETE_REGISTRATIONS,
@@ -725,7 +725,7 @@ export function SportsView({
           defaultFixtures={fixtures}
           isAdminOrTeacher={isAdminOrTeacher}
           onScheduleNewFixture={() => setIsScheduleFixtureModalOpen(true)}
-          onRecordScore={(fixtureId) => setSelectedFixtureForScore(fixtureId)}
+          onRecordScore={(fixtureId: string) => setSelectedFixtureForScore(fixtureId)}
         />
       )}
 

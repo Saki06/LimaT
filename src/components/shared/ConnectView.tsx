@@ -51,7 +51,7 @@ import {
   Eye,
   EyeOff
 } from "lucide-react";
-import { TeacherConnectView } from "@/components/views/TeacherConnectView";
+import { TeacherConnectView } from "@/components/teacher/TeacherConnectView";
 
 type ConnectTab = "teachers" | "purchases" | "groups" | "students";
 

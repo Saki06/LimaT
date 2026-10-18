@@ -6,27 +6,34 @@ import { PrototypeBar } from "@/components/layout/PrototypeBar";
 import { Navbar } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ToastContainer } from "@/components/ui/toast";
-import { LandingView } from "@/components/views/LandingView";
-import { StudentDashboard } from "@/components/views/StudentDashboard";
-import { CourseViews } from "@/components/views/CourseViews";
-import { AssignmentViews } from "@/components/views/AssignmentViews";
-import { QuizViews } from "@/components/views/QuizViews";
-import { ResultsView } from "@/components/views/ResultsView";
-import { TeacherViews } from "@/components/views/TeacherViews";
-import { AdminViews } from "@/components/views/AdminViews";
-import { AnnouncementsView } from "@/components/views/AnnouncementsView";
-import { LibraryViews } from "@/components/views/LibraryViews";
-import { ExamViews } from "@/components/views/ExamViews";
-import { SportsView } from "@/components/views/SportsView";
-import { EventsView } from "@/components/views/EventsView";
-import { TimetableView } from "@/components/views/TimetableView";
-import { StudentProgressView } from "@/components/views/StudentProgressView";
-import { ConnectView } from "@/components/views/ConnectView";
-import { ProfileView } from "@/components/views/ProfileView";
-import { SyllabusBuilderView } from "@/components/views/SyllabusBuilderView";
-import { LiveScheduleView } from "@/components/views/LiveScheduleView";
-import { SuperAdminPortalView } from "@/components/views/SuperAdminPortalView";
-import { ParentDashboardView } from "@/components/views/ParentDashboardView";
+import { LandingView } from "@/components/auth/LandingView";
+import {
+  StudentDashboard,
+  CourseViews,
+  AssignmentViews,
+  QuizViews,
+  ExamViews,
+  ResultsView,
+  TimetableView,
+  StudentProgressView
+} from "@/components/student";
+import {
+  TeacherViews,
+  TeacherConnectView,
+  SyllabusBuilderView,
+  LiveScheduleView
+} from "@/components/teacher";
+import { ParentDashboardView } from "@/components/parent";
+import { AdminViews } from "@/components/admin";
+import { SuperAdminPortalView } from "@/components/super-admin";
+import { SportsView } from "@/components/sports";
+import {
+  AnnouncementsView,
+  LibraryViews,
+  EventsView,
+  ConnectView,
+  ProfileView
+} from "@/components/shared";
 
 export default function HomePage() {
   const { currentRole, currentView, theme, isLanding, setIsLanding } = useApp();

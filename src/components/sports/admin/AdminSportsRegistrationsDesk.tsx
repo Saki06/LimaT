@@ -30,7 +30,7 @@ import {
   StoredAthleteRegistration,
   ChampionshipSportItem,
   INITIAL_CHAMPIONSHIP_SPORTS
-} from "./sportsRegistrationData";
+} from "@/components/sports/sportsRegistrationData";
 
 interface AdminSportsRegistrationsDeskProps {
   registrations: StoredAthleteRegistration[];

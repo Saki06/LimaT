@@ -38,7 +38,7 @@ import {
   StoredAthleteRegistration,
   SquadPlayer,
   TeamSquadDetails
-} from "./sportsRegistrationData";
+} from "@/components/sports/sportsRegistrationData";
 
 interface SportsRegistrationWizardProps {
   onRegistrationComplete: (registration: StoredAthleteRegistration) => void;

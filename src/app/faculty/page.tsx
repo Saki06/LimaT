@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { LandingView } from "@/components/views/LandingView";
+import { LandingView } from "@/components/auth/LandingView";
 import { PrototypeBar } from "@/components/layout/PrototypeBar";
 import { ToastContainer } from "@/components/ui/toast";
 import { useApp } from "@/context/AppContext";
