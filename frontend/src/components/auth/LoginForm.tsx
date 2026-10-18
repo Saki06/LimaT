@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Phone, Mail, Lock, Eye, EyeOff, LogIn } from "lucide-react";
+import { Phone, Mail, Lock, Eye, EyeOff, LogIn, Loader2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { SupportedRole } from "./types";
 
@@ -11,19 +11,20 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
-  const { setCurrentRole, addToast } = useApp();
+  const { setCurrentRole, addToast, loginUser } = useApp();
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Sri Lankan Parent OTP login states
   const [parentLoginMethod, setParentLoginMethod] = useState<"password" | "otp">("password");
   const [parentOtpSent, setParentOtpSent] = useState(false);
   const [parentOtpCode, setParentOtpCode] = useState("");
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (selectedRole === "parent" && parentLoginMethod === "otp" && !parentOtpSent) {
@@ -44,18 +45,41 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
       return;
     }
 
-    setCurrentRole(selectedRole);
-    addToast({
-      type: "success",
-      title: "Login Successful",
-      message:
-        selectedRole === "parent"
-          ? "Welcome to Parent Guardian Desk! Live attendance and fee receipts loaded."
-          : selectedRole === "teacher"
-          ? "Welcome to Tutor Cockpit! Course creator desk loaded."
-          : "Welcome back to LimaT Smart Book! Learning feed loaded."
-    });
-    onSuccess();
+    if (selectedRole === "parent" && parentLoginMethod === "otp" && parentOtpSent) {
+      if (parentOtpCode.trim().length !== 6) {
+        addToast({
+          type: "error",
+          title: "Invalid OTP Code",
+          message: "Please enter the complete 6-digit SMS verification code."
+        });
+        return;
+      }
+      setCurrentRole("parent");
+      onSuccess();
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await loginUser(loginEmail.trim(), loginPassword);
+      if (res.success) {
+        onSuccess();
+      } else {
+        addToast({
+          type: "error",
+          title: "Authentication Failed",
+          message: res.message || "Invalid email or password. Please verify your credentials."
+        });
+      }
+    } catch (err: any) {
+      addToast({
+        type: "error",
+        title: "Connection Error",
+        message: err.message || "Could not reach the authentication server."
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -243,7 +267,10 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
 
             <button
               type="submit"
+              disabled={isLoading}
               className={`w-full text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1 ${
+                isLoading ? "opacity-75 cursor-not-allowed" : ""
+              } ${
                 selectedRole === "parent"
                   ? "bg-[#1e3a5f] hover:bg-[#152a45]"
                   : selectedRole === "teacher"
@@ -251,15 +278,24 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
                   : "bg-[#0d5c4d] hover:bg-[#083e34]"
               }`}
             >
-              <LogIn className="h-4 w-4" />
-              <span>
-                Sign In to{" "}
-                {selectedRole === "student"
-                  ? "Student Portal"
-                  : selectedRole === "parent"
-                  ? "Parent Portal"
-                  : "Tutor Cockpit"}
-              </span>
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Verifying Credentials...</span>
+                </>
+              ) : (
+                <>
+                  <LogIn className="h-4 w-4" />
+                  <span>
+                    Sign In to{" "}
+                    {selectedRole === "student"
+                      ? "Student Portal"
+                      : selectedRole === "parent"
+                      ? "Parent Portal"
+                      : "Tutor Cockpit"}
+                  </span>
+                </>
+              )}
             </button>
           </>
         )}

@@ -49,6 +49,7 @@ import {
   initialLibraryResources
 } from '@/data/mockData';
 import { getTranslation } from '@/lib/i18n';
+import { api } from '@/lib/api';
 
 interface ToastMessage {
   id: string;
@@ -74,6 +75,12 @@ interface AppContextType {
   landingPortal: 'gateway' | 'student' | 'parent' | 'staff';
   setLandingPortal: (portal: 'gateway' | 'student' | 'parent' | 'staff') => void;
   t: ReturnType<typeof getTranslation>;
+
+  // Authentication State & Actions
+  authUser: any | null;
+  authToken: string | null;
+  loginUser: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  logoutUser: () => void;
 
   // Data Collections
   schools: School[];
@@ -271,9 +278,87 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [authUser, setAuthUser] = useState<any | null>(null);
+
+  // Restore authenticated session from localStorage on initial load
+  useEffect(() => {
+    const token = api.token.get();
+    const user = api.user.get();
+    if (token && user) {
+      setAuthToken(token);
+      setAuthUser(user);
+      const roleMap: Record<string, UserRole> = {
+        STUDENT: 'student',
+        TEACHER: 'teacher',
+        PARENT: 'parent',
+        ADMIN: 'admin',
+        SUPER_ADMIN: 'super_admin'
+      };
+      if (user.role && roleMap[user.role]) {
+        setCurrentRole(roleMap[user.role]);
+      }
+      setIsLanding(false);
+    }
+  }, []);
+
+  const loginUser = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const res = await api.auth.login({ email, password });
+      if (res.success && res.token && res.user) {
+        api.token.set(res.token);
+        api.user.set(res.user);
+        setAuthToken(res.token);
+        setAuthUser(res.user);
+        const roleMap: Record<string, UserRole> = {
+          STUDENT: 'student',
+          TEACHER: 'teacher',
+          PARENT: 'parent',
+          ADMIN: 'admin',
+          SUPER_ADMIN: 'super_admin'
+        };
+        if (res.user.role && roleMap[res.user.role]) {
+          setCurrentRole(roleMap[res.user.role]);
+        }
+        setIsLanding(false);
+        addToast({
+          type: 'success',
+          title: 'Login Successful',
+          message: `Welcome back, ${res.user.firstName || 'User'}!`
+        });
+        return { success: true };
+      }
+      return { success: false, message: res.message || 'Invalid credentials' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to connect to backend server' };
+    }
+  };
+
+  const logoutUser = () => {
+    api.token.remove();
+    api.user.remove();
+    setAuthToken(null);
+    setAuthUser(null);
+    setIsLanding(true);
+    addToast({
+      type: 'info',
+      title: 'Signed Out',
+      message: 'You have been successfully signed out.'
+    });
+  };
 
   const t = getTranslation(locale);
-  const currentUser = mockUsers[currentRole];
+  const baseUser = mockUsers[currentRole];
+  const currentUser: User = authUser
+    ? {
+        ...baseUser,
+        id: authUser.id,
+        name: `${authUser.firstName} ${authUser.lastName}`.trim() || authUser.email,
+        email: authUser.email,
+        role: currentRole,
+        avatar: authUser.avatarUrl || baseUser.avatar
+      }
+    : baseUser;
 
   const addToast = (toast: Omit<ToastMessage, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -1290,7 +1375,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isFeatureEnabled,
         toasts,
         addToast,
-        removeToast
+        removeToast,
+        authUser,
+        authToken,
+        loginUser,
+        logoutUser
       }}
     >
       {children}

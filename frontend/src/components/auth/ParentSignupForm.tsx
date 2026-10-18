@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { Users, User as UserIcon, Phone, GraduationCap, Lock, UserPlus } from "lucide-react";
+import { Users, User as UserIcon, Phone, GraduationCap, Lock, UserPlus, Loader2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import { api } from "@/lib/api";
 
 interface ParentSignupFormProps {
   onSuccess: () => void;
@@ -20,8 +21,9 @@ export function ParentSignupForm({ onSuccess }: ParentSignupFormProps) {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [parentConsent, setParentConsent] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (signupPassword && signupConfirmPassword && signupPassword !== signupConfirmPassword) {
@@ -51,13 +53,43 @@ export function ParentSignupForm({ onSuccess }: ParentSignupFormProps) {
       return;
     }
 
-    setCurrentRole("parent");
-    addToast({
-      type: "success",
-      title: "Guardian Account Registered!",
-      message: `Welcome, ${parentTitle} ${signupName}! Account successfully linked with ${childName}.`
-    });
-    onSuccess();
+    setIsLoading(true);
+    try {
+      const parentEmail = `${parentPhone.replace(/[^0-9]/g, '')}@parent.lms.edu`;
+      const res = await api.auth.registerParent({
+        firstName: `${parentTitle} ${signupName}`.trim(),
+        email: parentEmail,
+        password: signupPassword,
+        phoneNumber: parentPhone,
+        childStudentId: childPhoneOrId,
+      });
+
+      if (res.success && res.token && res.user) {
+        api.token.set(res.token);
+        api.user.set(res.user);
+        setCurrentRole("parent");
+        addToast({
+          type: "success",
+          title: "Guardian Account Registered!",
+          message: `Welcome, ${parentTitle} ${signupName}! Account successfully linked with ${childName}.`
+        });
+        onSuccess();
+      } else {
+        addToast({
+          type: "error",
+          title: "Registration Failed",
+          message: res.message || "Could not complete guardian registration."
+        });
+      }
+    } catch (err: any) {
+      addToast({
+        type: "error",
+        title: "Connection Error",
+        message: err.message || "Could not reach registration server."
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -223,10 +255,22 @@ export function ParentSignupForm({ onSuccess }: ParentSignupFormProps) {
 
         <button
           type="submit"
-          className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer mt-2"
+          disabled={isLoading}
+          className={`w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer mt-2 ${
+            isLoading ? "opacity-75 cursor-not-allowed" : ""
+          }`}
         >
-          <UserPlus className="h-4 w-4" />
-          <span>Complete Parent Registration &amp; Link Student</span>
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Registering Guardian Profile...</span>
+            </>
+          ) : (
+            <>
+              <UserPlus className="h-4 w-4" />
+              <span>Complete Parent Registration &amp; Link Student</span>
+            </>
+          )}
         </button>
       </div>
     </form>
