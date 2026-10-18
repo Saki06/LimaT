@@ -1,61 +1,130 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { prisma } from '../config/prisma';
 import { config } from '../config';
+import { Role } from '@prisma/client';
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password } = req.body;
 
     if (!email || !password) {
       res.status(400).json({ success: false, message: 'Email and password are required.' });
       return;
     }
 
-    // Demo / mock authentication response for rapid development and testing
-    const demoPayload = {
-      userId: 'usr-' + Date.now(),
-      email,
-      role: (role ? role.toUpperCase() : 'STUDENT') as any,
-      tenantId: 'tenant-apex-academy',
-      firstName: email.split('@')[0],
-      lastName: 'User',
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        tenant: true,
+        studentProfile: true,
+        teacherProfile: true,
+        parentProfile: true,
+      },
+    });
+
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Invalid email or password.' });
+      return;
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      res.status(401).json({ success: false, message: 'Invalid email or password.' });
+      return;
+    }
+
+    const payload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      firstName: user.firstName,
+      lastName: user.lastName,
     };
 
-    const token = jwt.sign(demoPayload, config.jwtSecret, { expiresIn: '7d' });
+    const token = jwt.sign(payload, config.jwtSecret, { expiresIn: '7d' });
 
     res.status(200).json({
       success: true,
       message: 'Logged in successfully',
       token,
-      user: demoPayload,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        tenant: user.tenant,
+        studentProfile: user.studentProfile,
+        teacherProfile: user.teacherProfile,
+        parentProfile: user.parentProfile,
+      },
     });
   } catch (error: any) {
+    console.error('Login error:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
 
 export const registerStudent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { firstName, lastName, email, password, gradeLevel, studentIdNo } = req.body;
+    const { firstName, lastName, email, password, gradeLevel, studentIdNo, tenantId } = req.body;
 
     if (!email || !password || !firstName) {
       res.status(400).json({ success: false, message: 'Missing required student registration fields' });
       return;
     }
 
-    const newUser = {
-      userId: 'stu-' + Date.now(),
-      email,
-      role: 'STUDENT',
-      firstName,
-      lastName: lastName || '',
-      gradeLevel: gradeLevel || 'Grade 10',
-      studentIdNo: studentIdNo || 'STU-' + Math.floor(1000 + Math.random() * 9000),
-      tenantId: 'tenant-apex-academy',
-    };
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      res.status(409).json({ success: false, message: 'Email already registered.' });
+      return;
+    }
 
-    const token = jwt.sign(newUser, config.jwtSecret, { expiresIn: '7d' });
+    // Default to first tenant if none specified
+    let selectedTenantId = tenantId;
+    if (!selectedTenantId) {
+      const defaultTenant = await prisma.tenant.findFirst();
+      selectedTenantId = defaultTenant?.id;
+    }
+
+    if (!selectedTenantId) {
+      res.status(400).json({ success: false, message: 'No valid tenant found to register student' });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const newUser = await prisma.user.create({
+      data: {
+        tenantId: selectedTenantId,
+        email,
+        passwordHash,
+        role: Role.STUDENT,
+        firstName,
+        lastName: lastName || '',
+        studentProfile: {
+          create: {
+            studentIdNo: studentIdNo || 'STU-' + Math.floor(1000 + Math.random() * 9000),
+            gradeLevel: gradeLevel || 'Grade 10',
+          },
+        },
+      },
+      include: { studentProfile: true },
+    });
+
+    const token = jwt.sign(
+      {
+        userId: newUser.id,
+        email: newUser.email,
+        role: newUser.role,
+        tenantId: newUser.tenantId,
+      },
+      config.jwtSecret,
+      { expiresIn: '7d' }
+    );
 
     res.status(201).json({
       success: true,
@@ -64,31 +133,62 @@ export const registerStudent = async (req: Request, res: Response): Promise<void
       user: newUser,
     });
   } catch (error: any) {
+    console.error('Register student error:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
 
 export const registerTutor = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { firstName, lastName, email, password, specialization, employeeNo } = req.body;
+    const { firstName, lastName, email, password, specialization, employeeNo, tenantId } = req.body;
 
     if (!email || !password || !firstName) {
-      res.status(400).json({ success: false, message: 'Missing required tutor registration fields' });
+      res.status(400).json({ success: false, message: 'Missing required tutor fields' });
       return;
     }
 
-    const newUser = {
-      userId: 'tut-' + Date.now(),
-      email,
-      role: 'TEACHER',
-      firstName,
-      lastName: lastName || '',
-      specialization: specialization || 'Computer Science',
-      employeeNo: employeeNo || 'FAC-' + Math.floor(1000 + Math.random() * 9000),
-      tenantId: 'tenant-apex-academy',
-    };
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      res.status(409).json({ success: false, message: 'Email already registered.' });
+      return;
+    }
 
-    const token = jwt.sign(newUser, config.jwtSecret, { expiresIn: '7d' });
+    let selectedTenantId = tenantId;
+    if (!selectedTenantId) {
+      const defaultTenant = await prisma.tenant.findFirst();
+      selectedTenantId = defaultTenant?.id;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const newUser = await prisma.user.create({
+      data: {
+        tenantId: selectedTenantId!,
+        email,
+        passwordHash,
+        role: Role.TEACHER,
+        firstName,
+        lastName: lastName || '',
+        teacherProfile: {
+          create: {
+            specialization: specialization || 'General Science',
+            employeeNo: employeeNo || 'FAC-' + Math.floor(1000 + Math.random() * 9000),
+          },
+        },
+      },
+      include: { teacherProfile: true },
+    });
+
+    const token = jwt.sign(
+      {
+        userId: newUser.id,
+        email: newUser.email,
+        role: newUser.role,
+        tenantId: newUser.tenantId,
+      },
+      config.jwtSecret,
+      { expiresIn: '7d' }
+    );
 
     res.status(201).json({
       success: true,
@@ -97,31 +197,61 @@ export const registerTutor = async (req: Request, res: Response): Promise<void> 
       user: newUser,
     });
   } catch (error: any) {
+    console.error('Register tutor error:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
 
 export const registerParent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { firstName, lastName, email, password, phoneNumber, childStudentId } = req.body;
+    const { firstName, lastName, email, password, phoneNumber, childStudentId, tenantId } = req.body;
 
     if (!email || !password || !firstName) {
-      res.status(400).json({ success: false, message: 'Missing required parent registration fields' });
+      res.status(400).json({ success: false, message: 'Missing required parent fields' });
       return;
     }
 
-    const newUser = {
-      userId: 'par-' + Date.now(),
-      email,
-      role: 'PARENT',
-      firstName,
-      lastName: lastName || '',
-      phoneNumber: phoneNumber || '',
-      childStudentId: childStudentId || '',
-      tenantId: 'tenant-apex-academy',
-    };
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      res.status(409).json({ success: false, message: 'Email already registered.' });
+      return;
+    }
 
-    const token = jwt.sign(newUser, config.jwtSecret, { expiresIn: '7d' });
+    let selectedTenantId = tenantId;
+    if (!selectedTenantId) {
+      const defaultTenant = await prisma.tenant.findFirst();
+      selectedTenantId = defaultTenant?.id;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const newUser = await prisma.user.create({
+      data: {
+        tenantId: selectedTenantId!,
+        email,
+        passwordHash,
+        role: Role.PARENT,
+        firstName,
+        lastName: lastName || '',
+        parentProfile: {
+          create: {
+            phoneNumber: phoneNumber || null,
+          },
+        },
+      },
+      include: { parentProfile: true },
+    });
+
+    const token = jwt.sign(
+      {
+        userId: newUser.id,
+        email: newUser.email,
+        role: newUser.role,
+        tenantId: newUser.tenantId,
+      },
+      config.jwtSecret,
+      { expiresIn: '7d' }
+    );
 
     res.status(201).json({
       success: true,
@@ -130,6 +260,7 @@ export const registerParent = async (req: Request, res: Response): Promise<void>
       user: newUser,
     });
   } catch (error: any) {
+    console.error('Register parent error:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };

@@ -1,58 +1,52 @@
 import { Request, Response } from 'express';
+import { prisma } from '../config/prisma';
+import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 export const listSportsEvents = async (req: Request, res: Response): Promise<void> => {
   try {
-    const events = [
-      {
-        id: 'evt-cricket-2026',
-        name: 'Inter-House Cricket Championship 2026',
-        sport: 'Cricket',
-        category: 'Inter-House',
-        fee: 0,
-        registrationDeadline: '2026-11-05',
-        status: 'Open',
-        slots: { total: 120, registered: 84 },
+    const events = await prisma.sportsEvent.findMany({
+      include: {
+        _count: {
+          select: { registrations: true },
+        },
       },
-      {
-        id: 'evt-football-2026',
-        name: 'State School Football League',
-        sport: 'Football',
-        category: 'State Championship',
-        fee: 500,
-        registrationDeadline: '2026-11-12',
-        status: 'Open',
-        slots: { total: 90, registered: 76 },
-      },
-    ];
+      orderBy: { startDate: 'asc' },
+    });
 
     res.status(200).json({ success: true, data: events });
   } catch (error: any) {
+    console.error('Error listing sports events:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
 
-export const registerForSport = async (req: Request, res: Response): Promise<void> => {
+export const registerForSport = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { eventId, studentName, studentId, emergencyContact, preferredPosition } = req.body;
+    const { eventId, jerseyNumber, roleInTeam, notes } = req.body;
+    const userId = req.user?.userId;
 
-    if (!eventId || !studentName) {
-      res.status(400).json({ success: false, message: 'Event ID and Student Name are required' });
+    if (!eventId || !userId) {
+      res.status(400).json({ success: false, message: 'Event ID and authenticated User are required' });
       return;
     }
 
-    const registration = {
-      id: 'reg-' + Date.now(),
-      eventId,
-      studentName,
-      studentId: studentId || 'STU-DEMO',
-      emergencyContact,
-      preferredPosition,
-      status: 'Confirmed',
-      registeredAt: new Date().toISOString(),
-    };
+    const registration = await prisma.sportsRegistration.create({
+      data: {
+        eventId,
+        userId,
+        jerseyNumber: jerseyNumber ? parseInt(jerseyNumber, 10) : null,
+        roleInTeam,
+        notes,
+      },
+    });
 
-    res.status(201).json({ success: true, message: 'Registration submitted successfully', data: registration });
+    res.status(201).json({
+      success: true,
+      message: 'Registered for sport event successfully',
+      data: registration,
+    });
   } catch (error: any) {
+    console.error('Error registering for sport:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
