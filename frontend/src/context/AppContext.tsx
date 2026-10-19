@@ -780,10 +780,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createAssignment = (asg: Partial<Assignment>) => {
+    const targetCourse = courses.find((c) => c.id === asg.courseId);
+    const resolvedSubjectName = asg.subjectName || targetCourse?.title || 'Combined Mathematics';
+
     const newAsg: Assignment = {
       id: `asg_${Date.now()}`,
-      courseId: asg.courseId || 'crs_math_12',
-      subjectName: asg.subjectName || 'Combined Mathematics',
+      courseId: asg.courseId || targetCourse?.id || 'crs_math_12',
+      subjectName: resolvedSubjectName,
       title: asg.title || 'New Assignment',
       instructions: asg.instructions || 'Follow problem set guidelines.',
       topicName: asg.topicName || 'General Topic',
@@ -798,13 +801,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addToast({
       type: 'success',
       title: 'Assignment Created & Published',
-      message: 'All enrolled students can now view and submit this assignment.'
+      message: `New assignment for "${resolvedSubjectName}" published successfully.`
     });
   };
 
   const updateAssignment = (id: string, updates: Partial<Assignment>) => {
     setAssignments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, ...updates } : a))
+      prev.map((a) => {
+        if (a.id !== id) return a;
+        const targetCourse = updates.courseId ? courses.find((c) => c.id === updates.courseId) : undefined;
+        return {
+          ...a,
+          ...updates,
+          subjectName: updates.subjectName || targetCourse?.title || a.subjectName,
+        };
+      })
     );
     addToast({
       type: 'success',
