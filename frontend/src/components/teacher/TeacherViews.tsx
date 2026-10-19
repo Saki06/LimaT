@@ -147,6 +147,7 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
   // New assignment form state
   const [newTitle, setNewTitle] = useState("");
   const [newTopic, setNewTopic] = useState("Unit 1: Quadratic Functions");
+  const [customTopic, setCustomTopic] = useState("");
   const [newDueDate, setNewDueDate] = useState("2026-10-18 23:59");
   const [newMaxMarks, setNewMaxMarks] = useState(100);
   const [newInstructions, setNewInstructions] = useState("");
@@ -159,10 +160,28 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
   const [editCourseId, setEditCourseId] = useState("");
   const [editTitle, setEditTitle] = useState("");
   const [editTopic, setEditTopic] = useState("");
+  const [editCustomTopic, setEditCustomTopic] = useState("");
   const [editMaxMarks, setEditMaxMarks] = useState(100);
   const [editDueDate, setEditDueDate] = useState("");
   const [editInstructions, setEditInstructions] = useState("");
   const [editAsgPdfFile, setEditAsgPdfFile] = useState<{ name: string; size: string } | null>(null);
+
+  // Dynamically extract syllabus units & topics for the chosen assignment course
+  const currentAsgCourse = courses.find((c) => c.id === newCourseId) || courses[0];
+  const asgAvailableTopics = useMemo(() => {
+    if (!currentAsgCourse?.units || currentAsgCourse.units.length === 0) return [];
+    return currentAsgCourse.units.flatMap((u) =>
+      u.topics.map((t) => `${u.title} • ${t.title}`)
+    );
+  }, [currentAsgCourse]);
+
+  const currentEditAsgCourse = courses.find((c) => c.id === editCourseId) || courses[0];
+  const editAsgAvailableTopics = useMemo(() => {
+    if (!currentEditAsgCourse?.units || currentEditAsgCourse.units.length === 0) return [];
+    return currentEditAsgCourse.units.flatMap((u) =>
+      u.topics.map((t) => `${u.title} • ${t.title}`)
+    );
+  }, [currentEditAsgCourse]);
 
   // New lesson form state with full multi-format upload support
   const [lessonCourseId, setLessonCourseId] = useState(courses[0]?.id || "crs_math_12");
@@ -295,10 +314,13 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
   const handleCreateAssignmentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle) return;
+    const targetCourse = courses.find((c) => c.id === newCourseId) || courses[0];
+    const finalTopic = newTopic === "__custom__" ? customTopic || "General Topic" : newTopic;
     createAssignment({
-      courseId: newCourseId || courses[0]?.id,
+      courseId: targetCourse?.id || courses[0]?.id,
+      subjectName: targetCourse?.title || "Combined Mathematics",
       title: newTitle,
-      topicName: newTopic,
+      topicName: finalTopic,
       dueDate: newDueDate,
       maxMarks: Number(newMaxMarks),
       instructions: newInstructions,
@@ -307,16 +329,20 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
     setIsCreateAsgModalOpen(false);
     setNewTitle("");
     setNewInstructions("");
+    setCustomTopic("");
     setAsgPdfFile(null);
   };
 
   const handleUpdateAssignmentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAsgId || !editTitle) return;
+    const targetCourse = courses.find((c) => c.id === editCourseId) || courses[0];
+    const finalTopic = editTopic === "__custom__" ? editCustomTopic || "General Topic" : editTopic;
     updateAssignment(editingAsgId, {
-      courseId: editCourseId,
+      courseId: targetCourse?.id || editCourseId,
+      subjectName: targetCourse?.title,
       title: editTitle,
-      topicName: editTopic,
+      topicName: finalTopic,
       dueDate: editDueDate,
       maxMarks: Number(editMaxMarks),
       instructions: editInstructions,
@@ -1467,9 +1493,14 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
                 <Card key={asg.id} className="border-[#e6ece8] bg-white shadow-2xs hover:shadow-xs transition-shadow">
                   <CardHeader className="p-5 pb-3">
                     <div className="flex items-center justify-between">
-                      <Badge variant="outline" className="text-[10px] font-bold text-[#0d5c4d] bg-[#ecf8f5] border-[#c4e9e0]">
-                        {asg.topicName}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-black text-[#0d5c4d] bg-[#ecf8f5] border border-[#c4e9e0] px-2.5 py-0.5 rounded-full">
+                          📚 {asg.subjectName || "Combined Mathematics"}
+                        </span>
+                        <Badge variant="outline" className="text-[10px] font-bold text-slate-700 bg-slate-50 border-slate-200">
+                          {asg.topicName}
+                        </Badge>
+                      </div>
                       <Badge variant="outline" className="text-xs font-mono font-bold">
                         {asg.maxMarks} Marks
                       </Badge>
@@ -1698,26 +1729,75 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
         description="Publish problem sets, lab guides, or questions to enrolled students."
       >
         <form onSubmit={handleCreateAssignmentSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-              Course
-            </label>
-            <select
-              value={newCourseId}
-              onChange={(e) => setNewCourseId(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
-            >
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title} ({c.className})
-                </option>
-              ))}
-            </select>
+          {/* Subject / Course & Syllabus Topic Selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Subject / Course <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={newCourseId}
+                onChange={(e) => {
+                  setNewCourseId(e.target.value);
+                  const selectedC = courses.find((c) => c.id === e.target.value);
+                  if (selectedC?.units?.[0]?.topics?.[0]) {
+                    setNewTopic(`${selectedC.units[0].title} • ${selectedC.units[0].topics[0].title}`);
+                  }
+                }}
+                className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    📚 {c.title} ({c.code || c.className || "A/L"})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Syllabus Unit / Topic
+              </label>
+              {asgAvailableTopics.length > 0 ? (
+                <div className="space-y-1.5">
+                  <select
+                    value={newTopic}
+                    onChange={(e) => setNewTopic(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+                  >
+                    {asgAvailableTopics.map((topStr) => (
+                      <option key={topStr} value={topStr}>
+                        {topStr}
+                      </option>
+                    ))}
+                    <option value="__custom__">✍️ Other / Custom Topic...</option>
+                  </select>
+                  {newTopic === "__custom__" && (
+                    <input
+                      type="text"
+                      required
+                      placeholder="Type custom topic name..."
+                      value={customTopic}
+                      onChange={(e) => setCustomTopic(e.target.value)}
+                      className="w-full h-9 px-3 rounded-xl bg-amber-50/50 border border-amber-300 text-xs text-slate-900"
+                    />
+                  )}
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={newTopic}
+                  onChange={(e) => setNewTopic(e.target.value)}
+                  placeholder="e.g. Unit 1: Quadratic Functions"
+                  className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+                />
+              )}
+            </div>
           </div>
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-              Assignment Title
+              Assignment Title <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -1732,23 +1812,23 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Topic Tag
-              </label>
-              <input
-                type="text"
-                value={newTopic}
-                onChange={(e) => setNewTopic(e.target.value)}
-                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                 Maximum Marks
               </label>
               <input
                 type="number"
                 value={newMaxMarks}
                 onChange={(e) => setNewMaxMarks(Number(e.target.value))}
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Due Date &amp; Time
+              </label>
+              <input
+                type="text"
+                value={newDueDate}
+                onChange={(e) => setNewDueDate(e.target.value)}
                 className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               />
             </div>
@@ -1842,26 +1922,75 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
         description="Update assignment problem sets, deadlines, or question paper documents."
       >
         <form onSubmit={handleUpdateAssignmentSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-              Course
-            </label>
-            <select
-              value={editCourseId}
-              onChange={(e) => setEditCourseId(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
-            >
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title} ({c.className})
-                </option>
-              ))}
-            </select>
+          {/* Subject / Course & Syllabus Topic Selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Subject / Course <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={editCourseId}
+                onChange={(e) => {
+                  setEditCourseId(e.target.value);
+                  const selectedC = courses.find((c) => c.id === e.target.value);
+                  if (selectedC?.units?.[0]?.topics?.[0]) {
+                    setEditTopic(`${selectedC.units[0].title} • ${selectedC.units[0].topics[0].title}`);
+                  }
+                }}
+                className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              >
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    📚 {c.title} ({c.code || c.className || "A/L"})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Syllabus Unit / Topic
+              </label>
+              {editAsgAvailableTopics.length > 0 ? (
+                <div className="space-y-1.5">
+                  <select
+                    value={editTopic}
+                    onChange={(e) => setEditTopic(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+                  >
+                    {editAsgAvailableTopics.map((topStr) => (
+                      <option key={topStr} value={topStr}>
+                        {topStr}
+                      </option>
+                    ))}
+                    <option value="__custom__">✍️ Other / Custom Topic...</option>
+                  </select>
+                  {editTopic === "__custom__" && (
+                    <input
+                      type="text"
+                      required
+                      placeholder="Type custom topic name..."
+                      value={editCustomTopic}
+                      onChange={(e) => setEditCustomTopic(e.target.value)}
+                      className="w-full h-9 px-3 rounded-xl bg-amber-50/50 border border-amber-300 text-xs text-slate-900"
+                    />
+                  )}
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={editTopic}
+                  onChange={(e) => setEditTopic(e.target.value)}
+                  placeholder="e.g. Unit 1: Quadratic Functions"
+                  className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+                />
+              )}
+            </div>
           </div>
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-              Assignment Title
+              Assignment Title <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -1876,23 +2005,23 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Topic Tag
-              </label>
-              <input
-                type="text"
-                value={editTopic}
-                onChange={(e) => setEditTopic(e.target.value)}
-                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                 Maximum Marks
               </label>
               <input
                 type="number"
                 value={editMaxMarks}
                 onChange={(e) => setEditMaxMarks(Number(e.target.value))}
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Due Date &amp; Time
+              </label>
+              <input
+                type="text"
+                value={editDueDate}
+                onChange={(e) => setEditDueDate(e.target.value)}
                 className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               />
             </div>
