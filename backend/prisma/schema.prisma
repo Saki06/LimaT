@@ -64,6 +64,19 @@ enum LiveMeetingPlatform {
   CUSTOM
 }
 
+enum AssignmentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SubmissionStatus {
+  NOT_SUBMITTED
+  SUBMITTED
+  MARKED
+  RESULT_RELEASED
+}
+
 // Multi-tenant School / Institution
 model Tenant {
   id             String          @id @default(uuid())
@@ -77,6 +90,7 @@ model Tenant {
   courses        Course[]
   packages       Package[]
   liveClasses    LiveClassSession[]
+  assignments    Assignment[]
   sportsEvents   SportsEvent[]
   announcements  Announcement[]
   createdAt      DateTime        @default(now())
@@ -120,6 +134,7 @@ model StudentProfile {
   enrollments   Enrollment[]
   packageSubscriptions PackageSubscription[]
   liveAttendances LiveClassAttendance[]
+  assignmentSubmissions AssignmentSubmission[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -133,6 +148,7 @@ model TeacherProfile {
   courses       Course[]
   packages      Package[]
   liveClasses   LiveClassSession[]
+  assignments   Assignment[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -160,6 +176,7 @@ model Course {
   enrollments   Enrollment[]
   packageCourses PackageCourse[]
   liveClasses   LiveClassSession[]
+  assignments   Assignment[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -320,3 +337,51 @@ model LiveClassAttendance {
   @@unique([sessionId, studentId])
   @@index([studentId])
 }
+
+model Assignment {
+  id                 String                 @id @default(uuid())
+  tenantId           String
+  tenant             Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  courseId           String?
+  course             Course?                @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  teacherId          String
+  teacher            TeacherProfile         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectName        String?
+  title              String
+  instructions       String?
+  topicName          String?
+  dueDate            DateTime?
+  maxMarks           Float                  @default(100.0)
+  status             AssignmentStatus       @default(PUBLISHED)
+  attachmentUrl      String?
+  attachmentName     String?
+  submissions        AssignmentSubmission[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([tenantId, status])
+  @@index([teacherId])
+  @@index([courseId])
+}
+
+model AssignmentSubmission {
+  id                 String           @id @default(uuid())
+  assignmentId       String
+  assignment         Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId          String
+  student            StudentProfile   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  textContent        String?
+  fileAttachmentUrl  String?
+  fileAttachmentName String?
+  status             SubmissionStatus @default(SUBMITTED)
+  marksObtained      Float?
+  teacherFeedback    String?
+  markedAt           DateTime?
+  submittedAt        DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([assignmentId, studentId])
+  @@index([assignmentId, status])
+  @@index([studentId])
+}
+

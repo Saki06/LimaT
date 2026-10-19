@@ -5,6 +5,7 @@ import sportsRoutes from './sports.routes';
 import courseRoutes from './course.routes';
 import packageRoutes from './package.routes';
 import liveClassRoutes from './liveClass.routes';
+import assignmentRoutes from './assignment.routes';
 
 const router = Router();
 
@@ -25,5 +26,6 @@ router.use('/sports', sportsRoutes);
 router.use('/courses', courseRoutes);
 router.use('/packages', packageRoutes);
 router.use('/live-classes', liveClassRoutes);
+router.use('/assignments', assignmentRoutes);
 
 export default router;

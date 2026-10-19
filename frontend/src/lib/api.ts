@@ -368,6 +368,137 @@ export const api = {
     },
   },
 
+  // Assignments & Homework Grading API
+  assignments: {
+    async getAll(params?: { courseId?: string; status?: string; subjectName?: string; search?: string }) {
+      const token = api.token.get();
+      const query = new URLSearchParams();
+      if (params?.courseId) query.append('courseId', params.courseId);
+      if (params?.status) query.append('status', params.status);
+      if (params?.subjectName) query.append('subjectName', params.subjectName);
+      if (params?.search) query.append('search', params.search);
+
+      const res = await fetch(`${API_BASE_URL}/assignments?${query.toString()}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getById(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/assignments/${id}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async create(data: {
+      title: string;
+      instructions?: string;
+      courseId?: string;
+      subjectName?: string;
+      topicName?: string;
+      dueDate?: string;
+      maxMarks?: number;
+      status?: string;
+      attachmentUrl?: string;
+      attachmentName?: string;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/assignments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async update(
+      id: string,
+      data: {
+        title?: string;
+        instructions?: string;
+        courseId?: string;
+        subjectName?: string;
+        topicName?: string;
+        dueDate?: string;
+        maxMarks?: number;
+        status?: string;
+        attachmentUrl?: string;
+        attachmentName?: string;
+      }
+    ) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/assignments/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async delete(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/assignments/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async submit(id: string, data: { textContent?: string; fileAttachmentUrl?: string; fileAttachmentName?: string }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/assignments/${id}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async gradeSubmission(
+      submissionId: string,
+      data: { marksObtained: number; teacherFeedback?: string; status?: string }
+    ) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/assignments/submissions/${submissionId}/grade`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async getSubmissions(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/assignments/${id}/submissions`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+  },
+
   // Token and Local Storage Helpers
   token: {
     get(): string | null {
