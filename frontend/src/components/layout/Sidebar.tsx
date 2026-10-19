@@ -109,6 +109,18 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
           }
         ]
       : []),
+    ...(isFeatureEnabled("live_broadcast_studio")
+      ? [
+          {
+            id: "live_schedule",
+            label: "Live Video Classes",
+            icon: Video,
+            badge: "Live",
+            badgeVariant: "gold" as const,
+            group: "Core Learning"
+          }
+        ]
+      : []),
     {
       id: "my_learning",
       label: t.nav.myLearning || "My Learning",

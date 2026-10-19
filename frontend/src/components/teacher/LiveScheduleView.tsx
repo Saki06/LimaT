@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
+import { api } from "@/lib/api";
 import {
   Video,
   Calendar,
@@ -25,7 +26,17 @@ import {
   Radio,
   Share2,
   X,
-  Laptop
+  Laptop,
+  Play,
+  Maximize2,
+  Minimize2,
+  ShieldCheck,
+  Check,
+  Mic,
+  MicOff,
+  VideoOff,
+  PhoneOff,
+  MessageSquare
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,13 +51,16 @@ export interface LiveSlot {
   day: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
   startTime: string;
   endTime: string;
-  platform: "Google Meet" | "Zoom" | "Microsoft Teams" | "YouTube Live";
+  platform: "In-App Live Studio (Jitsi)" | "Google Meet" | "Zoom" | "Microsoft Teams" | "YouTube Live" | "Custom";
   meetingUrl: string;
   meetingId?: string;
   passcode?: string;
   type: string;
   enrolledCount: number;
   status: "scheduled" | "live_now" | "completed";
+  recordingUrl?: string;
+  courseId?: string;
+  packageId?: string;
 }
 
 const INITIAL_SLOTS: LiveSlot[] = [
@@ -58,13 +72,14 @@ const INITIAL_SLOTS: LiveSlot[] = [
     day: "Tuesday",
     startTime: "07:00 PM",
     endTime: "09:00 PM",
-    platform: "Google Meet",
-    meetingUrl: "https://meet.google.com/sam-math-live",
-    meetingId: "sam-math-live",
+    platform: "In-App Live Studio (Jitsi)",
+    meetingUrl: "https://meet.jit.si/limat-math-calculus-live",
+    meetingId: "limat-math-calculus-live",
     passcode: "MATH2026",
     type: "Live Masterclass + Q&A",
     enrolledCount: 142,
-    status: "scheduled"
+    status: "live_now",
+    recordingUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
   },
   {
     id: "slot-2",
@@ -106,13 +121,14 @@ const INITIAL_SLOTS: LiveSlot[] = [
     day: "Sunday",
     startTime: "04:00 PM",
     endTime: "06:00 PM",
-    platform: "Google Meet",
-    meetingUrl: "https://meet.google.com/sam-math-live",
-    meetingId: "sam-math-live",
+    platform: "In-App Live Studio (Jitsi)",
+    meetingUrl: "https://meet.jit.si/limat-trig-complex-mastery",
+    meetingId: "limat-trig-complex-mastery",
     passcode: "TRIG2026",
     type: "Special Concept Booster",
     enrolledCount: 98,
-    status: "scheduled"
+    status: "completed",
+    recordingUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
   }
 ];
 
@@ -128,18 +144,18 @@ const DAYS = [
 ] as const;
 
 export function LiveScheduleView() {
-  const { currentUser, t } = useApp();
+  const { currentUser, currentRole, addToast, courses: contextCourses } = useApp();
+  const isTeacher = currentRole === "teacher" || currentRole === "admin" || currentRole === "super_admin";
 
   const [slots, setSlots] = useState<LiveSlot[]>(INITIAL_SLOTS);
   const [selectedDay, setSelectedDay] = useState<string>("All Days");
+  const [selectedTab, setSelectedTab] = useState<"all" | "live" | "upcoming" | "recordings">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [availablePackages, setAvailablePackages] = useState<any[]>([]);
 
-  // Toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  // In-App Video Studio Modal
+  const [activeStudioSession, setActiveStudioSession] = useState<LiveSlot | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Add / Edit Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -153,38 +169,108 @@ export function LiveScheduleView() {
     day: "Tuesday",
     startTime: "07:00 PM",
     endTime: "09:00 PM",
-    platform: "Google Meet",
-    meetingUrl: "https://meet.google.com/sam-math-live",
-    meetingId: "sam-math-live",
-    passcode: "MATH2026",
+    platform: "In-App Live Studio (Jitsi)",
+    meetingUrl: "https://meet.jit.si/limat-math-live-" + Math.random().toString(36).substring(2, 7),
+    meetingId: "",
+    passcode: "",
     type: "Live Masterclass + Q&A",
     enrolledCount: 142,
-    status: "scheduled"
+    status: "scheduled",
+    recordingUrl: "",
+    courseId: "",
+    packageId: ""
   });
 
-  // Delete Confirmation Modal
+  // Delete & Broadcast Modals
   const [deletingSlot, setDeletingSlot] = useState<LiveSlot | null>(null);
-
-  // Broadcast Alert Modal
   const [broadcastingSlot, setBroadcastingSlot] = useState<LiveSlot | null>(null);
+  const [recordingModalSlot, setRecordingModalSlot] = useState<LiveSlot | null>(null);
+  const [recordingInputUrl, setRecordingInputUrl] = useState("");
+
+  // 1. Fetch live classes from backend on mount
+  useEffect(() => {
+    const fetchLiveClasses = async () => {
+      try {
+        const res = await api.liveClasses.getAll();
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const mapped: LiveSlot[] = res.data.map((item: any) => {
+            const startD = new Date(item.startTime);
+            const daysOfWeek: LiveSlot["day"][] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            const dayName = daysOfWeek[startD.getDay()] || "Tuesday";
+            const timeStr = startD.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+            let plat: LiveSlot["platform"] = "In-App Live Studio (Jitsi)";
+            if (item.platform === "GOOGLE_MEET") plat = "Google Meet";
+            else if (item.platform === "ZOOM") plat = "Zoom";
+            else if (item.platform === "CUSTOM") plat = "Custom";
+
+            let stat: LiveSlot["status"] = "scheduled";
+            if (item.status === "LIVE") stat = "live_now";
+            else if (item.status === "COMPLETED") stat = "completed";
+
+            return {
+              id: item.id,
+              title: item.title,
+              subject: item.course?.title || item.package?.title || "Combined Mathematics",
+              grade: "Grade 12 & 13",
+              day: dayName,
+              startTime: timeStr,
+              endTime: "2 Hours",
+              platform: plat,
+              meetingUrl: item.meetingUrl || `https://meet.jit.si/${item.meetingId || "limat-live"}`,
+              meetingId: item.meetingId,
+              passcode: item.passcode,
+              type: item.topic || "Live Interactive Lecture",
+              enrolledCount: item._count?.attendances || 142,
+              status: stat,
+              recordingUrl: item.recordingUrl,
+              courseId: item.courseId,
+              packageId: item.packageId
+            };
+          });
+          setSlots(mapped);
+        }
+      } catch (err) {
+        console.warn("Using local live class slots (Backend sync optional):", err);
+      }
+    };
+
+    const fetchPackages = async () => {
+      try {
+        const res = await api.packages.getAll();
+        if (res.success && Array.isArray(res.data)) {
+          setAvailablePackages(res.data);
+        }
+      } catch (e) {
+        console.warn("Could not fetch packages:", e);
+      }
+    };
+
+    fetchLiveClasses();
+    fetchPackages();
+  }, []);
 
   // Open Add Modal
   const handleOpenAdd = () => {
     setEditingSlotId(null);
+    const randomSlug = `limat-live-${Math.random().toString(36).substring(2, 8)}`;
     setFormData({
       title: "",
-      subject: "Combined Mathematics",
+      subject: contextCourses?.[0]?.title || "Combined Mathematics",
       grade: "Grade 12 & 13",
       day: selectedDay !== "All Days" ? (selectedDay as LiveSlot["day"]) : "Tuesday",
       startTime: "07:00 PM",
       endTime: "09:00 PM",
-      platform: "Google Meet",
-      meetingUrl: "https://meet.google.com/sam-math-live",
-      meetingId: "sam-math-live",
+      platform: "In-App Live Studio (Jitsi)",
+      meetingUrl: `https://meet.jit.si/${randomSlug}`,
+      meetingId: randomSlug,
       passcode: "MATH2026",
       type: "Live Masterclass + Q&A",
       enrolledCount: 142,
-      status: "scheduled"
+      status: "scheduled",
+      recordingUrl: "",
+      courseId: contextCourses?.[0]?.id || "",
+      packageId: availablePackages?.[0]?.id || ""
     });
     setIsModalOpen(true);
   };
@@ -205,60 +291,229 @@ export function LiveScheduleView() {
       passcode: slot.passcode || "",
       type: slot.type,
       enrolledCount: slot.enrolledCount,
-      status: slot.status
+      status: slot.status,
+      recordingUrl: slot.recordingUrl || "",
+      courseId: slot.courseId || "",
+      packageId: slot.packageId || ""
     });
     setIsModalOpen(true);
   };
 
   // Save Slot (Add or Edit)
-  const handleSaveSlot = (e: React.FormEvent) => {
+  const handleSaveSlot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim()) {
-      showToast("Please enter a class topic / title.");
+      addToast({
+        type: "warning",
+        title: "Title Required",
+        message: "Please enter a class topic / title."
+      });
       return;
     }
 
-    if (editingSlotId) {
-      setSlots((prev) =>
-        prev.map((s) => (s.id === editingSlotId ? { ...formData, id: editingSlotId } : s))
-      );
-      showToast(`Updated live class: "${formData.title}"`);
-    } else {
-      const newSlot: LiveSlot = {
-        ...formData,
-        id: `slot-${Date.now()}`
-      };
-      setSlots((prev) => [newSlot, ...prev]);
-      showToast(`Added new live class: "${formData.title}"`);
+    let finalPlatform: "JITSI" | "GOOGLE_MEET" | "ZOOM" | "CUSTOM" = "JITSI";
+    if (formData.platform === "Google Meet") finalPlatform = "GOOGLE_MEET";
+    else if (formData.platform === "Zoom") finalPlatform = "ZOOM";
+    else if (formData.platform === "Custom") finalPlatform = "CUSTOM";
+
+    try {
+      if (editingSlotId) {
+        setSlots((prev) =>
+          prev.map((s) => (s.id === editingSlotId ? { ...formData, id: editingSlotId } : s))
+        );
+        // Sync with backend if persistent id
+        if (!editingSlotId.startsWith("slot-")) {
+          await api.liveClasses.update(editingSlotId, {
+            title: formData.title,
+            topic: formData.type,
+            platform: finalPlatform,
+            meetingUrl: formData.meetingUrl,
+            meetingId: formData.meetingId,
+            passcode: formData.passcode,
+            recordingUrl: formData.recordingUrl,
+            courseId: formData.courseId || undefined,
+            packageId: formData.packageId || undefined
+          });
+        }
+        addToast({
+          type: "success",
+          title: "Schedule Updated",
+          message: `Live class "${formData.title}" updated successfully.`
+        });
+      } else {
+        const fakeId = `slot-${Date.now()}`;
+        const newSlot: LiveSlot = {
+          ...formData,
+          id: fakeId
+        };
+        setSlots((prev) => [newSlot, ...prev]);
+
+        // Persist to backend
+        const now = new Date();
+        const res = await api.liveClasses.create({
+          title: formData.title,
+          topic: formData.type,
+          startTime: now.toISOString(),
+          durationMinutes: 90,
+          platform: finalPlatform,
+          meetingUrl: formData.meetingUrl,
+          meetingId: formData.meetingId,
+          passcode: formData.passcode,
+          recordingUrl: formData.recordingUrl,
+          courseId: formData.courseId || undefined,
+          packageId: formData.packageId || undefined
+        });
+
+        if (res.success && res.data?.id) {
+          setSlots((prev) =>
+            prev.map((s) => (s.id === fakeId ? { ...s, id: res.data.id } : s))
+          );
+        }
+
+        addToast({
+          type: "success",
+          title: "Live Class Scheduled",
+          message: `Scheduled new live lecture: "${formData.title}"`
+        });
+      }
+    } catch (err: any) {
+      console.warn("Failed to persist live class:", err);
     }
 
     setIsModalOpen(false);
   };
 
+  // Toggle Live Broadcast Status
+  const handleToggleStatus = async (slot: LiveSlot, newStatus: LiveSlot["status"]) => {
+    setSlots((prev) =>
+      prev.map((s) => (s.id === slot.id ? { ...s, status: newStatus } : s))
+    );
+
+    let backendStatus: "SCHEDULED" | "LIVE" | "COMPLETED" = "SCHEDULED";
+    if (newStatus === "live_now") backendStatus = "LIVE";
+    else if (newStatus === "completed") backendStatus = "COMPLETED";
+
+    if (!slot.id.startsWith("slot-")) {
+      try {
+        await api.liveClasses.updateStatus(slot.id, backendStatus);
+      } catch (e) {
+        console.warn("Backend status update error:", e);
+      }
+    }
+
+    if (newStatus === "live_now") {
+      addToast({
+        type: "success",
+        title: "🔴 Broadcast Started",
+        message: `You are now LIVE with "${slot.title}"! Students are notified.`
+      });
+      // Automatically launch studio if In-App
+      if (slot.platform === "In-App Live Studio (Jitsi)") {
+        setActiveStudioSession(slot);
+      }
+    } else if (newStatus === "completed") {
+      addToast({
+        type: "info",
+        title: "Broadcast Ended",
+        message: `Live class session ended. You can now attach a video recording link.`
+      });
+    } else {
+      addToast({
+        type: "info",
+        title: "Class Rescheduled",
+        message: `Status moved back to Scheduled.`
+      });
+    }
+  };
+
   // Delete Slot
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingSlot) return;
     setSlots((prev) => prev.filter((s) => s.id !== deletingSlot.id));
-    showToast(`Deleted live slot: "${deletingSlot.title}"`);
+    if (!deletingSlot.id.startsWith("slot-")) {
+      try {
+        await api.liveClasses.delete(deletingSlot.id);
+      } catch (e) {
+        console.warn("Backend delete error:", e);
+      }
+    }
+    addToast({
+      type: "info",
+      title: "Class Slot Removed",
+      message: `Deleted "${deletingSlot.title}".`
+    });
     setDeletingSlot(null);
   };
 
   // Copy Link
   const handleCopyLink = (url: string, title: string) => {
     navigator.clipboard?.writeText(url);
-    showToast(`Live meeting link for "${title}" copied to clipboard!`);
+    addToast({
+      type: "success",
+      title: "Link Copied",
+      message: `Virtual classroom link for "${title}" copied to clipboard!`
+    });
   };
 
   // Send Broadcast Alert
   const handleSendBroadcast = () => {
     if (!broadcastingSlot) return;
-    showToast(
-      `Live Class Reminder broadcast sent to ${broadcastingSlot.enrolledCount} enrolled students via SMS & In-App Notification!`
-    );
+    addToast({
+      type: "success",
+      title: "SMS & Push Sent",
+      message: `Live class alert broadcasted to ${broadcastingSlot.enrolledCount} active students!`
+    });
     setBroadcastingSlot(null);
   };
 
+  // Student Join Handler
+  const handleStudentJoin = async (slot: LiveSlot) => {
+    try {
+      if (!slot.id.startsWith("slot-")) {
+        await api.liveClasses.join(slot.id);
+      }
+    } catch (e) {
+      console.warn("Attendance log failed:", e);
+    }
+
+    addToast({
+      type: "success",
+      title: "Attendance Logged",
+      message: `Welcome to "${slot.title}"! Your attendance has been marked.`
+    });
+
+    if (slot.platform === "In-App Live Studio (Jitsi)") {
+      setActiveStudioSession(slot);
+    } else {
+      window.open(slot.meetingUrl, "_blank");
+    }
+  };
+
+  // Save Recording URL
+  const handleSaveRecording = async () => {
+    if (!recordingModalSlot || !recordingInputUrl.trim()) return;
+    setSlots((prev) =>
+      prev.map((s) => (s.id === recordingModalSlot.id ? { ...s, recordingUrl: recordingInputUrl } : s))
+    );
+    if (!recordingModalSlot.id.startsWith("slot-")) {
+      try {
+        await api.liveClasses.update(recordingModalSlot.id, { recordingUrl: recordingInputUrl });
+      } catch (e) {
+        console.warn("Recording URL sync failed:", e);
+      }
+    }
+    addToast({
+      type: "success",
+      title: "Recording Attached",
+      message: "Students can now watch the replay video in the Recordings Archive."
+    });
+    setRecordingModalSlot(null);
+    setRecordingInputUrl("");
+  };
+
   // Filtered Slots
+  const liveNowSlot = useMemo(() => slots.find((s) => s.status === "live_now"), [slots]);
+
   const filteredSlots = useMemo(() => {
     return slots.filter((slot) => {
       const matchesDay = selectedDay === "All Days" || slot.day === selectedDay;
@@ -268,34 +523,89 @@ export function LiveScheduleView() {
         slot.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
         slot.grade.toLowerCase().includes(searchQuery.toLowerCase()) ||
         slot.type.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesDay && matchesQuery;
-    });
-  }, [slots, selectedDay, searchQuery]);
 
-  // Statistics
-  const totalWeeklyHours = slots.length * 2; // approximation
-  const totalEnrolled = 142;
+      let matchesTab = true;
+      if (selectedTab === "live") matchesTab = slot.status === "live_now";
+      else if (selectedTab === "upcoming") matchesTab = slot.status === "scheduled";
+      else if (selectedTab === "recordings") matchesTab = slot.status === "completed" || !!slot.recordingUrl;
+
+      return matchesDay && matchesQuery && matchesTab;
+    });
+  }, [slots, selectedDay, searchQuery, selectedTab]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 pb-16">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 p-4 rounded-2xl bg-[#0d5c4d] text-white shadow-2xl flex items-center gap-3 border border-[#a5f3df] animate-in slide-in-from-top-4 duration-200">
-          <CheckCircle2 className="h-5 w-5 text-[#a5f3df] shrink-0" />
-          <div className="text-xs">
-            <p className="font-extrabold text-sm">Live Studio</p>
-            <p className="text-slate-100">{toastMessage}</p>
+    <div className="space-y-6 animate-in fade-in duration-300 pb-16 max-w-7xl mx-auto">
+      {/* =================================================================== */}
+      {/* 🔴 LIVE NOW HERO BANNER (When Broadcast is Active)                 */}
+      {/* =================================================================== */}
+      {liveNowSlot && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-rose-950 via-slate-900 to-[#0d2b26] border-2 border-rose-500/50 shadow-2xl text-white relative overflow-hidden animate-in slide-in-from-top-4 duration-300">
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-rose-500/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-3 w-3 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500" />
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-black tracking-wider uppercase">
+                  Class in Progress &bull; Broadcasting Live Now
+                </span>
+                <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 text-[10px]">
+                  {liveNowSlot.enrolledCount} Students Online
+                </Badge>
+              </div>
+
+              <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                {liveNowSlot.title}
+              </h2>
+
+              <p className="text-xs sm:text-sm text-slate-300 flex flex-wrap items-center gap-3">
+                <span className="font-semibold text-emerald-400">{liveNowSlot.subject}</span>
+                <span>&bull;</span>
+                <span>{liveNowSlot.day} ({liveNowSlot.startTime})</span>
+                <span>&bull;</span>
+                <span className="text-slate-400">Platform: {liveNowSlot.platform}</span>
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+              {isTeacher ? (
+                <>
+                  <Button
+                    onClick={() => {
+                      if (liveNowSlot.platform === "In-App Live Studio (Jitsi)") {
+                        setActiveStudioSession(liveNowSlot);
+                      } else {
+                        window.open(liveNowSlot.meetingUrl, "_blank");
+                      }
+                    }}
+                    className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs sm:text-sm px-5 py-5 rounded-2xl shadow-lg flex items-center gap-2 cursor-pointer transition-all hover:scale-105"
+                  >
+                    <Video className="h-4 w-4" /> Enter Live Studio ↗
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleToggleStatus(liveNowSlot, "completed")}
+                    className="border-rose-400/40 text-rose-300 hover:bg-rose-500/20 text-xs font-bold py-5 rounded-2xl cursor-pointer"
+                  >
+                    <PhoneOff className="h-4 w-4 mr-1.5" /> End Class
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={() => handleStudentJoin(liveNowSlot)}
+                  className="bg-rose-600 hover:bg-rose-700 text-white font-black text-sm sm:text-base px-6 py-6 rounded-2xl shadow-xl flex items-center gap-2 cursor-pointer transition-all hover:scale-105 animate-pulse"
+                >
+                  <Radio className="h-5 w-5" /> Join Live Classroom Now 🚀
+                </Button>
+              )}
+            </div>
           </div>
-          <button
-            onClick={() => setToastMessage(null)}
-            className="p-1 hover:bg-white/20 rounded-lg text-white/80 cursor-pointer ml-2"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
       )}
 
-      {/* Top Banner: Live Broadcast Management */}
+      {/* Top Banner: Header & Navigation */}
       <Card className="border-[#c4e9e0] bg-gradient-to-br from-[#f8fbf9] via-white to-[#ecf8f5] shadow-2xs overflow-hidden">
         <CardContent className="p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -303,30 +613,34 @@ export function LiveScheduleView() {
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1 rounded-full bg-[#0d5c4d] text-white text-xs font-bold tracking-wide uppercase flex items-center gap-1.5 shadow-2xs">
                   <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
-                  Teaching Studio &bull; Live Broadcasts
+                  {isTeacher ? "Teacher Teaching Studio" : "Student Live Learning Hub"}
                 </span>
                 <span className="text-xs font-semibold text-slate-500">
-                  Weekly Masterclass Schedule
+                  Interactive Video Classes
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-[#0d2b26] tracking-tight">
-                Live Classes &amp; Broadcast Schedule
+                Live Video Classes &amp; Studio
               </h1>
-              <p className="text-sm text-slate-600 max-w-2xl leading-relaxed">
-                Schedule and coordinate weekly live interactive lectures for Grade 12 &amp; 13 Combined Mathematics. Launch your virtual lecture hall, share meeting links, and broadcast instant class alerts to enrolled students.
+              <p className="text-xs sm:text-sm text-slate-600 max-w-2xl leading-relaxed">
+                {isTeacher
+                  ? "Schedule, manage, and broadcast weekly interactive live masterclasses. Launch your virtual classroom with In-App HD video, Google Meet, or Zoom."
+                  : "Join interactive live classes hosted by your teachers, ask questions in real-time, and catch up with past video lecture recordings."}
               </p>
             </div>
 
-            {/* Quick Action Button */}
-            <div className="flex items-center gap-3 shrink-0">
-              <Button
-                onClick={handleOpenAdd}
-                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-sm shadow-md px-5 py-5 rounded-2xl flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02]"
-              >
-                <Plus className="h-5 w-5" />
-                <span>+ Schedule Live Class</span>
-              </Button>
-            </div>
+            {/* Quick Action Buttons for Teacher */}
+            {isTeacher && (
+              <div className="flex items-center gap-3 shrink-0">
+                <Button
+                  onClick={handleOpenAdd}
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-sm shadow-md px-5 py-5 rounded-2xl flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02]"
+                >
+                  <Plus className="h-5 w-5" />
+                  <span>+ Schedule Live Class</span>
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -336,9 +650,9 @@ export function LiveScheduleView() {
         <Card className="border-[#e6ece8] bg-white shadow-2xs">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 font-semibold">Scheduled Live Classes</p>
-              <p className="text-2xl font-black text-[#0d2b26] mt-1">{slots.length} Slots</p>
-              <p className="text-[10px] text-emerald-700 font-bold mt-0.5">~{totalWeeklyHours} hrs weekly broadcast</p>
+              <p className="text-xs text-slate-500 font-semibold">Total Scheduled</p>
+              <p className="text-2xl font-black text-[#0d2b26] mt-1">{slots.length} Classes</p>
+              <p className="text-[10px] text-emerald-700 font-bold mt-0.5">Weekly timetable</p>
             </div>
             <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
               <Calendar className="h-5 w-5" />
@@ -349,12 +663,14 @@ export function LiveScheduleView() {
         <Card className="border-[#e6ece8] bg-white shadow-2xs">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 font-semibold">Enrolled Live Batch</p>
-              <p className="text-2xl font-black text-[#0d5c4d] mt-1">{totalEnrolled} Students</p>
-              <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Active Connect subscribers</p>
+              <p className="text-xs text-slate-500 font-semibold">Live Right Now</p>
+              <p className="text-2xl font-black text-rose-600 mt-1">
+                {slots.filter((s) => s.status === "live_now").length} Active
+              </p>
+              <p className="text-[10px] text-rose-700 font-bold mt-0.5">Broadcast studio</p>
             </div>
-            <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
-              <Users className="h-5 w-5" />
+            <div className="h-11 w-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+              <Radio className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
@@ -362,7 +678,7 @@ export function LiveScheduleView() {
         <Card className="border-[#e6ece8] bg-white shadow-2xs">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 font-semibold">Next Upcoming Live</p>
+              <p className="text-xs text-slate-500 font-semibold">Next Scheduled</p>
               <p className="text-lg font-black text-slate-900 mt-1">Tuesday &bull; 7:00 PM</p>
               <p className="text-[10px] text-emerald-600 font-bold mt-0.5">Calculus &amp; Limits</p>
             </div>
@@ -375,155 +691,183 @@ export function LiveScheduleView() {
         <Card className="border-[#e6ece8] bg-white shadow-2xs">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 font-semibold">Virtual Studio Setup</p>
-              <p className="text-2xl font-black text-[#0d2b26] mt-1">Google Meet</p>
-              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">HD 1080p recording ready</p>
+              <p className="text-xs text-slate-500 font-semibold">Recorded Replays</p>
+              <p className="text-2xl font-black text-[#0d2b26] mt-1">
+                {slots.filter((s) => !!s.recordingUrl).length} Videos
+              </p>
+              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">Archive library</p>
             </div>
             <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
-              <Radio className="h-5 w-5" />
+              <Play className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Permanent Faculty Live Room Card */}
-      <Card className="border-[#c4e9e0] bg-gradient-to-r from-[#0d5c4d] to-[#083e34] text-white shadow-sm overflow-hidden">
-        <CardContent className="p-5">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded bg-emerald-400/20 text-emerald-200 font-mono text-[10px] font-bold uppercase tracking-wider border border-emerald-400/30">
-                  Permanent Faculty Meeting Link
-                </span>
-                <span className="text-xs text-emerald-100/70">Always active for your students</span>
-              </div>
-              <p className="text-sm font-mono font-bold text-white truncate max-w-md">
-                https://meet.google.com/sam-math-live
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2.5">
-              <Button
-                size="sm"
-                onClick={() => handleCopyLink("https://meet.google.com/sam-math-live", "Faculty Room")}
-                variant="outline"
-                className="border-emerald-300/40 text-emerald-100 hover:bg-white/10 text-xs font-bold bg-white/5"
-              >
-                <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy Permanent Link
-              </Button>
-              <a
-                href="https://meet.google.com/sam-math-live"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="py-2 px-4 rounded-xl bg-white text-[#0d5c4d] hover:bg-emerald-50 text-xs font-extrabold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-              >
-                <Video className="h-4 w-4" /> Start Live ↗
-              </a>
-            </div>
+      {/* Tabs & Search Filter Controls */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl w-fit">
+            <button
+              onClick={() => setSelectedTab("all")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                selectedTab === "all"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              All Classes ({slots.length})
+            </button>
+            <button
+              onClick={() => setSelectedTab("live")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedTab === "live"
+                  ? "bg-rose-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+              Live Now ({slots.filter((s) => s.status === "live_now").length})
+            </button>
+            <button
+              onClick={() => setSelectedTab("upcoming")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                selectedTab === "upcoming"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Upcoming ({slots.filter((s) => s.status === "scheduled").length})
+            </button>
+            <button
+              onClick={() => setSelectedTab("recordings")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                selectedTab === "recordings"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Recordings Archive ({slots.filter((s) => !!s.recordingUrl).length})
+            </button>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-[#c4e9e0] shadow-xs">
-        {/* Day Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search topic or subject..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
+            />
+          </div>
+        </div>
+
+        {/* Days Pill Filter */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
           {DAYS.map((day) => (
             <button
               key={day}
               onClick={() => setSelectedDay(day)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                 selectedDay === day
-                  ? "bg-[#0d5c4d] text-white shadow-xs"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "bg-[#0d2b26] text-white shadow-xs"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
               }`}
             >
               {day}
             </button>
           ))}
         </div>
-
-        {/* Search */}
-        <div className="relative w-full md:w-72 shrink-0">
-          <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search classes or topics..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#0d5c4d] focus:bg-white transition-all"
-          />
-        </div>
       </div>
 
-      {/* Live Class Slots Grid / List */}
-      <div className="space-y-4">
-        {filteredSlots.length === 0 ? (
-          <Card className="border-dashed border-2 border-slate-300 bg-slate-50/50 p-12 text-center">
-            <Calendar className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-slate-700">No scheduled classes found</h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-              There are no live classes matching the selected day or search filter. Click "+ Schedule Live Class" to create one.
-            </p>
-            <Button
-              onClick={handleOpenAdd}
-              size="sm"
-              className="mt-4 bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs"
-            >
-              <Plus className="h-4 w-4 mr-1" /> Add New Slot
-            </Button>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filteredSlots.map((slot) => (
+      {/* =================================================================== */}
+      {/* CLASS SLOTS LISTING                                                 */}
+      {/* =================================================================== */}
+      {filteredSlots.length === 0 ? (
+        <Card className="border-dashed border-2 border-slate-200 bg-white p-12 text-center">
+          <div className="h-12 w-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+            <Video className="h-6 w-6" />
+          </div>
+          <h3 className="font-bold text-slate-800 text-base">No live classes match your filter</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            {isTeacher
+              ? "Click '+ Schedule Live Class' to set up your interactive teaching session."
+              : "Check back later for newly scheduled live lectures."}
+          </p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {filteredSlots.map((slot) => {
+            const isLive = slot.status === "live_now";
+            const isCompleted = slot.status === "completed";
+
+            return (
               <Card
                 key={slot.id}
-                className="border-[#e6ece8] hover:border-[#a5f3df] transition-all bg-white shadow-2xs hover:shadow-md rounded-2xl overflow-hidden flex flex-col justify-between"
+                className={`relative overflow-hidden transition-all duration-200 flex flex-col justify-between ${
+                  isLive
+                    ? "border-2 border-rose-500 shadow-md bg-gradient-to-b from-rose-50/20 to-white"
+                    : "border-[#e6ece8] bg-white hover:border-[#c4e9e0] hover:shadow-xs"
+                }`}
               >
                 <div>
-                  {/* Slot Header */}
-                  <CardHeader className="p-5 pb-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/70 to-white">
+                  <CardHeader className="p-5 pb-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge className="bg-[#0d5c4d] text-white font-bold text-[10px] px-2.5 py-0.5 rounded-md">
-                            {slot.day}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isLive ? (
+                            <span className="px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black tracking-wide uppercase flex items-center gap-1 shadow-xs">
+                              <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
+                              🔴 Live Now
+                            </span>
+                          ) : isCompleted ? (
+                            <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+                              Completed
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                              Scheduled
+                            </span>
+                          )}
+
+                          <Badge className="bg-[#ecf8f5] text-[#0d5c4d] border-[#c4e9e0] text-[10px] font-bold">
+                            {slot.day} &bull; {slot.startTime}
                           </Badge>
-                          <span className="text-xs font-mono font-bold text-slate-700 flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md">
-                            <Clock className="h-3 w-3 text-[#0d5c4d]" />
-                            {slot.startTime} - {slot.endTime}
-                          </span>
-                          <span className="text-[11px] font-semibold text-emerald-800 bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-[#c4e9e0]">
+
+                          <Badge className="bg-slate-100 text-slate-700 text-[10px] font-semibold">
                             {slot.platform}
-                          </span>
+                          </Badge>
                         </div>
-                        <h3 className="text-base font-black text-[#0d2b26] mt-1.5 leading-snug">
+
+                        <h3 className="text-base font-black text-[#0d2b26] mt-2 leading-snug">
                           {slot.title}
                         </h3>
                       </div>
 
-                      {/* Options menu / edit */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => handleOpenEdit(slot)}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] transition-colors cursor-pointer"
-                          title="Edit Class Slot"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeletingSlot(slot)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Delete Class Slot"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      {/* Options menu for teacher */}
+                      {isTeacher && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => handleOpenEdit(slot)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] transition-colors cursor-pointer"
+                            title="Edit Class Slot"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingSlot(slot)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Delete Class Slot"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
 
-                  {/* Slot Details Body */}
-                  <CardContent className="p-5 space-y-3.5 text-xs">
+                  <CardContent className="p-5 pt-0 space-y-3.5 text-xs">
                     <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Subject &amp; Grade</p>
@@ -531,7 +875,7 @@ export function LiveScheduleView() {
                         <p className="text-[11px] text-slate-500">{slot.grade}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">Format &amp; Audience</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Class Type</p>
                         <p className="font-bold text-slate-800 mt-0.5">{slot.type}</p>
                         <p className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
                           <Users className="h-3 w-3" /> {slot.enrolledCount} Students Enrolled
@@ -539,11 +883,11 @@ export function LiveScheduleView() {
                       </div>
                     </div>
 
-                    {/* Meeting Link Bar */}
+                    {/* Meeting Link / Room Info */}
                     <div className="p-3 rounded-xl bg-[#ecf8f5]/60 border border-[#c4e9e0] space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-[#0d5c4d] flex items-center gap-1">
-                          <LinkIcon className="h-3 w-3" /> Virtual Classroom Room URL:
+                          <LinkIcon className="h-3 w-3" /> Classroom URL:
                         </span>
                         {slot.passcode && (
                           <span className="font-mono text-[10px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
@@ -555,11 +899,28 @@ export function LiveScheduleView() {
                         {slot.meetingUrl}
                       </p>
                     </div>
+
+                    {/* Recording Attached Note */}
+                    {slot.recordingUrl && (
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
+                        <span className="flex items-center gap-1.5">
+                          <Play className="h-3.5 w-3.5 text-amber-600" /> Video Recording Ready
+                        </span>
+                        <a
+                          href={slot.recordingUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-amber-800 hover:text-amber-950 font-bold underline flex items-center gap-1"
+                        >
+                          Watch Replay ↗
+                        </a>
+                      </div>
+                    )}
                   </CardContent>
                 </div>
 
                 {/* Slot Footer Action Controls */}
-                <div className="p-4 pt-0 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/40">
+                <div className="p-4 pt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/60">
                   <div className="flex items-center gap-1.5">
                     <Button
                       size="sm"
@@ -569,40 +930,171 @@ export function LiveScheduleView() {
                     >
                       <Copy className="h-3.5 w-3.5 mr-1" /> Copy Link
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setBroadcastingSlot(slot)}
-                      className="border-amber-300 text-amber-900 hover:bg-amber-50 text-xs font-bold cursor-pointer"
-                      title="Send SMS & In-App notification to enrolled students"
-                    >
-                      <Send className="h-3.5 w-3.5 mr-1" /> Broadcast Alert
-                    </Button>
+
+                    {isTeacher && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setBroadcastingSlot(slot)}
+                        className="border-amber-300 text-amber-900 hover:bg-amber-50 text-xs font-bold cursor-pointer"
+                        title="Send SMS & In-App notification to enrolled students"
+                      >
+                        <Send className="h-3.5 w-3.5 mr-1" /> Broadcast
+                      </Button>
+                    )}
                   </div>
 
-                  <a
-                    href={slot.meetingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="py-1.5 px-4 rounded-xl bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                  >
-                    <Video className="h-3.5 w-3.5" /> Start Live ↗
-                  </a>
+                  {/* Role Specific Launch Button */}
+                  <div className="flex items-center gap-2">
+                    {isTeacher ? (
+                      <>
+                        {isLive ? (
+                          <Button
+                            onClick={() => {
+                              if (slot.platform === "In-App Live Studio (Jitsi)") {
+                                setActiveStudioSession(slot);
+                              } else {
+                                window.open(slot.meetingUrl, "_blank");
+                              }
+                            }}
+                            className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-xs flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Video className="h-3.5 w-3.5" /> Enter Studio ↗
+                          </Button>
+                        ) : isCompleted ? (
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setRecordingModalSlot(slot);
+                              setRecordingInputUrl(slot.recordingUrl || "");
+                            }}
+                            className="border-slate-300 text-slate-700 text-xs font-bold cursor-pointer"
+                          >
+                            <Play className="h-3.5 w-3.5 mr-1 text-[#0d5c4d]" />{" "}
+                            {slot.recordingUrl ? "Update Recording" : "+ Add Recording"}
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleToggleStatus(slot, "live_now")}
+                            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-extrabold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Radio className="h-3.5 w-3.5 text-rose-300" /> Start Live Class ↗
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {isLive ? (
+                          <Button
+                            onClick={() => handleStudentJoin(slot)}
+                            className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-sm flex items-center gap-1.5 cursor-pointer animate-pulse"
+                          >
+                            <Radio className="h-3.5 w-3.5" /> Join Live Classroom 🚀
+                          </Button>
+                        ) : slot.recordingUrl ? (
+                          <a
+                            href={slot.recordingUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="py-1.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Play className="h-3.5 w-3.5 text-rose-400" /> Watch Replay ↗
+                          </a>
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-500 px-3 py-1 bg-slate-100 rounded-xl">
+                            Starts {slot.day}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </Card>
-            ))}
-          </div>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* =================================================================== */}
-      {/* MODAL 1: ADD / EDIT LIVE CLASS SLOT                                 */}
+      {/* MODAL 1: IN-APP LIVE VIRTUAL STUDIO (Jitsi Embedded)                */}
+      {/* =================================================================== */}
+      {activeStudioSession && (
+        <div
+          className={`fixed z-50 transition-all duration-200 bg-slate-950 flex flex-col ${
+            isFullscreen ? "inset-0" : "inset-4 md:inset-8 rounded-3xl shadow-2xl border-2 border-[#0d5c4d]"
+          }`}
+        >
+          {/* Studio Top Control Bar */}
+          <div className="p-3.5 px-5 bg-gradient-to-r from-slate-950 via-slate-900 to-[#0d2b26] border-b border-white/10 flex items-center justify-between text-white shrink-0">
+            <div className="flex items-center gap-3">
+              <span className="flex h-3 w-3 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500" />
+              </span>
+              <div>
+                <h3 className="text-sm font-black text-white leading-tight flex items-center gap-2">
+                  <span>{activeStudioSession.title}</span>
+                  <Badge className="bg-rose-500/20 text-rose-300 border border-rose-400/30 text-[10px]">
+                    1080p HD Studio
+                  </Badge>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  {activeStudioSession.subject} &bull; Room: {activeStudioSession.meetingId || "Studio-Room"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => window.open(activeStudioSession.meetingUrl, "_blank")}
+                className="border-white/20 text-white hover:bg-white/10 text-xs font-bold"
+                title="Open in new window"
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-1" /> External Tab
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="border-white/20 text-white hover:bg-white/10 text-xs font-bold"
+                title="Toggle Fullscreen"
+              >
+                {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setActiveStudioSession(null)}
+                className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
+              >
+                <X className="h-4 w-4 mr-1" /> Leave Studio
+              </Button>
+            </div>
+          </div>
+
+          {/* Embedded Web Video Room */}
+          <div className="flex-1 w-full h-full bg-black relative">
+            <iframe
+              src={`https://meet.jit.si/${activeStudioSession.meetingId || "limat-classroom"}#config.prejoinPageEnabled=false&userInfo.displayName=${encodeURIComponent(
+                currentUser?.name || (isTeacher ? "Tutor Host" : "Student")
+              )}`}
+              allow="camera; microphone; fullscreen; display-capture; autoplay"
+              className="w-full h-full border-0"
+              title="Virtual Classroom Studio"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* MODAL 2: ADD / EDIT LIVE CLASS SLOT                                 */}
       {/* =================================================================== */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingSlotId ? "Edit Live Class Slot" : "Schedule New Live Class"}
-        description="Set up the day, time, curriculum topic, and virtual classroom meeting room for this live broadcast."
+        description="Set up the day, time, curriculum subject, and interactive virtual studio room for this live broadcast."
       >
         <form onSubmit={handleSaveSlot} className="space-y-4 pt-2">
           {/* Topic Title */}
@@ -623,31 +1115,49 @@ export function LiveScheduleView() {
           {/* Subject & Grade */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Subject</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Course / Subject</label>
               <select
                 value={formData.subject}
-                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                onChange={(e) => {
+                  const selectedCourse = contextCourses?.find((c) => c.title === e.target.value);
+                  setFormData({
+                    ...formData,
+                    subject: e.target.value,
+                    courseId: selectedCourse?.id || formData.courseId
+                  });
+                }}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#0d5c4d]"
               >
-                <option value="Combined Mathematics">Combined Mathematics</option>
-                <option value="Physics">Physics</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="Information Technology">Information Technology</option>
-                <option value="General English">General English</option>
+                {contextCourses && contextCourses.length > 0 ? (
+                  contextCourses.map((c) => (
+                    <option key={c.id} value={c.title}>
+                      {c.title} ({c.code})
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Combined Mathematics">Combined Mathematics</option>
+                    <option value="Physics">Physics</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Information Technology">Information Technology</option>
+                  </>
+                )}
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Grade / Level</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Target Package (Access)</label>
               <select
-                value={formData.grade}
-                onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                value={formData.packageId || ""}
+                onChange={(e) => setFormData({ ...formData, packageId: e.target.value })}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#0d5c4d]"
               >
-                <option value="Grade 12 & 13">Grade 12 &amp; 13</option>
-                <option value="Grade 12 (Theory)">Grade 12 (Theory)</option>
-                <option value="Grade 13 (Revision)">Grade 13 (Revision)</option>
-                <option value="A/L Paper Class">A/L Paper Class</option>
+                <option value="">All Enrolled Students (Public)</option>
+                {availablePackages.map((pkg) => (
+                  <option key={pkg.id} value={pkg.id}>
+                    🔒 {pkg.title} (Rs. {pkg.price})
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -694,7 +1204,7 @@ export function LiveScheduleView() {
             </div>
           </div>
 
-          {/* Format & Platform */}
+          {/* Platform & Format */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Class Format</label>
@@ -712,16 +1222,32 @@ export function LiveScheduleView() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Platform</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Meeting Provider</label>
               <select
                 value={formData.platform}
-                onChange={(e) => setFormData({ ...formData, platform: e.target.value as LiveSlot["platform"] })}
-                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#0d5c4d]"
+                onChange={(e) => {
+                  const plat = e.target.value as LiveSlot["platform"];
+                  let updatedUrl = formData.meetingUrl;
+                  let updatedId = formData.meetingId;
+                  if (plat === "In-App Live Studio (Jitsi)") {
+                    const slug = `limat-live-${Math.random().toString(36).substring(2, 8)}`;
+                    updatedUrl = `https://meet.jit.si/${slug}`;
+                    updatedId = slug;
+                  }
+                  setFormData({
+                    ...formData,
+                    platform: plat,
+                    meetingUrl: updatedUrl,
+                    meetingId: updatedId
+                  });
+                }}
+                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white font-bold focus:outline-hidden focus:border-[#0d5c4d]"
               >
+                <option value="In-App Live Studio (Jitsi)">🚀 In-App Live Studio (Built-in Jitsi)</option>
                 <option value="Google Meet">Google Meet</option>
                 <option value="Zoom">Zoom</option>
-                <option value="Microsoft Teams">Microsoft Teams</option>
                 <option value="YouTube Live">YouTube Live</option>
+                <option value="Custom">Custom Link</option>
               </select>
             </div>
           </div>
@@ -729,12 +1255,12 @@ export function LiveScheduleView() {
           {/* Meeting URL & Passcode */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Meeting URL <span className="text-rose-500">*</span>
+              Classroom Room URL <span className="text-rose-500">*</span>
             </label>
             <input
               type="url"
               required
-              placeholder="https://meet.google.com/sam-math-live"
+              placeholder="https://meet.jit.si/limat-live-room"
               value={formData.meetingUrl}
               onChange={(e) => setFormData({ ...formData, meetingUrl: e.target.value })}
               className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono focus:outline-hidden focus:border-[#0d5c4d]"
@@ -746,7 +1272,7 @@ export function LiveScheduleView() {
               <label className="block text-xs font-bold text-slate-700 mb-1">Meeting Room ID (Optional)</label>
               <input
                 type="text"
-                placeholder="sam-math-live"
+                placeholder="limat-live-room"
                 value={formData.meetingId}
                 onChange={(e) => setFormData({ ...formData, meetingId: e.target.value })}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono focus:outline-hidden focus:border-[#0d5c4d]"
@@ -786,7 +1312,7 @@ export function LiveScheduleView() {
       </Modal>
 
       {/* =================================================================== */}
-      {/* MODAL 2: DELETE CONFIRMATION                                        */}
+      {/* MODAL 3: DELETE CONFIRMATION                                        */}
       {/* =================================================================== */}
       <Modal
         isOpen={!!deletingSlot}
@@ -799,10 +1325,10 @@ export function LiveScheduleView() {
             <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-1">
               <p className="font-bold text-sm text-rose-950">{deletingSlot.title}</p>
               <p className="text-rose-800">
-                {deletingSlot.day} &bull; {deletingSlot.startTime} - {deletingSlot.endTime} &bull; {deletingSlot.subject}
+                {deletingSlot.day} &bull; {deletingSlot.startTime} &bull; {deletingSlot.subject}
               </p>
               <p className="text-[11px] text-rose-700 pt-1">
-                Note: Enrolled students ({deletingSlot.enrolledCount}) will no longer see this slot on their schedule.
+                Note: Enrolled students will no longer see this slot on their schedule.
               </p>
             </div>
 
@@ -826,7 +1352,7 @@ export function LiveScheduleView() {
       </Modal>
 
       {/* =================================================================== */}
-      {/* MODAL 3: BROADCAST ALERT MODAL                                      */}
+      {/* MODAL 4: BROADCAST ALERT MODAL                                      */}
       {/* =================================================================== */}
       <Modal
         isOpen={!!broadcastingSlot}
@@ -854,7 +1380,7 @@ export function LiveScheduleView() {
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 font-mono text-[11px] space-y-1">
               <p className="font-bold text-slate-900 text-xs">SMS &amp; Push Preview:</p>
               <p>
-                &ldquo;Reminder: Combined Maths Live Class &lsquo;{broadcastingSlot.title}&rsquo; starts {broadcastingSlot.day} at {broadcastingSlot.startTime}. Join link: {broadcastingSlot.meetingUrl}&rdquo;
+                &ldquo;Reminder: Live Class &lsquo;{broadcastingSlot.title}&rsquo; starts {broadcastingSlot.day} at {broadcastingSlot.startTime}. Join link: {broadcastingSlot.meetingUrl}&rdquo;
               </p>
             </div>
 
@@ -871,6 +1397,50 @@ export function LiveScheduleView() {
                 className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold cursor-pointer"
               >
                 <Send className="h-3.5 w-3.5 mr-1" /> Send Broadcast Now
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* =================================================================== */}
+      {/* MODAL 5: ATTACH RECORDING URL MODAL                                 */}
+      {/* =================================================================== */}
+      <Modal
+        isOpen={!!recordingModalSlot}
+        onClose={() => setRecordingModalSlot(null)}
+        title="Attach Class Replay Video"
+        description="Provide a YouTube or Google Drive recording link so students can replay this lecture."
+      >
+        {recordingModalSlot && (
+          <div className="space-y-4 pt-2 text-xs">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Video Replay Link (YouTube, Vimeo, Google Drive)
+              </label>
+              <input
+                type="url"
+                required
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={recordingInputUrl}
+                onChange={(e) => setRecordingInputUrl(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono focus:outline-hidden focus:border-[#0d5c4d]"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setRecordingModalSlot(null)}
+                className="text-xs font-bold"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveRecording}
+                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold cursor-pointer"
+              >
+                Save Recording Link
               </Button>
             </div>
           </div>
