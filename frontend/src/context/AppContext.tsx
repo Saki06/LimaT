@@ -515,7 +515,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Student submits assignment
-  const submitAssignment = (assignmentId: string, text: string, fileName?: string) => {
+  const submitAssignment = async (assignmentId: string, text: string, fileName?: string) => {
     const asg = assignments.find((a) => a.id === assignmentId);
     const existingIndex = submissions.findIndex(
       (s) => s.assignmentId === assignmentId && s.studentId === currentUser.id
@@ -545,10 +545,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       title: 'Assignment Submitted!',
       message: 'Your work has been submitted to your teacher for marking.'
     });
+
+    try {
+      await api.assignments.submit(assignmentId, {
+        textContent: text,
+        fileAttachmentName: fileName || 'Student_Submission.pdf',
+      });
+    } catch (err) {
+      console.warn('Backend submit assignment skipped:', err);
+    }
   };
 
   // Teacher grades submission and releases results
-  const gradeSubmission = (
+  const gradeSubmission = async (
     submissionId: string,
     marks: number,
     feedback: string,
@@ -576,6 +585,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ? `Marks (${marks}) released to student.`
         : 'Marks stored. Ready to release.'
     });
+
+    try {
+      await api.assignments.gradeSubmission(submissionId, {
+        marksObtained: marks,
+        teacherFeedback: feedback,
+        status: release ? 'RESULT_RELEASED' : 'MARKED',
+      });
+    } catch (err) {
+      console.warn('Backend grade submission skipped:', err);
+    }
   };
 
   // Student submits quiz attempt
@@ -779,12 +798,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const createAssignment = (asg: Partial<Assignment>) => {
+  const createAssignment = async (asg: Partial<Assignment>) => {
     const targetCourse = courses.find((c) => c.id === asg.courseId);
     const resolvedSubjectName = asg.subjectName || targetCourse?.title || 'Combined Mathematics';
 
+    const tempId = `asg_${Date.now()}`;
     const newAsg: Assignment = {
-      id: `asg_${Date.now()}`,
+      id: tempId,
       courseId: asg.courseId || targetCourse?.id || 'crs_math_12',
       subjectName: resolvedSubjectName,
       title: asg.title || 'New Assignment',
@@ -803,9 +823,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       title: 'Assignment Created & Published',
       message: `New assignment for "${resolvedSubjectName}" published successfully.`
     });
+
+    try {
+      const res = await api.assignments.create({
+        title: newAsg.title,
+        instructions: newAsg.instructions,
+        courseId: asg.courseId,
+        subjectName: resolvedSubjectName,
+        topicName: newAsg.topicName,
+        dueDate: newAsg.dueDate,
+        maxMarks: newAsg.maxMarks,
+        attachmentName: newAsg.attachmentName,
+      });
+      if (res && res.success && res.data) {
+        setAssignments((prev) =>
+          prev.map((a) => (a.id === tempId ? { ...a, id: res.data.id } : a))
+        );
+      }
+    } catch (err) {
+      console.warn('Backend assignment sync skipped:', err);
+    }
   };
 
-  const updateAssignment = (id: string, updates: Partial<Assignment>) => {
+  const updateAssignment = async (id: string, updates: Partial<Assignment>) => {
     setAssignments((prev) =>
       prev.map((a) => {
         if (a.id !== id) return a;
@@ -822,15 +862,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       title: 'Assignment Updated!',
       message: 'Assignment details and attachments saved successfully.'
     });
+
+    try {
+      await api.assignments.update(id, updates);
+    } catch (err) {
+      console.warn('Backend assignment update skipped:', err);
+    }
   };
 
-  const deleteAssignment = (id: string) => {
+  const deleteAssignment = async (id: string) => {
     setAssignments((prev) => prev.filter((a) => a.id !== id));
     addToast({
       type: 'info',
       title: 'Assignment Removed',
       message: 'Assignment deleted successfully.'
     });
+
+    try {
+      await api.assignments.delete(id);
+    } catch (err) {
+      console.warn('Backend assignment delete skipped:', err);
+    }
   };
 
   const createSchool = (sch: Partial<School>) => {
