@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import { LibraryResource, LibraryResourceType } from "@/types/lms";
+import { initialTutorPackages } from "@/data/connectMockData";
 import {
   Library,
   BookOpen,
@@ -66,7 +67,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
     updateLibraryResource,
     deleteLibraryResource,
     recordResourceView,
-    recordResourceDownload
+    recordResourceDownload,
+    addToast
   } = useApp();
 
   // Active library navigation tab
@@ -99,10 +101,16 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
   const [activeReaderResource, setActiveReaderResource] = useState<LibraryResource | null>(null);
   const [activeViewerResource, setActiveViewerResource] = useState<LibraryResource | null>(null);
 
+  // Locked Resource Access Modal & Active Subscriptions for Students
+  const [lockedResourceModal, setLockedResourceModal] = useState<LibraryResource | null>(null);
+  const [subscribedPackageIds, setSubscribedPackageIds] = useState<string[]>(["pkg_01"]);
+
   // Teacher Upload & Management states
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<LibraryResource | null>(null);
-  const [managementFilter, setManagementFilter] = useState<"all" | "published" | "draft" | "unpublished">("all");
+  const [managementFilter, setManagementFilter] = useState<
+    "all" | "public" | "subscribers_only" | "published" | "draft" | "unpublished"
+  >("all");
   const [resourceToDelete, setResourceToDelete] = useState<LibraryResource | null>(null);
 
   // Reader Settings State
@@ -215,30 +223,75 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
 
   // Filter resources uploaded by this specific teacher (or all if admin)
   const myTeacherResources = useMemo(() => {
-    if (currentRole === "admin") {
+    if (currentRole === "admin" || currentRole === "super_admin") {
       return libraryResources;
     }
-    const teacherName = (currentUser.name || "Mr. Samantha Perera").toLowerCase().trim();
+    const teacherName = (currentUser.name || "").toLowerCase().trim();
     return libraryResources.filter((r) => {
       const author = (r.author || "").toLowerCase().trim();
       return (
+        r.isOwner === true ||
+        (r.teacherId && r.teacherId === currentUser.id) ||
         author === teacherName ||
         author.includes(teacherName) ||
-        teacherName.includes(author) ||
-        (teacherName.includes("perera") && author.includes("perera"))
+        teacherName.includes(author)
       );
     });
-  }, [libraryResources, currentUser.name, currentRole]);
+  }, [libraryResources, currentUser.name, currentUser.id, currentRole]);
 
   // Teacher Management filtered resources
   const teacherManagedResources = useMemo(() => {
     return myTeacherResources.filter((r) => {
+      if (managementFilter === "public") return r.visibility === "public" || !r.visibility;
+      if (managementFilter === "subscribers_only") return r.visibility === "subscribers_only" || r.visibility === "private";
       if (managementFilter === "published") return r.status === "published";
       if (managementFilter === "draft") return r.status === "draft";
       if (managementFilter === "unpublished") return r.status === "unpublished";
       return true;
     });
   }, [myTeacherResources, managementFilter]);
+
+  // Check if current user has unlocked access to this resource
+  const isResourceUnlocked = (res: LibraryResource): boolean => {
+    // 1. Admins have complete access to everything
+    if (currentRole === "admin" || currentRole === "super_admin") return true;
+
+    // 2. Public resources are accessible to everyone (all students, all tutors)
+    if (!res.visibility || res.visibility === "public") return true;
+
+    // 3. The teacher/author who uploaded this resource always has full access
+    if (currentRole === "teacher") {
+      const teacherName = (currentUser.name || "").toLowerCase().trim();
+      const author = (res.author || "").toLowerCase().trim();
+      if (
+        res.isOwner ||
+        (res.teacherId && res.teacherId === currentUser.id) ||
+        author === teacherName ||
+        author.includes(teacherName) ||
+        teacherName.includes(author)
+      ) {
+        return true;
+      }
+    }
+
+    // 4. Backend access control flags (if already resolved)
+    if (res.isLocked === false && (res.visibility === "subscribers_only" || res.visibility === "private")) {
+      return true;
+    }
+    if (res.isLocked === true) {
+      return false;
+    }
+
+    // 5. Students check against active tuition package subscriptions
+    if (res.packageId && subscribedPackageIds.includes(res.packageId)) {
+      return true;
+    }
+    if (res.teacherId && subscribedPackageIds.includes(res.teacherId)) {
+      return true;
+    }
+
+    return false;
+  };
 
   // Practice Countdown Timer Effect
   React.useEffect(() => {
@@ -260,8 +313,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
     return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
 
-  // Open Resource Details or direct reader
+  // Open Resource Details or direct reader (Checks subscriber permission)
   const handleOpenResource = (res: LibraryResource) => {
+    if (!isResourceUnlocked(res)) {
+      setLockedResourceModal(res);
+      return;
+    }
     recordResourceView(res.id);
     if (res.resourceType === "book") {
       setSelectedBook(res);
@@ -273,6 +330,15 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
     } else {
       setSelectedTute(res);
     }
+  };
+
+  // Download Resource with Subscriber Check
+  const handleDownloadResource = (res: LibraryResource) => {
+    if (!isResourceUnlocked(res)) {
+      setLockedResourceModal(res);
+      return;
+    }
+    recordResourceDownload(res.id);
   };
 
   // Launch Reader
@@ -506,35 +572,35 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
 
             <div className="bg-white rounded-xl p-4 border border-[#e6ece8] shadow-xs">
               <div className="flex items-center justify-between text-slate-500 mb-1">
-                <span className="text-xs font-semibold">Total Student Views</span>
+                <span className="text-xs font-semibold">🌐 Public (Free for All)</span>
+                <Globe className="h-4 w-4 text-emerald-600" />
+              </div>
+              <p className="text-2xl font-extrabold text-[#0d2b26]">
+                {myTeacherResources.filter((r) => r.visibility === "public" || !r.visibility).length}
+              </p>
+              <p className="text-[11px] text-emerald-600 font-semibold mt-1">Open to all students &amp; tutors</p>
+            </div>
+
+            <div className="bg-white rounded-xl p-4 border border-[#e6ece8] shadow-xs">
+              <div className="flex items-center justify-between text-slate-500 mb-1">
+                <span className="text-xs font-semibold">🔒 Subscribers Only</span>
+                <Lock className="h-4 w-4 text-amber-600" />
+              </div>
+              <p className="text-2xl font-extrabold text-[#0d2b26]">
+                {myTeacherResources.filter((r) => r.visibility === "subscribers_only" || r.visibility === "private").length}
+              </p>
+              <p className="text-[11px] text-amber-600 font-semibold mt-1">Exclusive to tuition package</p>
+            </div>
+
+            <div className="bg-white rounded-xl p-4 border border-[#e6ece8] shadow-xs">
+              <div className="flex items-center justify-between text-slate-500 mb-1">
+                <span className="text-xs font-semibold">Student Engagements</span>
                 <Eye className="h-4 w-4 text-blue-600" />
               </div>
               <p className="text-2xl font-extrabold text-[#0d2b26]">
-                {myTeacherResources.reduce((acc, curr) => acc + curr.viewsCount, 0).toLocaleString()}
+                {myTeacherResources.reduce((acc, curr) => acc + curr.viewsCount + curr.downloadsCount, 0).toLocaleString()}
               </p>
-              <p className="text-[11px] text-blue-600 font-semibold mt-1">Across your uploaded materials</p>
-            </div>
-
-            <div className="bg-white rounded-xl p-4 border border-[#e6ece8] shadow-xs">
-              <div className="flex items-center justify-between text-slate-500 mb-1">
-                <span className="text-xs font-semibold">Downloads Recorded</span>
-                <Download className="h-4 w-4 text-[#0d5c4d]" />
-              </div>
-              <p className="text-2xl font-extrabold text-[#0d2b26]">
-                {myTeacherResources.reduce((acc, curr) => acc + curr.downloadsCount, 0).toLocaleString()}
-              </p>
-              <p className="text-[11px] text-emerald-600 font-semibold mt-1">Offline study access</p>
-            </div>
-
-            <div className="bg-white rounded-xl p-4 border border-[#e6ece8] shadow-xs">
-              <div className="flex items-center justify-between text-slate-500 mb-1">
-                <span className="text-xs font-semibold">Drafts & In-Review</span>
-                <Clock className="h-4 w-4 text-amber-500" />
-              </div>
-              <p className="text-2xl font-extrabold text-[#0d2b26]">
-                {myTeacherResources.filter((r) => r.status !== "published").length}
-              </p>
-              <p className="text-[11px] text-amber-600 font-semibold mt-1">Requires publication</p>
+              <p className="text-[11px] text-blue-600 font-semibold mt-1">Total reads &amp; downloads</p>
             </div>
           </div>
 
@@ -543,10 +609,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e6ece8]">
               <div>
                 <h2 className="text-base font-bold text-[#0d2b26]">
-                  Teacher &amp; Author Resource Management
+                  Teacher &amp; Author Resource Desk
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Managing materials uploaded by <span className="font-semibold text-[#0d5c4d]">{currentUser.name || "Mr. Samantha Perera"}</span> ({myTeacherResources.length} resources)
+                  Managing learning materials uploaded by <span className="font-semibold text-[#0d5c4d]">{currentUser.name || "Mr. Samantha Perera"}</span> ({myTeacherResources.length} resources)
                 </p>
               </div>
 
@@ -559,52 +625,54 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                   className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors"
                 >
                   <Plus className="h-4 w-4" />
-                  <span>Add New Resource</span>
+                  <span>Upload Resource</span>
                 </button>
               </div>
             </div>
 
-            {/* Status Pills */}
+            {/* Status & Access Filter Pills */}
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setManagementFilter("all")}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   managementFilter === "all"
-                    ? "bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0]"
+                    ? "bg-[#0d5c4d] text-white shadow-xs"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent"
                 }`}
               >
                 All Uploads ({myTeacherResources.length})
               </button>
               <button
-                onClick={() => setManagementFilter("published")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  managementFilter === "published"
-                    ? "bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0]"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent"
+                onClick={() => setManagementFilter("public")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  managementFilter === "public"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
                 }`}
               >
-                Published ({myTeacherResources.filter((r) => r.status === "published").length})
+                <Globe className="h-3 w-3" />
+                <span>🌐 Public ({myTeacherResources.filter((r) => r.visibility === "public" || !r.visibility).length})</span>
+              </button>
+              <button
+                onClick={() => setManagementFilter("subscribers_only")}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  managementFilter === "subscribers_only"
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
+                }`}
+              >
+                <Lock className="h-3 w-3" />
+                <span>🔒 Subscribers Only ({myTeacherResources.filter((r) => r.visibility === "subscribers_only" || r.visibility === "private").length})</span>
               </button>
               <button
                 onClick={() => setManagementFilter("draft")}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   managementFilter === "draft"
-                    ? "bg-amber-50 text-amber-800 border border-amber-200"
+                    ? "bg-slate-700 text-white"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent"
                 }`}
               >
                 Draft ({myTeacherResources.filter((r) => r.status === "draft").length})
-              </button>
-              <button
-                onClick={() => setManagementFilter("unpublished")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  managementFilter === "unpublished"
-                    ? "bg-slate-200 text-slate-800 border border-slate-300"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent"
-                }`}
-              >
-                Unpublished ({myTeacherResources.filter((r) => r.status === "unpublished").length})
               </button>
             </div>
 
@@ -615,10 +683,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                   <tr>
                     <th className="py-3 px-4">Resource</th>
                     <th className="py-3 px-4">Type</th>
-                    <th className="py-3 px-4">Subject & Topic</th>
+                    <th className="py-3 px-4">Subject &amp; Topic</th>
                     <th className="py-3 px-4">Author</th>
                     <th className="py-3 px-4">Uploaded Date</th>
-                    <th className="py-3 px-4">Visibility</th>
+                    <th className="py-3 px-4">Access Mode</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
@@ -626,126 +694,186 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 <tbody className="divide-y divide-[#e6ece8]">
                   {teacherManagedResources.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400">
-                        No resources in this status category.
+                      <td colSpan={8} className="py-12 text-center">
+                        <div className="max-w-sm mx-auto space-y-3">
+                          <div className="h-10 w-10 rounded-full bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center mx-auto">
+                            <UploadCloud className="h-5 w-5" />
+                          </div>
+                          <p className="font-bold text-[#0d2b26] text-sm">No resources in this filter</p>
+                          <p className="text-xs text-slate-400">
+                            Upload your past papers, tutes, or notes and control whether they are Public or Subscribers-Only.
+                          </p>
+                          <button
+                            onClick={() => {
+                              setEditingResource(null);
+                              setIsUploadModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] text-white font-bold text-xs hover:bg-[#0a473b]"
+                          >
+                            <Plus className="h-4 w-4" />
+                            <span>Upload First Resource</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    teacherManagedResources.map((res) => (
-                      <tr key={res.id} className="hover:bg-[#fbfcfb] transition-colors">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-8 rounded overflow-hidden bg-slate-100 shrink-0 shadow-xs border border-slate-200">
-                              <img
-                                src={res.coverImage}
-                                alt={res.title}
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                            <div className="max-w-xs">
-                              <p className="font-bold text-[#0d2b26] line-clamp-1">{res.title}</p>
-                              <p className="text-[11px] text-slate-400">
-                                {res.fileType} · {res.fileSize} · {res.pageCount} pgs
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                              res.resourceType === "book"
-                                ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            }`}
-                          >
-                            {res.resourceType === "book" ? "Book" : "Tute"}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <p className="font-semibold text-slate-700">{res.subject}</p>
-                          <p className="text-[11px] text-slate-400 line-clamp-1">
-                            {res.topic || res.category}
-                          </p>
-                        </td>
-                        <td className="py-3 px-4 font-medium text-slate-600">{res.author}</td>
-                        <td className="py-3 px-4 text-slate-500">{res.uploadedDate}</td>
-                        <td className="py-3 px-4">
-                          <span className="flex items-center gap-1 text-[11px] text-slate-600 font-medium capitalize">
-                            {res.visibility === "public" ? (
-                              <Globe className="h-3 w-3 text-emerald-600" />
-                            ) : res.visibility === "class_only" ? (
-                              <Users className="h-3 w-3 text-blue-600" />
-                            ) : (
-                              <Lock className="h-3 w-3 text-slate-400" />
-                            )}
-                            {res.visibility.replace("_", " ")}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
-                              res.status === "published"
-                                ? "bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0]"
-                                : res.status === "draft"
-                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                : "bg-slate-100 text-slate-600 border border-slate-200"
-                            }`}
-                          >
-                            {res.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Preview button */}
-                            <button
-                              onClick={() => handleOpenResource(res)}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-[#0d5c4d] hover:bg-slate-100 transition-colors"
-                              title="Preview"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
+                    teacherManagedResources.map((res) => {
+                      const isPastPaper = res.resourceType === "past_paper";
+                      const isBook = res.resourceType === "book";
+                      const isSubOnly = res.visibility === "subscribers_only" || res.visibility === "private";
 
-                            {/* Publish / Unpublish Toggle */}
-                            <button
-                              onClick={() => {
-                                const newStatus =
-                                  res.status === "published" ? "unpublished" : "published";
-                                updateLibraryResource(res.id, { status: newStatus });
-                              }}
-                              className={`p-1.5 rounded-lg transition-colors ${
-                                res.status === "published"
-                                  ? "text-emerald-600 hover:bg-emerald-50"
-                                  : "text-slate-400 hover:bg-slate-100"
+                      return (
+                        <tr key={res.id} className="hover:bg-[#fbfcfb] transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-8 rounded overflow-hidden bg-slate-100 shrink-0 shadow-xs border border-slate-200">
+                                <img
+                                  src={res.coverImage}
+                                  alt={res.title}
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                              <div className="max-w-xs">
+                                <p className="font-bold text-[#0d2b26] line-clamp-1">{res.title}</p>
+                                <p className="text-[11px] text-slate-400">
+                                  {res.fileType} · {res.fileSize} · {res.pageCount} pgs
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                isPastPaper
+                                  ? "bg-amber-50 text-amber-800 border border-amber-200"
+                                  : isBook
+                                  ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"
                               }`}
-                              title={res.status === "published" ? "Unpublish" : "Publish"}
                             >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                            </button>
+                              {isPastPaper ? "Past Paper" : isBook ? "Book" : "Tute"}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <p className="font-semibold text-slate-700">{res.subject}</p>
+                            <p className="text-[11px] text-slate-400 line-clamp-1">
+                              {res.topic || res.category}
+                            </p>
+                          </td>
+                          <td className="py-3 px-4 font-medium text-slate-600">{res.author}</td>
+                          <td className="py-3 px-4 text-slate-500">{res.uploadedDate}</td>
+                          <td className="py-3 px-4">
+                            {isSubOnly ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                                <Lock className="h-3 w-3 text-amber-600 shrink-0" />
+                                <span>Subscribers Only</span>
+                                {res.packageName && (
+                                  <span className="text-[10px] text-amber-700 font-normal max-w-[100px] truncate" title={res.packageName}>
+                                    ({res.packageName})
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <Globe className="h-3 w-3 text-emerald-600 shrink-0" />
+                                <span>Public • Free</span>
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+                                res.status === "published"
+                                  ? "bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0]"
+                                  : res.status === "draft"
+                                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                  : "bg-slate-100 text-slate-600 border border-slate-200"
+                              }`}
+                            >
+                              {res.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Preview button */}
+                              <button
+                                onClick={() => handleOpenResource(res)}
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-[#0d5c4d] hover:bg-slate-100 transition-colors"
+                                title="Preview Resource"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
 
-                            {/* Edit */}
-                            <button
-                              onClick={() => {
-                                setEditingResource(res);
-                                setIsUploadModalOpen(true);
-                              }}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                              title="Edit"
-                            >
-                              <Edit3 className="h-3.5 w-3.5" />
-                            </button>
+                              {/* Quick 1-Click Visibility Toggle (Public <-> Subscribers Only) */}
+                              <button
+                                onClick={() => {
+                                  const nextVisibility = isSubOnly ? "public" : "subscribers_only";
+                                  updateLibraryResource(res.id, { visibility: nextVisibility });
+                                  addToast({
+                                    type: "info",
+                                    title: nextVisibility === "public" ? "Made Public 🌐" : "Subscribers Only 🔒",
+                                    message:
+                                      nextVisibility === "public"
+                                        ? `"${res.title}" is now accessible to all students & tutors.`
+                                        : `"${res.title}" is now restricted to your tuition subscribers.`
+                                  });
+                                }}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  isSubOnly
+                                    ? "text-amber-600 hover:bg-amber-50"
+                                    : "text-emerald-600 hover:bg-emerald-50"
+                                }`}
+                                title={
+                                  isSubOnly
+                                    ? "Click to switch to Public Access (Free for all)"
+                                    : "Click to restrict to Subscribers Only (Tuition package)"
+                                }
+                              >
+                                {isSubOnly ? <Lock className="h-3.5 w-3.5" /> : <Globe className="h-3.5 w-3.5" />}
+                              </button>
 
-                            {/* Delete */}
-                            <button
-                              onClick={() => setResourceToDelete(res)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              {/* Publish / Unpublish Toggle */}
+                              <button
+                                onClick={() => {
+                                  const newStatus =
+                                    res.status === "published" ? "unpublished" : "published";
+                                  updateLibraryResource(res.id, { status: newStatus });
+                                }}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  res.status === "published"
+                                    ? "text-emerald-600 hover:bg-emerald-50"
+                                    : "text-slate-400 hover:bg-slate-100"
+                                }`}
+                                title={res.status === "published" ? "Unpublish" : "Publish"}
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              </button>
+
+                              {/* Edit */}
+                              <button
+                                onClick={() => {
+                                  setEditingResource(res);
+                                  setIsUploadModalOpen(true);
+                                }}
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                title="Edit"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                              </button>
+
+                              {/* Delete */}
+                              <button
+                                onClick={() => setResourceToDelete(res)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1032,16 +1160,17 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                   }}
                   className="px-4 py-2 rounded-xl bg-[#0d5c4d] text-white text-xs font-bold hover:bg-[#0a473b] transition-colors"
                 >
-                  View All Resources
+                  Clear All Filters
                 </button>
               </div>
             ) : viewMode === "grid" ? (
-              /* GRID VIEW */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 {filteredResources.map((res) => {
                   const isSaved = savedResourceIds.includes(res.id);
                   const isBook = res.resourceType === "book";
                   const isPastPaper = res.resourceType === "past_paper";
+                  const isSubOnly = res.visibility === "subscribers_only" || res.visibility === "private";
+                  const unlocked = isResourceUnlocked(res);
 
                   return (
                     <div
@@ -1057,19 +1186,38 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
+                        {/* Subscriber Locked Overlay */}
+                        {!unlocked && (
+                          <div className="absolute inset-0 bg-black/40 backdrop-blur-[1.5px] flex items-center justify-center pointer-events-none">
+                            <div className="px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-amber-400/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 shadow-lg">
+                              <Lock className="h-3.5 w-3.5" />
+                              <span>Subscriber Access</span>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Top Badges */}
                         <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                          <span
-                            className={`px-2.5 py-0.8 rounded-full text-[10px] font-extrabold uppercase tracking-wider backdrop-blur-md shadow-xs ${
-                              isPastPaper
-                                ? "bg-amber-500/95 text-white"
-                                : isBook
-                                ? "bg-purple-600/90 text-white"
-                                : "bg-[#0d5c4d]/90 text-white"
-                            }`}
-                          >
-                            {isPastPaper ? "Past Paper & Scheme" : isBook ? "Book" : "Tute"}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`px-2.5 py-0.8 rounded-full text-[10px] font-extrabold uppercase tracking-wider backdrop-blur-md shadow-xs ${
+                                isPastPaper
+                                  ? "bg-amber-500/95 text-white"
+                                  : isBook
+                                  ? "bg-purple-600/90 text-white"
+                                  : "bg-[#0d5c4d]/90 text-white"
+                              }`}
+                            >
+                              {isPastPaper ? "Past Paper & Scheme" : isBook ? "Book" : "Tute"}
+                            </span>
+
+                            {isSubOnly && (
+                              <span className="px-2 py-0.8 rounded-full text-[10px] font-extrabold bg-amber-500/95 text-white backdrop-blur-md flex items-center gap-1 shadow-xs">
+                                <Lock className="h-2.5 w-2.5" />
+                                <span>Subscribers Only</span>
+                              </span>
+                            )}
+                          </div>
 
                           {/* Bookmark Action */}
                           <button
@@ -1135,47 +1283,68 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
 
                         {/* Action Buttons */}
                         <div className="pt-2 border-t border-[#f0f4f1] flex items-center gap-2">
-                          <button
-                            onClick={() => handleOpenResource(res)}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl font-bold text-xs transition-colors ${
-                              isPastPaper
-                                ? "bg-[#fef7e6] hover:bg-[#fde4af] text-[#b47a16]"
-                                : "bg-[#ecf8f5] hover:bg-[#c4e9e0] text-[#0d5c4d]"
-                            }`}
-                          >
-                            {isPastPaper ? (
-                              <>
-                                <Award className="h-3.5 w-3.5" />
-                                <span>Solve &amp; View Scheme</span>
-                              </>
-                            ) : isBook ? (
-                              <>
-                                <BookOpen className="h-3.5 w-3.5" />
-                                <span>Read Book</span>
-                              </>
-                            ) : (
-                              <>
-                                <Eye className="h-3.5 w-3.5" />
-                                <span>View Tute</span>
-                              </>
-                            )}
-                          </button>
-
-                          {res.allowDownload ? (
-                            <button
-                              onClick={() => recordResourceDownload(res.id)}
-                              className="p-2 rounded-xl border border-[#d6dfd9] hover:bg-slate-100 text-slate-600 transition-colors"
-                              title="Download resource file"
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                            </button>
+                          {!unlocked ? (
+                            <>
+                              <button
+                                onClick={() => setLockedResourceModal(res)}
+                                className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-xs transition-all"
+                              >
+                                <Lock className="h-3.5 w-3.5" />
+                                <span>Subscribe to Unlock</span>
+                              </button>
+                              <button
+                                onClick={() => setLockedResourceModal(res)}
+                                className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors"
+                                title="Requires Active Subscription"
+                              >
+                                <Lock className="h-3.5 w-3.5" />
+                              </button>
+                            </>
                           ) : (
-                            <span
-                              className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 cursor-not-allowed text-[10px] font-semibold"
-                              title="Online Reading Only"
-                            >
-                              <Lock className="h-3.5 w-3.5" />
-                            </span>
+                            <>
+                              <button
+                                onClick={() => handleOpenResource(res)}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl font-bold text-xs transition-colors ${
+                                  isPastPaper
+                                    ? "bg-[#fef7e6] hover:bg-[#fde4af] text-[#b47a16]"
+                                    : "bg-[#ecf8f5] hover:bg-[#c4e9e0] text-[#0d5c4d]"
+                                }`}
+                              >
+                                {isPastPaper ? (
+                                  <>
+                                    <Award className="h-3.5 w-3.5" />
+                                    <span>Solve &amp; View Scheme</span>
+                                  </>
+                                ) : isBook ? (
+                                  <>
+                                    <BookOpen className="h-3.5 w-3.5" />
+                                    <span>Read Book</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="h-3.5 w-3.5" />
+                                    <span>View Tute</span>
+                                  </>
+                                )}
+                              </button>
+
+                              {res.allowDownload ? (
+                                <button
+                                  onClick={() => handleDownloadResource(res)}
+                                  className="p-2 rounded-xl border border-[#d6dfd9] hover:bg-slate-100 text-slate-600 transition-colors"
+                                  title="Download resource file"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                </button>
+                              ) : (
+                                <span
+                                  className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 cursor-not-allowed text-[10px] font-semibold"
+                                  title="Online Reading Only"
+                                >
+                                  <Lock className="h-3.5 w-3.5" />
+                                </span>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -1189,6 +1358,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 {filteredResources.map((res) => {
                   const isSaved = savedResourceIds.includes(res.id);
                   const isBook = res.resourceType === "book";
+                  const isSubOnly = res.visibility === "subscribers_only" || res.visibility === "private";
+                  const unlocked = isResourceUnlocked(res);
 
                   return (
                     <div
@@ -1198,13 +1369,18 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                       <div className="flex items-start gap-4">
                         <div
                           onClick={() => handleOpenResource(res)}
-                          className="w-16 h-20 shrink-0 rounded-lg overflow-hidden bg-slate-100 shadow-xs border border-slate-200 cursor-pointer"
+                          className="relative w-16 h-20 shrink-0 rounded-lg overflow-hidden bg-slate-100 shadow-xs border border-slate-200 cursor-pointer"
                         >
                           <img
                             src={res.coverImage}
                             alt={res.title}
                             className="h-full w-full object-cover"
                           />
+                          {!unlocked && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-amber-300">
+                              <Lock className="h-4 w-4" />
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-1">
@@ -1218,6 +1394,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                             >
                               {isBook ? "Book" : "Tute"}
                             </span>
+                            {isSubOnly && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
+                                <Lock className="h-2.5 w-2.5" />
+                                <span>Subscribers Only</span>
+                              </span>
+                            )}
                             <span className="text-xs font-semibold text-slate-500">{res.subject}</span>
                             <span className="text-slate-300">•</span>
                             <span className="text-xs text-slate-400">{res.category}</span>
@@ -1258,29 +1440,39 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                           <Bookmark className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
                         </button>
 
-                        <button
-                          onClick={() => handleOpenResource(res)}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors"
-                        >
-                          {res.resourceType === "past_paper" ? (
-                            <Award className="h-3.5 w-3.5 text-amber-300" />
-                          ) : isBook ? (
-                            <BookOpen className="h-3.5 w-3.5" />
-                          ) : (
-                            <Eye className="h-3.5 w-3.5" />
-                          )}
-                          <span>
-                            {res.resourceType === "past_paper"
-                              ? "Solve & Scheme"
-                              : isBook
-                              ? "Read Book"
-                              : "View Tute"}
-                          </span>
-                        </button>
+                        {!unlocked ? (
+                          <button
+                            onClick={() => setLockedResourceModal(res)}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-xs transition-colors"
+                          >
+                            <Lock className="h-3.5 w-3.5" />
+                            <span>Subscribe to Unlock</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleOpenResource(res)}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors"
+                          >
+                            {res.resourceType === "past_paper" ? (
+                              <Award className="h-3.5 w-3.5 text-amber-300" />
+                            ) : isBook ? (
+                              <BookOpen className="h-3.5 w-3.5" />
+                            ) : (
+                              <Eye className="h-3.5 w-3.5" />
+                            )}
+                            <span>
+                              {res.resourceType === "past_paper"
+                                ? "Solve & Scheme"
+                                : isBook
+                                ? "Read Book"
+                                : "View Tute"}
+                            </span>
+                          </button>
+                        )}
 
                         {res.allowDownload && (
                           <button
-                            onClick={() => recordResourceDownload(res.id)}
+                            onClick={() => handleDownloadResource(res)}
                             className="p-2 rounded-xl border border-[#d6dfd9] hover:bg-slate-100 text-slate-600 transition-colors"
                             title="Download"
                           >
@@ -2269,6 +2461,123 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
           </div>
         </div>
       )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* 7. EXCLUSIVE SUBSCRIBER RESOURCE MODAL */}
+      {/* ------------------------------------------------------------- */}
+      {lockedResourceModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 my-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="h-10 w-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 shadow-xs">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#0d2b26]">Exclusive Subscriber Access</h3>
+                  <p className="text-[11px] text-slate-500">Reserved for enrolled tuition subscribers</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setLockedResourceModal(null)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Resource Preview Card */}
+            <div className="p-3.5 rounded-2xl bg-[#f8faf9] border border-[#e6ece8] flex items-start gap-3">
+              <div className="h-14 w-11 rounded-lg overflow-hidden bg-slate-200 shrink-0 border border-slate-300 shadow-xs">
+                <img
+                  src={lockedResourceModal.coverImage}
+                  alt={lockedResourceModal.title}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full uppercase">
+                    {lockedResourceModal.resourceType === "past_paper"
+                      ? "Past Paper & Scheme"
+                      : lockedResourceModal.resourceType === "book"
+                      ? "Textbook"
+                      : "Revision Tute"}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-500">{lockedResourceModal.subject}</span>
+                </div>
+                <h4 className="font-bold text-xs text-[#0d2b26] mt-1 line-clamp-2 leading-snug">
+                  {lockedResourceModal.title}
+                </h4>
+                <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
+                  Author: <span className="text-[#0d5c4d] font-bold">{lockedResourceModal.author}</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Tutor Package Information Card */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/90 to-orange-50/90 border border-amber-200/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-200/60 px-2 py-0.5 rounded-md">
+                    Tuition Package
+                  </span>
+                  <h4 className="text-xs font-bold text-amber-950 mt-1">
+                    {lockedResourceModal.packageName || `${lockedResourceModal.subject} Masterclass Package`}
+                  </h4>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-black text-amber-950">
+                    LKR {(lockedResourceModal.packagePrice || 3500).toLocaleString()}
+                  </p>
+                  <p className="text-[10px] text-amber-700 font-medium">/ month</p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-amber-200/70 text-xs text-amber-900">
+                <div className="flex items-center gap-2 text-[11px]">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span>Immediate unlock for all past papers &amp; schemes by {lockedResourceModal.author}</span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span>Weekly live interactive classes &amp; HD recordings</span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span>Personal doubt clearing and model answer evaluation</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Subscription CTA Action */}
+            <div className="space-y-2 pt-1">
+              <button
+                onClick={() => {
+                  const pkgId = lockedResourceModal.packageId || lockedResourceModal.teacherId || "pkg_01";
+                  setSubscribedPackageIds((prev) => [...prev, pkgId]);
+                  addToast({
+                    type: "success",
+                    title: "Package Subscribed! 🎉",
+                    message: `You are now subscribed to ${lockedResourceModal.author}'s package. All exclusive materials are unlocked!`
+                  });
+                  setLockedResourceModal(null);
+                }}
+                className="w-full py-3 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-2 hover:scale-[1.01]"
+              >
+                <Sparkles className="h-4 w-4 text-amber-300" />
+                <span>Subscribe to Unlock Now • LKR {(lockedResourceModal.packagePrice || 3500).toLocaleString()}/mo</span>
+              </button>
+              <button
+                onClick={() => setLockedResourceModal(null)}
+                className="w-full py-2 text-center text-xs text-slate-500 hover:text-slate-700 font-semibold"
+              >
+                Maybe Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2302,8 +2611,23 @@ function TeacherUploadModal({
   const [category, setCategory] = useState(resource?.category || "Advanced Level");
   const [fileType, setFileType] = useState(resource?.fileType || "PDF");
   const [fileSize, setFileSize] = useState(resource?.fileSize || "4.5 MB");
-  const [visibility, setVisibility] = useState<"public" | "class_only" | "private">(
+  const [visibility, setVisibility] = useState<"public" | "subscribers_only" | "class_only" | "private">(
     resource?.visibility || "public"
+  );
+
+  // Available packages for this tutor
+  const tutorPackages = useMemo(() => {
+    return initialTutorPackages;
+  }, []);
+
+  const [selectedPackageId, setSelectedPackageId] = useState<string>(
+    resource?.packageId || (tutorPackages[0]?.id || "pkg_01")
+  );
+  const [selectedPackageName, setSelectedPackageName] = useState<string>(
+    resource?.packageName || (tutorPackages[0]?.title || "A/L Combined Mathematics Full Masterclass")
+  );
+  const [selectedPackagePrice, setSelectedPackagePrice] = useState<number>(
+    resource?.packagePrice || (tutorPackages[0]?.monthlyFeeLkr || 3500)
   );
   const [allowDownload, setAllowDownload] = useState<boolean>(
     resource ? resource.allowDownload : true
@@ -2379,6 +2703,8 @@ function TeacherUploadModal({
       return;
     }
 
+    const isSubOnly = visibility === "subscribers_only" || visibility === "private";
+
     setError(null);
     onSave(
       {
@@ -2392,7 +2718,12 @@ function TeacherUploadModal({
         coverImage,
         fileType,
         fileSize,
-        visibility,
+        visibility: isSubOnly ? "subscribers_only" : "public",
+        packageId: isSubOnly ? selectedPackageId : undefined,
+        packageName: isSubOnly ? selectedPackageName : undefined,
+        packagePrice: isSubOnly ? selectedPackagePrice : undefined,
+        teacherId: currentUser.id,
+        isOwner: true,
         allowDownload,
         year: resourceType === "past_paper" ? Number(year) : undefined,
         medium: resourceType === "past_paper" ? medium : undefined,
@@ -2754,22 +3085,98 @@ function TeacherUploadModal({
             </div>
           </div>
 
-          {/* Visibility & Permissions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#e6ece8]">
-            <div className="space-y-1">
-              <label className="font-bold text-slate-700">Visibility</label>
-              <select
-                value={visibility}
-                onChange={(e) => setVisibility(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl border border-[#d6dfd9] text-xs bg-white text-slate-700 font-semibold"
-              >
-                <option value="public">Public (All Students)</option>
-                <option value="class_only">Enrolled Classes Only</option>
-                <option value="private">Private (Author Only)</option>
-              </select>
+          {/* Access Mode & Visibility Selection */}
+          <div className="space-y-3 pt-3 border-t border-[#e6ece8]">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="font-bold text-slate-800 text-xs">Access Mode &amp; Visibility *</label>
+                <p className="text-[11px] text-slate-400">Choose who can access, view, and solve this resource</p>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option 1: Public */}
+              <button
+                type="button"
+                onClick={() => setVisibility("public")}
+                className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all ${
+                  visibility === "public"
+                    ? "bg-emerald-50/80 border-emerald-300 text-emerald-950 shadow-xs ring-2 ring-emerald-500/20"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${visibility === "public" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                  <Globe className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="font-extrabold text-xs">🌐 Public (அனைவருக்கும் பொதுவானது)</p>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                    Available to all students, tutors, and visitors across the academy. Free educational access.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 2: Subscribers Only */}
+              <button
+                type="button"
+                onClick={() => setVisibility("subscribers_only")}
+                className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all ${
+                  visibility === "subscribers_only" || visibility === "private"
+                    ? "bg-amber-50/80 border-amber-300 text-amber-950 shadow-xs ring-2 ring-amber-500/20"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${visibility === "subscribers_only" || visibility === "private" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
+                  <Lock className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="font-extrabold text-xs">🔒 Subscribers Only (சந்தாதாரர்கள் மட்டும்)</p>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                    Accessible ONLY to you and students subscribed to your tuition package. Locked for other students.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* Tuition Package Dropdown (Shown when Subscribers Only) */}
+            {(visibility === "subscribers_only" || visibility === "private") && (
+              <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-2.5 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-amber-950 text-[11px] flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                    <span>Link to Tuition Package *</span>
+                  </label>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                    LKR {selectedPackagePrice.toLocaleString()} / mo
+                  </span>
+                </div>
+                <select
+                  value={selectedPackageId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelectedPackageId(id);
+                    const found = tutorPackages.find((p) => p.id === id);
+                    if (found) {
+                      setSelectedPackageName(found.title);
+                      setSelectedPackagePrice(found.monthlyFeeLkr);
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                >
+                  {tutorPackages.map((pkg) => (
+                    <option key={pkg.id} value={pkg.id}>
+                      {pkg.title} — LKR {pkg.monthlyFeeLkr.toLocaleString()} / month ({pkg.subject})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-amber-800/80 leading-relaxed">
+                  Students without an active monthly subscription to this package will see a "Subscribe to Unlock (LKR {selectedPackagePrice.toLocaleString()})" prompt.
+                </p>
+              </div>
+            )}
+
+            {/* Offline Download Permission */}
+            <div className="flex items-center gap-2 pt-2">
               <input
                 type="checkbox"
                 id="allowDownloadCheck"
@@ -2777,8 +3184,8 @@ function TeacherUploadModal({
                 onChange={(e) => setAllowDownload(e.target.checked)}
                 className="h-4 w-4 text-[#0d5c4d] rounded border-slate-300 focus:ring-[#0d5c4d]"
               />
-              <label htmlFor="allowDownloadCheck" className="text-xs font-semibold text-slate-700">
-                Permit Offline Download
+              <label htmlFor="allowDownloadCheck" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                Permit Offline Download (PDF / material files)
               </label>
             </div>
           </div>

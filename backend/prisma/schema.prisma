@@ -77,6 +77,17 @@ enum SubmissionStatus {
   RESULT_RELEASED
 }
 
+enum ResourceVisibility {
+  PUBLIC
+  SUBSCRIBERS_ONLY
+}
+
+enum ResourceType {
+  PAST_PAPER
+  TUTE
+  BOOK
+}
+
 // Multi-tenant School / Institution
 model Tenant {
   id             String          @id @default(uuid())
@@ -91,6 +102,7 @@ model Tenant {
   packages       Package[]
   liveClasses    LiveClassSession[]
   assignments    Assignment[]
+  libraryResources LibraryResource[]
   sportsEvents   SportsEvent[]
   announcements  Announcement[]
   createdAt      DateTime        @default(now())
@@ -149,6 +161,7 @@ model TeacherProfile {
   packages      Package[]
   liveClasses   LiveClassSession[]
   assignments   Assignment[]
+  libraryResources LibraryResource[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -259,6 +272,7 @@ model Package {
   courses       PackageCourse[]
   subscriptions PackageSubscription[]
   liveClasses   LiveClassSession[]
+  libraryResources LibraryResource[]
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
 
@@ -384,4 +398,46 @@ model AssignmentSubmission {
   @@index([assignmentId, status])
   @@index([studentId])
 }
+
+model LibraryResource {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  teacherId          String
+  teacher            TeacherProfile      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  packageId          String?
+  package            Package?            @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  title              String
+  description        String?
+  resourceType       ResourceType        @default(PAST_PAPER)
+  subject            String
+  topic              String?
+  category           String?
+  year               Int?
+  medium             String?             // e.g. "Tamil", "English", "Sinhala"
+  examType           String?             // e.g. "G.C.E. A/L", "Term Test"
+  paperPart          String?             // e.g. "Part I (MCQ)", "Part II"
+  fileUrl            String?
+  fileName           String?
+  fileSize           String?
+  fileType           String              @default("pdf")
+  coverImage         String?
+  hasMarkingScheme   Boolean             @default(false)
+  markingSchemeUrl   String?
+  markingSchemeNotes String?
+  timeAllowedMinutes Int?                @default(180)
+  visibility         ResourceVisibility  @default(PUBLIC)
+  status             String              @default("published")
+  allowDownload      Boolean             @default(true)
+  viewsCount         Int                 @default(0)
+  downloadsCount     Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([tenantId, visibility])
+  @@index([teacherId])
+  @@index([subject])
+  @@index([packageId])
+}
+
 

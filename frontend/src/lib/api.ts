@@ -499,6 +499,98 @@ export const api = {
     },
   },
 
+  // Library Resources (Past Papers, Tutes, Books with Access Control)
+  resources: {
+    async getAll(params?: {
+      resourceType?: string;
+      subject?: string;
+      year?: string | number;
+      medium?: string;
+      examType?: string;
+      search?: string;
+      mine?: boolean;
+    }) {
+      const token = api.token.get();
+      const query = new URLSearchParams();
+      if (params?.resourceType) query.append('resourceType', params.resourceType);
+      if (params?.subject) query.append('subject', params.subject);
+      if (params?.year) query.append('year', params.year.toString());
+      if (params?.medium) query.append('medium', params.medium);
+      if (params?.examType) query.append('examType', params.examType);
+      if (params?.search) query.append('search', params.search);
+      if (params?.mine) query.append('mine', 'true');
+
+      const res = await fetch(`${API_BASE_URL}/resources?${query.toString()}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getById(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/resources/${id}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async create(data: any) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/resources`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async update(id: string, data: any) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/resources/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async delete(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/resources/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async recordView(id: string) {
+      const res = await fetch(`${API_BASE_URL}/resources/${id}/view`, {
+        method: 'POST',
+      });
+      return res.json();
+    },
+
+    async recordDownload(id: string) {
+      const res = await fetch(`${API_BASE_URL}/resources/${id}/download`, {
+        method: 'POST',
+      });
+      return res.json();
+    },
+  },
+
   // Token and Local Storage Helpers
   token: {
     get(): string | null {
