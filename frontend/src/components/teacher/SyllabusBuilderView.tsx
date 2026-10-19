@@ -37,6 +37,7 @@ export function SyllabusBuilderView() {
     courses,
     selectedCourseId,
     setSelectedCourseId,
+    createCourse,
     createUnit,
     updateUnit,
     createTopic,
@@ -54,9 +55,14 @@ export function SyllabusBuilderView() {
   const visibleCourses = useMemo(() => {
     if (currentRole === "teacher") {
       const tutorCourses = courses.filter(
-        (c) => c.teacherName === currentUser?.name || c.id === "crs_math_12" || c.title.toLowerCase().includes("math")
+        (c) =>
+          c.teacherName === currentUser?.name ||
+          c.teacherId === currentUser?.id ||
+          c.id === "crs_math_12" ||
+          c.title.toLowerCase().includes("math") ||
+          !c.id.startsWith("crs_") // include all dynamically created backend courses
       );
-      return tutorCourses.length > 0 ? tutorCourses : courses.slice(0, 2);
+      return tutorCourses.length > 0 ? tutorCourses : courses;
     }
     return courses;
   }, [courses, currentRole, currentUser]);
