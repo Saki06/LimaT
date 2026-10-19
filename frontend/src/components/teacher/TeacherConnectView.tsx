@@ -196,7 +196,7 @@ const PREDEFINED_GRADE_GROUPS = [
 const ALL_PREDEFINED_GRADES = PREDEFINED_GRADE_GROUPS.flatMap((g) => g.grades);
 
 export function TeacherConnectView() {
-  const { currentUser, t } = useApp();
+  const { currentUser, t, fetchCourses } = useApp();
   const hubSettings = useHubSettings();
   if (!hubSettings.enabled) {
     return <Card className="p-10 text-center"><p className="text-lg font-black text-[#0d2b26]">Tutor Connect Hub is currently disabled</p><p className="mt-2 text-sm text-slate-500">Please contact platform administration.</p></Card>;
@@ -364,7 +364,8 @@ export function TeacherConnectView() {
         const newPkg = mapBackendPackageToFrontend(res.data);
         setPackages((prev) => [newPkg, ...prev]);
         setIsCreatePackageModalOpen(false);
-        showToast(`Package "${newPkg.title}" saved to cloud database!`);
+        showToast(`Package "${newPkg.title}" saved! Subject automatically available in Syllabus Builder.`);
+        if (fetchCourses) fetchCourses();
         return;
       }
     } catch (err) {

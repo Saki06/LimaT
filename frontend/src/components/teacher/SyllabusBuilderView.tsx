@@ -85,33 +85,6 @@ export function SyllabusBuilderView() {
     }));
   };
 
-  // Create Course Modal state
-  const [isNewCourseModalOpen, setIsNewCourseModalOpen] = useState(false);
-  const [newCourseTitle, setNewCourseTitle] = useState("");
-  const [newCourseCode, setNewCourseCode] = useState("");
-  const [newCourseDescription, setNewCourseDescription] = useState("");
-  const [isCreatingCourse, setIsCreatingCourse] = useState(false);
-
-  const handleCreateCourseSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCourseTitle.trim() || !newCourseCode.trim()) return;
-
-    setIsCreatingCourse(true);
-    const res = await createCourse({
-      title: newCourseTitle.trim(),
-      code: newCourseCode.trim().toUpperCase(),
-      description: newCourseDescription.trim() || undefined,
-    });
-    setIsCreatingCourse(false);
-
-    if (res.success) {
-      setIsNewCourseModalOpen(false);
-      setNewCourseTitle("");
-      setNewCourseCode("");
-      setNewCourseDescription("");
-    }
-  };
-
   // Modals state
   const [isAddUnitModalOpen, setIsAddUnitModalOpen] = useState(false);
   const [newUnitTitle, setNewUnitTitle] = useState("");
@@ -446,14 +419,6 @@ export function SyllabusBuilderView() {
               ))}
             </select>
           </div>
-
-          <Button
-            onClick={() => setIsNewCourseModalOpen(true)}
-            variant="outline"
-            className="border-[#0d5c4d] text-[#0d5c4d] hover:bg-[#ecf8f5] font-bold gap-1.5 text-xs shadow-xs cursor-pointer"
-          >
-            <FolderPlus className="h-3.5 w-3.5" /> + New Subject / Course
-          </Button>
 
           <Button
             onClick={() => handleOpenAddLesson()}
@@ -1857,74 +1822,6 @@ export function SyllabusBuilderView() {
               className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold shadow-xs cursor-pointer"
             >
               Save Lesson Changes
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Create New Subject / Course Modal */}
-      <Modal
-        isOpen={isNewCourseModalOpen}
-        onClose={() => setIsNewCourseModalOpen(false)}
-        title="Create New Subject / Course"
-      >
-        <form onSubmit={handleCreateCourseSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-[#0d2b26] mb-1">
-              Course / Subject Title <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={newCourseTitle}
-              onChange={(e) => setNewCourseTitle(e.target.value)}
-              placeholder="e.g. A/L Combined Mathematics 2026 Batch"
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#0d5c4d]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-[#0d2b26] mb-1">
-              Course Code <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={newCourseCode}
-              onChange={(e) => setNewCourseCode(e.target.value)}
-              placeholder="e.g. MATH-2026"
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#0d5c4d] uppercase"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-[#0d2b26] mb-1">
-              Description (Optional)
-            </label>
-            <textarea
-              rows={3}
-              value={newCourseDescription}
-              onChange={(e) => setNewCourseDescription(e.target.value)}
-              placeholder="e.g. Comprehensive theory, paper discussions, and revision modules."
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#0d5c4d]"
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsNewCourseModalOpen(false)}
-              disabled={isCreatingCourse}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isCreatingCourse}
-              className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold shadow-xs cursor-pointer"
-            >
-              {isCreatingCourse ? "Saving to Cloud Database..." : "Save Subject to Cloud"}
             </Button>
           </div>
         </form>

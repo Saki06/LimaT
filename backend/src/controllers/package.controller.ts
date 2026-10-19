@@ -62,6 +62,46 @@ export const createPackage = async (req: AuthenticatedRequest, res: Response): P
       ? slug.trim().toLowerCase()
       : title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now().toString().slice(-4);
 
+    // If no courseIds provided, automatically create the Course/Subject for this package
+    let finalCourseIds: string[] = Array.isArray(courseIds) ? [...courseIds] : [];
+
+    if (finalCourseIds.length === 0) {
+      const cleanTitle = title.trim();
+      const codeBase = cleanTitle.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6).toUpperCase() || 'PKG';
+      const courseCode = `${codeBase}-${Date.now().toString().slice(-4)}`;
+
+      const autoCourse = await prisma.course.create({
+        data: {
+          tenantId,
+          teacherId: teacherProfile.id,
+          title: cleanTitle,
+          code: courseCode,
+          description: description ? description.trim() : `Syllabus & coursework for ${cleanTitle}`,
+          syllabus: {
+            units: [
+              {
+                id: `unt_${Date.now()}_1`,
+                subjectId: courseCode,
+                title: 'Unit 1: Course Overview & Foundation',
+                order: 1,
+                topics: [
+                  {
+                    id: `top_${Date.now()}_1`,
+                    unitId: `unt_${Date.now()}_1`,
+                    title: 'Topic 1: Introduction & Roadmap',
+                    description: 'Introductory module and syllabus structure.',
+                    order: 1,
+                    lessons: [],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+      finalCourseIds.push(autoCourse.id);
+    }
+
     const newPackage = await prisma.package.create({
       data: {
         tenantId,
@@ -75,7 +115,7 @@ export const createPackage = async (req: AuthenticatedRequest, res: Response): P
         features: features || [],
         isPublished: Boolean(isPublished),
         courses: {
-          create: (Array.isArray(courseIds) ? courseIds : []).map((courseId: string) => ({
+          create: finalCourseIds.map((courseId: string) => ({
             courseId,
           })),
         },
