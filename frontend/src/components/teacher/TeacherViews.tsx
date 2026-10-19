@@ -36,7 +36,13 @@ import {
   Film,
   FileCheck,
   Edit3,
-  Copy
+  Copy,
+  Download,
+  ZoomIn,
+  ZoomOut,
+  ChevronRight,
+  GraduationCap,
+  CheckCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -111,6 +117,9 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
   const [assignmentFilter, setAssignmentFilter] = useState<string>("all");
   const [marksInput, setMarksInput] = useState<number>(85);
   const [feedbackInput, setFeedbackInput] = useState<string>("");
+  const [searchStudent, setSearchStudent] = useState<string>("");
+  const [isAnswerSheetModalOpen, setIsAnswerSheetModalOpen] = useState(false);
+  const [docZoom, setDocZoom] = useState<number>(100);
 
   // Modals
   const [isCreateAsgModalOpen, setIsCreateAsgModalOpen] = useState(false);
@@ -254,9 +263,27 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
   // View announcement modal state
   const [viewingNotice, setViewingNotice] = useState<Announcement | null>(null);
 
+  const QUICK_FEEDBACK_PILLS = [
+    "🌟 Excellent derivation with clear step-by-step mathematical working!",
+    "👍 Good attempt; please double-check calculations in question 2.",
+    "🔍 Formula applied correctly, but final units or graph notation are missing.",
+    "⚠️ Partially correct. Please revisit syllabus unit theory before the exam.",
+    "📝 Incomplete submission. Please resubmit the remaining questions.",
+  ];
+
+  const getALGrade = (score: number, max: number) => {
+    const pct = max > 0 ? (score / max) * 100 : 0;
+    if (pct >= 75) return { grade: "A", label: "Distinction", color: "text-emerald-700 bg-emerald-50 border-emerald-300" };
+    if (pct >= 65) return { grade: "B", label: "Very Good", color: "text-blue-700 bg-blue-50 border-blue-300" };
+    if (pct >= 55) return { grade: "C", label: "Credit", color: "text-amber-700 bg-amber-50 border-amber-300" };
+    if (pct >= 35) return { grade: "S", label: "Ordinary Pass", color: "text-orange-700 bg-orange-50 border-orange-300" };
+    return { grade: "F", label: "Referral / Weak", color: "text-rose-700 bg-rose-50 border-rose-300" };
+  };
+
   // Filtered submissions for Grading Desk
   const filteredSubmissions = submissions.filter((s) => {
     if (assignmentFilter !== "all" && s.assignmentId !== assignmentFilter) return false;
+    if (searchStudent.trim() && !s.studentName.toLowerCase().includes(searchStudent.toLowerCase())) return false;
     if (subFilter === "pending") return s.status === "submitted";
     if (subFilter === "marked") return s.status === "marked";
     if (subFilter === "released") return s.status === "result_released";
@@ -269,7 +296,7 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
   // Update inputs when active submission changes
   useEffect(() => {
     if (activeSubmission) {
-      setMarksInput(activeSubmission.marksObtained ?? activeSubmission.maxMarks * 0.85);
+      setMarksInput(activeSubmission.marksObtained ?? Math.round(activeSubmission.maxMarks * 0.85));
       setFeedbackInput(activeSubmission.teacherFeedback || "");
     }
   }, [activeSubmission?.id]);
@@ -277,6 +304,28 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
   const handleSaveGrade = (release: boolean) => {
     if (!activeSubmission) return;
     gradeSubmission(activeSubmission.id, Number(marksInput), feedbackInput, release);
+  };
+
+  const handleGradeAndNext = (release: boolean) => {
+    if (!activeSubmission) return;
+    gradeSubmission(activeSubmission.id, Number(marksInput), feedbackInput, release);
+    const currentIndex = filteredSubmissions.findIndex((s) => s.id === activeSubmission.id);
+    if (currentIndex >= 0 && currentIndex < filteredSubmissions.length - 1) {
+      setSelectedSubId(filteredSubmissions[currentIndex + 1].id);
+    }
+  };
+
+  const handleBatchRelease = () => {
+    const draftSubs = submissions.filter((s) => s.status === "marked");
+    if (draftSubs.length === 0) return;
+    draftSubs.forEach((sub) => {
+      gradeSubmission(
+        sub.id,
+        sub.marksObtained ?? Math.round(sub.maxMarks * 0.75),
+        sub.teacherFeedback || "Evaluated by tutor.",
+        true
+      );
+    });
   };
 
   const handleAsgFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1206,259 +1255,483 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
       )}
 
       {/* TAB 1: Submissions Review & Grading Desk (Section 6.4) */}
-      {activeTab === "grading" && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="text-base font-extrabold text-[#0d2b26] flex items-center gap-2">
-              <ClipboardCheck className="h-5 w-5 text-[#0d5c4d]" />
-              Submissions Review & Grading Desk (Section 6.4)
-            </h2>
+      {activeTab === "grading" && (() => {
+        const totalSubs = submissions.length;
+        const pendingCount = submissions.filter((s) => s.status === "submitted").length;
+        const draftCount = submissions.filter((s) => s.status === "marked").length;
+        const releasedCount = submissions.filter((s) => s.status === "result_released").length;
+        const evaluatedSubs = submissions.filter((s) => s.marksObtained !== undefined);
+        const avgScore = evaluatedSubs.length > 0
+          ? Math.round(evaluatedSubs.reduce((acc, curr) => acc + (curr.marksObtained || 0), 0) / evaluatedSubs.length)
+          : 0;
 
-            {/* Filter Group */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Assignment Filter */}
-              <select
-                value={assignmentFilter}
-                onChange={(e) => setAssignmentFilter(e.target.value)}
-                className="h-8 px-2.5 rounded-xl bg-white border border-[#e6ece8] text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0d5c4d]"
-              >
-                <option value="all">All Assignments</option>
-                {assignments.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.title}
-                  </option>
-                ))}
-              </select>
+        return (
+          <div className="space-y-5">
+            {/* Header & Batch Controls */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+              <div>
+                <h2 className="text-xl font-black text-[#0d2b26] flex items-center gap-2.5">
+                  <ClipboardCheck className="h-6 w-6 text-[#0d5c4d]" />
+                  Submissions Review &amp; Grading Desk
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Evaluate student answer scripts, assign marks against G.C.E A/L benchmarks, and release official results.
+                </p>
+              </div>
 
-              {/* Status Filter */}
-              <div className="flex items-center bg-white border border-[#e6ece8] rounded-xl p-0.5 shadow-2xs">
-                <button
-                  onClick={() => setSubFilter("pending")}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                    subFilter === "pending"
-                      ? "bg-[#f3b738] text-slate-950 shadow-xs"
-                      : "text-slate-600 hover:text-[#0d5c4d]"
-                  }`}
+              {draftCount > 0 && (
+                <Button
+                  onClick={handleBatchRelease}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 rounded-xl shadow-xs flex items-center gap-2 cursor-pointer transition-all animate-in fade-in"
                 >
-                  Pending ({submissions.filter((s) => s.status === "submitted").length})
-                </button>
-                <button
-                  onClick={() => setSubFilter("marked")}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                    subFilter === "marked"
-                      ? "bg-slate-800 text-white shadow-xs"
-                      : "text-slate-600 hover:text-[#0d5c4d]"
-                  }`}
+                  <CheckCheck className="h-4 w-4" />
+                  Release All Graded Drafts ({draftCount})
+                </Button>
+              )}
+            </div>
+
+            {/* Quick KPI Metric Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+              <div className="p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Total Received</span>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-2xl font-black text-slate-900">{totalSubs}</span>
+                  <Badge variant="outline" className="text-[10px] bg-slate-50 border-slate-200">Submissions</Badge>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 shadow-2xs">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 block">Pending Evaluation</span>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-2xl font-black text-amber-900">{pendingCount}</span>
+                  <Badge variant="warning" className="text-[10px] bg-[#f3b738] text-slate-950 font-black">Needs Review</Badge>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 shadow-2xs">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 block">Draft Saved</span>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-2xl font-black text-blue-900">{draftCount}</span>
+                  <Badge variant="default" className="text-[10px] bg-blue-600 text-white">Unreleased</Badge>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 shadow-2xs">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block">Class Average</span>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-2xl font-black text-emerald-900">{avgScore}%</span>
+                  <Badge variant="success" className="text-[10px] bg-[#0d5c4d] text-white font-bold">A/L Cohort</Badge>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="p-3 bg-white border border-[#e6ece8] rounded-2xl shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Assignment Filter */}
+                <select
+                  value={assignmentFilter}
+                  onChange={(e) => setAssignmentFilter(e.target.value)}
+                  className="h-9 px-3 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
                 >
-                  Draft ({submissions.filter((s) => s.status === "marked").length})
-                </button>
-                <button
-                  onClick={() => setSubFilter("released")}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                    subFilter === "released"
-                      ? "bg-[#0d5c4d] text-white shadow-xs"
-                      : "text-slate-600 hover:text-[#0d5c4d]"
-                  }`}
-                >
-                  Released ({submissions.filter((s) => s.status === "result_released").length})
-                </button>
-                <button
-                  onClick={() => setSubFilter("all")}
-                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                    subFilter === "all"
-                      ? "bg-[#0d5c4d] text-white shadow-xs"
-                      : "text-slate-600 hover:text-[#0d5c4d]"
-                  }`}
-                >
-                  All ({submissions.length})
-                </button>
+                  <option value="all">📚 All Course Assignments ({assignments.length})</option>
+                  {assignments.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.title} ({a.subjectName || "A/L"})
+                    </option>
+                  ))}
+                </select>
+
+                {/* Status Tabs */}
+                <div className="flex items-center bg-[#f0f4f2] p-1 rounded-xl">
+                  <button
+                    onClick={() => setSubFilter("pending")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      subFilter === "pending"
+                        ? "bg-[#f3b738] text-slate-950 shadow-xs"
+                        : "text-slate-600 hover:text-[#0d5c4d]"
+                    }`}
+                  >
+                    Pending ({pendingCount})
+                  </button>
+                  <button
+                    onClick={() => setSubFilter("marked")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      subFilter === "marked"
+                        ? "bg-slate-800 text-white shadow-xs"
+                        : "text-slate-600 hover:text-[#0d5c4d]"
+                    }`}
+                  >
+                    Draft ({draftCount})
+                  </button>
+                  <button
+                    onClick={() => setSubFilter("released")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      subFilter === "released"
+                        ? "bg-[#0d5c4d] text-white shadow-xs"
+                        : "text-slate-600 hover:text-[#0d5c4d]"
+                    }`}
+                  >
+                    Released ({releasedCount})
+                  </button>
+                  <button
+                    onClick={() => setSubFilter("all")}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      subFilter === "all"
+                        ? "bg-[#0d5c4d] text-white shadow-xs"
+                        : "text-slate-600 hover:text-[#0d5c4d]"
+                    }`}
+                  >
+                    All ({totalSubs})
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Student Input */}
+              <div className="relative min-w-[240px]">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Filter student name..."
+                  value={searchStudent}
+                  onChange={(e) => setSearchStudent(e.target.value)}
+                  className="w-full h-9 pl-9 pr-8 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d]"
+                />
+                {searchStudent && (
+                  <button
+                    onClick={() => setSearchStudent("")}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Main Submissions Workspace Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Submissions Queue (5 cols) */}
+              <div className="lg:col-span-5 space-y-2.5">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Submissions Queue ({filteredSubmissions.length})
+                  </p>
+                  <span className="text-[11px] text-slate-400">Click to evaluate</span>
+                </div>
+
+                {filteredSubmissions.length === 0 ? (
+                  <div className="p-10 text-center bg-white border border-[#e6ece8] rounded-2xl text-xs text-slate-500">
+                    <ClipboardCheck className="h-8 w-8 mx-auto text-slate-300 mb-2" />
+                    No submissions matching this filter or search query.
+                  </div>
+                ) : (
+                  filteredSubmissions.map((sub) => {
+                    const isSelected = activeSubmission?.id === sub.id;
+                    const gradeInfo = sub.marksObtained !== undefined ? getALGrade(sub.marksObtained, sub.maxMarks) : null;
+                    const initials = sub.studentName
+                      .split(" ")
+                      .map((n) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase();
+
+                    return (
+                      <div
+                        key={sub.id}
+                        onClick={() => setSelectedSubId(sub.id)}
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                          isSelected
+                            ? "bg-white border-[#0d5c4d] shadow-md ring-2 ring-[#0d5c4d]/15 -translate-y-0.5"
+                            : "bg-white border-[#e6ece8] hover:border-[#c4e9e0] hover:bg-[#fafcfb] shadow-2xs"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
+                            isSelected ? "bg-[#0d5c4d] text-white" : "bg-[#ecf8f5] text-[#0d5c4d]"
+                          }`}>
+                            {initials}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-xs font-black text-slate-900 truncate">{sub.studentName}</span>
+                              <Badge
+                                variant={
+                                  sub.status === "result_released"
+                                    ? "success"
+                                    : sub.status === "marked"
+                                    ? "default"
+                                    : "warning"
+                                }
+                                className="text-[10px] shrink-0"
+                              >
+                                {sub.status === "result_released"
+                                  ? "Released"
+                                  : sub.status === "marked"
+                                  ? "Draft Saved"
+                                  : "Pending Review"}
+                              </Badge>
+                            </div>
+
+                            <p className="text-[11px] text-[#0d5c4d] font-bold truncate mt-0.5">
+                              {sub.assignmentTitle}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-3 pt-2.5 border-t border-slate-100">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {sub.submittedAt}
+                          </span>
+
+                          {sub.marksObtained !== undefined && gradeInfo ? (
+                            <span className={`px-2 py-0.5 rounded-md font-mono font-bold text-[10px] border ${gradeInfo.color}`}>
+                              {sub.marksObtained}/{sub.maxMarks} • {gradeInfo.grade} ({gradeInfo.label})
+                            </span>
+                          ) : (
+                            <span className="text-amber-600 font-bold text-[10px] flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" /> Awaiting Marks
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Right Column: Grading Desk & Feedback Composer (7 cols) */}
+              <div className="lg:col-span-7">
+                {activeSubmission ? (
+                  <Card className="border-[#e6ece8] bg-white shadow-2xs p-6 space-y-6">
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#e6ece8]">
+                      <div className="flex items-center gap-3">
+                        <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-[#0d5c4d] to-[#1a7f6c] text-white flex items-center justify-center font-black text-sm shadow-xs shrink-0">
+                          {activeSubmission.studentName
+                            .split(" ")
+                            .map((n) => n[0])
+                            .slice(0, 2)
+                            .join("")
+                            .toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-black text-[#0d2b26]">
+                              {activeSubmission.studentName}
+                            </h3>
+                            <Badge
+                              variant={
+                                activeSubmission.status === "result_released"
+                                  ? "success"
+                                  : activeSubmission.status === "marked"
+                                  ? "default"
+                                  : "warning"
+                              }
+                              className="text-[10px]"
+                            >
+                              {activeSubmission.status === "result_released"
+                                ? "Marks Released"
+                                : activeSubmission.status === "marked"
+                                ? "Draft Saved"
+                                : "Awaiting Evaluation"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                            {activeSubmission.assignmentTitle} &bull; Submitted: {activeSubmission.submittedAt}
+                          </p>
+                        </div>
+                      </div>
+
+                      <Badge variant="outline" className="text-xs font-mono font-bold bg-[#f8faf9] border-slate-300 self-start sm:self-auto">
+                        Max Marks: {activeSubmission.maxMarks}
+                      </Badge>
+                    </div>
+
+                    {/* Student's answer text and file */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                          <FileText className="h-4 w-4 text-[#0d5c4d]" />
+                          Student's Submitted Work &amp; Solution:
+                        </p>
+                        {activeSubmission.textContent && (
+                          <button
+                            onClick={() => {
+                              navigator.clipboard?.writeText(activeSubmission.textContent || "");
+                            }}
+                            className="text-[11px] text-slate-400 hover:text-slate-700 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Copy className="h-3 w-3" /> Copy
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-[#f8faf9] border border-[#e6ece8] text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-sans">
+                        {activeSubmission.textContent || "No written response text was entered. Please inspect attached answer sheet file below."}
+                      </div>
+
+                      {activeSubmission.fileAttachmentName && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] gap-2">
+                          <div className="flex items-center gap-2.5 text-[#0d5c4d] font-bold text-xs min-w-0">
+                            <div className="p-2 rounded-lg bg-white border border-[#c4e9e0] shadow-2xs shrink-0">
+                              <FileCheck className="h-4 w-4 text-[#0d5c4d]" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-slate-900 font-black">{activeSubmission.fileAttachmentName}</p>
+                              <span className="text-[10px] text-slate-500 font-normal">Candidate Solution Answer Sheet &bull; PDF Document</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setDocZoom(100);
+                                setIsAnswerSheetModalOpen(true);
+                              }}
+                              className="h-8 text-xs font-bold text-[#0d5c4d] border-[#c4e9e0] hover:bg-white bg-white/70 cursor-pointer"
+                            >
+                              <Eye className="h-3.5 w-3.5 mr-1" /> Inspect Answer Sheet
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Teacher Marks Entry, Sri Lankan A/L Grade & Quick Feedback */}
+                    <div className="space-y-4 pt-4 border-t border-[#e6ece8]">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                            <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
+                            Marks &amp; A/L Grade Classification:
+                          </label>
+
+                          {/* Calculated Grade Badge */}
+                          {(() => {
+                            const currentGrade = getALGrade(Number(marksInput), activeSubmission.maxMarks);
+                            return (
+                              <span className={`px-2.5 py-0.5 rounded-lg font-bold text-xs border ${currentGrade.color}`}>
+                                Grade: {currentGrade.grade} ({currentGrade.label})
+                              </span>
+                            );
+                          })()}
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                          {/* Number Input */}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min={0}
+                              max={activeSubmission.maxMarks}
+                              value={marksInput}
+                              onChange={(e) => setMarksInput(Math.min(activeSubmission.maxMarks, Math.max(0, Number(e.target.value))))}
+                              className="w-24 h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 font-mono font-black text-xl focus:outline-none focus:border-[#0d5c4d]"
+                            />
+                            <span className="text-xs font-bold text-slate-500">
+                              / {activeSubmission.maxMarks}
+                            </span>
+                          </div>
+
+                          {/* Interactive Range Slider */}
+                          <div className="flex-1 flex items-center gap-3">
+                            <input
+                              type="range"
+                              min={0}
+                              max={activeSubmission.maxMarks}
+                              value={marksInput}
+                              onChange={(e) => setMarksInput(Number(e.target.value))}
+                              className="flex-1 accent-[#0d5c4d] h-2 bg-slate-200 rounded-lg cursor-pointer"
+                            />
+                            <span className="font-mono font-bold text-xs text-[#0d5c4d] w-12 text-right">
+                              {Math.round((Number(marksInput) / activeSubmission.maxMarks) * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Feedback Presets */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                          Quick Feedback Presets (1-Click Insert):
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {QUICK_FEEDBACK_PILLS.map((pill, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setFeedbackInput((prev) =>
+                                  prev ? `${prev} ${pill}` : pill
+                                );
+                              }}
+                              className="text-[11px] px-2.5 py-1 rounded-lg bg-[#f0f4f2] text-slate-700 hover:bg-[#ecf8f5] hover:text-[#0d5c4d] border border-slate-200 transition-colors text-left cursor-pointer"
+                            >
+                              {pill}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Feedback Textarea */}
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                          {t.academic.teacherFeedback}
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={feedbackInput}
+                          onChange={(e) => setFeedbackInput(e.target.value)}
+                          placeholder="Add personalized feedback, areas of improvement, and commendations..."
+                          className="w-full p-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+
+                      {/* Actions: Save Draft vs Release Results vs Save & Next */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                        <Button
+                          variant="outline"
+                          onClick={() => handleSaveGrade(false)}
+                          className="text-xs font-bold border-slate-300 hover:bg-slate-50 cursor-pointer"
+                        >
+                          Save Marks as Draft
+                        </Button>
+
+                        <div className="flex items-center gap-2.5">
+                          <Button
+                            variant="outline"
+                            onClick={() => handleGradeAndNext(false)}
+                            className="text-xs font-bold border-[#c4e9e0] text-[#0d5c4d] hover:bg-[#ecf8f5] cursor-pointer"
+                          >
+                            Save &amp; Next <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                          </Button>
+
+                          <Button
+                            onClick={() => handleSaveGrade(true)}
+                            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-2 text-xs shadow-sm cursor-pointer"
+                          >
+                            <Send className="h-4 w-4" />
+                            {t.academic.releaseResults}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ) : (
+                  <div className="p-12 text-center bg-white border border-[#e6ece8] rounded-2xl text-xs text-slate-500">
+                    <ClipboardCheck className="h-10 w-10 mx-auto text-slate-300 mb-2" />
+                    Select a student submission from the queue on the left to grade.
+                  </div>
+                )}
               </div>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Submissions Queue (5 cols) */}
-            <div className="lg:col-span-5 space-y-2.5">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
-                Select Student Submission ({filteredSubmissions.length})
-              </p>
-
-              {filteredSubmissions.length === 0 ? (
-                <div className="p-8 text-center bg-white border border-[#e6ece8] rounded-2xl text-xs text-slate-500">
-                  No submissions matching this filter.
-                </div>
-              ) : (
-                filteredSubmissions.map((sub) => {
-                  const isSelected = activeSubmission?.id === sub.id;
-
-                  return (
-                    <div
-                      key={sub.id}
-                      onClick={() => setSelectedSubId(sub.id)}
-                      className={`p-4 rounded-2xl border cursor-pointer transition-all ${
-                        isSelected
-                          ? "bg-white border-[#0d5c4d] shadow-md ring-2 ring-[#0d5c4d]/10"
-                          : "bg-white border-[#e6ece8] hover:border-[#c4e9e0] shadow-2xs"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-slate-900">{sub.studentName}</span>
-                        <Badge
-                          variant={
-                            sub.status === "result_released"
-                              ? "success"
-                              : sub.status === "marked"
-                              ? "default"
-                              : "warning"
-                          }
-                        >
-                          {sub.status === "result_released"
-                            ? "Released"
-                            : sub.status === "marked"
-                            ? "Draft Marked"
-                            : "Pending Review"}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-[#0d5c4d] font-bold mt-1">
-                        {sub.assignmentTitle}
-                      </p>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2">
-                        <span>Submitted: {sub.submittedAt}</span>
-                        {sub.marksObtained !== undefined && (
-                          <span className="font-bold text-[#0d5c4d]">
-                            Score: {sub.marksObtained}/{sub.maxMarks} (
-                            {Math.round((sub.marksObtained / sub.maxMarks) * 100)}%)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Grading Desk & Feedback Composer (7 cols) */}
-            <div className="lg:col-span-7">
-              {activeSubmission ? (
-                <Card className="border-[#e6ece8] bg-white shadow-2xs p-6 space-y-6">
-                  <div className="flex items-center justify-between pb-4 border-b border-[#e6ece8]">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-black text-[#0d2b26]">
-                          {activeSubmission.studentName}
-                        </h3>
-                        <Badge
-                          variant={
-                            activeSubmission.status === "result_released"
-                              ? "success"
-                              : activeSubmission.status === "marked"
-                              ? "default"
-                              : "warning"
-                          }
-                          className="text-[10px]"
-                        >
-                          {activeSubmission.status === "result_released"
-                            ? "Marks Released"
-                            : activeSubmission.status === "marked"
-                            ? "Draft Saved"
-                            : "Awaiting Evaluation"}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {activeSubmission.assignmentTitle}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="text-xs font-mono font-bold bg-[#f8faf9] border-slate-300">
-                      Max: {activeSubmission.maxMarks} Marks
-                    </Badge>
-                  </div>
-
-                  {/* Student's answer text and file */}
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Student's Submission Work:
-                    </p>
-                    <div className="p-4 rounded-xl bg-[#f8faf9] border border-[#e6ece8] text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
-                      {activeSubmission.textContent || "No written response text entered."}
-                    </div>
-                    {activeSubmission.fileAttachmentName && (
-                      <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] text-xs">
-                        <div className="flex items-center gap-2 text-[#0d5c4d] font-bold">
-                          <FileText className="h-4 w-4" />
-                          <span>{activeSubmission.fileAttachmentName}</span>
-                        </div>
-                        <Button variant="outline" size="sm" className="h-7 text-xs text-[#0d5c4d] border-[#c4e9e0] hover:bg-[#ecf8f5]">
-                          <Eye className="h-3.5 w-3.5 mr-1" /> View PDF
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Teacher Marks Entry & Written Feedback */}
-                  <div className="space-y-4 pt-4 border-t border-[#e6ece8]">
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                          Enter Marks (out of {activeSubmission.maxMarks}):
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            min={0}
-                            max={activeSubmission.maxMarks}
-                            value={marksInput}
-                            onChange={(e) => setMarksInput(Number(e.target.value))}
-                            className="w-28 h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 font-mono font-bold text-lg focus:outline-none focus:border-[#0d5c4d]"
-                          />
-                          <span className="text-xs font-bold text-slate-500">
-                            / {activeSubmission.maxMarks} (
-                            {Math.round((Number(marksInput) / activeSubmission.maxMarks) * 100)}%)
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                        {t.academic.teacherFeedback}
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={feedbackInput}
-                        onChange={(e) => setFeedbackInput(e.target.value)}
-                        placeholder="Add personalized feedback, areas of improvement, and commendations..."
-                        className="w-full p-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d]"
-                      />
-                    </div>
-
-                    {/* Actions: Save Draft vs Release Results */}
-                    <div className="flex flex-wrap items-center justify-end gap-3 pt-3">
-                      <Button
-                        variant="outline"
-                        onClick={() => handleSaveGrade(false)}
-                        className="text-xs font-bold border-slate-300 hover:bg-slate-50"
-                      >
-                        Save Marks as Draft
-                      </Button>
-                      <Button
-                        onClick={() => handleSaveGrade(true)}
-                        className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-2 text-xs shadow-sm"
-                      >
-                        <Send className="h-4 w-4" />
-                        {t.academic.releaseResults}
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ) : (
-                <div className="p-12 text-center bg-white border border-[#e6ece8] rounded-2xl text-xs text-slate-500">
-                  Select a submission from the list on the left to grade.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* TAB 2: Course Assignments Manager (Section 6.3) */}
       {activeTab === "assignments" && (
@@ -2937,6 +3210,122 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Modal: Student Answer Sheet Inspector */}
+      <Modal
+        isOpen={isAnswerSheetModalOpen}
+        onClose={() => setIsAnswerSheetModalOpen(false)}
+        title="Candidate Answer Script Inspector"
+        description={`${activeSubmission?.studentName || "Student"} • ${activeSubmission?.assignmentTitle || "Assignment"}`}
+        maxWidth="max-w-4xl"
+      >
+        <div className="space-y-4">
+          {/* Top toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-900 text-white rounded-2xl">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-bold bg-slate-800 px-2.5 py-1 rounded-lg text-slate-300">
+                📄 {activeSubmission?.fileAttachmentName || "Solution_Paper.pdf"}
+              </span>
+              <span className="text-xs text-slate-400">Page 1 of 2</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDocZoom((z) => Math.max(70, z - 10))}
+                className="h-7 text-xs border-slate-700 bg-slate-800 text-white hover:bg-slate-700 cursor-pointer"
+              >
+                <ZoomOut className="h-3.5 w-3.5 mr-1" /> Zoom Out
+              </Button>
+              <span className="text-xs font-mono font-bold text-emerald-400 px-1">{docZoom}%</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDocZoom((z) => Math.min(150, z + 10))}
+                className="h-7 text-xs border-slate-700 bg-slate-800 text-white hover:bg-slate-700 cursor-pointer"
+              >
+                <ZoomIn className="h-3.5 w-3.5 mr-1" /> Zoom In
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  window.alert("Downloading candidate answer sheet PDF...");
+                }}
+                className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold ml-2 cursor-pointer"
+              >
+                <Download className="h-3.5 w-3.5 mr-1" /> Download
+              </Button>
+            </div>
+          </div>
+
+          {/* Simulated Answer Sheet Paper Canvas */}
+          <div className="overflow-x-auto p-4 bg-slate-100 rounded-2xl flex justify-center">
+            <div
+              style={{ transform: `scale(${docZoom / 100})`, transformOrigin: "top center", transition: "transform 0.15s ease-out" }}
+              className="w-full max-w-2xl bg-white rounded-xl shadow-lg border border-slate-200 p-8 space-y-6 text-slate-900"
+            >
+              {/* Paper Header */}
+              <div className="border-b-2 border-slate-900 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-black tracking-wide uppercase">General Certificate of Education (Advanced Level)</h4>
+                    <p className="text-xs font-bold text-slate-600">Department of Examinations, Sri Lanka &bull; Candidate Script</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-mono font-bold bg-slate-100 border border-slate-300 px-2 py-1 rounded">
+                      INDEX: {activeSubmission?.studentId?.substring(0, 8).toUpperCase() || "2026-AL-0442"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-slate-700">
+                  <div><strong>Candidate Name:</strong> {activeSubmission?.studentName}</div>
+                  <div><strong>Subject:</strong> {assignments.find((a) => a.id === activeSubmission?.assignmentId)?.subjectName || "Combined Mathematics"}</div>
+                  <div><strong>Assignment:</strong> {activeSubmission?.assignmentTitle}</div>
+                  <div><strong>Submitted At:</strong> {activeSubmission?.submittedAt}</div>
+                </div>
+              </div>
+
+              {/* Simulated Mathematical Solution Content */}
+              <div className="space-y-4 font-mono text-xs leading-relaxed text-slate-800">
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="font-bold text-slate-900 mb-1 font-sans">Part A — Question 01 [Calculus / Integration]:</p>
+                  <p>Given the curve equation: y = x² &bull; sin(2x)</p>
+                  <p>Applying the product rule of differentiation: dy/dx = u(dv/dx) + v(du/dx)</p>
+                  <p className="pl-4 text-emerald-800 font-bold">&rArr; dy/dx = x² &bull; [2 cos(2x)] + sin(2x) &bull; [2x]</p>
+                  <p className="pl-4 text-emerald-800 font-bold">&rArr; dy/dx = 2x [ x &bull; cos(2x) + sin(2x) ] &check; (Correct working step)</p>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg">
+                  <p className="font-bold text-slate-900 mb-1 font-sans">Part B — Question 02 [Definite Integral Solution]:</p>
+                  <p>&int;₀^(&pi;/2) x &bull; cos(x) dx</p>
+                  <p>Using Integration by Parts: &int; u v' dx = u v - &int; u' v dx</p>
+                  <p>Let u = x &rArr; du = dx ; dv = cos(x) dx &rArr; v = sin(x)</p>
+                  <p className="pl-4">&rArr; [x &bull; sin(x)]₀^(&pi;/2) - &int;₀^(&pi;/2) sin(x) dx</p>
+                  <p className="pl-4 text-emerald-800 font-bold">&rArr; (&pi;/2 &bull; 1 - 0) - [ -cos(x) ]₀^(&pi;/2) = &pi;/2 - 1 &check; (Full Marks)</p>
+                </div>
+
+                <div className="p-4 rounded-xl border border-dashed border-slate-300 bg-amber-50/50 text-slate-600 text-center">
+                  <p className="text-[11px] font-sans">
+                    End of Candidate Answer Sheet Script &bull; Verified in LMS Submission Vault
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsAnswerSheetModalOpen(false)}
+              className="text-xs font-bold border-slate-300"
+            >
+              Close Inspector
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
