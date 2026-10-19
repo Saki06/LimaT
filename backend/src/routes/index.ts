@@ -2,6 +2,7 @@ import { Router } from 'express';
 import authRoutes from './auth.routes';
 import tenantRoutes from './tenant.routes';
 import sportsRoutes from './sports.routes';
+import courseRoutes from './course.routes';
 
 const router = Router();
 
@@ -19,5 +20,6 @@ router.get('/health', (req, res) => {
 router.use('/auth', authRoutes);
 router.use('/tenants', tenantRoutes);
 router.use('/sports', sportsRoutes);
+router.use('/courses', courseRoutes);
 
 export default router;
