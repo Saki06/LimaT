@@ -84,6 +84,84 @@ export const api = {
     },
   },
 
+  // Courses & Subjects API
+  courses: {
+    async getAll(params?: { search?: string; tenantId?: string; page?: number; limit?: number }) {
+      const query = new URLSearchParams();
+      if (params?.search) query.append('search', params.search);
+      if (params?.tenantId) query.append('tenantId', params.tenantId);
+      if (params?.page) query.append('page', params.page.toString());
+      if (params?.limit) query.append('limit', params.limit.toString());
+
+      const res = await fetch(`${API_BASE_URL}/courses?${query.toString()}`);
+      return res.json();
+    },
+
+    async getMyCourses() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/courses/my-courses`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getById(id: string) {
+      const res = await fetch(`${API_BASE_URL}/courses/${id}`);
+      return res.json();
+    },
+
+    async create(courseData: {
+      title: string;
+      code: string;
+      description?: string;
+      syllabus?: any;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/courses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(courseData),
+      });
+      return res.json();
+    },
+
+    async update(id: string, courseData: {
+      title?: string;
+      code?: string;
+      description?: string;
+      syllabus?: any;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/courses/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(courseData),
+      });
+      return res.json();
+    },
+
+    async delete(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/courses/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+  },
+
   // Token and Local Storage Helpers
   token: {
     get(): string | null {

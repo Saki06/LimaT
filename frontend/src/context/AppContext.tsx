@@ -130,6 +130,8 @@ interface AppContextType {
   createAssignment: (assignment: Partial<Assignment>) => void;
   updateAssignment: (id: string, updates: Partial<Assignment>) => void;
   deleteAssignment: (id: string) => void;
+  createCourse: (data: { title: string; code: string; description?: string }) => Promise<{ success: boolean; message?: string }>;
+  fetchCourses: () => Promise<void>;
   createUnit: (courseId: string, unitTitle: string) => string;
   updateUnit: (courseId: string, unitId: string, updates: { title?: string; order?: number }) => void;
   createTopic: (courseId: string, unitId: string, topicTitle: string, description?: string) => string;
@@ -300,7 +302,103 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       setIsLanding(false);
     }
+    fetchCourses();
   }, []);
+
+  const mapBackendCourseToFrontend = (c: any): Course => {
+    const teacherName = c.teacher?.user
+      ? `${c.teacher.user.firstName} ${c.teacher.user.lastName || ''}`.trim()
+      : 'Assigned Tutor';
+
+    const units: SyllabusUnit[] = Array.isArray(c.syllabus?.units)
+      ? c.syllabus.units
+      : [
+          {
+            id: `unt_${c.id}_default`,
+            subjectId: c.id,
+            title: 'Unit 1: Course Introduction & Overview',
+            order: 1,
+            topics: [
+              {
+                id: `top_${c.id}_default`,
+                unitId: `unt_${c.id}_default`,
+                title: 'Topic 1: Foundations',
+                description: c.description || 'Welcome to the course.',
+                order: 1,
+                lessons: []
+              }
+            ]
+          }
+        ];
+
+    return {
+      id: c.id,
+      subjectId: c.id,
+      title: c.title,
+      code: c.code,
+      teacherId: c.teacherId || 'tutor',
+      teacherName,
+      gradeName: 'Active Batch',
+      className: 'Online Cohort',
+      bannerColor: '#0d5c4d',
+      units,
+      totalLessons: 0,
+      completedLessons: 0
+    };
+  };
+
+  const fetchCourses = async () => {
+    try {
+      const res = await api.courses.getAll();
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        const backendCourses = res.data.map(mapBackendCourseToFrontend);
+        setCourses((prev) => {
+          const backendIds = new Set(backendCourses.map((b: Course) => b.id));
+          const nonDuplicatePrev = prev.filter((p) => !backendIds.has(p.id));
+          return [...backendCourses, ...nonDuplicatePrev];
+        });
+      }
+    } catch (err) {
+      console.warn('Backend courses API not reachable yet:', err);
+    }
+  };
+
+  const createCourse = async (data: {
+    title: string;
+    code: string;
+    description?: string;
+  }): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const res = await api.courses.create(data);
+      if (res.success && res.data) {
+        const newCourse = mapBackendCourseToFrontend(res.data);
+        setCourses((prev) => [newCourse, ...prev]);
+        setSelectedCourseId(newCourse.id);
+        addToast({
+          type: 'success',
+          title: 'Subject / Course Created!',
+          message: `"${data.title}" (${data.code}) successfully saved to cloud database.`
+        });
+        return { success: true };
+      } else {
+        const errorMsg = res.message || 'Failed to create course';
+        addToast({
+          type: 'error',
+          title: 'Failed to Create Course',
+          message: errorMsg
+        });
+        return { success: false, message: errorMsg };
+      }
+    } catch (err: any) {
+      const errorMsg = err.message || 'Network error while creating course';
+      addToast({
+        type: 'error',
+        title: 'Error Creating Course',
+        message: errorMsg
+      });
+      return { success: false, message: errorMsg };
+    }
+  };
 
   const loginUser = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
@@ -1339,6 +1437,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createAssignment,
         updateAssignment,
         deleteAssignment,
+        createCourse,
+        fetchCourses,
         createUnit,
         updateUnit,
         createTopic,
