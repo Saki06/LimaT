@@ -86,19 +86,29 @@ export function AuthDrawer({
               ? "bg-[#ecf8f5] border-[#c4e9e0] text-[#0d5c4d]"
               : selectedRole === "parent"
               ? "bg-[#f0f5fa] border-[#cbdfe8] text-[#1e3a5f]"
-              : "bg-[#fef7e6] border-[#fde4af] text-[#b47a16]"
+              : selectedRole === "teacher"
+              ? "bg-[#fef7e6] border-[#fde4af] text-[#b47a16]"
+              : selectedRole === "admin"
+              ? "bg-slate-100 border-slate-300 text-slate-800"
+              : "bg-amber-100 border-amber-300 text-amber-950 font-black"
           }`}
         >
           <div className="flex items-center gap-2">
             {selectedRole === "student" && <GraduationCap className="h-4 w-4" />}
             {selectedRole === "parent" && <Users className="h-4 w-4" />}
-            {selectedRole !== "student" && selectedRole !== "parent" && <Sparkles className="h-4 w-4" />}
+            {selectedRole === "teacher" && <Sparkles className="h-4 w-4" />}
+            {selectedRole === "admin" && <Shield className="h-4 w-4 text-slate-700" />}
+            {selectedRole === "super_admin" && <span className="text-sm">👑</span>}
             <span className="text-xs font-black uppercase tracking-wider">
               {selectedRole === "student"
                 ? "Student Portal"
                 : selectedRole === "parent"
                 ? "Parent & Guardian Desk"
-                : "Tutor Cockpit"}
+                : selectedRole === "teacher"
+                ? "Tutor Cockpit"
+                : selectedRole === "admin"
+                ? "School Admin Operations"
+                : "Super Admin SaaS Console"}
             </span>
           </div>
           <span className="text-[10px] font-bold opacity-75">
@@ -106,40 +116,50 @@ export function AuthDrawer({
               ? "Direct Enrollment"
               : selectedRole === "parent"
               ? "Fee & Attendance"
-              : "Course Creator"}
+              : selectedRole === "teacher"
+              ? "Course Creator"
+              : selectedRole === "admin"
+              ? "Tuition Desk"
+              : "Platform Control"}
           </span>
         </div>
       )}
 
       {/* Tab Switcher: Sign In vs Create Account */}
-      <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 text-xs font-bold">
-        <button
-          type="button"
-          onClick={() => setAuthTab("login")}
-          className={`py-2 rounded-xl transition-all cursor-pointer ${
-            authTab === "login"
-              ? "bg-white text-[#0d2b26] shadow-xs font-black"
-              : "text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          Sign In (Login)
-        </button>
-        <button
-          type="button"
-          onClick={() => setAuthTab("signup")}
-          className={`py-2 rounded-xl transition-all cursor-pointer ${
-            authTab === "signup"
-              ? "bg-white text-[#0d2b26] shadow-xs font-black"
-              : "text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          {selectedRole === "parent"
-            ? "Register Guardian"
-            : selectedRole === "teacher"
-            ? "Register as Tutor"
-            : "Create Account (Sign Up)"}
-        </button>
-      </div>
+      {selectedRole !== "super_admin" && selectedRole !== "admin" ? (
+        <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => setAuthTab("login")}
+            className={`py-2 rounded-xl transition-all cursor-pointer ${
+              authTab === "login"
+                ? "bg-white text-[#0d2b26] shadow-xs font-black"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Sign In (Login)
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthTab("signup")}
+            className={`py-2 rounded-xl transition-all cursor-pointer ${
+              authTab === "signup"
+                ? "bg-white text-[#0d2b26] shadow-xs font-black"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            {selectedRole === "parent"
+              ? "Register Guardian"
+              : selectedRole === "teacher"
+              ? "Register as Tutor"
+              : "Create Account (Sign Up)"}
+          </button>
+        </div>
+      ) : (
+        <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 text-center text-xs font-bold text-slate-700">
+          <span>Official Administrative Sign In</span>
+        </div>
+      )}
 
       {renderActiveForm()}
     </div>

@@ -187,6 +187,10 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
                   ? "Student Mobile No or Email"
                   : selectedRole === "parent"
                   ? "Parent Mobile No or Email Address"
+                  : selectedRole === "super_admin"
+                  ? "Super Admin Master Email"
+                  : selectedRole === "admin"
+                  ? "School Admin Email Address"
                   : "Tutor Email or Mobile Number"}
               </label>
               <div className="relative">
@@ -202,10 +206,14 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
                   onChange={(e) => setLoginEmail(e.target.value)}
                   placeholder={
                     selectedRole === "student"
-                      ? "e.g. 077 123 4567 or student@gmail.com"
+                      ? "e.g. 077 123 4567 or student@apex.edu"
                       : selectedRole === "parent"
-                      ? "e.g. 077 123 4567 or parent@gmail.com"
-                      : "e.g. tutor@soloclass.lk or 077 987 6543"
+                      ? "e.g. 077 123 4567 or parent@apex.edu"
+                      : selectedRole === "super_admin"
+                      ? "e.g. superadmin@apex.edu"
+                      : selectedRole === "admin"
+                      ? "e.g. admin@apex.edu"
+                      : "e.g. teacher@apex.edu or 077 987 6543"
                   }
                   className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
                 />
@@ -275,6 +283,10 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
                   ? "bg-[#1e3a5f] hover:bg-[#152a45]"
                   : selectedRole === "teacher"
                   ? "bg-[#b47a16] hover:bg-[#96640f]"
+                  : selectedRole === "admin"
+                  ? "bg-slate-800 hover:bg-slate-900"
+                  : selectedRole === "super_admin"
+                  ? "bg-slate-900 hover:bg-black text-amber-300 border border-amber-400/40"
                   : "bg-[#0d5c4d] hover:bg-[#083e34]"
               }`}
             >
@@ -292,6 +304,10 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
                       ? "Student Portal"
                       : selectedRole === "parent"
                       ? "Parent Portal"
+                      : selectedRole === "admin"
+                      ? "School Admin Desk"
+                      : selectedRole === "super_admin"
+                      ? "Super Admin Console"
                       : "Tutor Cockpit"}
                   </span>
                 </>

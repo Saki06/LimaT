@@ -1,4 +1,4 @@
-export type SupportedRole = "student" | "parent" | "teacher" | "admin";
+export type SupportedRole = "student" | "parent" | "teacher" | "admin" | "super_admin";
 export type AuthDisplayMode = "closed" | "drawer" | "fullpage";
 export type AuthTab = "login" | "signup";
 
@@ -12,26 +12,32 @@ export interface RolePreset {
 export const ROLE_PRESET_CREDENTIALS: Record<SupportedRole, RolePreset> = {
   student: {
     name: "Sathurjan K.",
-    email: "student@soloclass.lk",
+    email: "student@apex.edu",
     detail: "2026 A/L Combined Maths",
     school: "Apex Science Academy"
   },
   parent: {
-    name: "Mrs. Priyadarshani Kulatunga",
-    email: "parent@soloclass.lk",
-    detail: "Parent of Sathurjan K. (Fee & Attendance)",
+    name: "Robert Morgan",
+    email: "parent@apex.edu",
+    detail: "Parent of Alex Morgan (Fee & Attendance)",
     school: "Apex Science Academy"
   },
   teacher: {
-    name: "Dr. K. Arulnesan",
-    email: "tutor@soloclass.lk",
+    name: "Sarah Jenkins",
+    email: "teacher@apex.edu",
     detail: "Master Tutor & Course Creator",
     school: "Apex Science Academy"
   },
   admin: {
     name: "Class Operations Admin",
-    email: "admin@soloclass.lk",
-    detail: "Tuition Desk Administration",
+    email: "admin@apex.edu",
+    detail: "School Desk Administration",
     school: "Apex Science Academy"
+  },
+  super_admin: {
+    name: "Chief Administrator",
+    email: "superadmin@apex.edu",
+    detail: "Global Multi-Tenant Platform Control",
+    school: "Apex Academy Global (SaaS Platform)"
   }
 };

@@ -41,7 +41,7 @@ import {
   Send
 } from "lucide-react";
 
-type SupportedRole = "student" | "parent" | "teacher" | "admin";
+type SupportedRole = "student" | "parent" | "teacher" | "admin" | "super_admin";
 type AuthDisplayMode = "closed" | "drawer" | "fullpage";
 export type PortalType = "gateway" | "student" | "parent" | "staff";
 
@@ -75,7 +75,7 @@ export function LandingView({
   onEnterApp: () => void;
   initialPortal?: PortalType;
 }) {
-  const { setCurrentRole, addToast, schools, t, landingPortal, setLandingPortal } = useApp();
+  const { setCurrentRole, addToast, schools, t, landingPortal, setLandingPortal, loginUser } = useApp();
 
   // Auto-rotate the student banner image every 3.5 seconds
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -131,30 +131,36 @@ export function LandingView({
   const [parentConsent, setParentConsent] = useState(true);
 
   // Pre-fill credentials based on role (Tutor Platform)
-  const rolePresetCredentials = {
+  const rolePresetCredentials: Record<SupportedRole, { name: string; email: string; detail: string; school: string }> = {
     student: {
       name: "Sathurjan K.",
-      email: "student@soloclass.lk",
+      email: "student@apex.edu",
       detail: "2026 A/L Combined Maths",
       school: "Apex Science Academy"
     },
     parent: {
       name: "Mrs. Priyadarshani Kulatunga",
-      email: "parent@soloclass.lk",
+      email: "parent@apex.edu",
       detail: "Parent of Sathurjan K. (Fee & Attendance)",
       school: "Apex Science Academy"
     },
     teacher: {
       name: "Dr. K. Arulnesan",
-      email: "tutor@soloclass.lk",
+      email: "teacher@apex.edu",
       detail: "Master Tutor & Course Creator",
       school: "Apex Science Academy"
     },
     admin: {
       name: "Class Operations Admin",
-      email: "admin@soloclass.lk",
-      detail: "Tuition Desk Administration",
+      email: "admin@apex.edu",
+      detail: "School Desk Administration",
       school: "Apex Science Academy"
+    },
+    super_admin: {
+      name: "Platform Master Admin",
+      email: "superadmin@apex.edu",
+      detail: "Global Multi-Tenant SaaS Console",
+      school: "Platform Root"
     }
   };
 
@@ -166,6 +172,13 @@ export function LandingView({
     setAuthTab(tab);
     handleRoleSelect(role);
     setAuthMode(mode);
+    if (role === "admin") {
+      setLoginEmail("admin@apex.edu");
+      setLoginPassword("password123");
+    } else if (role === "super_admin") {
+      setLoginEmail("superadmin@apex.edu");
+      setLoginPassword("password123");
+    }
   };
 
   const handlePortalSwitch = (type: PortalType) => {
@@ -184,13 +197,23 @@ export function LandingView({
     setAuthMode("closed");
     addToast({
       type: "success",
-      title: `Signed in as ${role === "student" ? "Student" : role === "parent" ? "Parent" : "Tutor"}`,
+      title: `Signed in as ${
+        role === "student"
+          ? "Student"
+          : role === "parent"
+          ? "Parent"
+          : role === "teacher"
+          ? "Tutor"
+          : role === "super_admin"
+          ? "Super Admin"
+          : "School Admin"
+      }`,
       message: `Welcome back, ${rolePresetCredentials[role].name}!`
     });
     onEnterApp();
   };
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (selectedRole === "parent" && parentLoginMethod === "otp" && !parentOtpSent) {
@@ -211,16 +234,54 @@ export function LandingView({
       return;
     }
 
+    if (selectedRole === "parent" && parentLoginMethod === "otp" && parentOtpSent) {
+      if (parentOtpCode.trim().length !== 6) {
+        addToast({
+          type: "error",
+          title: "Invalid OTP Code",
+          message: "Please enter the complete 6-digit SMS verification code."
+        });
+        return;
+      }
+      setCurrentRole("parent");
+      setAuthMode("closed");
+      addToast({
+        type: "success",
+        title: "Login Successful",
+        message: "Welcome to Parent Guardian Desk! Live attendance and fee receipts loaded."
+      });
+      onEnterApp();
+      return;
+    }
+
+    // Try real backend authentication
+    try {
+      const res = await loginUser(loginEmail.trim(), loginPassword);
+      if (res.success) {
+        setAuthMode("closed");
+        onEnterApp();
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
+    // Fallback role switch
     setCurrentRole(selectedRole);
     setAuthMode("closed");
     addToast({
       type: "success",
       title: "Login Successful",
-      message: selectedRole === "parent"
-        ? "Welcome to Parent Guardian Desk! Live attendance and fee receipts loaded."
-        : selectedRole === "teacher"
-        ? "Welcome to Tutor Cockpit! Course creator desk loaded."
-        : "Welcome back to LimaT Smart Book! Learning feed loaded."
+      message:
+        selectedRole === "parent"
+          ? "Welcome to Parent Guardian Desk! Live attendance and fee receipts loaded."
+          : selectedRole === "teacher"
+          ? "Welcome to Tutor Cockpit! Course creator desk loaded."
+          : selectedRole === "super_admin"
+          ? "Welcome to Super Admin Console! Platform master controls loaded."
+          : selectedRole === "admin"
+          ? "Welcome to School Admin Operations Desk!"
+          : "Welcome back to LimaT Smart Book! Learning feed loaded."
     });
     onEnterApp();
   };
@@ -287,6 +348,10 @@ export function LandingView({
             ? "bg-[#ecf8f5] border-[#c4e9e0] text-[#0d5c4d]"
             : selectedRole === "parent"
             ? "bg-[#f0f5fa] border-[#cbdfe8] text-[#1e3a5f]"
+            : selectedRole === "admin"
+            ? "bg-slate-100 border-slate-300 text-slate-800"
+            : selectedRole === "super_admin"
+            ? "bg-slate-900 border-amber-400/40 text-amber-300"
             : "bg-[#fef7e6] border-[#fde4af] text-[#b47a16]"
         }`}>
           <div className="flex items-center gap-2">
@@ -294,6 +359,10 @@ export function LandingView({
               <GraduationCap className="h-4 w-4" />
             ) : selectedRole === "parent" ? (
               <Users className="h-4 w-4" />
+            ) : selectedRole === "admin" ? (
+              <Shield className="h-4 w-4 text-[#0d5c4d]" />
+            ) : selectedRole === "super_admin" ? (
+              <span className="text-sm">👑</span>
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
@@ -302,44 +371,63 @@ export function LandingView({
                 ? "Student Portal"
                 : selectedRole === "parent"
                 ? "Parent & Guardian Portal"
+                : selectedRole === "admin"
+                ? "School Admin Operations"
+                : selectedRole === "super_admin"
+                ? "Super Admin SaaS Console"
                 : "Tutor Cockpit"}
             </span>
           </div>
           <span className="text-[10px] font-bold opacity-75">
-            {selectedRole === "student" ? "Direct Enrollment" : selectedRole === "parent" ? "Fee & Attendance" : "Course Creator"}
+            {selectedRole === "student"
+              ? "Direct Enrollment"
+              : selectedRole === "parent"
+              ? "Fee & Attendance"
+              : selectedRole === "admin"
+              ? "Tuition Desk Administration"
+              : selectedRole === "super_admin"
+              ? "Master Platform Control"
+              : "Course Creator"}
           </span>
         </div>
       )}
 
       {/* Tab Switcher: Sign In vs Create Account */}
-      <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 text-xs font-bold">
-        <button
-          type="button"
-          onClick={() => setAuthTab("login")}
-          className={`py-2 rounded-xl transition-all cursor-pointer ${
-            authTab === "login"
-              ? "bg-white text-[#0d2b26] shadow-xs font-black"
-              : "text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          Sign In (Login)
-        </button>
-        <button
-          type="button"
-          onClick={() => setAuthTab("signup")}
-          className={`py-2 rounded-xl transition-all cursor-pointer ${
-            authTab === "signup"
-              ? "bg-white text-[#0d2b26] shadow-xs font-black"
-              : "text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          {selectedRole === "parent"
-            ? "Register Guardian"
-            : selectedRole === "teacher"
-            ? "Register as Tutor"
-            : "Create Account (Sign Up)"}
-        </button>
-      </div>
+      {selectedRole !== "admin" && selectedRole !== "super_admin" ? (
+        <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => setAuthTab("login")}
+            className={`py-2 rounded-xl transition-all cursor-pointer ${
+              authTab === "login"
+                ? "bg-white text-[#0d2b26] shadow-xs font-black"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Sign In (Login)
+          </button>
+          <button
+            type="button"
+            onClick={() => setAuthTab("signup")}
+            className={`py-2 rounded-xl transition-all cursor-pointer ${
+              authTab === "signup"
+                ? "bg-white text-[#0d2b26] shadow-xs font-black"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            {selectedRole === "parent"
+              ? "Register Guardian"
+              : selectedRole === "teacher"
+              ? "Register as Tutor"
+              : "Create Account (Sign Up)"}
+          </button>
+        </div>
+      ) : (
+        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5">
+          <Lock className="h-3.5 w-3.5 text-amber-600" />
+          <span>Restricted Administrative Access • Authorized Personnel Only</span>
+        </div>
+      )}
 
 
       {/* -------------------- SIGN IN TAB CONTENT -------------------- */}
@@ -452,6 +540,10 @@ export function LandingView({
                       ? "Student Mobile No or Email"
                       : selectedRole === "parent"
                       ? "Parent Mobile No or Email Address"
+                      : selectedRole === "admin"
+                      ? "School Admin Email Address"
+                      : selectedRole === "super_admin"
+                      ? "Super Admin Master Email"
                       : "Tutor Email or Mobile Number"}
                   </label>
                   <div className="relative">
@@ -467,10 +559,14 @@ export function LandingView({
                       onChange={(e) => setLoginEmail(e.target.value)}
                       placeholder={
                         selectedRole === "student"
-                          ? "e.g. 077 123 4567 or student@gmail.com"
+                          ? "e.g. 077 123 4567 or student@apex.edu"
                           : selectedRole === "parent"
-                          ? "e.g. 077 123 4567 or parent@gmail.com"
-                          : "e.g. tutor@soloclass.lk or 077 987 6543"
+                          ? "e.g. 077 123 4567 or parent@apex.edu"
+                          : selectedRole === "admin"
+                          ? "e.g. admin@apex.edu"
+                          : selectedRole === "super_admin"
+                          ? "e.g. superadmin@apex.edu"
+                          : "e.g. teacher@apex.edu or 077 987 6543"
                       }
                       className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
                     />
@@ -538,12 +634,25 @@ export function LandingView({
                       ? "bg-[#1e3a5f] hover:bg-[#152a45]"
                       : selectedRole === "teacher"
                       ? "bg-[#b47a16] hover:bg-[#96640f]"
+                      : selectedRole === "admin"
+                      ? "bg-slate-800 hover:bg-slate-900"
+                      : selectedRole === "super_admin"
+                      ? "bg-slate-900 hover:bg-black text-amber-300 border border-amber-400/40"
                       : "bg-[#0d5c4d] hover:bg-[#083e34]"
                   }`}
                 >
                   <LogIn className="h-4 w-4" />
                   <span>
-                    Sign In to {selectedRole === "student" ? "Student Portal" : selectedRole === "parent" ? "Parent Portal" : "Tutor Cockpit"}
+                    Sign In to{" "}
+                    {selectedRole === "student"
+                      ? "Student Portal"
+                      : selectedRole === "parent"
+                      ? "Parent Portal"
+                      : selectedRole === "admin"
+                      ? "School Admin Desk"
+                      : selectedRole === "super_admin"
+                      ? "Super Admin Console"
+                      : "Tutor Cockpit"}
                   </span>
                 </button>
               </>
@@ -1021,19 +1130,43 @@ export function LandingView({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <span className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            <span className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
               <Globe className="h-3.5 w-3.5 text-[#0d5c4d]" />
               Trilingual: EN • SI • TA
             </span>
 
+            {/* Tutor Hub button */}
             <button
               type="button"
               onClick={() => handlePortalSwitch("staff")}
-              className="text-xs font-bold text-amber-800 hover:text-amber-950 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="text-xs font-bold text-amber-800 hover:text-amber-950 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs hover:shadow-xs"
+              title="Enter Tutor Hub & Course Creator Portal"
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-600" />
               <span>Tutor Hub →</span>
+            </button>
+
+            {/* Admin navigation button */}
+            <button
+              type="button"
+              onClick={() => openAuth("login", "admin", "drawer")}
+              className="text-xs font-bold text-slate-700 hover:text-slate-950 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs hover:shadow-xs"
+              title="School Administrator Portal"
+            >
+              <Shield className="h-3.5 w-3.5 text-[#0d5c4d]" />
+              <span>Admin</span>
+            </button>
+
+            {/* Super Admin navigation button */}
+            <button
+              type="button"
+              onClick={() => openAuth("login", "super_admin", "drawer")}
+              className="text-xs font-black text-amber-300 hover:text-amber-100 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-black border border-amber-400/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md"
+              title="Super Admin SaaS Platform Control"
+            >
+              <span className="text-xs leading-none">👑</span>
+              <span>Super Admin</span>
             </button>
           </div>
         </nav>
@@ -2454,6 +2587,22 @@ export function LandingView({
               >
                 Tutor Portal
               </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => openAuth("login", "admin", "drawer")}
+                className="hover:text-[#0d5c4d] cursor-pointer font-bold text-slate-600"
+              >
+                Admin Desk
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => openAuth("login", "super_admin", "drawer")}
+                className="hover:text-amber-700 cursor-pointer font-black text-amber-800"
+              >
+                Super Admin
+              </button>
             </div>
 
             <p className="text-center sm:text-right text-[11px] text-slate-400">
@@ -2489,6 +2638,10 @@ export function LandingView({
                       ? "Parent & Guardian Desk"
                       : selectedRole === "student"
                       ? "Student Portal"
+                      : selectedRole === "admin"
+                      ? "School Admin Operations"
+                      : selectedRole === "super_admin"
+                      ? "Super Admin SaaS Console"
                       : "Tutor Cockpit"}
                   </p>
                 </div>
