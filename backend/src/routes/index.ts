@@ -6,6 +6,7 @@ import courseRoutes from './course.routes';
 import packageRoutes from './package.routes';
 import liveClassRoutes from './liveClass.routes';
 import assignmentRoutes from './assignment.routes';
+import resourceRoutes from './resource.routes';
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use('/courses', courseRoutes);
 router.use('/packages', packageRoutes);
 router.use('/live-classes', liveClassRoutes);
 router.use('/assignments', assignmentRoutes);
+router.use('/resources', resourceRoutes);
 
 export default router;

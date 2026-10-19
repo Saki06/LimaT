@@ -1354,24 +1354,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const createLibraryResource = (resource: Partial<LibraryResource>) => {
     const isBook = resource.resourceType === 'book';
+    const isPastPaper = resource.resourceType === 'past_paper';
+    const tempId = resource.id || `lib_${Date.now()}`;
     const newRes: LibraryResource = {
-      id: `lib_${Date.now()}`,
+      id: tempId,
       title: resource.title || 'Untitled Resource',
       resourceType: resource.resourceType || 'tute',
       subject: resource.subject || 'General',
       author: resource.author || currentUser.name,
+      teacherId: resource.teacherId || currentUser.id,
+      isOwner: true,
       description: resource.description || 'Comprehensive learning resource uploaded for student study and curriculum preparation.',
       topic: resource.topic || (isBook ? undefined : 'General Module'),
-      category: resource.category || 'Advanced Level',
+      category: resource.category || (isPastPaper ? 'Past Papers & Model Exams' : 'Advanced Level'),
       coverImage: resource.coverImage || (isBook 
         ? 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80'
+        : isPastPaper
+        ? 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=600&auto=format&fit=crop&q=80'
         : 'https://images.unsplash.com/photo-1588072432836-e10032774350?w=600&auto=format&fit=crop&q=80'),
       fileType: resource.fileType || 'PDF',
       fileSize: resource.fileSize || '4.2 MB',
       pageCount: resource.pageCount || (isBook ? 120 : 20),
-      uploadedDate: new Date().toISOString().split('T')[0],
+      uploadedDate: resource.uploadedDate || new Date().toISOString().split('T')[0],
       status: resource.status || 'published',
       visibility: resource.visibility || 'public',
+      packageId: resource.packageId,
+      packageName: resource.packageName,
+      packagePrice: resource.packagePrice,
+      isLocked: false,
+      year: resource.year,
+      medium: resource.medium,
+      examType: resource.examType,
+      paperPart: resource.paperPart,
+      hasMarkingScheme: resource.hasMarkingScheme,
+      markingSchemeUrl: resource.markingSchemeUrl,
+      markingSchemePages: resource.markingSchemePages,
+      markingSchemeNotes: resource.markingSchemeNotes,
+      timeAllowedMinutes: resource.timeAllowedMinutes,
       allowDownload: resource.allowDownload !== false,
       downloadsCount: 0,
       viewsCount: 1,
@@ -1400,8 +1419,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addToast({
       type: 'success',
       title: newRes.status === 'published' ? 'Resource Published!' : 'Draft Saved!',
-      message: `"${newRes.title}" is now added to the ${newRes.resourceType === 'book' ? 'Books' : 'Tutes'} collection.`
+      message: `"${newRes.title}" is now added (${newRes.visibility === 'subscribers_only' ? '🔒 Subscribers Only' : '🌐 Public'}).`
     });
+
+    // Asynchronous backend sync
+    api.resources
+      .create({
+        title: newRes.title,
+        description: newRes.description,
+        resourceType: newRes.resourceType,
+        subject: newRes.subject,
+        topic: newRes.topic,
+        category: newRes.category,
+        year: newRes.year,
+        medium: newRes.medium,
+        examType: newRes.examType,
+        paperPart: newRes.paperPart,
+        fileType: newRes.fileType,
+        fileSize: newRes.fileSize,
+        coverImage: newRes.coverImage,
+        hasMarkingScheme: newRes.hasMarkingScheme,
+        markingSchemeNotes: newRes.markingSchemeNotes,
+        timeAllowedMinutes: newRes.timeAllowedMinutes,
+        visibility: newRes.visibility === 'subscribers_only' || newRes.visibility === 'private' ? 'SUBSCRIBERS_ONLY' : 'PUBLIC',
+        packageId: newRes.packageId,
+        status: newRes.status,
+        allowDownload: newRes.allowDownload
+      })
+      .then((backendRes) => {
+        if (backendRes.success && backendRes.data?.id) {
+          setLibraryResources((prev) =>
+            prev.map((r) => (r.id === tempId ? { ...r, id: backendRes.data.id } : r))
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend sync for created resource skipped or failed:', err?.message);
+      });
   };
 
   const updateLibraryResource = (id: string, updates: Partial<LibraryResource>) => {
@@ -1413,6 +1467,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       title: 'Resource Updated',
       message: 'Library resource information was successfully updated.'
     });
+
+    // Asynchronous backend update sync
+    api.resources
+      .update(id, {
+        ...updates,
+        visibility:
+          updates.visibility === 'subscribers_only' || updates.visibility === 'private'
+            ? 'SUBSCRIBERS_ONLY'
+            : updates.visibility === 'public'
+            ? 'PUBLIC'
+            : undefined
+      })
+      .catch((err) => {
+        console.warn('Backend update sync skipped:', err?.message);
+      });
   };
 
   const deleteLibraryResource = (id: string) => {
@@ -1424,12 +1493,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       title: 'Resource Deleted',
       message: target ? `"${target.title}" was removed from the library.` : 'Resource removed.'
     });
+
+    // Asynchronous backend deletion sync
+    api.resources.delete(id).catch((err) => {
+      console.warn('Backend delete sync skipped:', err?.message);
+    });
   };
 
   const recordResourceView = (id: string) => {
     setLibraryResources((prev) =>
       prev.map((r) => (r.id === id ? { ...r, viewsCount: r.viewsCount + 1 } : r))
     );
+    api.resources.recordView(id).catch(() => {});
   };
 
   const recordResourceDownload = (id: string) => {
@@ -1451,6 +1526,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       title: 'Download Initiated',
       message: `Downloading "${target.title}" (${target.fileSize} · ${target.fileType}).`
     });
+    api.resources.recordDownload(id).catch(() => {});
   };
 
   return (

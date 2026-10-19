@@ -376,7 +376,14 @@ export interface LibraryResource {
   pageCount?: number;
   uploadedDate: string; // "2026-09-15"
   status: 'published' | 'draft' | 'unpublished';
-  visibility: 'public' | 'class_only' | 'private';
+  visibility: 'public' | 'class_only' | 'private' | 'subscribers_only';
+  packageId?: string;
+  packageName?: string;
+  packagePrice?: number;
+  isLocked?: boolean;
+  isOwner?: boolean;
+  teacherId?: string;
+  authorAvatar?: string;
   allowDownload: boolean;
   downloadsCount: number;
   viewsCount: number;
