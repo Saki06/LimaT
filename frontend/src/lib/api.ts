@@ -162,6 +162,106 @@ export const api = {
     },
   },
 
+  // Tutor Study Packages API
+  packages: {
+    async getAll(params?: { search?: string; tenantId?: string; page?: number; limit?: number }) {
+      const query = new URLSearchParams();
+      if (params?.search) query.append('search', params.search);
+      if (params?.tenantId) query.append('tenantId', params.tenantId);
+      if (params?.page) query.append('page', params.page.toString());
+      if (params?.limit) query.append('limit', params.limit.toString());
+
+      const res = await fetch(`${API_BASE_URL}/packages?${query.toString()}`);
+      return res.json();
+    },
+
+    async getMyPackages() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/packages/my-packages`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getById(id: string) {
+      const res = await fetch(`${API_BASE_URL}/packages/${id}`);
+      return res.json();
+    },
+
+    async create(packageData: {
+      title: string;
+      description?: string;
+      price?: number;
+      billingCycle?: string;
+      durationDays?: number;
+      features?: string[];
+      isPublished?: boolean;
+      courseIds?: string[];
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/packages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(packageData),
+      });
+      return res.json();
+    },
+
+    async update(id: string, packageData: any) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/packages/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(packageData),
+      });
+      return res.json();
+    },
+
+    async delete(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/packages/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async subscribe(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/packages/${id}/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getSubscribers(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/packages/${id}/subscribers`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+  },
+
   // Token and Local Storage Helpers
   token: {
     get(): string | null {

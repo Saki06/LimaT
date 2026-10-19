@@ -36,6 +36,20 @@ enum RegistrationStatus {
   REJECTED
 }
 
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  ONE_TIME
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING
+}
+
 // Multi-tenant School / Institution
 model Tenant {
   id             String          @id @default(uuid())
@@ -47,6 +61,7 @@ model Tenant {
   settings       Json?
   users          User[]
   courses        Course[]
+  packages       Package[]
   sportsEvents   SportsEvent[]
   announcements  Announcement[]
   createdAt      DateTime        @default(now())
@@ -88,6 +103,7 @@ model StudentProfile {
   guardianId    String?
   guardian      ParentProfile? @relation(fields: [guardianId], references: [id])
   enrollments   Enrollment[]
+  packageSubscriptions PackageSubscription[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -99,6 +115,7 @@ model TeacherProfile {
   employeeNo    String       @unique
   specialization String
   courses       Course[]
+  packages      Package[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -124,6 +141,7 @@ model Course {
   description   String?
   syllabus      Json?
   enrollments   Enrollment[]
+  packageCourses PackageCourse[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -188,3 +206,53 @@ model Announcement {
 
   @@index([tenantId, targetRole])
 }
+
+model Package {
+  id            String                @id @default(uuid())
+  tenantId      String
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  teacherId     String
+  teacher       TeacherProfile        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  title         String
+  slug          String?
+  description   String?
+  price         Float                 @default(0.0)
+  billingCycle  BillingCycle          @default(MONTHLY)
+  durationDays  Int                   @default(30)
+  features      Json?
+  isPublished   Boolean               @default(true)
+  courses       PackageCourse[]
+  subscriptions PackageSubscription[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([tenantId, isPublished])
+}
+
+model PackageCourse {
+  id        String   @id @default(uuid())
+  packageId String
+  package   Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, courseId])
+}
+
+model PackageSubscription {
+  id         String             @id @default(uuid())
+  packageId  String
+  package    Package            @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  studentId  String
+  student    StudentProfile     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  status     SubscriptionStatus @default(ACTIVE)
+  startDate  DateTime           @default(now())
+  endDate    DateTime
+  paidAmount Float              @default(0.0)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([packageId, status])
+  @@index([studentId, status])
+}
+

@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import { useHubSettings } from "@/context/AdminContext";
 import { TeacherSubscriber, TutorPackage, ConnectStudyGroup } from "@/types/lms";
 import { initialTeacherSubscribers, initialTutorPackages, initialConnectStudyGroups } from "@/data/connectMockData";
+import { api } from "@/lib/api";
 import {
   Users,
   Users2,
@@ -204,10 +205,45 @@ export function TeacherConnectView() {
   // Active tab inside Teacher Connect Hub - Default to Packages (கட்டணப் பேக்கேஜ்கள்)
   const [activeTab, setActiveTab] = useState<TeacherConnectTab>("packages");
 
+  const mapBackendPackageToFrontend = (pkg: any): TutorPackage => ({
+    id: pkg.id,
+    teacherId: pkg.teacherId || "usr_teacher_01",
+    title: pkg.title,
+    subject: pkg.courses?.[0]?.course?.title || "Combined Mathematics",
+    grade: "Grade 12 & 13 (A/L)",
+    monthlyFeeLkr: pkg.price || 2500,
+    billingCycle: pkg.billingCycle === "ONE_TIME" ? "Full Syllabus Pass" : "Monthly",
+    description: pkg.description || "Comprehensive tuition module with live interactive classes and revision notes.",
+    features: Array.isArray(pkg.features) && pkg.features.length > 0 ? pkg.features : ["Live Interactive Classes / Week", "Recorded Video Access"],
+    liveClassesPerWeek: 3,
+    status: pkg.isPublished ? "active" : "draft",
+    enrolledCount: pkg._count?.subscriptions || 0,
+    badge: pkg.price > 0 ? "POPULAR" : "FREE",
+    createdAt: new Date(pkg.createdAt).toISOString().split("T")[0],
+  });
+
   // Packages CRUD state
   const [packages, setPackages] = useState<TutorPackage[]>(initialTutorPackages);
   const [packageSearchQuery, setPackageSearchQuery] = useState("");
   const [packageStatusFilter, setPackageStatusFilter] = useState<"all" | "active" | "draft">("all");
+
+  useEffect(() => {
+    const loadPackages = async () => {
+      try {
+        const res = await api.packages.getAll();
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const loaded = res.data.map(mapBackendPackageToFrontend);
+          setPackages((prev) => {
+            const ids = new Set(loaded.map((l: any) => l.id));
+            return [...loaded, ...prev.filter((p) => !ids.has(p.id))];
+          });
+        }
+      } catch (e) {
+        console.warn("Could not load backend packages:", e);
+      }
+    };
+    loadPackages();
+  }, []);
 
   // Package Modals
   const [isCreatePackageModalOpen, setIsCreatePackageModalOpen] = useState(false);
@@ -306,12 +342,35 @@ export function TeacherConnectView() {
     setIsCreatePackageModalOpen(true);
   };
 
-  const handleSaveCreatePackage = (e: React.FormEvent) => {
+  const handleSaveCreatePackage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!packageFormData.title.trim()) {
       showToast("Please enter a package title!");
       return;
     }
+
+    try {
+      const res = await api.packages.create({
+        title: packageFormData.title.trim(),
+        description: packageFormData.description.trim(),
+        price: Number(packageFormData.monthlyFeeLkr) || 2500,
+        billingCycle: packageFormData.billingCycle === "Full Syllabus Pass" ? "ONE_TIME" : "MONTHLY",
+        durationDays: packageFormData.billingCycle === "Term (3 Months)" ? 90 : packageFormData.billingCycle === "Full Syllabus Pass" ? 365 : 30,
+        features: packageFormData.features.length > 0 ? packageFormData.features : ["Live Interactive Classes / Week", "Recorded Video Access"],
+        isPublished: packageFormData.status === "active",
+      });
+
+      if (res.success && res.data) {
+        const newPkg = mapBackendPackageToFrontend(res.data);
+        setPackages((prev) => [newPkg, ...prev]);
+        setIsCreatePackageModalOpen(false);
+        showToast(`Package "${newPkg.title}" saved to cloud database!`);
+        return;
+      }
+    } catch (err) {
+      console.warn("Backend error creating package, falling back to local state:", err);
+    }
+
     const newPkg: TutorPackage = {
       id: `pkg_${Date.now()}`,
       teacherId: currentUser.id || "usr_teacher_01",
@@ -351,13 +410,28 @@ export function TeacherConnectView() {
     setIsEditPackageModalOpen(true);
   };
 
-  const handleSaveEditPackage = (e: React.FormEvent) => {
+  const handleSaveEditPackage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPackage) return;
     if (!packageFormData.title.trim()) {
       showToast("Please enter a package title!");
       return;
     }
+
+    try {
+      if (!editingPackage.id.startsWith("pkg_")) {
+        await api.packages.update(editingPackage.id, {
+          title: packageFormData.title.trim(),
+          description: packageFormData.description.trim(),
+          price: Number(packageFormData.monthlyFeeLkr),
+          isPublished: packageFormData.status === "active",
+          features: packageFormData.features,
+        });
+      }
+    } catch (err) {
+      console.warn("Backend error updating package:", err);
+    }
+
     setPackages((prev) =>
       prev.map((p) =>
         p.id === editingPackage.id
@@ -386,8 +460,15 @@ export function TeacherConnectView() {
     setDeletingPackage(pkg);
   };
 
-  const handleConfirmDeletePackage = () => {
+  const handleConfirmDeletePackage = async () => {
     if (!deletingPackage) return;
+    try {
+      if (!deletingPackage.id.startsWith("pkg_")) {
+        await api.packages.delete(deletingPackage.id);
+      }
+    } catch (err) {
+      console.warn("Backend error deleting package:", err);
+    }
     setPackages((prev) => prev.filter((p) => p.id !== deletingPackage.id));
     showToast(`Package "${deletingPackage.title}" deleted.`);
     setDeletingPackage(null);

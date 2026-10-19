@@ -894,11 +894,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addToast({ type: 'success', title: 'Event Created Successfully!' });
   };
 
+  const syncCourseSyllabus = async (courseId: string, updatedCourses: Course[]) => {
+    try {
+      if (!courseId.startsWith("crs_")) {
+        const target = updatedCourses.find((c) => c.id === courseId);
+        if (target) {
+          await api.courses.update(courseId, { syllabus: { units: target.units } });
+        }
+      }
+    } catch (e) {
+      console.warn("Could not sync syllabus to server:", e);
+    }
+  };
+
   const createUnit = (courseId: string, unitTitle: string): string => {
     const newUnitId = `unt_${Date.now()}`;
     const newTopicId = `top_${Date.now()}`;
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         const newUnit: SyllabusUnit = {
           id: newUnitId,
@@ -920,8 +933,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ...c,
           units: [...c.units, newUnit]
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'success',
       title: 'Unit Added to Syllabus!',
