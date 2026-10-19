@@ -4,6 +4,7 @@ import tenantRoutes from './tenant.routes';
 import sportsRoutes from './sports.routes';
 import courseRoutes from './course.routes';
 import packageRoutes from './package.routes';
+import liveClassRoutes from './liveClass.routes';
 
 const router = Router();
 
@@ -23,5 +24,6 @@ router.use('/tenants', tenantRoutes);
 router.use('/sports', sportsRoutes);
 router.use('/courses', courseRoutes);
 router.use('/packages', packageRoutes);
+router.use('/live-classes', liveClassRoutes);
 
 export default router;

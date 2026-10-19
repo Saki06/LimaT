@@ -262,6 +262,112 @@ export const api = {
     },
   },
 
+  // Live Video Classes API
+  liveClasses: {
+    async getAll(params?: { status?: string; courseId?: string; packageId?: string }) {
+      const token = api.token.get();
+      const query = new URLSearchParams();
+      if (params?.status) query.append('status', params.status);
+      if (params?.courseId) query.append('courseId', params.courseId);
+      if (params?.packageId) query.append('packageId', params.packageId);
+
+      const res = await fetch(`${API_BASE_URL}/live-classes?${query.toString()}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getById(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/live-classes/${id}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async create(data: {
+      title: string;
+      description?: string;
+      topic?: string;
+      courseId?: string;
+      packageId?: string;
+      startTime: string;
+      durationMinutes?: number;
+      platform?: 'JITSI' | 'GOOGLE_MEET' | 'ZOOM' | 'CUSTOM';
+      meetingUrl?: string;
+      meetingId?: string;
+      passcode?: string;
+      recordingUrl?: string;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/live-classes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async update(id: string, data: any) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/live-classes/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async updateStatus(id: string, status: 'SCHEDULED' | 'LIVE' | 'COMPLETED' | 'CANCELLED') {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/live-classes/${id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status }),
+      });
+      return res.json();
+    },
+
+    async delete(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/live-classes/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async join(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/live-classes/${id}/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+  },
+
   // Token and Local Storage Helpers
   token: {
     get(): string | null {
