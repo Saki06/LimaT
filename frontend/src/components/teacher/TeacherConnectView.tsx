@@ -196,7 +196,7 @@ const PREDEFINED_GRADE_GROUPS = [
 const ALL_PREDEFINED_GRADES = PREDEFINED_GRADE_GROUPS.flatMap((g) => g.grades);
 
 export function TeacherConnectView() {
-  const { currentUser, t, fetchCourses } = useApp();
+  const { currentUser, t, fetchCourses, setCurrentView } = useApp();
   const hubSettings = useHubSettings();
   if (!hubSettings.enabled) {
     return <Card className="p-10 text-center"><p className="text-lg font-black text-[#0d2b26]">Tutor Connect Hub is currently disabled</p><p className="mt-2 text-sm text-slate-500">Please contact platform administration.</p></Card>;
@@ -498,17 +498,6 @@ export function TeacherConnectView() {
     }));
   };
 
-  // Copy meet link
-  const handleCopyMeet = () => {
-    navigator.clipboard?.writeText("https://meet.google.com/sam-math-live");
-    showToast("Live Google Meet link copied to clipboard!");
-  };
-
-  // Broadcast link
-  const handleBroadcastMeet = () => {
-    showToast("Live Class broadcast alert sent to all 142 active subscribed students via SMS & Notification!");
-  };
-
   // Approve bank slip
   const handleApproveSlip = (subId: string) => {
     setSubscribers((prev) =>
@@ -571,53 +560,32 @@ export function TeacherConnectView() {
                 Subscribers &amp; Tuition Hub
               </h1>
               <p className="text-xs text-slate-600 max-w-xl">
-                Manage all students enrolled in your live tuition masterclasses, review bank deposit payment slips, and broadcast live Google Meet lecture links.
+                Manage student tuition packages, track active enrolled students, and verify bank deposit payment slips.
               </p>
             </div>
 
-            {/* Live Meet Action Box */}
-            <div className="p-4 rounded-2xl bg-white border border-[#c4e9e0] shadow-xs space-y-3 shrink-0 lg:w-80">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <Video className="h-3.5 w-3.5 text-[#0d5c4d]" /> Live Class Link
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-extrabold">
-                  ACTIVE ROOM
-                </span>
-              </div>
+            {/* Quick Actions */}
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <Button
+                onClick={() => setCurrentView("live_schedule")}
+                variant="outline"
+                className="border-[#c4e9e0] text-[#0d5c4d] hover:bg-[#ecf8f5] text-xs font-bold py-5 px-4 rounded-2xl cursor-pointer flex items-center gap-2"
+              >
+                <Video className="h-4 w-4 text-[#0d5c4d]" />
+                <span>Live Video Studio ↗</span>
+              </Button>
 
-              <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-700 truncate">
-                https://meet.google.com/sam-math-live
-              </div>
-
-              <div className="flex items-center gap-2">
-                <a
-                  href="https://meet.google.com/sam-math-live"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 py-1.5 px-3 rounded-xl bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" /> Start Lecture
-                </a>
-                <Button
-                  onClick={handleCopyMeet}
-                  variant="outline"
-                  size="sm"
-                  className="border-[#c4e9e0] text-[#0d5c4d] hover:bg-[#ecf8f5] text-xs font-bold"
-                  title="Copy Google Meet Link"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  onClick={handleBroadcastMeet}
-                  variant="outline"
-                  size="sm"
-                  className="border-amber-300 text-amber-800 hover:bg-amber-50 text-xs font-bold"
-                  title="Broadcast to All Students"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+              <Button
+                onClick={() => {
+                  setEditingPackage(null);
+                  setPackageFormData(initialPackageForm);
+                  setIsCreatePackageModalOpen(true);
+                }}
+                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-black py-5 px-5 rounded-2xl shadow-md cursor-pointer flex items-center gap-2 transition-all hover:scale-[1.02]"
+              >
+                <Plus className="h-4 w-4" />
+                <span>+ Create Package</span>
+              </Button>
             </div>
           </div>
         </CardContent>
