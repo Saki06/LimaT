@@ -559,33 +559,9 @@ export function TeacherConnectView() {
               <h1 className="text-2xl font-black text-[#0d2b26]">
                 Subscribers &amp; Tuition Hub
               </h1>
-              <p className="text-xs text-slate-600 max-w-xl">
+              <p className="text-xs text-slate-600 max-w-2xl">
                 Manage student tuition packages, track active enrolled students, and verify bank deposit payment slips.
               </p>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
-              <Button
-                onClick={() => setCurrentView("live_schedule")}
-                variant="outline"
-                className="border-[#c4e9e0] text-[#0d5c4d] hover:bg-[#ecf8f5] text-xs font-bold py-5 px-4 rounded-2xl cursor-pointer flex items-center gap-2"
-              >
-                <Video className="h-4 w-4 text-[#0d5c4d]" />
-                <span>Live Video Studio ↗</span>
-              </Button>
-
-              <Button
-                onClick={() => {
-                  setEditingPackage(null);
-                  setPackageFormData(initialPackageForm);
-                  setIsCreatePackageModalOpen(true);
-                }}
-                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-black py-5 px-5 rounded-2xl shadow-md cursor-pointer flex items-center gap-2 transition-all hover:scale-[1.02]"
-              >
-                <Plus className="h-4 w-4" />
-                <span>+ Create Package</span>
-              </Button>
             </div>
           </div>
         </CardContent>
