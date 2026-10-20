@@ -632,10 +632,40 @@ export interface HubAuditEntry {
 }
 
 export interface TeacherQualification {
+  id?: string;
   degree: string;
   institution: string;
   year: string;
   grade?: string;
+  honors?: string;
+  details?: string;
+}
+
+export interface TeacherAccreditation {
+  id: string;
+  title: string;
+  issuer: string;
+  regNo: string;
+  status: string;
+  badge: string;
+  badgeColor?: string;
+}
+
+export interface TeacherBankAccount {
+  id: string;
+  bankName: string;
+  bankAccountName: string;
+  bankAccountNumber: string;
+  bankBranch: string;
+  bankBranchCode?: string;
+  isPrimary: boolean;
+}
+
+export interface TeacherSocialChannel {
+  id: string;
+  platform: string;
+  title: string;
+  url: string;
 }
 
 export interface TeacherProfileData {
@@ -655,6 +685,9 @@ export interface TeacherProfileData {
   mediums: string[];
   experienceYears: number;
   qualifications: TeacherQualification[];
+  accreditations?: TeacherAccreditation[];
+  bankAccounts?: TeacherBankAccount[];
+  socialChannels?: TeacherSocialChannel[];
   bankName?: string;
   bankAccountName?: string;
   bankAccountNumber?: string;

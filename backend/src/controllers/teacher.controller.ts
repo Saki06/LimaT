@@ -88,6 +88,42 @@ const getOrCreateTeacherProfile = async (userId: string) => {
 };
 
 /**
+ * Helper to parse extended qualifications JSON safely
+ */
+const parseQualificationsField = (raw: any) => {
+  if (!raw) {
+    return {
+      qualifications: [],
+      accreditations: [],
+      bankAccounts: [],
+      socialChannels: [],
+    };
+  }
+  if (Array.isArray(raw)) {
+    return {
+      qualifications: raw,
+      accreditations: [],
+      bankAccounts: [],
+      socialChannels: [],
+    };
+  }
+  if (typeof raw === 'object') {
+    return {
+      qualifications: Array.isArray(raw.degrees) ? raw.degrees : (Array.isArray(raw.qualifications) ? raw.qualifications : []),
+      accreditations: Array.isArray(raw.accreditations) ? raw.accreditations : [],
+      bankAccounts: Array.isArray(raw.bankAccounts) ? raw.bankAccounts : [],
+      socialChannels: Array.isArray(raw.socialChannels) ? raw.socialChannels : [],
+    };
+  }
+  return {
+    qualifications: [],
+    accreditations: [],
+    bankAccounts: [],
+    socialChannels: [],
+  };
+};
+
+/**
  * 1. Get Current Teacher Profile & Studio Statistics
  * GET /api/teachers/me
  * Restricted to: TEACHER, ADMIN, SUPER_ADMIN
@@ -116,10 +152,16 @@ export const getMyTeacherProfile = async (req: AuthenticatedRequest, res: Respon
       monthlyGrossRevenue += activeSubs * Number(pkg.price || 0);
     });
 
+    const parsedQ = parseQualificationsField(profile.qualifications);
+
     res.status(200).json({
       success: true,
       data: {
         ...profile,
+        qualifications: parsedQ.qualifications,
+        accreditations: parsedQ.accreditations,
+        bankAccounts: parsedQ.bankAccounts,
+        socialChannels: parsedQ.socialChannels,
         stats: {
           totalSubscribers,
           monthlyGrossRevenue,
@@ -165,6 +207,9 @@ export const updateMyTeacherProfile = async (req: AuthenticatedRequest, res: Res
       mediums,
       experienceYears,
       qualifications,
+      accreditations,
+      bankAccounts,
+      socialChannels,
       bankName,
       bankAccountName,
       bankAccountNumber,
@@ -179,7 +224,8 @@ export const updateMyTeacherProfile = async (req: AuthenticatedRequest, res: Res
     } = req.body;
 
     // Ensure teacher profile exists
-    await getOrCreateTeacherProfile(userId);
+    const existing = await getOrCreateTeacherProfile(userId);
+    const existingQ = parseQualificationsField(existing?.qualifications);
 
     // Update User record if names or avatar provided
     if (firstName !== undefined || lastName !== undefined || avatarUrl !== undefined) {
@@ -207,6 +253,52 @@ export const updateMyTeacherProfile = async (req: AuthenticatedRequest, res: Res
       }
     }
 
+    // Merge qualifications object if any extended collection is provided
+    let qualificationsPayload: any = undefined;
+    if (qualifications !== undefined || accreditations !== undefined || bankAccounts !== undefined || socialChannels !== undefined) {
+      qualificationsPayload = {
+        degrees: qualifications !== undefined ? (Array.isArray(qualifications) ? qualifications : existingQ.qualifications) : existingQ.qualifications,
+        accreditations: accreditations !== undefined ? accreditations : existingQ.accreditations,
+        bankAccounts: bankAccounts !== undefined ? bankAccounts : existingQ.bankAccounts,
+        socialChannels: socialChannels !== undefined ? socialChannels : existingQ.socialChannels,
+      };
+    }
+
+    // Sync bank details from primary bank account if bankAccounts array passed
+    let finalBankName = bankName;
+    let finalBankAccountName = bankAccountName;
+    let finalBankAccountNumber = bankAccountNumber;
+    let finalBankBranch = bankBranch;
+    let finalBankBranchCode = bankBranchCode;
+
+    if (Array.isArray(bankAccounts) && bankAccounts.length > 0) {
+      const primary = bankAccounts.find((b: any) => b.isPrimary) || bankAccounts[0];
+      if (primary) {
+        if (primary.bankName) finalBankName = primary.bankName;
+        if (primary.bankAccountName) finalBankAccountName = primary.bankAccountName;
+        if (primary.bankAccountNumber) finalBankAccountNumber = primary.bankAccountNumber;
+        if (primary.bankBranch) finalBankBranch = primary.bankBranch;
+        if (primary.bankBranchCode) finalBankBranchCode = primary.bankBranchCode;
+      }
+    }
+
+    // Sync social media channels if passed
+    let finalYoutube = youtubeUrl;
+    let finalTelegram = telegramUrl;
+    let finalWhatsapp = whatsappNumber;
+    let finalWebsite = websiteUrl;
+
+    if (Array.isArray(socialChannels) && socialChannels.length > 0) {
+      const yt = socialChannels.find((s: any) => s.platform?.toLowerCase() === 'youtube');
+      if (yt) finalYoutube = yt.url;
+      const tg = socialChannels.find((s: any) => s.platform?.toLowerCase() === 'telegram');
+      if (tg) finalTelegram = tg.url;
+      const wa = socialChannels.find((s: any) => s.platform?.toLowerCase() === 'whatsapp');
+      if (wa) finalWhatsapp = wa.url;
+      const web = socialChannels.find((s: any) => s.platform?.toLowerCase() === 'website' || s.platform?.toLowerCase() === 'other');
+      if (web) finalWebsite = web.url;
+    }
+
     // Update TeacherProfile record
     const updatedProfile = await prisma.teacherProfile.update({
       where: { userId },
@@ -223,17 +315,17 @@ export const updateMyTeacherProfile = async (req: AuthenticatedRequest, res: Res
         ...(sltsRegNo !== undefined ? { sltsRegNo } : {}),
         ...(mediums !== undefined ? { mediums } : {}),
         ...(experienceYears !== undefined ? { experienceYears: Number(experienceYears) || 0 } : {}),
-        ...(qualifications !== undefined ? { qualifications } : {}),
-        ...(bankName !== undefined ? { bankName } : {}),
-        ...(bankAccountName !== undefined ? { bankAccountName } : {}),
-        ...(bankAccountNumber !== undefined ? { bankAccountNumber } : {}),
-        ...(bankBranch !== undefined ? { bankBranch } : {}),
-        ...(bankBranchCode !== undefined ? { bankBranchCode } : {}),
+        ...(qualificationsPayload !== undefined ? { qualifications: qualificationsPayload } : {}),
+        ...(finalBankName !== undefined ? { bankName: finalBankName } : {}),
+        ...(finalBankAccountName !== undefined ? { bankAccountName: finalBankAccountName } : {}),
+        ...(finalBankAccountNumber !== undefined ? { bankAccountNumber: finalBankAccountNumber } : {}),
+        ...(finalBankBranch !== undefined ? { bankBranch: finalBankBranch } : {}),
+        ...(finalBankBranchCode !== undefined ? { bankBranchCode: finalBankBranchCode } : {}),
         ...(publicSlug !== undefined ? { publicSlug } : {}),
-        ...(youtubeUrl !== undefined ? { youtubeUrl } : {}),
-        ...(telegramUrl !== undefined ? { telegramUrl } : {}),
-        ...(whatsappNumber !== undefined ? { whatsappNumber } : {}),
-        ...(websiteUrl !== undefined ? { websiteUrl } : {}),
+        ...(finalYoutube !== undefined ? { youtubeUrl: finalYoutube } : {}),
+        ...(finalTelegram !== undefined ? { telegramUrl: finalTelegram } : {}),
+        ...(finalWhatsapp !== undefined ? { whatsappNumber: finalWhatsapp } : {}),
+        ...(finalWebsite !== undefined ? { websiteUrl: finalWebsite } : {}),
         ...(coverImageUrl !== undefined ? { coverImageUrl } : {}),
       },
       include: {
@@ -254,10 +346,18 @@ export const updateMyTeacherProfile = async (req: AuthenticatedRequest, res: Res
       },
     });
 
+    const parsedUpdated = parseQualificationsField(updatedProfile.qualifications);
+
     res.status(200).json({
       success: true,
       message: 'Teacher Studio Profile updated successfully',
-      data: updatedProfile,
+      data: {
+        ...updatedProfile,
+        qualifications: parsedUpdated.qualifications,
+        accreditations: parsedUpdated.accreditations,
+        bankAccounts: parsedUpdated.bankAccounts,
+        socialChannels: parsedUpdated.socialChannels,
+      },
     });
   } catch (error) {
     console.error('Error updating teacher profile:', error);
@@ -329,6 +429,8 @@ export const getPublicTutorProfile = async (req: Request, res: Response): Promis
       return;
     }
 
+    const parsedQ = parseQualificationsField(profile.qualifications);
+
     // Sanitize sensitive banking info for public view
     const publicData = {
       id: profile.id,
@@ -342,7 +444,9 @@ export const getPublicTutorProfile = async (req: Request, res: Response): Promis
       isVerified: profile.isVerified,
       mediums: profile.mediums,
       experienceYears: profile.experienceYears,
-      qualifications: profile.qualifications,
+      qualifications: parsedQ.qualifications,
+      accreditations: parsedQ.accreditations,
+      socialChannels: parsedQ.socialChannels,
       publicSlug: profile.publicSlug,
       youtubeUrl: profile.youtubeUrl,
       telegramUrl: profile.telegramUrl,

@@ -49,8 +49,18 @@ import {
   Lock,
   Plus,
   Trash2,
-  HelpCircle
+  HelpCircle,
+  Phone,
+  MessageSquare,
+  AlertCircle,
+  AlertTriangle
 } from "lucide-react";
+import {
+  TeacherQualification,
+  TeacherAccreditation,
+  TeacherBankAccount,
+  TeacherSocialChannel
+} from "@/types/lms";
 import { initialExams, initialExamTermResult } from "@/data/mockData";
 
 type ProfileTab =
@@ -316,8 +326,9 @@ export function ProfileView() {
   const [coverImageUrl, setCoverImageUrl] = useState("https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80");
 
   // Qualifications & Accreditations (Teacher)
-  const [qualificationsList, setQualificationsList] = useState<Array<{ degree: string; institution: string; year: string; honors: string; details: string }>>([
+  const [qualificationsList, setQualificationsList] = useState<TeacherQualification[]>([
     {
+      id: "deg-1",
       degree: "Bachelor of Science (B.Sc. Special) in Mathematics",
       institution: "University of Colombo, Sri Lanka",
       honors: "First Class Honours (GPA: 3.92 / 4.0)",
@@ -325,6 +336,7 @@ export function ProfileView() {
       details: "Pure Mathematics, Real Analysis, Complex Variables, Abstract Algebra & Numerical Methods."
     },
     {
+      id: "deg-2",
       degree: "Post Graduate Diploma in Education (PGDE)",
       institution: "National Institute of Education (NIE), Maharagama",
       honors: "Passed with Distinction",
@@ -332,6 +344,7 @@ export function ProfileView() {
       details: "Secondary & Collegiate STEM Pedagogy, Educational Psychology, Curriculum Formulation & Evaluation."
     },
     {
+      id: "deg-3",
       degree: "Master of Science (M.Sc.) in Applied Mathematics",
       institution: "University of Peradeniya",
       honors: "Thesis Distinction",
@@ -340,8 +353,158 @@ export function ProfileView() {
     }
   ]);
 
+  const [accreditationsList, setAccreditationsList] = useState<TeacherAccreditation[]>([
+    {
+      id: "acc-1",
+      title: "Sri Lanka Teachers' Service (SLTS) Class 1 Senior Educator",
+      issuer: "Ministry of Education, Isurupaya, Battaramulla",
+      regNo: "SLTS-REG/2012/4482",
+      status: "Active & Permanent Pensionable Service · 14 Years Seniority",
+      badge: "SLTS Class 1",
+      badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200"
+    },
+    {
+      id: "acc-2",
+      title: "G.C.E. Advanced Level Chief Examiner & Paper Setter Accreditation",
+      issuer: "Department of Examinations, Pelawatte, Battaramulla",
+      regNo: "EXAM-AL/MTH-P03",
+      status: "Supervising Examiner · Combined Mathematics Paper Evaluation Panel 03",
+      badge: "Chief Examiner",
+      badgeColor: "bg-blue-50 text-blue-800 border-blue-200"
+    },
+    {
+      id: "acc-3",
+      title: "National STEM Pedagogical Master Trainer & Digital Lead",
+      issuer: "UNESCO & National Education Commission (NEC)",
+      regNo: "STEM-LK/2021/88",
+      status: "Accredited Master Facilitator for Advanced Collegiate Mathematics Instruction",
+      badge: "Master Trainer",
+      badgeColor: "bg-purple-50 text-purple-800 border-purple-200"
+    },
+    {
+      id: "acc-4",
+      title: "Provincial Teaching Excellence & Mentorship Award (2023)",
+      issuer: "Western Provincial Department of Education",
+      regNo: "WP-EDU/AWARD/2023",
+      status: "Awarded for 98% Distinction Rate in A/L Combined Mathematics Examination",
+      badge: "Provincial Award",
+      badgeColor: "bg-amber-50 text-amber-800 border-amber-200"
+    }
+  ]);
+
+  const [bankAccountsList, setBankAccountsList] = useState<TeacherBankAccount[]>([
+    {
+      id: "bank-1",
+      bankName: "Commercial Bank of Ceylon",
+      bankAccountName: "Samantha Priyantha Perera",
+      bankAccountNumber: "8004561234",
+      bankBranch: "Havelock Town",
+      bankBranchCode: "042",
+      isPrimary: true
+    },
+    {
+      id: "bank-2",
+      bankName: "Bank of Ceylon (BOC)",
+      bankAccountName: "Samantha Priyantha Perera",
+      bankAccountNumber: "0072938491",
+      bankBranch: "Kollupitiya Super Grade",
+      bankBranchCode: "001",
+      isPrimary: false
+    }
+  ]);
+
+  const [socialChannelsList, setSocialChannelsList] = useState<TeacherSocialChannel[]>([
+    {
+      id: "soc-1",
+      platform: "youtube",
+      title: "YouTube Lecture Channel",
+      url: "https://youtube.com/@SamanthaPereraMaths"
+    },
+    {
+      id: "soc-2",
+      platform: "telegram",
+      title: "Telegram Student Discussion Group",
+      url: "https://t.me/CombinedMaths2026LK"
+    },
+    {
+      id: "soc-3",
+      platform: "whatsapp",
+      title: "Direct WhatsApp Mentorship Helpline",
+      url: "+94774567890"
+    },
+    {
+      id: "soc-4",
+      platform: "website",
+      title: "Personal Tutor Studio & Notes Portal",
+      url: "https://samanthamaths.lk"
+    }
+  ]);
+
+  const [subjectsList, setSubjectsList] = useState<string[]>([
+    "Combined Mathematics",
+    "Pure Mathematics",
+    "Applied Mathematics",
+    "Mechanics",
+    "Probability & Statistics"
+  ]);
+
   const [selectedMediums, setSelectedMediums] = useState<string[]>(["English", "Sinhala", "Tamil"]);
   const [experienceYears, setExperienceYears] = useState<number>(14);
+
+  // Modal states for full CRUD workflows
+  const [degreeModalState, setDegreeModalState] = useState<{
+    isOpen: boolean;
+    mode: "add" | "edit";
+    index?: number;
+    data: TeacherQualification;
+  }>({
+    isOpen: false,
+    mode: "add",
+    data: { degree: "", institution: "", year: "", honors: "", details: "" }
+  });
+
+  const [accreditationModalState, setAccreditationModalState] = useState<{
+    isOpen: boolean;
+    mode: "add" | "edit";
+    index?: number;
+    data: TeacherAccreditation;
+  }>({
+    isOpen: false,
+    mode: "add",
+    data: { id: "", title: "", issuer: "", regNo: "", status: "", badge: "Accredited", badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200" }
+  });
+
+  const [bankModalState, setBankModalState] = useState<{
+    isOpen: boolean;
+    mode: "add" | "edit";
+    index?: number;
+    data: TeacherBankAccount;
+  }>({
+    isOpen: false,
+    mode: "add",
+    data: { id: "", bankName: "Commercial Bank of Ceylon", bankAccountName: "", bankAccountNumber: "", bankBranch: "", bankBranchCode: "", isPrimary: false }
+  });
+
+  const [socialModalState, setSocialModalState] = useState<{
+    isOpen: boolean;
+    mode: "add" | "edit";
+    index?: number;
+    data: TeacherSocialChannel;
+  }>({
+    isOpen: false,
+    mode: "add",
+    data: { id: "", platform: "youtube", title: "", url: "" }
+  });
+
+  const [coverModalState, setCoverModalState] = useState<{ isOpen: boolean; url: string }>({
+    isOpen: false,
+    url: ""
+  });
+
+  const [newSubjectInput, setNewSubjectInput] = useState<string>("");
+  const [showSubjectInput, setShowSubjectInput] = useState<boolean>(false);
+  const [isEditingSlug, setIsEditingSlug] = useState<boolean>(false);
+  const [slugEditValue, setSlugEditValue] = useState<string>("");
 
   // Sync with backend teacher profile when loaded
   useEffect(() => {
@@ -362,7 +525,22 @@ export function ProfileView() {
         setSelectedMediums(teacherProfile.mediums);
       }
       if (Array.isArray(teacherProfile.qualifications) && teacherProfile.qualifications.length > 0) {
-        setQualificationsList(teacherProfile.qualifications as any);
+        setQualificationsList(teacherProfile.qualifications);
+      }
+      if (Array.isArray(teacherProfile.accreditations) && teacherProfile.accreditations.length > 0) {
+        setAccreditationsList(teacherProfile.accreditations);
+      }
+      if (Array.isArray(teacherProfile.bankAccounts) && teacherProfile.bankAccounts.length > 0) {
+        setBankAccountsList(teacherProfile.bankAccounts);
+      }
+      if (Array.isArray(teacherProfile.socialChannels) && teacherProfile.socialChannels.length > 0) {
+        setSocialChannelsList(teacherProfile.socialChannels);
+      }
+      if (teacherProfile.specialization) {
+        const parsedSubjects = teacherProfile.specialization.split(",").map((s) => s.trim()).filter(Boolean);
+        if (parsedSubjects.length > 0) {
+          setSubjectsList(parsedSubjects);
+        }
       }
     }
   }, [teacherProfile, currentRole]);
@@ -414,6 +592,268 @@ export function ProfileView() {
     });
   };
 
+  // =========================================================================
+  // CRUD HANDLERS (Add, Edit, Delete) for Teacher Tabs
+  // =========================================================================
+
+  // 1. Degree CRUD
+  const saveDegree = (item: TeacherQualification) => {
+    let updated: TeacherQualification[];
+    if (degreeModalState.mode === "add") {
+      updated = [...qualificationsList, { ...item, id: `deg-${Date.now()}` }];
+      addToast({ type: "success", title: "Degree Added", message: `"${item.degree}" has been added to your profile.` });
+    } else {
+      updated = qualificationsList.map((q, i) => i === degreeModalState.index ? item : q);
+      addToast({ type: "success", title: "Degree Updated", message: `"${item.degree}" details have been updated.` });
+    }
+    setQualificationsList(updated);
+    setDegreeModalState({ ...degreeModalState, isOpen: false });
+    if (currentRole === "teacher") {
+      updateTeacherProfile({ qualifications: updated, accreditations: accreditationsList, bankAccounts: bankAccountsList, socialChannels: socialChannelsList });
+    }
+  };
+
+  const deleteDegree = (index: number) => {
+    const item = qualificationsList[index];
+    const updated = qualificationsList.filter((_, i) => i !== index);
+    setQualificationsList(updated);
+    addToast({ type: "info", title: "Degree Removed", message: `"${item.degree}" was removed from your profile.` });
+    if (currentRole === "teacher") {
+      updateTeacherProfile({ qualifications: updated, accreditations: accreditationsList, bankAccounts: bankAccountsList, socialChannels: socialChannelsList });
+    }
+  };
+
+  // 2. Accreditation CRUD
+  const saveAccreditation = (item: TeacherAccreditation) => {
+    let updated: TeacherAccreditation[];
+    if (accreditationModalState.mode === "add") {
+      updated = [...accreditationsList, { ...item, id: `acc-${Date.now()}` }];
+      addToast({ type: "success", title: "Accreditation Added", message: `"${item.title}" credential registered.` });
+    } else {
+      updated = accreditationsList.map((a, i) => i === accreditationModalState.index ? item : a);
+      addToast({ type: "success", title: "Accreditation Updated", message: `"${item.title}" credential updated.` });
+    }
+    setAccreditationsList(updated);
+    setAccreditationModalState({ ...accreditationModalState, isOpen: false });
+    if (currentRole === "teacher") {
+      updateTeacherProfile({ qualifications: qualificationsList, accreditations: updated, bankAccounts: bankAccountsList, socialChannels: socialChannelsList });
+    }
+  };
+
+  const deleteAccreditation = (index: number) => {
+    const item = accreditationsList[index];
+    const updated = accreditationsList.filter((_, i) => i !== index);
+    setAccreditationsList(updated);
+    addToast({ type: "info", title: "Accreditation Removed", message: `"${item.title}" was removed.` });
+    if (currentRole === "teacher") {
+      updateTeacherProfile({ qualifications: qualificationsList, accreditations: updated, bankAccounts: bankAccountsList, socialChannels: socialChannelsList });
+    }
+  };
+
+  // 3. Bank Account CRUD
+  const saveBankAccount = (item: TeacherBankAccount) => {
+    let updated: TeacherBankAccount[];
+    if (bankModalState.mode === "add") {
+      const willBePrimary = item.isPrimary || bankAccountsList.length === 0;
+      const newItem = { ...item, id: `bank-${Date.now()}`, isPrimary: willBePrimary };
+      if (willBePrimary) {
+        updated = bankAccountsList.map((b) => ({ ...b, isPrimary: false })).concat(newItem);
+      } else {
+        updated = [...bankAccountsList, newItem];
+      }
+      addToast({ type: "success", title: "Bank Account Added", message: `${item.bankName} payout account registered.` });
+    } else {
+      if (item.isPrimary) {
+        updated = bankAccountsList.map((b, i) => i === bankModalState.index ? item : { ...b, isPrimary: false });
+      } else {
+        updated = bankAccountsList.map((b, i) => i === bankModalState.index ? item : b);
+      }
+      addToast({ type: "success", title: "Bank Account Updated", message: `${item.bankName} account details updated.` });
+    }
+    setBankAccountsList(updated);
+    setBankModalState({ ...bankModalState, isOpen: false });
+
+    const primary = updated.find((b) => b.isPrimary) || updated[0];
+    if (primary) {
+      setBankName(primary.bankName);
+      setBankAccountName(primary.bankAccountName);
+      setBankAccountNumber(primary.bankAccountNumber);
+      setBankBranch(primary.bankBranch);
+      setBankBranchCode(primary.bankBranchCode || "");
+    }
+    if (currentRole === "teacher") {
+      updateTeacherProfile({
+        bankAccounts: updated,
+        bankName: primary?.bankName,
+        bankAccountName: primary?.bankAccountName,
+        bankAccountNumber: primary?.bankAccountNumber,
+        bankBranch: primary?.bankBranch,
+        bankBranchCode: primary?.bankBranchCode
+      });
+    }
+  };
+
+  const deleteBankAccount = (index: number) => {
+    if (bankAccountsList.length <= 1) {
+      addToast({ type: "error", title: "Action Prevented", message: "At least one active payout bank account is required for subscription disbursements." });
+      return;
+    }
+    const item = bankAccountsList[index];
+    const updated = bankAccountsList.filter((_, i) => i !== index);
+    if (item.isPrimary && updated.length > 0) {
+      updated[0].isPrimary = true;
+    }
+    setBankAccountsList(updated);
+    addToast({ type: "info", title: "Account Removed", message: `${item.bankName} account was disconnected.` });
+
+    const primary = updated.find((b) => b.isPrimary) || updated[0];
+    if (primary) {
+      setBankName(primary.bankName);
+      setBankAccountName(primary.bankAccountName);
+      setBankAccountNumber(primary.bankAccountNumber);
+      setBankBranch(primary.bankBranch);
+      setBankBranchCode(primary.bankBranchCode || "");
+    }
+    if (currentRole === "teacher") {
+      updateTeacherProfile({
+        bankAccounts: updated,
+        bankName: primary?.bankName,
+        bankAccountName: primary?.bankAccountName,
+        bankAccountNumber: primary?.bankAccountNumber,
+        bankBranch: primary?.bankBranch,
+        bankBranchCode: primary?.bankBranchCode
+      });
+    }
+  };
+
+  const setPrimaryBankAccount = (index: number) => {
+    const updated = bankAccountsList.map((b, i) => ({ ...b, isPrimary: i === index }));
+    setBankAccountsList(updated);
+    const primary = updated[index];
+    if (primary) {
+      setBankName(primary.bankName);
+      setBankAccountName(primary.bankAccountName);
+      setBankAccountNumber(primary.bankAccountNumber);
+      setBankBranch(primary.bankBranch);
+      setBankBranchCode(primary.bankBranchCode || "");
+      addToast({ type: "success", title: "Primary Account Set", message: `${primary.bankName} is now your primary payout account.` });
+      if (currentRole === "teacher") {
+        updateTeacherProfile({
+          bankAccounts: updated,
+          bankName: primary.bankName,
+          bankAccountName: primary.bankAccountName,
+          bankAccountNumber: primary.bankAccountNumber,
+          bankBranch: primary.bankBranch,
+          bankBranchCode: primary.bankBranchCode
+        });
+      }
+    }
+  };
+
+  // 4. Social Channel CRUD
+  const saveSocialChannel = (item: TeacherSocialChannel) => {
+    let updated: TeacherSocialChannel[];
+    if (socialModalState.mode === "add") {
+      updated = [...socialChannelsList, { ...item, id: `soc-${Date.now()}` }];
+      addToast({ type: "success", title: "Social Channel Added", message: `"${item.title}" has been connected.` });
+    } else {
+      updated = socialChannelsList.map((s, i) => i === socialModalState.index ? item : s);
+      addToast({ type: "success", title: "Social Channel Updated", message: `"${item.title}" updated.` });
+    }
+    setSocialChannelsList(updated);
+    setSocialModalState({ ...socialModalState, isOpen: false });
+
+    // Sync individual channel fields
+    const yt = updated.find((s) => s.platform.toLowerCase() === "youtube")?.url || youtubeUrl;
+    const tg = updated.find((s) => s.platform.toLowerCase() === "telegram")?.url || telegramUrl;
+    const wa = updated.find((s) => s.platform.toLowerCase() === "whatsapp")?.url || whatsappNumber;
+    const wb = updated.find((s) => s.platform.toLowerCase() === "website" || s.platform.toLowerCase() === "other")?.url || websiteUrl;
+    setYoutubeUrl(yt);
+    setTelegramUrl(tg);
+    setWhatsappNumber(wa);
+    setWebsiteUrl(wb);
+
+    if (currentRole === "teacher") {
+      updateTeacherProfile({
+        socialChannels: updated,
+        youtubeUrl: yt,
+        telegramUrl: tg,
+        whatsappNumber: wa,
+        websiteUrl: wb
+      });
+    }
+  };
+
+  const deleteSocialChannel = (index: number) => {
+    const item = socialChannelsList[index];
+    const updated = socialChannelsList.filter((_, i) => i !== index);
+    setSocialChannelsList(updated);
+    addToast({ type: "info", title: "Channel Removed", message: `"${item.title}" was removed.` });
+    if (currentRole === "teacher") {
+      updateTeacherProfile({ socialChannels: updated });
+    }
+  };
+
+  // 5. Subject Specialization CRUD
+  const addSubject = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (subjectsList.includes(trimmed)) {
+      addToast({ type: "info", title: "Duplicate Subject", message: `"${trimmed}" is already in your specialization list.` });
+      return;
+    }
+    const updated = [...subjectsList, trimmed];
+    setSubjectsList(updated);
+    setProfileData({ ...profileData, stream: updated.join(", ") });
+    setNewSubjectInput("");
+    setShowSubjectInput(false);
+    addToast({ type: "success", title: "Subject Added", message: `Added "${trimmed}" to specializations.` });
+    if (currentRole === "teacher") {
+      updateTeacherProfile({ specialization: updated.join(", ") });
+    }
+  };
+
+  const deleteSubject = (subjectToRemove: string) => {
+    const updated = subjectsList.filter((s) => s !== subjectToRemove);
+    setSubjectsList(updated);
+    setProfileData({ ...profileData, stream: updated.join(", ") });
+    addToast({ type: "info", title: "Subject Removed", message: `Removed "${subjectToRemove}".` });
+    if (currentRole === "teacher") {
+      updateTeacherProfile({ specialization: updated.join(", ") });
+    }
+  };
+
+  // 6. Cover Banner CRUD
+  const saveCoverImage = (url: string) => {
+    setCoverImageUrl(url);
+    setCoverModalState({ isOpen: false, url: "" });
+    addToast({ type: "success", title: "Cover Banner Updated", message: "Studio cover banner has been saved." });
+    if (currentRole === "teacher") {
+      updateTeacherProfile({ coverImageUrl: url });
+    }
+  };
+
+  const resetCoverImage = () => {
+    const defaultUrl = "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80";
+    setCoverImageUrl(defaultUrl);
+    addToast({ type: "info", title: "Cover Banner Reset", message: "Default studio banner restored." });
+    if (currentRole === "teacher") {
+      updateTeacherProfile({ coverImageUrl: defaultUrl });
+    }
+  };
+
+  // 7. Shareable Slug Save
+  const saveSlug = () => {
+    const clean = slugEditValue.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    if (!clean) return;
+    setPublicSlug(clean);
+    setIsEditingSlug(false);
+    addToast({ type: "success", title: "Public Studio URL Updated", message: `New URL: https://limat.lk/tutors/${clean}` });
+    if (currentRole === "teacher") {
+      updateTeacherProfile({ publicSlug: clean });
+    }
+  };
+
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
@@ -422,7 +862,7 @@ export function ProfileView() {
       const success = await updateTeacherProfile({
         title: profileData.grade,
         bio: profileData.bio,
-        specialization: profileData.stream,
+        specialization: subjectsList.join(", "),
         phone: profileData.phone,
         address: profileData.address,
         city: profileData.city,
@@ -432,7 +872,10 @@ export function ProfileView() {
         sltsRegNo: profileData.indexNumber,
         mediums: selectedMediums,
         experienceYears: Number(experienceYears) || 0,
-        qualifications: qualificationsList as any,
+        qualifications: qualificationsList,
+        accreditations: accreditationsList,
+        bankAccounts: bankAccountsList,
+        socialChannels: socialChannelsList,
         bankName,
         bankAccountName,
         bankAccountNumber,
@@ -743,13 +1186,13 @@ export function ProfileView() {
       {activeTab === "personal" && (
         <div className="space-y-6 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
               <div>
                 <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
                   <User className="h-4 w-4 text-[#0d5c4d]" />
                   <span>
                     {currentRole === "teacher"
-                      ? "Faculty Official Identification"
+                      ? "Tutor Studio Profile & Faculty Credentials"
                       : currentRole === "super_admin"
                       ? "Platform Directorate Master Credentials"
                       : "General Information"}
@@ -757,18 +1200,135 @@ export function ProfileView() {
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {currentRole === "teacher"
-                    ? "Official personal identification and Ministry of Education service registration."
+                    ? "Official personal identification, studio profile details, and Ministry of Education service registration."
                     : currentRole === "super_admin"
                     ? "Master administrator credentials, root authority, and global tenant control specifications."
                     : "Official personal identification as registered with the Ministry of Education."}
                 </p>
               </div>
-              {isEditing && (
-                <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                  Editing Mode Active
-                </span>
+
+              {currentRole === "teacher" && (
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  {isEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(false)}
+                        className="px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={isSavingProfile}
+                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <Save className="h-3.5 w-3.5" />
+                        <span>{isSavingProfile ? "Saving..." : "Save Details"}</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] hover:bg-[#d8f2eb] border border-[#c4e9e0] font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                      <span>Edit Details</span>
+                    </button>
+                  )}
+                </div>
               )}
             </div>
+
+            {/* SUBJECT SPECIALIZATIONS MANAGER (Add, Edit, Delete tags) */}
+            {currentRole === "teacher" && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#f8faf9] to-[#f2f8f6] border border-[#d6ede6] space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="font-extrabold text-xs text-[#0d2b26] flex items-center gap-1.5 uppercase tracking-wide">
+                      <Award className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                      <span>Subject Specializations &amp; Modules</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Add and manage the specific subjects students search for on your tutor profile.
+                    </p>
+                  </div>
+
+                  {!showSubjectInput && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSubjectInput(true)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all shadow-xs cursor-pointer self-start sm:self-auto"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Add Subject</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Inline Add Subject Input */}
+                {showSubjectInput && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-[#0d5c4d]/30 shadow-xs">
+                    <input
+                      type="text"
+                      value={newSubjectInput}
+                      onChange={(e) => setNewSubjectInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addSubject(newSubjectInput);
+                        }
+                      }}
+                      placeholder="Type subject name (e.g. Combined Mathematics, Applied Mechanics)"
+                      className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-[#0d5c4d]"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addSubject(newSubjectInput)}
+                      className="px-3 py-1.5 rounded-lg bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowSubjectInput(false);
+                        setNewSubjectInput("");
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-700 text-xs font-bold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+
+                {/* Subject Tags with Delete (X) */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {subjectsList.map((subj) => (
+                    <span
+                      key={subj}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-[#0d2b26] border border-[#c4e9e0] text-xs font-bold shadow-2xs group hover:border-[#0d5c4d] transition-colors"
+                    >
+                      <span>{subj}</span>
+                      <button
+                        type="button"
+                        onClick={() => deleteSubject(subj)}
+                        className="h-4 w-4 rounded-full flex items-center justify-center text-slate-400 group-hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                        title={`Remove ${subj}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {subjectsList.length === 0 && (
+                    <p className="text-xs text-slate-400 italic">No subject specializations listed yet. Click "+ Add Subject" to add your first module.</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Full Name */}
@@ -1867,189 +2427,182 @@ export function ProfileView() {
 
             {/* University Degrees List */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
-                  <Award className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Higher Education Degrees &amp; Diplomas</span>
-                </h4>
-                {isEditing && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQualificationsList([
-                        ...qualificationsList,
-                        {
-                          degree: "New Degree / Certification",
-                          institution: "University / Institute Name",
-                          year: "2026",
-                          honors: "Honours / Pass Grade",
-                          details: "Curriculum and subject coverage."
-                        }
-                      ]);
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] hover:bg-[#d8f2eb] font-bold text-xs transition-colors cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Add Degree</span>
-                  </button>
-                )}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
+                    <Award className="h-4 w-4 text-[#0d5c4d]" />
+                    <span>Higher Education Degrees &amp; Diplomas</span>
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Manage certified university degrees, diplomas, and collegiate qualifications.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDegreeModalState({
+                      isOpen: true,
+                      mode: "add",
+                      data: {
+                        degree: "",
+                        institution: "",
+                        year: new Date().getFullYear().toString(),
+                        honors: "",
+                        details: ""
+                      }
+                    });
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add Degree / Qualification</span>
+                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {qualificationsList.map((item, idx) => (
                   <div
-                    key={idx}
-                    className="p-5 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3 flex flex-col justify-between hover:border-[#c4e9e0] transition-colors"
+                    key={item.id || idx}
+                    className="p-5 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3 flex flex-col justify-between hover:border-[#0d5c4d] transition-all shadow-2xs group"
                   >
-                    {isEditing ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">Degree #{idx + 1}</span>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2.5 py-0.5 rounded-full border border-[#c4e9e0]">
+                          {item.year || "Year N/A"}
+                        </span>
+                        <div className="flex items-center gap-1">
                           <button
                             type="button"
                             onClick={() => {
-                              setQualificationsList(qualificationsList.filter((_, i) => i !== idx));
+                              setDegreeModalState({
+                                isOpen: true,
+                                mode: "edit",
+                                index: idx,
+                                data: { ...item }
+                              });
                             }}
-                            className="text-red-500 hover:text-red-700 p-1"
-                            title="Remove Degree"
+                            className="p-1 rounded-lg text-slate-400 hover:text-[#0d5c4d] hover:bg-white transition-colors cursor-pointer"
+                            title="Edit Qualification"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteDegree(idx)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Delete Qualification"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                        <input
-                          type="text"
-                          value={item.degree}
-                          onChange={(e) => {
-                            const updated = [...qualificationsList];
-                            updated[idx].degree = e.target.value;
-                            setQualificationsList(updated);
-                          }}
-                          placeholder="Degree Title"
-                          className="w-full h-8 px-2.5 rounded-lg border border-slate-300 text-xs font-bold"
-                        />
-                        <input
-                          type="text"
-                          value={item.institution}
-                          onChange={(e) => {
-                            const updated = [...qualificationsList];
-                            updated[idx].institution = e.target.value;
-                            setQualificationsList(updated);
-                          }}
-                          placeholder="University / Institute"
-                          className="w-full h-8 px-2.5 rounded-lg border border-slate-300 text-xs"
-                        />
-                        <div className="grid grid-cols-2 gap-2">
-                          <input
-                            type="text"
-                            value={item.year}
-                            onChange={(e) => {
-                              const updated = [...qualificationsList];
-                              updated[idx].year = e.target.value;
-                              setQualificationsList(updated);
-                            }}
-                            placeholder="Year"
-                            className="h-8 px-2.5 rounded-lg border border-slate-300 text-xs"
-                          />
-                          <input
-                            type="text"
-                            value={item.honors}
-                            onChange={(e) => {
-                              const updated = [...qualificationsList];
-                              updated[idx].honors = e.target.value;
-                              setQualificationsList(updated);
-                            }}
-                            placeholder="Honors / Grade"
-                            className="h-8 px-2.5 rounded-lg border border-slate-300 text-xs"
-                          />
-                        </div>
-                        <textarea
-                          rows={2}
-                          value={item.details}
-                          onChange={(e) => {
-                            const updated = [...qualificationsList];
-                            updated[idx].details = e.target.value;
-                            setQualificationsList(updated);
-                          }}
-                          placeholder="Specialization description"
-                          className="w-full p-2 rounded-lg border border-slate-300 text-[11px]"
-                        />
                       </div>
-                    ) : (
-                      <>
-                        <div className="space-y-1.5">
-                          <span className="text-[10px] font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-full border border-[#c4e9e0]">
-                            {item.year}
-                          </span>
-                          <h5 className="font-black text-sm text-[#0d2b26] leading-snug">{item.degree}</h5>
-                          <p className="text-xs font-semibold text-slate-700">{item.institution}</p>
-                          <p className="text-xs text-amber-700 font-bold">{item.honors}</p>
-                        </div>
-                        <p className="text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 leading-relaxed">
-                          {item.details}
-                        </p>
-                      </>
+
+                      <h5 className="font-black text-sm text-[#0d2b26] leading-snug">{item.degree}</h5>
+                      <p className="text-xs font-semibold text-slate-700">{item.institution}</p>
+                      {item.honors && (
+                        <p className="text-xs text-amber-700 font-bold">{item.honors}</p>
+                      )}
+                    </div>
+
+                    {item.details && (
+                      <p className="text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 leading-relaxed">
+                        {item.details}
+                      </p>
                     )}
                   </div>
                 ))}
+
+                {qualificationsList.length === 0 && (
+                  <div className="md:col-span-3 p-8 text-center rounded-2xl border border-dashed border-slate-300 space-y-2">
+                    <GraduationCap className="h-8 w-8 text-slate-400 mx-auto" />
+                    <p className="text-xs font-bold text-slate-600">No degrees or diplomas added yet.</p>
+                    <p className="text-[11px] text-slate-400">Click &quot;Add Degree / Qualification&quot; above to list your higher education background.</p>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* National Accreditations & Licensing */}
-            <div className="space-y-3 pt-4 border-t border-slate-100">
-              <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
-                <span>Professional Licensing &amp; National Accreditations</span>
-              </h4>
+            <div className="space-y-4 pt-6 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
+                    <span>Professional Licensing &amp; National Accreditations</span>
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Official teaching service licenses, examiner credentials, and state pedagogical awards.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccreditationModalState({
+                      isOpen: true,
+                      mode: "add",
+                      data: {
+                        id: "",
+                        title: "",
+                        issuer: "",
+                        regNo: "",
+                        status: "Active & Verified Service",
+                        badge: "Accredited",
+                        badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200"
+                      }
+                    });
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add License / Accreditation</span>
+                </button>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  {
-                    title: "Sri Lanka Teachers' Service (SLTS) Class 1 Senior Educator",
-                    issuer: "Ministry of Education, Isurupaya, Battaramulla",
-                    regNo: profileData.indexNumber || "SLTS-REG/2012/4482",
-                    status: "Active & Permanent Pensionable Service · 14 Years Seniority",
-                    badge: "SLTS Class 1",
-                    badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200"
-                  },
-                  {
-                    title: "G.C.E. Advanced Level Chief Examiner & Paper Setter Accreditation",
-                    issuer: "Department of Examinations, Pelawatte, Battaramulla",
-                    regNo: "EXAM-AL/MTH-P03",
-                    status: "Supervising Examiner · Combined Mathematics Paper Evaluation Panel 03",
-                    badge: "Chief Examiner",
-                    badgeColor: "bg-blue-50 text-blue-800 border-blue-200"
-                  },
-                  {
-                    title: "National STEM Pedagogical Master Trainer & Digital Lead",
-                    issuer: "UNESCO & National Education Commission (NEC)",
-                    regNo: "STEM-LK/2021/88",
-                    status: "Accredited Master Facilitator for Advanced Collegiate Mathematics Instruction",
-                    badge: "Master Trainer",
-                    badgeColor: "bg-purple-50 text-purple-800 border-purple-200"
-                  },
-                  {
-                    title: "Provincial Teaching Excellence & Mentorship Award (2023)",
-                    issuer: "Western Provincial Department of Education",
-                    regNo: "WP-EDU/AWARD/2023",
-                    status: "Awarded for 98% Distinction Rate in A/L Combined Mathematics Examination",
-                    badge: "Provincial Award",
-                    badgeColor: "bg-amber-50 text-amber-800 border-amber-200"
-                  }
-                ].map((lic, idx) => (
+                {accreditationsList.map((lic, idx) => (
                   <div
-                    key={idx}
-                    className="p-5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs hover:shadow-xs transition-shadow space-y-2.5"
+                    key={lic.id || idx}
+                    className="p-5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs hover:shadow-xs transition-all space-y-3 hover:border-[#0d5c4d] group"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${lic.badgeColor}`}>
+                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${lic.badgeColor || "bg-emerald-50 text-emerald-800 border-emerald-200"}`}>
                           {lic.badge}
                         </span>
                         <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1.5 leading-snug">{lic.title}</h5>
                       </div>
-                      <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 shrink-0">
-                        {lic.regNo}
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {lic.regNo && (
+                          <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                            {lic.regNo}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAccreditationModalState({
+                              isOpen: true,
+                              mode: "edit",
+                              index: idx,
+                              data: { ...lic }
+                            });
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-[#0d5c4d] hover:bg-slate-50 transition-colors cursor-pointer"
+                          title="Edit Accreditation"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteAccreditation(idx)}
+                          className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                          title="Delete Accreditation"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <p className="text-xs text-slate-500 font-medium">{lic.issuer}</p>
@@ -2060,6 +2613,14 @@ export function ProfileView() {
                     </div>
                   </div>
                 ))}
+
+                {accreditationsList.length === 0 && (
+                  <div className="md:col-span-2 p-8 text-center rounded-2xl border border-dashed border-slate-300 space-y-2">
+                    <ShieldCheck className="h-8 w-8 text-slate-400 mx-auto" />
+                    <p className="text-xs font-bold text-slate-600">No accreditations or licenses added yet.</p>
+                    <p className="text-[11px] text-slate-400">Click &quot;Add License / Accreditation&quot; above to list teaching licenses and examiner appointments.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -2079,15 +2640,32 @@ export function ProfileView() {
                   <span>Tuition Revenue Payout &amp; Direct Deposit Settings</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Register your Sri Lankan bank account for monthly electronic direct deposit of tuition subscription earnings.
+                  Register and manage your Sri Lankan commercial bank accounts for automatic monthly tuition disbursements.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>Direct Deposit Protocol Active</span>
-                </span>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setBankModalState({
+                    isOpen: true,
+                    mode: "add",
+                    data: {
+                      id: "",
+                      bankName: "Commercial Bank of Ceylon",
+                      bankAccountName: profileData.fullName || "Samantha Priyantha Perera",
+                      bankAccountNumber: "",
+                      bankBranch: "",
+                      bankBranchCode: "",
+                      isPrimary: bankAccountsList.length === 0
+                    }
+                  });
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Bank Account</span>
+              </button>
             </div>
 
             {/* Payout Terms & Rate Card */}
@@ -2099,7 +2677,7 @@ export function ProfileView() {
                 <div>
                   <h4 className="font-extrabold text-sm text-[#0d2b26]">90% Guaranteed Tutor Payout Share</h4>
                   <p className="text-xs text-slate-600 mt-0.5">
-                    Monthly student tuition subscriptions are directly disbursed on the 1st of every calendar month.
+                    Monthly student tuition subscriptions are directly disbursed to your primary bank account on the 1st of every calendar month.
                   </p>
                 </div>
               </div>
@@ -2109,110 +2687,107 @@ export function ProfileView() {
               </div>
             </div>
 
-            {/* Bank Form */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Bank Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Commercial Bank Name</label>
-                {isEditing ? (
-                  <select
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
+            {/* Bank Accounts List */}
+            <div className="space-y-3">
+              <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-[#0d5c4d]" />
+                <span>Registered Direct Deposit Accounts ({bankAccountsList.length})</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {bankAccountsList.map((account, idx) => (
+                  <div
+                    key={account.id || idx}
+                    className={`p-5 rounded-2xl border transition-all space-y-3 shadow-2xs group ${
+                      account.isPrimary
+                        ? "bg-gradient-to-br from-white to-[#f7fcf9] border-[#0d5c4d] ring-1 ring-[#0d5c4d]/20"
+                        : "bg-white border-[#e2eae5] hover:border-slate-400"
+                    }`}
                   >
-                    <option value="Commercial Bank of Ceylon">Commercial Bank of Ceylon</option>
-                    <option value="Bank of Ceylon (BOC)">Bank of Ceylon (BOC)</option>
-                    <option value="People's Bank">People&apos;s Bank</option>
-                    <option value="Hatton National Bank (HNB)">Hatton National Bank (HNB)</option>
-                    <option value="Sampath Bank">Sampath Bank</option>
-                    <option value="Seylan Bank">Seylan Bank</option>
-                    <option value="Nations Trust Bank (NTB)">Nations Trust Bank (NTB)</option>
-                    <option value="DFCC Bank">DFCC Bank</option>
-                    <option value="National Development Bank (NDB)">National Development Bank (NDB)</option>
-                    <option value="Pan Asia Bank">Pan Asia Bank</option>
-                    <option value="Union Bank of Colombo">Union Bank of Colombo</option>
-                  </select>
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {bankName}
-                  </p>
-                )}
-              </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-[#0d5c4d]" />
+                          <h5 className="font-extrabold text-sm text-[#0d2b26]">{account.bankName}</h5>
+                        </div>
+                        {account.isPrimary ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold">
+                            <Check className="h-3 w-3 text-emerald-600" />
+                            <span>Primary Payout Account</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setPrimaryBankAccount(idx)}
+                            className="text-[10px] font-bold text-slate-500 hover:text-[#0d5c4d] bg-slate-100 hover:bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                          >
+                            Set as Primary
+                          </button>
+                        )}
+                      </div>
 
-              {/* Account Holder Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Bank Account Holder Legal Name</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={bankAccountName}
-                    onChange={(e) => setBankAccountName(e.target.value)}
-                    placeholder="Matches National Identity Card"
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {bankAccountName}
-                  </p>
-                )}
-              </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBankModalState({
+                              isOpen: true,
+                              mode: "edit",
+                              index: idx,
+                              data: { ...account }
+                            });
+                          }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-[#0d5c4d] hover:bg-slate-50 transition-colors cursor-pointer"
+                          title="Edit Bank Account"
+                        >
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteBankAccount(idx)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                          title="Delete Bank Account"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
 
-              {/* Account Number */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Account Number</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={bankAccountNumber}
-                    onChange={(e) => setBankAccountNumber(e.target.value)}
-                    placeholder="e.g. 8004561234"
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-mono font-bold text-[#0d5c4d] focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-bold text-[#0d5c4d]">
-                    <span>••••••••{bankAccountNumber.slice(-4) || "1234"}</span>
-                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      Verified
-                    </span>
+                    <div className="space-y-1.5 pt-1 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Account Holder Legal Name</span>
+                        <p className="font-semibold text-slate-800">{account.bankAccountName || "N/A"}</p>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block font-sans font-bold">Account Number</span>
+                          <span className="font-bold text-[#0d5c4d] text-xs">
+                            ••••••••{account.bankAccountNumber.slice(-4) || "1234"}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-sans">
+                          Verified
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                        <span>Branch: <strong className="text-slate-700">{account.bankBranch || "Main"}</strong></span>
+                        {account.bankBranchCode && (
+                          <span>Code: <strong className="font-mono text-slate-700">{account.bankBranchCode}</strong></span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {bankAccountsList.length === 0 && (
+                  <div className="md:col-span-2 p-8 text-center rounded-2xl border border-dashed border-slate-300 space-y-2">
+                    <CreditCard className="h-8 w-8 text-slate-400 mx-auto" />
+                    <p className="text-xs font-bold text-slate-600">No bank accounts registered.</p>
+                    <p className="text-[11px] text-slate-400">Click &quot;Add Bank Account&quot; to link your direct deposit account for tuition income.</p>
                   </div>
                 )}
-              </div>
-
-              {/* Branch Name & Code */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Branch Name</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={bankBranch}
-                      onChange={(e) => setBankBranch(e.target.value)}
-                      placeholder="e.g. Havelock Town"
-                      className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                    />
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                      {bankBranch}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Branch Code</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={bankBranchCode}
-                      onChange={(e) => setBankBranchCode(e.target.value)}
-                      placeholder="e.g. 042"
-                      className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:border-[#0d5c4d]"
-                    />
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-semibold text-slate-900">
-                      {bankBranchCode}
-                    </p>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -2258,17 +2833,51 @@ export function ProfileView() {
 
             {/* Public URL Slug Card */}
             <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-2">
-              <label className="text-xs font-bold text-slate-700">Custom Shareable Tutor URL Slug</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">Custom Shareable Tutor URL Slug</label>
+                {!isEditingSlug ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSlugEditValue(publicSlug);
+                      setIsEditingSlug(true);
+                    }}
+                    className="flex items-center gap-1 text-xs font-bold text-[#0d5c4d] hover:underline cursor-pointer"
+                  >
+                    <Edit3 className="h-3 w-3" />
+                    <span>Edit Slug</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingSlug(false)}
+                      className="text-xs text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveSlug}
+                      className="px-2.5 py-0.5 rounded-lg bg-[#0d5c4d] text-white text-xs font-bold hover:bg-[#0a473b] cursor-pointer"
+                    >
+                      Save Slug
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <div className="flex-1 flex items-center h-10 rounded-xl border border-slate-300 bg-white overflow-hidden px-3">
                   <span className="text-xs text-slate-400 font-mono select-none">https://limat.lk/tutors/</span>
-                  {isEditing ? (
+                  {isEditingSlug ? (
                     <input
                       type="text"
-                      value={publicSlug}
-                      onChange={(e) => setPublicSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                      value={slugEditValue}
+                      onChange={(e) => setSlugEditValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
                       placeholder="prof-samantha-perera"
                       className="flex-1 text-xs font-mono font-bold text-[#0d5c4d] focus:outline-none"
+                      autoFocus
                     />
                   ) : (
                     <span className="text-xs font-mono font-bold text-[#0d5c4d]">{publicSlug}</span>
@@ -2295,149 +2904,182 @@ export function ProfileView() {
               </p>
             </div>
 
-            {/* Social Channels Inputs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* YouTube Channel */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <span className="text-red-500 font-bold">▶</span> YouTube Lecture Channel
-                </label>
-                {isEditing ? (
-                  <input
-                    type="url"
-                    value={youtubeUrl}
-                    onChange={(e) => setYoutubeUrl(e.target.value)}
-                    placeholder="https://youtube.com/@Channel"
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-medium text-slate-800">
-                    <span className="truncate max-w-xs">{youtubeUrl}</span>
-                    <a
-                      href={youtubeUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-red-600 hover:text-red-700 font-bold text-[11px] flex items-center gap-1"
-                    >
-                      <span>Visit</span>
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              {/* Telegram Channel */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <span className="text-sky-500 font-bold">✈</span> Telegram Discussion Group
-                </label>
-                {isEditing ? (
-                  <input
-                    type="url"
-                    value={telegramUrl}
-                    onChange={(e) => setTelegramUrl(e.target.value)}
-                    placeholder="https://t.me/Group"
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-medium text-slate-800">
-                    <span className="truncate max-w-xs">{telegramUrl}</span>
-                    <a
-                      href={telegramUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sky-600 hover:text-sky-700 font-bold text-[11px] flex items-center gap-1"
-                    >
-                      <span>Join</span>
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              {/* WhatsApp Hotline */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <span className="text-emerald-500 font-bold">💬</span> WhatsApp Student Admissions Hotline
-                </label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={whatsappNumber}
-                    onChange={(e) => setWhatsappNumber(e.target.value)}
-                    placeholder="+94 77 123 4567"
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-medium text-slate-800">
-                    <span>{whatsappNumber}</span>
-                    <a
-                      href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, "")}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-emerald-600 hover:text-emerald-700 font-bold text-[11px] flex items-center gap-1"
-                    >
-                      <span>Chat</span>
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              {/* Official Website */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Globe className="h-3.5 w-3.5 text-[#0d5c4d]" /> Official Academy Website
-                </label>
-                {isEditing ? (
-                  <input
-                    type="url"
-                    value={websiteUrl}
-                    onChange={(e) => setWebsiteUrl(e.target.value)}
-                    placeholder="https://tutor.lk"
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-medium text-slate-800">
-                    <span className="truncate max-w-xs">{websiteUrl}</span>
-                    <a
-                      href={websiteUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[#0d5c4d] hover:underline font-bold text-[11px] flex items-center gap-1"
-                    >
-                      <span>Visit</span>
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Studio Cover Banner Selection */}
-            <div className="space-y-2 pt-2">
-              <label className="text-xs font-bold text-slate-700">Studio Cover Banner</label>
-              <div className="relative h-28 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100">
+            <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wide">Studio Cover Banner</h4>
+                  <p className="text-[11px] text-slate-500">Custom branded cover banner displayed at the top of your student studio.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCoverModalState({ isOpen: true, url: coverImageUrl });
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0d5c4d] text-white hover:bg-[#0a473b] text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <Camera className="h-3.5 w-3.5" />
+                    <span>Change Banner</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetCoverImage}
+                    className="px-2.5 py-1.5 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer"
+                    title="Reset to default banner"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              <div className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-inner">
                 <img
                   src={coverImageUrl}
                   alt="Studio Cover"
                   className="h-full w-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent flex items-end p-3 text-white text-xs font-bold">
-                  <span>Current Banner Preview</span>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex items-end justify-between p-4 text-white">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-amber-300">Live Studio Banner</span>
+                    <h5 className="font-black text-sm">{profileData.fullName}</h5>
+                  </div>
+                  <span className="text-[10px] font-mono bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-md">
+                    1200 x 400
+                  </span>
                 </div>
               </div>
-              {isEditing && (
-                <div className="pt-2">
-                  <input
-                    type="url"
-                    value={coverImageUrl}
-                    onChange={(e) => setCoverImageUrl(e.target.value)}
-                    placeholder="Paste banner image URL"
-                    className="w-full h-9 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
+            </div>
+
+            {/* Connected Social & Community Channels */}
+            <div className="space-y-4 pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
+                    <Share2 className="h-4 w-4 text-[#0d5c4d]" />
+                    <span>Connected Social &amp; Community Channels ({socialChannelsList.length})</span>
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Connect your YouTube, Telegram, WhatsApp, TikTok, and other platforms so students can follow your lectures.
+                  </p>
                 </div>
-              )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSocialModalState({
+                      isOpen: true,
+                      mode: "add",
+                      data: {
+                        id: "",
+                        platform: "youtube",
+                        title: "",
+                        url: ""
+                      }
+                    });
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add Social Channel</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {socialChannelsList.map((channel, idx) => {
+                  const plat = channel.platform.toLowerCase();
+                  let badgeBg = "bg-slate-100 text-slate-800 border-slate-200";
+                  let icon = "🌐";
+
+                  if (plat === "youtube") {
+                    badgeBg = "bg-red-50 text-red-700 border-red-200";
+                    icon = "▶";
+                  } else if (plat === "telegram") {
+                    badgeBg = "bg-sky-50 text-sky-700 border-sky-200";
+                    icon = "✈";
+                  } else if (plat === "whatsapp") {
+                    badgeBg = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                    icon = "💬";
+                  } else if (plat === "tiktok") {
+                    badgeBg = "bg-slate-900 text-white border-slate-800";
+                    icon = "🎵";
+                  } else if (plat === "facebook") {
+                    badgeBg = "bg-blue-50 text-blue-700 border-blue-200";
+                    icon = "f";
+                  } else if (plat === "linkedin") {
+                    badgeBg = "bg-indigo-50 text-indigo-700 border-indigo-200";
+                    icon = "in";
+                  }
+
+                  const targetUrl = plat === "whatsapp" && !channel.url.startsWith("http")
+                    ? `https://wa.me/${channel.url.replace(/[^0-9]/g, "")}`
+                    : channel.url;
+
+                  return (
+                    <div
+                      key={channel.id || idx}
+                      className="p-4 rounded-2xl bg-white border border-[#e2eae5] shadow-2xs hover:shadow-xs hover:border-[#0d5c4d] transition-all space-y-3 group"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded-lg text-xs font-bold border flex items-center gap-1 ${badgeBg}`}>
+                            <span>{icon}</span>
+                            <span className="capitalize">{channel.platform}</span>
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <a
+                            href={targetUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] transition-colors cursor-pointer"
+                            title="Visit Channel"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSocialModalState({
+                                isOpen: true,
+                                mode: "edit",
+                                index: idx,
+                                data: { ...channel }
+                              });
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-[#0d5c4d] hover:bg-slate-50 transition-colors cursor-pointer"
+                            title="Edit Channel"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteSocialChannel(idx)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Delete Channel"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <h5 className="font-extrabold text-xs text-[#0d2b26]">{channel.title}</h5>
+                        <p className="text-[11px] text-slate-500 font-mono truncate">{channel.url}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {socialChannelsList.length === 0 && (
+                  <div className="sm:col-span-2 p-8 text-center rounded-2xl border border-dashed border-slate-300 space-y-2">
+                    <Share2 className="h-8 w-8 text-slate-400 mx-auto" />
+                    <p className="text-xs font-bold text-slate-600">No social channels connected yet.</p>
+                    <p className="text-[11px] text-slate-400">Click &quot;Add Social Channel&quot; to connect YouTube, Telegram, or WhatsApp.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -3417,6 +4059,651 @@ export function ProfileView() {
               >
                 Back to Studio Editor
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* 1. DEGREE / QUALIFICATION MODAL (Add & Edit)                         */}
+      {/* =================================================================== */}
+      {degreeModalState.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center font-bold">
+                  <GraduationCap className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[#0d2b26]">
+                    {degreeModalState.mode === "add" ? "Add Higher Education Degree" : "Edit Degree & Qualification"}
+                  </h3>
+                  <p className="text-xs text-slate-500">Degree or pedagogical diploma credential details.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDegreeModalState({ ...degreeModalState, isOpen: false })}
+                className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveDegree(degreeModalState.data);
+              }}
+              className="px-6 space-y-4"
+            >
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Degree / Diploma Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={degreeModalState.data.degree}
+                  onChange={(e) => setDegreeModalState({
+                    ...degreeModalState,
+                    data: { ...degreeModalState.data, degree: e.target.value }
+                  })}
+                  placeholder="e.g. Bachelor of Science (B.Sc. Special) in Mathematics"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0d2b26] focus:outline-none focus:border-[#0d5c4d]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Awarding University / Institute *</label>
+                <input
+                  type="text"
+                  required
+                  value={degreeModalState.data.institution}
+                  onChange={(e) => setDegreeModalState({
+                    ...degreeModalState,
+                    data: { ...degreeModalState.data, institution: e.target.value }
+                  })}
+                  placeholder="e.g. University of Colombo, Sri Lanka"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Year Awarded *</label>
+                  <input
+                    type="text"
+                    required
+                    value={degreeModalState.data.year}
+                    onChange={(e) => setDegreeModalState({
+                      ...degreeModalState,
+                      data: { ...degreeModalState.data, year: e.target.value }
+                    })}
+                    placeholder="e.g. 2012"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Honors / Class Classification</label>
+                  <input
+                    type="text"
+                    value={degreeModalState.data.honors || ""}
+                    onChange={(e) => setDegreeModalState({
+                      ...degreeModalState,
+                      data: { ...degreeModalState.data, honors: e.target.value }
+                    })}
+                    placeholder="e.g. First Class Honours"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Specialization Focus &amp; Curriculum</label>
+                <textarea
+                  rows={3}
+                  value={degreeModalState.data.details || ""}
+                  onChange={(e) => setDegreeModalState({
+                    ...degreeModalState,
+                    data: { ...degreeModalState.data, details: e.target.value }
+                  })}
+                  placeholder="e.g. Pure Mathematics, Complex Analysis, Linear Algebra and Mathematical Modeling."
+                  className="w-full p-3 rounded-xl border border-slate-300 text-xs leading-relaxed focus:outline-none focus:border-[#0d5c4d]"
+                />
+              </div>
+
+              <div className="pt-3 pb-6 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setDegreeModalState({ ...degreeModalState, isOpen: false })}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs transition-colors shadow-xs cursor-pointer"
+                >
+                  {degreeModalState.mode === "add" ? "Add Qualification" : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* 2. ACCREDITATION / LICENSE MODAL (Add & Edit)                        */}
+      {/* =================================================================== */}
+      {accreditationModalState.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[#0d2b26]">
+                    {accreditationModalState.mode === "add" ? "Add License / Accreditation" : "Edit Accreditation"}
+                  </h3>
+                  <p className="text-xs text-slate-500">Government, examination board or council accreditation.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAccreditationModalState({ ...accreditationModalState, isOpen: false })}
+                className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveAccreditation(accreditationModalState.data);
+              }}
+              className="px-6 space-y-4"
+            >
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Licensing / Credential Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={accreditationModalState.data.title}
+                  onChange={(e) => setAccreditationModalState({
+                    ...accreditationModalState,
+                    data: { ...accreditationModalState.data, title: e.target.value }
+                  })}
+                  placeholder="e.g. Sri Lanka Teachers' Service (SLTS) Class 1 Senior Educator"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0d2b26] focus:outline-none focus:border-[#0d5c4d]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Issuing Ministry or Authority *</label>
+                <input
+                  type="text"
+                  required
+                  value={accreditationModalState.data.issuer}
+                  onChange={(e) => setAccreditationModalState({
+                    ...accreditationModalState,
+                    data: { ...accreditationModalState.data, issuer: e.target.value }
+                  })}
+                  placeholder="e.g. Ministry of Education, Pelawatte, Battaramulla"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Registration / Reference No *</label>
+                  <input
+                    type="text"
+                    required
+                    value={accreditationModalState.data.regNo}
+                    onChange={(e) => setAccreditationModalState({
+                      ...accreditationModalState,
+                      data: { ...accreditationModalState.data, regNo: e.target.value }
+                    })}
+                    placeholder="e.g. SLTS-REG/2012/4482"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Badge Classification</label>
+                  <select
+                    value={accreditationModalState.data.badge}
+                    onChange={(e) => {
+                      const badge = e.target.value;
+                      let badgeColor = "bg-emerald-50 text-emerald-800 border-emerald-200";
+                      if (badge.includes("Examiner")) badgeColor = "bg-blue-50 text-blue-800 border-blue-200";
+                      else if (badge.includes("Trainer")) badgeColor = "bg-purple-50 text-purple-800 border-purple-200";
+                      else if (badge.includes("Award")) badgeColor = "bg-amber-50 text-amber-800 border-amber-200";
+                      setAccreditationModalState({
+                        ...accreditationModalState,
+                        data: { ...accreditationModalState.data, badge, badgeColor }
+                      });
+                    }}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-bold"
+                  >
+                    <option value="SLTS Class 1">SLTS Class 1</option>
+                    <option value="Chief Examiner">Chief Examiner</option>
+                    <option value="Master Trainer">Master Trainer</option>
+                    <option value="Provincial Award">Provincial Award</option>
+                    <option value="Accredited Educator">Accredited Educator</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Service Status &amp; Scope</label>
+                <input
+                  type="text"
+                  value={accreditationModalState.data.status}
+                  onChange={(e) => setAccreditationModalState({
+                    ...accreditationModalState,
+                    data: { ...accreditationModalState.data, status: e.target.value }
+                  })}
+                  placeholder="e.g. Active & Permanent Pensionable Service · 14 Years Seniority"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                />
+              </div>
+
+              <div className="pt-3 pb-6 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setAccreditationModalState({ ...accreditationModalState, isOpen: false })}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs transition-colors shadow-xs cursor-pointer"
+                >
+                  {accreditationModalState.mode === "add" ? "Register Accreditation" : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* 3. BANK ACCOUNT MODAL (Add & Edit)                                  */}
+      {/* =================================================================== */}
+      {bankModalState.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[#0d2b26]">
+                    {bankModalState.mode === "add" ? "Add Direct Deposit Account" : "Edit Payout Bank Details"}
+                  </h3>
+                  <p className="text-xs text-slate-500">Sri Lankan commercial bank for monthly subscription transfers.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBankModalState({ ...bankModalState, isOpen: false })}
+                className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveBankAccount(bankModalState.data);
+              }}
+              className="px-6 space-y-4"
+            >
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Commercial Bank Name *</label>
+                <select
+                  value={bankModalState.data.bankName}
+                  onChange={(e) => setBankModalState({
+                    ...bankModalState,
+                    data: { ...bankModalState.data, bankName: e.target.value }
+                  })}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d] bg-white"
+                >
+                  <option value="Commercial Bank of Ceylon">Commercial Bank of Ceylon</option>
+                  <option value="Bank of Ceylon (BOC)">Bank of Ceylon (BOC)</option>
+                  <option value="People's Bank">People&apos;s Bank</option>
+                  <option value="Hatton National Bank (HNB)">Hatton National Bank (HNB)</option>
+                  <option value="Sampath Bank">Sampath Bank</option>
+                  <option value="Seylan Bank">Seylan Bank</option>
+                  <option value="Nations Trust Bank (NTB)">Nations Trust Bank (NTB)</option>
+                  <option value="DFCC Bank">DFCC Bank</option>
+                  <option value="National Development Bank (NDB)">National Development Bank (NDB)</option>
+                  <option value="Pan Asia Bank">Pan Asia Bank</option>
+                  <option value="Union Bank of Colombo">Union Bank of Colombo</option>
+                  <option value="Standard Chartered Sri Lanka">Standard Chartered Sri Lanka</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Account Holder Legal Name (Matches NIC) *</label>
+                <input
+                  type="text"
+                  required
+                  value={bankModalState.data.bankAccountName}
+                  onChange={(e) => setBankModalState({
+                    ...bankModalState,
+                    data: { ...bankModalState.data, bankAccountName: e.target.value }
+                  })}
+                  placeholder="e.g. Samantha Priyantha Perera"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0d2b26] focus:outline-none focus:border-[#0d5c4d]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Account Number *</label>
+                <input
+                  type="text"
+                  required
+                  value={bankModalState.data.bankAccountNumber}
+                  onChange={(e) => setBankModalState({
+                    ...bankModalState,
+                    data: { ...bankModalState.data, bankAccountNumber: e.target.value }
+                  })}
+                  placeholder="e.g. 8004561234"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-mono font-bold text-[#0d5c4d] focus:outline-none focus:border-[#0d5c4d]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Branch Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={bankModalState.data.bankBranch}
+                    onChange={(e) => setBankModalState({
+                      ...bankModalState,
+                      data: { ...bankModalState.data, bankBranch: e.target.value }
+                    })}
+                    placeholder="e.g. Havelock Town"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Branch Code</label>
+                  <input
+                    type="text"
+                    value={bankModalState.data.bankBranchCode || ""}
+                    onChange={(e) => setBankModalState({
+                      ...bankModalState,
+                      data: { ...bankModalState.data, bankBranchCode: e.target.value }
+                    })}
+                    placeholder="e.g. 042"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-1">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={bankModalState.data.isPrimary}
+                    onChange={(e) => setBankModalState({
+                      ...bankModalState,
+                      data: { ...bankModalState.data, isPrimary: e.target.checked }
+                    })}
+                    className="h-4 w-4 rounded-md border-slate-300 text-[#0d5c4d] focus:ring-[#0d5c4d]"
+                  />
+                  <span>Set as primary direct deposit account for tuition subscriptions</span>
+                </label>
+              </div>
+
+              <div className="pt-3 pb-6 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setBankModalState({ ...bankModalState, isOpen: false })}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs transition-colors shadow-xs cursor-pointer"
+                >
+                  {bankModalState.mode === "add" ? "Register Bank Account" : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* 4. SOCIAL CHANNEL MODAL (Add & Edit)                                 */}
+      {/* =================================================================== */}
+      {socialModalState.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+                  <Share2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[#0d2b26]">
+                    {socialModalState.mode === "add" ? "Connect Social Channel" : "Edit Social Channel"}
+                  </h3>
+                  <p className="text-xs text-slate-500">Provide direct links for students to follow your content.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSocialModalState({ ...socialModalState, isOpen: false })}
+                className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveSocialChannel(socialModalState.data);
+              }}
+              className="px-6 space-y-4"
+            >
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Platform *</label>
+                <select
+                  value={socialModalState.data.platform}
+                  onChange={(e) => {
+                    const platform = e.target.value;
+                    let title = socialModalState.data.title;
+                    if (!title) {
+                      if (platform === "youtube") title = "YouTube Lecture Channel";
+                      else if (platform === "telegram") title = "Telegram Discussion Group";
+                      else if (platform === "whatsapp") title = "WhatsApp Helpline";
+                      else if (platform === "tiktok") title = "TikTok Educational Clips";
+                      else if (platform === "facebook") title = "Official Facebook Page";
+                      else if (platform === "linkedin") title = "Professional Profile";
+                    }
+                    setSocialModalState({
+                      ...socialModalState,
+                      data: { ...socialModalState.data, platform, title }
+                    });
+                  }}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d] bg-white"
+                >
+                  <option value="youtube">YouTube</option>
+                  <option value="telegram">Telegram</option>
+                  <option value="whatsapp">WhatsApp Hotline</option>
+                  <option value="tiktok">TikTok</option>
+                  <option value="facebook">Facebook</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="discord">Discord</option>
+                  <option value="website">Custom Website</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Display Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={socialModalState.data.title}
+                  onChange={(e) => setSocialModalState({
+                    ...socialModalState,
+                    data: { ...socialModalState.data, title: e.target.value }
+                  })}
+                  placeholder="e.g. Combined Mathematics 2026 YouTube"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0d2b26] focus:outline-none focus:border-[#0d5c4d]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">
+                  {socialModalState.data.platform === "whatsapp" ? "WhatsApp Number (with country code) *" : "Channel or Profile URL *"}
+                </label>
+                <input
+                  type={socialModalState.data.platform === "whatsapp" ? "text" : "url"}
+                  required
+                  value={socialModalState.data.url}
+                  onChange={(e) => setSocialModalState({
+                    ...socialModalState,
+                    data: { ...socialModalState.data, url: e.target.value }
+                  })}
+                  placeholder={
+                    socialModalState.data.platform === "whatsapp"
+                      ? "+94 77 123 4567"
+                      : "https://youtube.com/@Channel"
+                  }
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:border-[#0d5c4d]"
+                />
+              </div>
+
+              <div className="pt-3 pb-6 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setSocialModalState({ ...socialModalState, isOpen: false })}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs transition-colors shadow-xs cursor-pointer"
+                >
+                  {socialModalState.mode === "add" ? "Connect Channel" : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* 5. COVER BANNER MODAL (Presets & Custom URL)                         */}
+      {/* =================================================================== */}
+      {coverModalState.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center font-bold">
+                  <Camera className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[#0d2b26]">Change Studio Cover Banner</h3>
+                  <p className="text-xs text-slate-500">Select a curated theme preset or paste a custom banner image link.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCoverModalState({ ...coverModalState, isOpen: false })}
+                className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="px-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700">Curated Educational Presets</label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {[
+                    {
+                      title: "Digital Tech Studio",
+                      url: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80"
+                    },
+                    {
+                      title: "University Hall",
+                      url: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1200&auto=format&fit=crop&q=80"
+                    },
+                    {
+                      title: "Mathematics Chalkboard",
+                      url: "https://images.unsplash.com/photo-1596495578065-6e0763fa1178?w=1200&auto=format&fit=crop&q=80"
+                    },
+                    {
+                      title: "Emerald Studio Abstract",
+                      url: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=1200&auto=format&fit=crop&q=80"
+                    }
+                  ].map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setCoverModalState({ ...coverModalState, url: preset.url })}
+                      className={`relative h-20 rounded-xl overflow-hidden border-2 text-left transition-all cursor-pointer group ${
+                        coverModalState.url === preset.url ? "border-[#0d5c4d] ring-2 ring-[#0d5c4d]/20" : "border-slate-200 hover:border-slate-400"
+                      }`}
+                    >
+                      <img src={preset.url} alt={preset.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                      <div className="absolute inset-0 bg-black/40 flex items-end p-2 text-white text-[11px] font-bold">
+                        <span>{preset.title}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Or Paste Custom Image URL</label>
+                <input
+                  type="url"
+                  value={coverModalState.url}
+                  onChange={(e) => setCoverModalState({ ...coverModalState, url: e.target.value })}
+                  placeholder="https://images.unsplash.com/..."
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                />
+              </div>
+
+              <div className="pt-3 pb-6 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setCoverModalState({ ...coverModalState, isOpen: false })}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveCoverImage(coverModalState.url)}
+                  disabled={!coverModalState.url}
+                  className="px-5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  Apply Cover Banner
+                </button>
+              </div>
             </div>
           </div>
         </div>
