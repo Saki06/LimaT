@@ -591,6 +591,37 @@ export const api = {
     },
   },
 
+  // Teacher Studio Profile & Payout APIs
+  teachers: {
+    async getMyProfile() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/teachers/me`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async updateMyProfile(data: any) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/teachers/me`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async getPublicProfile(slugOrId: string) {
+      const res = await fetch(`${API_BASE_URL}/teachers/public/${slugOrId}`);
+      return res.json();
+    },
+  },
+
   // Token and Local Storage Helpers
   token: {
     get(): string | null {

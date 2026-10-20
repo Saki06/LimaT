@@ -630,3 +630,56 @@ export interface HubAuditEntry {
   reason?: string;
   createdAt: string;
 }
+
+export interface TeacherQualification {
+  degree: string;
+  institution: string;
+  year: string;
+  grade?: string;
+}
+
+export interface TeacherProfileData {
+  id: string;
+  userId: string;
+  employeeNo: string;
+  specialization: string;
+  title?: string;
+  bio?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  district?: string;
+  province?: string;
+  postalCode?: string;
+  sltsRegNo?: string;
+  mediums: string[];
+  experienceYears: number;
+  qualifications: TeacherQualification[];
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
+  bankBranch?: string;
+  bankBranchCode?: string;
+  publicSlug?: string;
+  youtubeUrl?: string;
+  telegramUrl?: string;
+  whatsappNumber?: string;
+  websiteUrl?: string;
+  coverImageUrl?: string;
+  rating?: number;
+  isVerified?: boolean;
+  user?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl?: string;
+  };
+  stats?: {
+    totalSubscribers: number;
+    monthlyGrossRevenue: number;
+    totalPackages: number;
+    totalCourses: number;
+    totalResources: number;
+  };
+}

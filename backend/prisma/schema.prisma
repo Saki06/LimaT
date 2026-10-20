@@ -152,18 +152,43 @@ model StudentProfile {
 }
 
 model TeacherProfile {
-  id            String       @id @default(uuid())
-  userId        String       @unique
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  employeeNo    String       @unique
-  specialization String
-  courses       Course[]
-  packages      Package[]
-  liveClasses   LiveClassSession[]
-  assignments   Assignment[]
-  libraryResources LibraryResource[]
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id                String            @id @default(uuid())
+  userId            String            @unique
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeNo        String            @unique
+  specialization    String
+  title             String?
+  bio               String?
+  phone             String?
+  address           String?
+  city              String?
+  district          String?
+  province          String?
+  postalCode        String?
+  sltsRegNo         String?
+  mediums           String[]          @default([])
+  experienceYears   Int?              @default(0)
+  qualifications    Json?             @default("[]")
+  bankName          String?
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankBranch        String?
+  bankBranchCode    String?
+  publicSlug        String?           @unique
+  youtubeUrl        String?
+  telegramUrl       String?
+  whatsappNumber    String?
+  websiteUrl        String?
+  coverImageUrl     String?
+  rating            Float?            @default(4.9)
+  isVerified        Boolean           @default(true)
+  courses           Course[]
+  packages          Package[]
+  liveClasses       LiveClassSession[]
+  assignments       Assignment[]
+  libraryResources  LibraryResource[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 }
 
 model ParentProfile {

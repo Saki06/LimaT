@@ -39,7 +39,17 @@ import {
   TrendingUp,
   BarChart3,
   Flame,
-  Target
+  Target,
+  Globe,
+  Share2,
+  Sparkles,
+  Send,
+  Eye,
+  X,
+  Lock,
+  Plus,
+  Trash2,
+  HelpCircle
 } from "lucide-react";
 import { initialExams, initialExamTermResult } from "@/data/mockData";
 
@@ -52,10 +62,21 @@ type ProfileTab =
   | "teaching"
   | "qualifications"
   | "schedule"
-  | "responsibilities";
+  | "responsibilities"
+  | "payout"
+  | "social";
 
 export function ProfileView() {
-  const { currentUser, currentRole, setCurrentView, addToast, courses, setSelectedCourseId } = useApp();
+  const {
+    currentUser,
+    currentRole,
+    setCurrentView,
+    addToast,
+    courses,
+    setSelectedCourseId,
+    teacherProfile,
+    updateTeacherProfile
+  } = useApp();
 
   const [activeTab, setActiveTab] = useState<ProfileTab>("personal");
   const [isEditing, setIsEditing] = useState(false);
@@ -85,38 +106,42 @@ export function ProfileView() {
   // Editable Profile State based on role
   const defaultProfile = useMemo(() => {
     if (currentRole === "teacher") {
+      const userFirstName = teacherProfile?.user?.firstName || currentUser.name?.split(" ")[0] || "Samantha";
+      const userLastName = teacherProfile?.user?.lastName || currentUser.name?.split(" ").slice(1).join(" ") || "Perera";
+      const userFullName = `${userFirstName} ${userLastName}`.trim();
+
       return {
         name: currentUser.name || "Mr. Samantha Perera",
-        fullName: "Samantha Priyantha Perera",
-        preferredName: "Samantha",
-        studentId: "TCH-2026-0042",
-        indexNumber: "SLTS-REG/2012/4482",
-        email: currentUser.email || "samantha.p@school.lk",
-        phone: "+94 77 456 7890",
+        fullName: userFullName || "Samantha Priyantha Perera",
+        preferredName: userFirstName || "Samantha",
+        studentId: teacherProfile?.employeeNo || "TCH-2026-0042",
+        indexNumber: teacherProfile?.sltsRegNo || "SLTS-REG/2012/4482",
+        email: teacherProfile?.user?.email || currentUser.email || "samantha.p@school.lk",
+        phone: teacherProfile?.phone || "+94 77 456 7890",
         altPhone: "+94 11 234 5678",
         dob: "1984-06-18",
         gender: "Male",
         bloodGroup: "B+",
-        medium: "English, Sinhala & Tamil",
-        address: "No. 18, Havelock Road, Havelock Town",
-        city: "Colombo 05",
-        district: "Colombo",
-        province: "Western Province",
-        postalCode: "00500",
-        bio: "Lead Specialist Educator & Department Chair for Combined Mathematics (A/L). 14 years of teaching excellence preparing students for G.C.E. Advanced Level with distinction.",
+        medium: (teacherProfile?.mediums && teacherProfile.mediums.length > 0) ? teacherProfile.mediums.join(", ") : "English, Sinhala & Tamil",
+        address: teacherProfile?.address || "No. 18, Havelock Road, Havelock Town",
+        city: teacherProfile?.city || "Colombo 05",
+        district: teacherProfile?.district || "Colombo",
+        province: teacherProfile?.province || "Western Province",
+        postalCode: teacherProfile?.postalCode || "00500",
+        bio: teacherProfile?.bio || "Lead Specialist Educator & Department Chair for Combined Mathematics (A/L). 14 years of teaching excellence preparing students for G.C.E. Advanced Level with distinction.",
         schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
         schoolCode: "LMT-COLOMBO",
         gradeLevel: "Faculty",
-        grade: "A/L Faculty (Grade 12 & 13)",
+        grade: teacherProfile?.title || "A/L Faculty (Grade 12 & 13)",
         classRoom: "Advanced Level Mathematics Faculty",
-        stream: "Combined Mathematics & Pure Sciences",
+        stream: teacherProfile?.specialization || "Combined Mathematics & Pure Sciences",
         examYear: "2026",
         academicYear: "Faculty Member (2012 - Present)",
         house: "Lions Sports Academy Mentor",
         classTeacher: "Head of Faculty (Mathematics)",
         admittedDate: "September 2012",
         attendanceRate: "99.1%",
-        gpa: "Faculty Rating 4.9/5.0",
+        gpa: `Faculty Rating ${teacherProfile?.rating ?? 4.9}/5.0`,
         guardianName: "Mrs. Malini Perera",
         guardianRelationship: "Spouse (Next of Kin)",
         guardianPhone: "+94 77 987 6543",
@@ -272,11 +297,80 @@ export function ProfileView() {
   }, [currentRole, currentUser]);
 
   const [profileData, setProfileData] = useState(defaultProfile);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [showPublicPreview, setShowPublicPreview] = useState(false);
+
+  // Bank & Payout Details (Teacher)
+  const [bankName, setBankName] = useState("Commercial Bank of Ceylon");
+  const [bankAccountName, setBankAccountName] = useState("Samantha Priyantha Perera");
+  const [bankAccountNumber, setBankAccountNumber] = useState("8004561234");
+  const [bankBranch, setBankBranch] = useState("Havelock Town");
+  const [bankBranchCode, setBankBranchCode] = useState("042");
+
+  // Public Studio & Social Ecosystem (Teacher)
+  const [publicSlug, setPublicSlug] = useState("prof-samantha-perera");
+  const [youtubeUrl, setYoutubeUrl] = useState("https://youtube.com/@SamanthaPereraMaths");
+  const [telegramUrl, setTelegramUrl] = useState("https://t.me/CombinedMaths2026LK");
+  const [whatsappNumber, setWhatsappNumber] = useState("+94774567890");
+  const [websiteUrl, setWebsiteUrl] = useState("https://samanthamaths.lk");
+  const [coverImageUrl, setCoverImageUrl] = useState("https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80");
+
+  // Qualifications & Accreditations (Teacher)
+  const [qualificationsList, setQualificationsList] = useState<Array<{ degree: string; institution: string; year: string; honors: string; details: string }>>([
+    {
+      degree: "Bachelor of Science (B.Sc. Special) in Mathematics",
+      institution: "University of Colombo, Sri Lanka",
+      honors: "First Class Honours (GPA: 3.92 / 4.0)",
+      year: "2008",
+      details: "Pure Mathematics, Real Analysis, Complex Variables, Abstract Algebra & Numerical Methods."
+    },
+    {
+      degree: "Post Graduate Diploma in Education (PGDE)",
+      institution: "National Institute of Education (NIE), Maharagama",
+      honors: "Passed with Distinction",
+      year: "2014",
+      details: "Secondary & Collegiate STEM Pedagogy, Educational Psychology, Curriculum Formulation & Evaluation."
+    },
+    {
+      degree: "Master of Science (M.Sc.) in Applied Mathematics",
+      institution: "University of Peradeniya",
+      honors: "Thesis Distinction",
+      year: "2018",
+      details: "Thesis: Numerical Modeling of Partial Differential Equations & Boundary Value Simulations."
+    }
+  ]);
+
+  const [selectedMediums, setSelectedMediums] = useState<string[]>(["English", "Sinhala", "Tamil"]);
+  const [experienceYears, setExperienceYears] = useState<number>(14);
+
+  // Sync with backend teacher profile when loaded
+  useEffect(() => {
+    if (teacherProfile && currentRole === "teacher") {
+      if (teacherProfile.bankName) setBankName(teacherProfile.bankName);
+      if (teacherProfile.bankAccountName) setBankAccountName(teacherProfile.bankAccountName);
+      if (teacherProfile.bankAccountNumber) setBankAccountNumber(teacherProfile.bankAccountNumber);
+      if (teacherProfile.bankBranch) setBankBranch(teacherProfile.bankBranch);
+      if (teacherProfile.bankBranchCode) setBankBranchCode(teacherProfile.bankBranchCode);
+      if (teacherProfile.publicSlug) setPublicSlug(teacherProfile.publicSlug);
+      if (teacherProfile.youtubeUrl) setYoutubeUrl(teacherProfile.youtubeUrl);
+      if (teacherProfile.telegramUrl) setTelegramUrl(teacherProfile.telegramUrl);
+      if (teacherProfile.whatsappNumber) setWhatsappNumber(teacherProfile.whatsappNumber);
+      if (teacherProfile.websiteUrl) setWebsiteUrl(teacherProfile.websiteUrl);
+      if (teacherProfile.coverImageUrl) setCoverImageUrl(teacherProfile.coverImageUrl);
+      if (teacherProfile.experienceYears) setExperienceYears(teacherProfile.experienceYears);
+      if (Array.isArray(teacherProfile.mediums) && teacherProfile.mediums.length > 0) {
+        setSelectedMediums(teacherProfile.mediums);
+      }
+      if (Array.isArray(teacherProfile.qualifications) && teacherProfile.qualifications.length > 0) {
+        setQualificationsList(teacherProfile.qualifications as any);
+      }
+    }
+  }, [teacherProfile, currentRole]);
 
   useEffect(() => {
     setProfileData(defaultProfile);
     if (currentRole === "teacher") {
-      if (!["personal", "teaching", "schedule"].includes(activeTab)) {
+      if (!["personal", "qualifications", "payout", "social", "teaching", "schedule"].includes(activeTab)) {
         setActiveTab("personal");
       }
     } else if (currentRole === "super_admin") {
@@ -320,14 +414,49 @@ export function ProfileView() {
     });
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsEditing(false);
-    addToast({
-      type: "success",
-      title: "Profile Saved",
-      message: "Your profile information has been successfully updated!"
-    });
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    if (currentRole === "teacher") {
+      setIsSavingProfile(true);
+      const success = await updateTeacherProfile({
+        title: profileData.grade,
+        bio: profileData.bio,
+        specialization: profileData.stream,
+        phone: profileData.phone,
+        address: profileData.address,
+        city: profileData.city,
+        district: profileData.district,
+        province: profileData.province,
+        postalCode: profileData.postalCode,
+        sltsRegNo: profileData.indexNumber,
+        mediums: selectedMediums,
+        experienceYears: Number(experienceYears) || 0,
+        qualifications: qualificationsList as any,
+        bankName,
+        bankAccountName,
+        bankAccountNumber,
+        bankBranch,
+        bankBranchCode,
+        publicSlug,
+        youtubeUrl,
+        telegramUrl,
+        whatsappNumber,
+        websiteUrl,
+        coverImageUrl
+      });
+      setIsSavingProfile(false);
+      if (success) {
+        setIsEditing(false);
+      }
+    } else {
+      setIsEditing(false);
+      addToast({
+        type: "success",
+        title: "Profile Saved",
+        message: "Your profile information has been successfully updated!"
+      });
+    }
   };
 
   return (
@@ -358,9 +487,21 @@ export function ProfileView() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2.5">
+          {currentRole === "teacher" && (
+            <button
+              type="button"
+              onClick={() => setShowPublicPreview(true)}
+              className="px-3.5 py-2 rounded-xl bg-purple-50 border border-purple-200 hover:bg-purple-100 text-xs font-bold text-purple-700 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title="Preview how students and visitors view your tutor studio profile"
+            >
+              <Eye className="h-3.5 w-3.5 text-purple-600" />
+              <span className="hidden sm:inline">Preview Public Page</span>
+            </button>
+          )}
+
           <button
             onClick={() => window.print()}
-            className="px-3.5 py-2 rounded-xl bg-white border border-[#d6ede6] hover:bg-[#f6fbf9] text-xs font-bold text-slate-700 transition-all flex items-center gap-1.5 shadow-2xs"
+            className="px-3.5 py-2 rounded-xl bg-white border border-[#d6ede6] hover:bg-[#f6fbf9] text-xs font-bold text-slate-700 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
             title="Print or Save Profile Record as PDF"
           >
             <Printer className="h-3.5 w-3.5 text-slate-500" />
@@ -370,15 +511,16 @@ export function ProfileView() {
           {isEditing ? (
             <button
               onClick={handleSave}
-              className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-sm shadow-[#0d5c4d]/20"
+              disabled={isSavingProfile}
+              className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-sm shadow-[#0d5c4d]/20 cursor-pointer disabled:opacity-50"
             >
               <Save className="h-3.5 w-3.5" />
-              <span>Save Changes</span>
+              <span>{isSavingProfile ? "Saving..." : "Save Changes"}</span>
             </button>
           ) : (
             <button
               onClick={() => setIsEditing(true)}
-              className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-sm shadow-[#0d5c4d]/20"
+              className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-xs font-bold text-white transition-all flex items-center gap-1.5 shadow-sm shadow-[#0d5c4d]/20 cursor-pointer"
             >
               <Edit3 className="h-3.5 w-3.5" />
               <span>Edit Profile</span>
@@ -496,15 +638,21 @@ export function ProfileView() {
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enrolled Subscribers</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d5c4d]">142 Students</span>
-                <span className="text-[10px] text-emerald-600 font-bold">Across 4 Batches</span>
+                <span className="text-lg font-black text-[#0d5c4d] font-mono">
+                  {teacherProfile?.stats?.totalSubscribers ?? 142} Students
+                </span>
+                <span className="text-[10px] text-emerald-600 font-bold">
+                  Across {teacherProfile?.stats?.totalPackages ?? 4} Batches
+                </span>
               </div>
             </div>
 
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Monthly Gross Revenue</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-amber-600 font-mono">Rs. 639,000</span>
+                <span className="text-lg font-black text-amber-600 font-mono">
+                  Rs. {(teacherProfile?.stats?.monthlyGrossRevenue ?? 639000).toLocaleString()}
+                </span>
                 <span className="text-[10px] text-slate-500 font-semibold">90% Tutor Payout</span>
               </div>
             </div>
@@ -552,6 +700,9 @@ export function ProfileView() {
         {(currentRole === "teacher"
           ? [
               { id: "personal", label: "Tutor Studio Profile", icon: User },
+              { id: "qualifications", label: "Qualifications & Credentials", icon: GraduationCap },
+              { id: "payout", label: "Bank & Payout Details", icon: CreditCard },
+              { id: "social", label: "Public Studio & Social", icon: Globe },
               { id: "teaching", label: "Active Batches & Study Packages", icon: BookOpen },
               { id: "schedule", label: "Live Class Schedule & Meet", icon: Calendar }
             ]
@@ -955,147 +1106,86 @@ export function ProfileView() {
             </form>
           </div>
 
-          {/* TEACHER QUALIFICATIONS & ACCREDITATIONS (Embedded inside Faculty Profile & Info) */}
+          {/* TEACHER INSTRUCTION MEDIUMS & EXPERIENCE (Personal Tab) */}
           {currentRole === "teacher" && (
-            <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-5">
+              <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                    <Award className="h-4 w-4 text-[#0d5c4d]" />
-                    <span>Academic Degrees, Professional Accreditations &amp; Licensing</span>
+                    <BookOpen className="h-4 w-4 text-[#0d5c4d]" />
+                    <span>Teaching Mediums &amp; Professional Experience</span>
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Verified university credentials, post-graduate education diplomas, and Ministry examiner licenses.
+                    Select your languages of instruction and total years of Advanced Level coaching experience.
                   </p>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleDownloadTeacherDossier}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-md transition-colors self-start sm:self-auto cursor-pointer"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Download Faculty Dossier (PDF)</span>
-                </button>
+                {isEditing && (
+                  <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                    Editing Mode Active
+                  </span>
+                )}
               </div>
 
-              {/* Higher Education Degrees */}
-              <div className="space-y-3">
-                <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>University Degrees &amp; Higher Education</span>
-                </h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {[
-                    {
-                      degree: "Bachelor of Science (B.Sc. Special) in Mathematics",
-                      institution: "University of Colombo, Sri Lanka",
-                      honors: "First Class Honours (GPA: 3.92 / 4.0)",
-                      year: "Class of 2008",
-                      details: "Pure Mathematics, Real Analysis, Complex Variables, Abstract Algebra & Numerical Methods."
-                    },
-                    {
-                      degree: "Post Graduate Diploma in Education (PGDE)",
-                      institution: "National Institute of Education (NIE), Maharagama",
-                      honors: "Passed with Distinction",
-                      year: "Class of 2014",
-                      details: "Secondary & Collegiate STEM Pedagogy, Educational Psychology, Curriculum Formulation & Evaluation."
-                    },
-                    {
-                      degree: "Master of Science (M.Sc.) in Applied Mathematics",
-                      institution: "University of Peradeniya",
-                      honors: "Thesis Distinction",
-                      year: "Class of 2018",
-                      details: "Thesis: Numerical Modeling of Partial Differential Equations & Boundary Value Simulations."
-                    }
-                  ].map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="p-5 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-2 flex flex-col justify-between"
-                    >
-                      <div className="space-y-1.5">
-                        <span className="text-[10px] font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-full border border-[#c4e9e0]">
-                          {item.year}
-                        </span>
-                        <h5 className="font-black text-sm text-[#0d2b26] leading-snug">{item.degree}</h5>
-                        <p className="text-xs font-semibold text-slate-700">{item.institution}</p>
-                        <p className="text-xs text-amber-700 font-bold">{item.honors}</p>
-                      </div>
-                      <p className="text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 leading-relaxed">
-                        {item.details}
-                      </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700">Mediums of Instruction</label>
+                  {isEditing ? (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {["English", "Sinhala", "Tamil"].map((med) => {
+                        const isSel = selectedMediums.includes(med);
+                        return (
+                          <button
+                            key={med}
+                            type="button"
+                            onClick={() => {
+                              setSelectedMediums((prev) =>
+                                prev.includes(med) ? prev.filter((m) => m !== med) : [...prev, med]
+                              );
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                              isSel
+                                ? "bg-[#0d5c4d] text-white border-[#0d5c4d]"
+                                : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                            }`}
+                          >
+                            {isSel ? `✓ ${med}` : `+ ${med}`}
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {selectedMediums.map((med) => (
+                        <span
+                          key={med}
+                          className="px-3 py-1 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] font-bold text-xs border border-[#c4e9e0]"
+                        >
+                          {med}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              {/* Government Licensing & Accreditations */}
-              <div className="space-y-3 pt-4 border-t border-slate-100">
-                <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Professional Licensing &amp; National Accreditations</span>
-                </h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    {
-                      title: "Sri Lanka Teachers' Service (SLTS) Class 1 Senior Educator",
-                      issuer: "Ministry of Education, Isurupaya, Battaramulla",
-                      regNo: "SLTS-REG/2012/4482",
-                      status: "Active & Permanent Pensionable Service · 14 Years Seniority",
-                      badge: "SLTS Class 1",
-                      badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200"
-                    },
-                    {
-                      title: "G.C.E. Advanced Level Chief Examiner & Paper Setter Accreditation",
-                      issuer: "Department of Examinations, Pelawatte, Battaramulla",
-                      regNo: "EXAM-AL/MTH-P03",
-                      status: "Supervising Examiner · Combined Mathematics Paper Evaluation Panel 03",
-                      badge: "Chief Examiner",
-                      badgeColor: "bg-blue-50 text-blue-800 border-blue-200"
-                    },
-                    {
-                      title: "National STEM Pedagogical Master Trainer & Digital Lead",
-                      issuer: "UNESCO & National Education Commission (NEC)",
-                      regNo: "STEM-LK/2021/88",
-                      status: "Accredited Master Facilitator for Advanced Collegiate Mathematics Instruction",
-                      badge: "Master Trainer",
-                      badgeColor: "bg-purple-50 text-purple-800 border-purple-200"
-                    },
-                    {
-                      title: "Provincial Teaching Excellence & Mentorship Award (2023)",
-                      issuer: "Western Provincial Department of Education",
-                      regNo: "WP-EDU/AWARD/2023",
-                      status: "Awarded for 98% Distinction Rate in A/L Combined Mathematics Examination",
-                      badge: "Provincial Award",
-                      badgeColor: "bg-amber-50 text-amber-800 border-amber-200"
-                    }
-                  ].map((lic, idx) => (
-                    <div
-                      key={idx}
-                      className="p-5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs hover:shadow-xs transition-shadow space-y-2.5"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${lic.badgeColor}`}>
-                            {lic.badge}
-                          </span>
-                          <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1.5 leading-snug">{lic.title}</h5>
-                        </div>
-                        <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 shrink-0">
-                          {lic.regNo}
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-slate-500 font-medium">{lic.issuer}</p>
-
-                      <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold pt-2 border-t border-slate-100">
-                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                        <span>{lic.status}</span>
-                      </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700">Years of Advanced Level Teaching Experience</label>
+                  {isEditing ? (
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        min={0}
+                        max={50}
+                        value={experienceYears}
+                        onChange={(e) => setExperienceYears(Number(e.target.value) || 0)}
+                        className="w-32 h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0d5c4d] focus:outline-none focus:border-[#0d5c4d]"
+                      />
+                      <span className="text-xs font-bold text-slate-600">Years in Service</span>
                     </div>
-                  ))}
+                  ) : (
+                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-bold text-[#0d5c4d]">
+                      {experienceYears} Years of A/L Excellence &amp; Ranker Mentorship
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1741,6 +1831,613 @@ export function ProfileView() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* TEACHER TAB: QUALIFICATIONS & CREDENTIALS                           */}
+      {/* =================================================================== */}
+      {currentRole === "teacher" && activeTab === "qualifications" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
+                  <span>Academic Qualifications &amp; Pedagogical Degrees</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Verified university credentials, post-graduate education diplomas, and research specializations.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadTeacherDossier}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-md transition-colors cursor-pointer"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Download Faculty Dossier (PDF)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* University Degrees List */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
+                  <Award className="h-4 w-4 text-[#0d5c4d]" />
+                  <span>Higher Education Degrees &amp; Diplomas</span>
+                </h4>
+                {isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQualificationsList([
+                        ...qualificationsList,
+                        {
+                          degree: "New Degree / Certification",
+                          institution: "University / Institute Name",
+                          year: "2026",
+                          honors: "Honours / Pass Grade",
+                          details: "Curriculum and subject coverage."
+                        }
+                      ]);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] hover:bg-[#d8f2eb] font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Add Degree</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {qualificationsList.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-5 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3 flex flex-col justify-between hover:border-[#c4e9e0] transition-colors"
+                  >
+                    {isEditing ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Degree #{idx + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQualificationsList(qualificationsList.filter((_, i) => i !== idx));
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1"
+                            title="Remove Degree"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={item.degree}
+                          onChange={(e) => {
+                            const updated = [...qualificationsList];
+                            updated[idx].degree = e.target.value;
+                            setQualificationsList(updated);
+                          }}
+                          placeholder="Degree Title"
+                          className="w-full h-8 px-2.5 rounded-lg border border-slate-300 text-xs font-bold"
+                        />
+                        <input
+                          type="text"
+                          value={item.institution}
+                          onChange={(e) => {
+                            const updated = [...qualificationsList];
+                            updated[idx].institution = e.target.value;
+                            setQualificationsList(updated);
+                          }}
+                          placeholder="University / Institute"
+                          className="w-full h-8 px-2.5 rounded-lg border border-slate-300 text-xs"
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            value={item.year}
+                            onChange={(e) => {
+                              const updated = [...qualificationsList];
+                              updated[idx].year = e.target.value;
+                              setQualificationsList(updated);
+                            }}
+                            placeholder="Year"
+                            className="h-8 px-2.5 rounded-lg border border-slate-300 text-xs"
+                          />
+                          <input
+                            type="text"
+                            value={item.honors}
+                            onChange={(e) => {
+                              const updated = [...qualificationsList];
+                              updated[idx].honors = e.target.value;
+                              setQualificationsList(updated);
+                            }}
+                            placeholder="Honors / Grade"
+                            className="h-8 px-2.5 rounded-lg border border-slate-300 text-xs"
+                          />
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={item.details}
+                          onChange={(e) => {
+                            const updated = [...qualificationsList];
+                            updated[idx].details = e.target.value;
+                            setQualificationsList(updated);
+                          }}
+                          placeholder="Specialization description"
+                          className="w-full p-2 rounded-lg border border-slate-300 text-[11px]"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-full border border-[#c4e9e0]">
+                            {item.year}
+                          </span>
+                          <h5 className="font-black text-sm text-[#0d2b26] leading-snug">{item.degree}</h5>
+                          <p className="text-xs font-semibold text-slate-700">{item.institution}</p>
+                          <p className="text-xs text-amber-700 font-bold">{item.honors}</p>
+                        </div>
+                        <p className="text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 leading-relaxed">
+                          {item.details}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* National Accreditations & Licensing */}
+            <div className="space-y-3 pt-4 border-t border-slate-100">
+              <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
+                <span>Professional Licensing &amp; National Accreditations</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  {
+                    title: "Sri Lanka Teachers' Service (SLTS) Class 1 Senior Educator",
+                    issuer: "Ministry of Education, Isurupaya, Battaramulla",
+                    regNo: profileData.indexNumber || "SLTS-REG/2012/4482",
+                    status: "Active & Permanent Pensionable Service · 14 Years Seniority",
+                    badge: "SLTS Class 1",
+                    badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200"
+                  },
+                  {
+                    title: "G.C.E. Advanced Level Chief Examiner & Paper Setter Accreditation",
+                    issuer: "Department of Examinations, Pelawatte, Battaramulla",
+                    regNo: "EXAM-AL/MTH-P03",
+                    status: "Supervising Examiner · Combined Mathematics Paper Evaluation Panel 03",
+                    badge: "Chief Examiner",
+                    badgeColor: "bg-blue-50 text-blue-800 border-blue-200"
+                  },
+                  {
+                    title: "National STEM Pedagogical Master Trainer & Digital Lead",
+                    issuer: "UNESCO & National Education Commission (NEC)",
+                    regNo: "STEM-LK/2021/88",
+                    status: "Accredited Master Facilitator for Advanced Collegiate Mathematics Instruction",
+                    badge: "Master Trainer",
+                    badgeColor: "bg-purple-50 text-purple-800 border-purple-200"
+                  },
+                  {
+                    title: "Provincial Teaching Excellence & Mentorship Award (2023)",
+                    issuer: "Western Provincial Department of Education",
+                    regNo: "WP-EDU/AWARD/2023",
+                    status: "Awarded for 98% Distinction Rate in A/L Combined Mathematics Examination",
+                    badge: "Provincial Award",
+                    badgeColor: "bg-amber-50 text-amber-800 border-amber-200"
+                  }
+                ].map((lic, idx) => (
+                  <div
+                    key={idx}
+                    className="p-5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs hover:shadow-xs transition-shadow space-y-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${lic.badgeColor}`}>
+                          {lic.badge}
+                        </span>
+                        <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1.5 leading-snug">{lic.title}</h5>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 shrink-0">
+                        {lic.regNo}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-500 font-medium">{lic.issuer}</p>
+
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold pt-2 border-t border-slate-100">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      <span>{lic.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* TEACHER TAB: BANK & PAYOUT DETAILS                                  */}
+      {/* =================================================================== */}
+      {currentRole === "teacher" && activeTab === "payout" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+            <div className="pb-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-[#0d5c4d]" />
+                  <span>Tuition Revenue Payout &amp; Direct Deposit Settings</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Register your Sri Lankan bank account for monthly electronic direct deposit of tuition subscription earnings.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Direct Deposit Protocol Active</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Payout Terms & Rate Card */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-[#ecf8f5] to-[#f4faf7] border border-[#c4e9e0] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-xl bg-[#0d5c4d] text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+                  <DollarSign className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-[#0d2b26]">90% Guaranteed Tutor Payout Share</h4>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Monthly student tuition subscriptions are directly disbursed on the 1st of every calendar month.
+                  </p>
+                </div>
+              </div>
+              <div className="text-right sm:border-l sm:border-[#c4e9e0] sm:pl-5 shrink-0">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Settlement Cycle</span>
+                <p className="font-black text-sm text-[#0d5c4d]">1st of Every Month</p>
+              </div>
+            </div>
+
+            {/* Bank Form */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Bank Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Commercial Bank Name</label>
+                {isEditing ? (
+                  <select
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
+                  >
+                    <option value="Commercial Bank of Ceylon">Commercial Bank of Ceylon</option>
+                    <option value="Bank of Ceylon (BOC)">Bank of Ceylon (BOC)</option>
+                    <option value="People's Bank">People&apos;s Bank</option>
+                    <option value="Hatton National Bank (HNB)">Hatton National Bank (HNB)</option>
+                    <option value="Sampath Bank">Sampath Bank</option>
+                    <option value="Seylan Bank">Seylan Bank</option>
+                    <option value="Nations Trust Bank (NTB)">Nations Trust Bank (NTB)</option>
+                    <option value="DFCC Bank">DFCC Bank</option>
+                    <option value="National Development Bank (NDB)">National Development Bank (NDB)</option>
+                    <option value="Pan Asia Bank">Pan Asia Bank</option>
+                    <option value="Union Bank of Colombo">Union Bank of Colombo</option>
+                  </select>
+                ) : (
+                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                    {bankName}
+                  </p>
+                )}
+              </div>
+
+              {/* Account Holder Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Bank Account Holder Legal Name</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={bankAccountName}
+                    onChange={(e) => setBankAccountName(e.target.value)}
+                    placeholder="Matches National Identity Card"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                ) : (
+                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                    {bankAccountName}
+                  </p>
+                )}
+              </div>
+
+              {/* Account Number */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Account Number</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={bankAccountNumber}
+                    onChange={(e) => setBankAccountNumber(e.target.value)}
+                    placeholder="e.g. 8004561234"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-mono font-bold text-[#0d5c4d] focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                ) : (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-bold text-[#0d5c4d]">
+                    <span>••••••••{bankAccountNumber.slice(-4) || "1234"}</span>
+                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      Verified
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Branch Name & Code */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Branch Name</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={bankBranch}
+                      onChange={(e) => setBankBranch(e.target.value)}
+                      placeholder="e.g. Havelock Town"
+                      className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                    />
+                  ) : (
+                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                      {bankBranch}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Branch Code</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={bankBranchCode}
+                      onChange={(e) => setBankBranchCode(e.target.value)}
+                      placeholder="e.g. 042"
+                      className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:border-[#0d5c4d]"
+                    />
+                  ) : (
+                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-semibold text-slate-900">
+                      {bankBranchCode}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Payout Security Notice */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-3">
+              <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-bold text-slate-800">256-Bit Bank Grade Encryption</span>
+                <p className="leading-relaxed">
+                  Your banking information is encrypted at rest using industry standard AES-256 protocols. LimaT uses this information strictly to transfer verified student tuition payments and generate formal income invoices.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* TEACHER TAB: PUBLIC STUDIO & SOCIAL ECOSYSTEM                       */}
+      {/* =================================================================== */}
+      {currentRole === "teacher" && activeTab === "social" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+            <div className="pb-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-[#0d5c4d]" />
+                  <span>Public Studio URL &amp; Student Social Channels</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Manage your shareable student-facing studio URL slug, video lectures, and community channels.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPublicPreview(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
+              >
+                <Eye className="h-3.5 w-3.5 text-purple-600" />
+                <span>Preview Public Page</span>
+              </button>
+            </div>
+
+            {/* Public URL Slug Card */}
+            <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-2">
+              <label className="text-xs font-bold text-slate-700">Custom Shareable Tutor URL Slug</label>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="flex-1 flex items-center h-10 rounded-xl border border-slate-300 bg-white overflow-hidden px-3">
+                  <span className="text-xs text-slate-400 font-mono select-none">https://limat.lk/tutors/</span>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={publicSlug}
+                      onChange={(e) => setPublicSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                      placeholder="prof-samantha-perera"
+                      className="flex-1 text-xs font-mono font-bold text-[#0d5c4d] focus:outline-none"
+                    />
+                  ) : (
+                    <span className="text-xs font-mono font-bold text-[#0d5c4d]">{publicSlug}</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`https://limat.lk/tutors/${publicSlug}`);
+                    addToast({
+                      type: "info",
+                      title: "Studio Link Copied",
+                      message: `https://limat.lk/tutors/${publicSlug} copied to clipboard.`
+                    });
+                  }}
+                  className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>Copy Link</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Share this link on WhatsApp, Facebook, and flyers so prospective students can browse your study packages and enroll directly.
+              </p>
+            </div>
+
+            {/* Social Channels Inputs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* YouTube Channel */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <span className="text-red-500 font-bold">▶</span> YouTube Lecture Channel
+                </label>
+                {isEditing ? (
+                  <input
+                    type="url"
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    placeholder="https://youtube.com/@Channel"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                ) : (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-medium text-slate-800">
+                    <span className="truncate max-w-xs">{youtubeUrl}</span>
+                    <a
+                      href={youtubeUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-red-600 hover:text-red-700 font-bold text-[11px] flex items-center gap-1"
+                    >
+                      <span>Visit</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Telegram Channel */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <span className="text-sky-500 font-bold">✈</span> Telegram Discussion Group
+                </label>
+                {isEditing ? (
+                  <input
+                    type="url"
+                    value={telegramUrl}
+                    onChange={(e) => setTelegramUrl(e.target.value)}
+                    placeholder="https://t.me/Group"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                ) : (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-medium text-slate-800">
+                    <span className="truncate max-w-xs">{telegramUrl}</span>
+                    <a
+                      href={telegramUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sky-600 hover:text-sky-700 font-bold text-[11px] flex items-center gap-1"
+                    >
+                      <span>Join</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* WhatsApp Hotline */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <span className="text-emerald-500 font-bold">💬</span> WhatsApp Student Admissions Hotline
+                </label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={whatsappNumber}
+                    onChange={(e) => setWhatsappNumber(e.target.value)}
+                    placeholder="+94 77 123 4567"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                ) : (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-medium text-slate-800">
+                    <span>{whatsappNumber}</span>
+                    <a
+                      href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-600 hover:text-emerald-700 font-bold text-[11px] flex items-center gap-1"
+                    >
+                      <span>Chat</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Official Website */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Globe className="h-3.5 w-3.5 text-[#0d5c4d]" /> Official Academy Website
+                </label>
+                {isEditing ? (
+                  <input
+                    type="url"
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    placeholder="https://tutor.lk"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                ) : (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-medium text-slate-800">
+                    <span className="truncate max-w-xs">{websiteUrl}</span>
+                    <a
+                      href={websiteUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[#0d5c4d] hover:underline font-bold text-[11px] flex items-center gap-1"
+                    >
+                      <span>Visit</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Studio Cover Banner Selection */}
+            <div className="space-y-2 pt-2">
+              <label className="text-xs font-bold text-slate-700">Studio Cover Banner</label>
+              <div className="relative h-28 rounded-2xl overflow-hidden border border-slate-200 bg-slate-100">
+                <img
+                  src={coverImageUrl}
+                  alt="Studio Cover"
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent flex items-end p-3 text-white text-xs font-bold">
+                  <span>Current Banner Preview</span>
+                </div>
+              </div>
+              {isEditing && (
+                <div className="pt-2">
+                  <input
+                    type="url"
+                    value={coverImageUrl}
+                    onChange={(e) => setCoverImageUrl(e.target.value)}
+                    placeholder="Paste banner image URL"
+                    className="w-full h-9 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2507,6 +3204,222 @@ export function ProfileView() {
         </div>
       )}
         </>
+      )}
+
+      {/* =================================================================== */}
+      {/* PUBLIC TUTOR STUDIO PREVIEW MODAL                                   */}
+      {/* =================================================================== */}
+      {showPublicPreview && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-3xl w-full border border-slate-200 shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Top Bar */}
+            <div className="px-6 py-4 bg-[#0d2b26] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+                  Public Visitor Preview
+                </span>
+                <span className="text-xs text-slate-300 hidden sm:inline">
+                  • https://limat.lk/tutors/{publicSlug}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPublicPreview(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="max-h-[80vh] overflow-y-auto">
+              {/* Studio Cover Banner */}
+              <div className="relative h-44 sm:h-52 w-full bg-slate-900">
+                <img
+                  src={coverImageUrl}
+                  alt="Studio Cover"
+                  className="h-full w-full object-cover opacity-85"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                <div className="absolute bottom-4 left-6 right-6 flex items-end justify-between">
+                  <div className="flex items-end gap-4">
+                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-[#0d5c4d] to-[#147a66] border-4 border-white text-white flex items-center justify-center text-3xl font-black shadow-xl">
+                      {profileData.name.charAt(0)}
+                    </div>
+                    <div className="text-white space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-xl sm:text-2xl font-black">{profileData.fullName}</h2>
+                        <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-extrabold text-[10px]">
+                          VERIFIED TUTOR ✓
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-200">{profileData.grade}</p>
+                    </div>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-1.5 bg-black/40 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/20 text-white text-xs font-bold">
+                    <span className="text-amber-400">★ 4.9</span>
+                    <span>· 142 Active Students</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 sm:p-8 space-y-6">
+                {/* Teaching Mediums & Experience Badges */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-slate-500 mr-1">Mediums:</span>
+                  {selectedMediums.map((m) => (
+                    <span key={m} className="px-2.5 py-1 rounded-lg bg-[#ecf8f5] text-[#0d5c4d] font-bold text-xs border border-[#c4e9e0]">
+                      {m}
+                    </span>
+                  ))}
+                  <span className="text-slate-300">•</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs">
+                    {experienceYears} Years Teaching Experience
+                  </span>
+                  <span className="text-slate-300">•</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-bold text-xs border border-emerald-200">
+                    SLTS Registered
+                  </span>
+                </div>
+
+                {/* About the Tutor */}
+                <div className="space-y-2">
+                  <h4 className="font-extrabold text-sm text-[#0d2b26]">About the Tutor &amp; Teaching Methodology</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {profileData.bio}
+                  </p>
+                </div>
+
+                {/* Degrees & Qualifications */}
+                <div className="space-y-3 pt-2">
+                  <h4 className="font-extrabold text-sm text-[#0d2b26] flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
+                    <span>Academic Credentials &amp; Degrees</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {qualificationsList.map((q, idx) => (
+                      <div key={idx} className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
+                        <span className="text-[10px] font-bold text-[#0d5c4d]">{q.year}</span>
+                        <h5 className="font-bold text-xs text-[#0d2b26] line-clamp-1">{q.degree}</h5>
+                        <p className="text-[11px] text-slate-500 line-clamp-1">{q.institution}</p>
+                        <p className="text-[10px] text-amber-700 font-semibold">{q.honors}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Available Study Packages */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-extrabold text-sm text-[#0d2b26] flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>Available Tuition Packages &amp; Masterclasses</span>
+                    </h4>
+                    <span className="text-[11px] font-semibold text-emerald-700">Admission Open</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[
+                      {
+                        title: "Combined Mathematics 2026 (Theory & Revision)",
+                        fee: "Rs. 4,500 / month",
+                        schedule: "Mon & Wed · 06:30 PM",
+                        features: ["Live Interactive Stream", "Recorded HD Archive", "Past Paper Vault", "WhatsApp Q&A"]
+                      },
+                      {
+                        title: "Pure Mathematics Fast-Track Paper Class",
+                        fee: "Rs. 3,500 / month",
+                        schedule: "Tue & Thu · 07:00 PM",
+                        features: ["Timed Exam Simulations", "Model Papers", "Marking Scheme Review", "Monthly Assessment"]
+                      }
+                    ].map((pkg, idx) => (
+                      <div key={idx} className="p-4 rounded-2xl bg-white border border-[#e2eae5] hover:border-[#0d5c4d] shadow-2xs space-y-3 transition-all">
+                        <div className="flex items-start justify-between gap-2">
+                          <h5 className="font-bold text-sm text-[#0d2b26]">{pkg.title}</h5>
+                          <span className="font-mono font-black text-xs text-[#0d5c4d] whitespace-nowrap bg-[#ecf8f5] px-2.5 py-1 rounded-lg">
+                            {pkg.fee}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-medium">🕒 {pkg.schedule}</p>
+                        <ul className="space-y-1 text-[11px] text-slate-600">
+                          {pkg.features.map((f, i) => (
+                            <li key={i} className="flex items-center gap-1.5">
+                              <Check className="h-3 w-3 text-emerald-600" />
+                              <span>{f}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            addToast({
+                              type: "info",
+                              title: "Enrollment Notice",
+                              message: `In public mode, clicking this lets students subscribe to ${pkg.title}.`
+                            });
+                          }}
+                          className="w-full py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Enroll in Batch Now
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Social Channels & Contact */}
+                <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-slate-700">Official Channels:</span>
+                    <a
+                      href={youtubeUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 text-xs font-bold flex items-center gap-1"
+                    >
+                      <span>YouTube</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                    <a
+                      href={telegramUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-xs font-bold flex items-center gap-1"
+                    >
+                      <span>Telegram</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+
+                  <a
+                    href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
+                  >
+                    <span>Chat on WhatsApp</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              <span className="text-xs text-slate-500">
+                This is a live preview simulation of your public studio profile.
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowPublicPreview(false)}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Back to Studio Editor
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

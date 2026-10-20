@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   UserRole,
   LocaleCode,
@@ -25,7 +25,8 @@ import {
   Tournament,
   SchoolEvent,
   Announcement,
-  LibraryResource
+  LibraryResource,
+  TeacherProfileData
 } from '@/types/lms';
 import { Tenant, TenantFeature, TenantType } from '@/types/tenant';
 import { INITIAL_TENANTS, TENANT_PRESETS } from '@/data/tenantMockData';
@@ -164,6 +165,11 @@ interface AppContextType {
   deleteLibraryResource: (id: string) => void;
   recordResourceView: (id: string) => void;
   recordResourceDownload: (id: string) => void;
+
+  // Teacher Profile & Studio State
+  teacherProfile: TeacherProfileData | null;
+  updateTeacherProfile: (updates: Partial<TeacherProfileData>) => Promise<boolean>;
+  refreshTeacherProfile: () => Promise<void>;
 
   // Multi-Tenant SaaS State
   tenants: Tenant[];
@@ -1529,6 +1535,56 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     api.resources.recordDownload(id).catch(() => {});
   };
 
+  // Teacher Studio Profile & Payout State
+  const [teacherProfile, setTeacherProfile] = useState<TeacherProfileData | null>(null);
+
+  const refreshTeacherProfile = useCallback(async () => {
+    try {
+      const res = await api.teachers.getMyProfile();
+      if (res && res.success && res.data) {
+        setTeacherProfile(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not fetch teacher profile from API:', err);
+    }
+  }, []);
+
+  const updateTeacherProfile = async (updates: Partial<TeacherProfileData>): Promise<boolean> => {
+    try {
+      setTeacherProfile((prev) => (prev ? { ...prev, ...updates } : (updates as TeacherProfileData)));
+      const res = await api.teachers.updateMyProfile(updates);
+      if (res && res.success && res.data) {
+        setTeacherProfile(res.data);
+        addToast({
+          type: 'success',
+          title: 'Profile Saved',
+          message: 'Your Tutor Studio Profile & Payout details have been updated.'
+        });
+        return true;
+      } else {
+        addToast({
+          type: 'error',
+          title: 'Save Failed',
+          message: res?.error || 'Could not update profile. Please try again.'
+        });
+        return false;
+      }
+    } catch (err: any) {
+      addToast({
+        type: 'error',
+        title: 'Error',
+        message: err?.message || 'Network error while saving profile.'
+      });
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    if (currentRole === 'teacher') {
+      refreshTeacherProfile();
+    }
+  }, [currentRole, refreshTeacherProfile]);
+
   return (
     <AppContext.Provider
       value={{
@@ -1617,6 +1673,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteLibraryResource,
         recordResourceView,
         recordResourceDownload,
+        teacherProfile,
+        updateTeacherProfile,
+        refreshTeacherProfile,
         tenants,
         activeTenantId,
         activeTenant,
