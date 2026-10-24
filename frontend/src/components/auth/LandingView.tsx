@@ -1131,17 +1131,11 @@ export function LandingView({
               <span className="absolute -top-1 -right-1 text-xs">🪽</span>
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
-                  Newtoz
-                </span>
-                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-[10px] font-extrabold shrink-0">
-                  <Sparkles className="h-3 w-3 text-amber-500" />
-                  newtoz.com
-                </span>
-              </div>
-              <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block truncate">
-                Shape Your Future • Guided by Tozy 🐘
+              <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] block leading-tight">
+                Newtoz
+              </span>
+              <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block">
+                Shape Your Future
               </p>
             </div>
           </div>
@@ -1172,7 +1166,7 @@ export function LandingView({
                 </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block truncate">
-                Shape Your Future • Guided by Tozy 🐘
+                Shape Your Future
               </p>
             </div>
           </div>
@@ -1233,7 +1227,7 @@ export function LandingView({
                 </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#1e3a5f] font-black hidden sm:block truncate">
-                Shape Your Future • Guided by Tozy 🐘
+                Shape Your Future
               </p>
             </div>
           </div>
@@ -1293,7 +1287,7 @@ export function LandingView({
                 </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block truncate">
-                Shape Your Future • Guided by Tozy 🐘
+                Shape Your Future
               </p>
             </div>
           </div>
@@ -1395,19 +1389,15 @@ export function LandingView({
                 />
               </div>
 
-              <div>
+              <div className="space-y-1">
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-[#0d2b26]">
-                  Welcome to <span className="bg-gradient-to-r from-[#0d5c4d] via-emerald-600 to-teal-700 bg-clip-text text-transparent">Newtoz!</span>
+                  Welcome to <span className="text-[#0d5c4d]">Newtoz!</span>
                 </h1>
-                <p className="text-xs sm:text-sm font-extrabold text-[#0d5c4d] tracking-wide mt-0.5 flex items-center justify-center gap-1.5">
-                  <span className="text-amber-500">✨</span>
-                  <span>Shape Your Future</span>
-                  <span className="text-slate-400">•</span>
-                  <span className="text-slate-600 font-bold">newtoz.com</span>
-                  <span className="text-amber-500">✨</span>
+                <p className="text-xs sm:text-sm font-black text-[#0d5c4d] tracking-wider uppercase">
+                  Shape Your Future
                 </p>
                 <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
-                  Your friendly learning journey guided by Tozy 🐘🪽
+                  Your friendly learning journey guided by Tozy
                 </p>
               </div>
             </div>

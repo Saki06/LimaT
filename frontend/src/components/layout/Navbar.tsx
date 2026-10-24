@@ -71,17 +71,11 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
             <span className="absolute -top-1 -right-1 text-xs animate-bounce pointer-events-none">✨</span>
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-black text-base sm:text-xl tracking-tight text-[#0d2b26] truncate">
-                Newtoz
-              </span>
-              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#0d5c4d] border border-emerald-200 text-[10px] font-extrabold shrink-0 shadow-2xs">
-                <span className="text-[10px]">🪽</span>
-                <span>newtoz.com</span>
-              </span>
-            </div>
-            <p className="text-[10px] uppercase tracking-wider text-[#0d5c4d] font-black hidden sm:block truncate">
-              Shape Your Future • Guided by Tozy 🐘
+            <span className="font-black text-base sm:text-xl tracking-tight text-[#0d2b26] block leading-tight">
+              Newtoz
+            </span>
+            <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block">
+              Shape Your Future
             </p>
           </div>
         </div>
