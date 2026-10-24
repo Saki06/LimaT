@@ -1377,7 +1377,7 @@ export function LandingView({
             </svg>
           </div>
 
-          <main className="relative z-10 flex-1 flex flex-col justify-between px-3 sm:px-6 lg:px-8 py-2 sm:py-3 max-w-4xl mx-auto w-full">
+          <main className="relative z-10 flex-1 flex flex-col justify-between px-3 sm:px-6 lg:px-8 py-2 sm:py-3 max-w-6xl lg:max-w-7xl mx-auto w-full">
             {/* Tozy Mascot & Welcome Header */}
             <div className="text-center space-y-1.5 pt-0.5 sm:pt-1 flex flex-col items-center">
               {/* Animated Floating Tozy Mascot with Wings and Speech */}
@@ -1402,8 +1402,8 @@ export function LandingView({
               </div>
             </div>
 
-            {/* 3 Clean Role Cards: Student, Parent & Tutor */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5 lg:gap-6 my-1.5 sm:my-3 max-w-4xl lg:max-w-5xl mx-auto w-full items-stretch">
+            {/* 4 Clean Role Cards: Student, Parent, Tutor & Admin */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 lg:gap-5 my-1.5 sm:my-3 max-w-6xl mx-auto w-full items-stretch">
               {/* CARD 1: STUDENT */}
               <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
                 {/* Tozy Buddy Badge */}
@@ -1503,6 +1503,40 @@ export function LandingView({
                 {/* Subtitle Caption */}
                 <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
                   Teach, broadcast notices, manage batches & fees.
+                </p>
+              </div>
+
+              {/* CARD 4: ADMIN */}
+              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-slate-200 hover:border-[#1e293b] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+                {/* Tozy Buddy Badge */}
+                <div className="absolute top-2.5 right-2.5 bg-slate-100 text-slate-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-slate-300/80 flex items-center gap-1">
+                  <span>🐘</span>
+                  <span>Lead with Tozy</span>
+                </div>
+
+                {/* Administrator Character Illustration */}
+                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
+                  <img
+                    src="/images/admin_brush_portrait.jpg"
+                    alt="School Principal and Administrator with Newtoz"
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 rounded-2xl"
+                  />
+                </div>
+
+                {/* Pill Button in Slate Navy Theme (#1e293b) */}
+                <button
+                  type="button"
+                  onClick={() => openAuth("login", "admin", "drawer")}
+                  className="w-full max-w-xs bg-[#1e293b] hover:bg-[#0f172a] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
+                >
+                  <Shield className="h-4 sm:h-5 w-4 sm:w-5" />
+                  <span>Admin</span>
+                  <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                {/* Subtitle Caption */}
+                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
+                  Campus governance, school operations & analytics.
                 </p>
               </div>
             </div>
