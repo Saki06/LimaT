@@ -40,6 +40,7 @@ import {
   CreditCard,
   Send
 } from "lucide-react";
+import { TozyAnimatedMascot } from "@/components/tozy";
 
 type SupportedRole = "student" | "parent" | "teacher" | "admin" | "super_admin";
 type AuthDisplayMode = "closed" | "drawer" | "fullpage";
@@ -281,7 +282,7 @@ export function LandingView({
           ? "Welcome to Super Admin Console! Platform master controls loaded."
           : selectedRole === "admin"
           ? "Welcome to School Admin Operations Desk!"
-          : "Welcome back to LimaT Smart Book! Learning feed loaded."
+          : "Welcome back to Newtoz! Shape Your Future!"
     });
     onEnterApp();
   };
@@ -951,7 +952,7 @@ export function LandingView({
                     onChange={(e) => setAgreeTerms(e.target.checked)}
                     className="rounded text-[#0d5c4d] focus:ring-0"
                   />
-                  <span>I agree to the LimaT Terms & Privacy Policy</span>
+                  <span>I agree to the Newtoz Terms & Privacy Policy</span>
                 </label>
               </div>
 
@@ -982,15 +983,25 @@ export function LandingView({
         {/* Full Page Navigation Header */}
         <header className="h-20 border-b border-[#e6ece8] bg-white px-6 sm:px-12 flex items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-[#f3b738] flex items-center justify-center text-slate-950 font-black text-xl shadow-xs font-sans">
-              L
+            <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-emerald-500/20">
+              <img
+                src="/images/tozy_icon.jpg"
+                alt="Tozy - Newtoz Mascot"
+                className="w-full h-full object-cover rounded-[14px] bg-white"
+              />
+              <span className="absolute -top-1 -right-1 text-xs">🪽</span>
             </div>
             <div>
-              <span className="font-black text-2xl tracking-tight text-[#0d2b26]">
-                LimaT Smart Book
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-black text-2xl tracking-tight text-[#0d2b26]">
+                  Newtoz
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-[#0d5c4d] border border-emerald-200 text-[10px] font-extrabold">
+                  newtoz.com
+                </span>
+              </div>
               <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black">
-                {portalType === "student" ? "STUDENT & PARENT ACCESS" : "FACULTY & CAMPUS GOVERNANCE"}
+                Shape Your Future • Guided by Tozy 🐘
               </p>
             </div>
           </div>
@@ -1066,10 +1077,10 @@ export function LandingView({
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div>
                     <h3 className="text-xl font-black text-[#0d2b26]">
-                      {authTab === "login" ? "Sign In to LimaT" : "Create Account"}
+                      {authTab === "login" ? "Sign In to Newtoz" : "Create Newtoz Account"}
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      {selectedRole === "student" ? "Student Learning Portal" : selectedRole === "parent" ? "Parent & Guardian Desk" : "Tutor Portal"}
+                      {selectedRole === "student" ? "Student Learning Portal • Shape Your Future" : selectedRole === "parent" ? "Parent & Guardian Desk" : "Tutor Portal"}
                     </p>
                   </div>
 
@@ -1096,7 +1107,7 @@ export function LandingView({
 
         {/* Footer */}
         <footer className="border-t border-[#e6ece8] bg-white py-6 px-6 text-center text-xs text-slate-500">
-          <p className="font-bold text-[#0d2b26]">LimaT Smart Book — LEARN · GROW · LEAD</p>
+          <p className="font-bold text-[#0d2b26]">Newtoz • Shape Your Future — <span className="text-emerald-700">newtoz.com</span> (Guided by Tozy 🐘🪽)</p>
         </footer>
       </div>
     );
@@ -1111,21 +1122,26 @@ export function LandingView({
       {portalType === "gateway" && (
         <nav className="h-14 sm:h-16 border-b border-emerald-100/60 bg-[#ebf8f4]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 shrink-0 transition-colors">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#f3b738] flex items-center justify-center text-slate-950 font-black text-base sm:text-xl shadow-xs font-sans shrink-0">
-              L
+            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-emerald-500/20">
+              <img
+                src="/images/tozy_icon.jpg"
+                alt="Tozy - Newtoz Mascot"
+                className="w-full h-full object-cover rounded-[14px] bg-white"
+              />
+              <span className="absolute -top-1 -right-1 text-xs">🪽</span>
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
-                  LimaT Smart Book
+                  Newtoz
                 </span>
                 <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-[10px] font-extrabold shrink-0">
-                  <Sparkles className="h-3 w-3 text-[#f3b738]" />
-                  Portal Selection
+                  <Sparkles className="h-3 w-3 text-amber-500" />
+                  newtoz.com
                 </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block truncate">
-                LEARN · GROW · LEAD • SRI LANKA
+                Shape Your Future • Guided by Tozy 🐘
               </p>
             </div>
           </div>
@@ -1144,7 +1160,7 @@ export function LandingView({
               title="Enter Tutor Hub & Course Creator Portal"
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-              <span>Tutor Hub →</span>
+              <span>Tutor Hub ↗</span>
             </button>
 
             {/* Admin navigation button */}
@@ -1176,13 +1192,18 @@ export function LandingView({
       {portalType === "student" && (
         <nav className="h-16 sm:h-20 border-b border-emerald-100/60 bg-[#ebf8f4]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#f3b738] flex items-center justify-center text-slate-950 font-black text-base sm:text-xl shadow-xs font-sans shrink-0">
-              L
+            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-emerald-500/20">
+              <img
+                src="/images/tozy_icon.jpg"
+                alt="Tozy - Newtoz Mascot"
+                className="w-full h-full object-cover rounded-[14px] bg-white"
+              />
+              <span className="absolute -top-1 -right-1 text-xs">🪽</span>
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
-                  LimaT Smart Book
+                  Newtoz
                 </span>
                 <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/80 text-[#0d5c4d] border border-emerald-200/80 text-[10px] font-extrabold shrink-0 shadow-2xs">
                   <GraduationCap className="h-3 w-3" />
@@ -1190,7 +1211,7 @@ export function LandingView({
                 </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block truncate">
-                LEARN · GROW · LEAD
+                Shape Your Future • Guided by Tozy 🐘
               </p>
             </div>
           </div>
@@ -1232,13 +1253,18 @@ export function LandingView({
       {portalType === "parent" && (
         <nav className="h-16 sm:h-20 border-b border-sky-100/60 bg-[#f0f6fc]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#1e3a5f] flex items-center justify-center text-[#f3b738] font-black text-base sm:text-xl shadow-xs font-sans shrink-0">
-              L
+            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-sky-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-sky-500/20">
+              <img
+                src="/images/tozy_icon.jpg"
+                alt="Tozy - Newtoz Mascot"
+                className="w-full h-full object-cover rounded-[14px] bg-white"
+              />
+              <span className="absolute -top-1 -right-1 text-xs">🪽</span>
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
-                  LimaT Smart Book
+                  Newtoz
                 </span>
                 <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/80 text-[#1e3a5f] border border-sky-200/80 text-[10px] font-extrabold shrink-0 shadow-2xs">
                   <Users className="h-3 w-3 text-[#1e3a5f]" />
@@ -1246,7 +1272,7 @@ export function LandingView({
                 </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#1e3a5f] font-black hidden sm:block truncate">
-                ACADEMIC TRACKING · REPORT CARDS · GUIDANCE
+                Shape Your Future • Guided by Tozy 🐘
               </p>
             </div>
           </div>
@@ -1287,13 +1313,18 @@ export function LandingView({
       {portalType === "staff" && (
         <nav className="h-16 sm:h-20 border-b border-amber-200/50 bg-[#fef8eb]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-[#0d5c4d] flex items-center justify-center text-[#f3b738] font-black text-base sm:text-xl shadow-xs font-sans shrink-0">
-              L
+            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-amber-400 via-emerald-300 to-cyan-300 p-0.5 shadow-sm shrink-0 ring-2 ring-amber-500/20">
+              <img
+                src="/images/tozy_icon.jpg"
+                alt="Tozy - Newtoz Mascot"
+                className="w-full h-full object-cover rounded-[14px] bg-white"
+              />
+              <span className="absolute -top-1 -right-1 text-xs">🪽</span>
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
-                  LimaT Smart Book
+                  Newtoz
                 </span>
                 <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/80 text-[#b47a16] border border-amber-200/80 text-[10px] font-extrabold shrink-0 shadow-2xs">
                   <Sparkles className="h-3 w-3 text-[#b47a16]" />
@@ -1301,7 +1332,7 @@ export function LandingView({
                 </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block truncate">
-                AUTHOR · BROADCAST · ATTENDANCE · FEE MONITORING
+                Shape Your Future • Guided by Tozy 🐘
               </p>
             </div>
           </div>
@@ -1392,25 +1423,49 @@ export function LandingView({
           </div>
 
           <main className="relative z-10 flex-1 flex flex-col justify-between px-3 sm:px-6 lg:px-8 py-2 sm:py-3 max-w-4xl mx-auto w-full">
-            {/* Header */}
-            <div className="text-center space-y-1 pt-0.5 sm:pt-1">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-[#0d2b26]">
-                Welcome to <span className="text-[#0d5c4d]">LimaT Book!</span>
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-600 font-semibold">
-                Choose your role to get started
-              </p>
+            {/* Tozy Mascot & Welcome Header */}
+            <div className="text-center space-y-1.5 pt-0.5 sm:pt-1 flex flex-col items-center">
+              {/* Animated Floating Tozy Mascot with Wings and Speech */}
+              <div className="relative mb-0.5">
+                <TozyAnimatedMascot
+                  size="md"
+                  showSpeech={true}
+                  speechText="Shape Your Future! Pick your portal below ✨"
+                />
+              </div>
+
+              <div>
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-[#0d2b26]">
+                  Welcome to <span className="bg-gradient-to-r from-[#0d5c4d] via-emerald-600 to-teal-700 bg-clip-text text-transparent">Newtoz!</span>
+                </h1>
+                <p className="text-xs sm:text-sm font-extrabold text-[#0d5c4d] tracking-wide mt-0.5 flex items-center justify-center gap-1.5">
+                  <span className="text-amber-500">✨</span>
+                  <span>Shape Your Future</span>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-slate-600 font-bold">newtoz.com</span>
+                  <span className="text-amber-500">✨</span>
+                </p>
+                <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
+                  Your friendly learning journey guided by Tozy 🐘🪽
+                </p>
+              </div>
             </div>
 
             {/* 3 Clean Role Cards: Student, Parent & Tutor */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5 lg:gap-6 my-1.5 sm:my-3 max-w-4xl lg:max-w-5xl mx-auto w-full items-stretch">
               {/* CARD 1: STUDENT */}
               <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+                {/* Tozy Buddy Badge */}
+                <div className="absolute top-2.5 right-2.5 bg-emerald-50 text-[#0d5c4d] text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200/80 flex items-center gap-1">
+                  <span>🐘</span>
+                  <span>Learn with Tozy</span>
+                </div>
+
                 {/* Brush-Splash Character Illustration */}
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center">
+                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
                   <img
                     src="/images/student_brush_portrait.jpg"
-                    alt="Student learning with LimaT Book"
+                    alt="Student learning with Newtoz"
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>
@@ -1428,7 +1483,7 @@ export function LandingView({
 
                 {/* Subtitle Caption */}
                 <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
-                  Learn anytime, anywhere, grow your future.
+                  Shape your future, learn anytime, fly high!
                 </p>
 
                 {/* Quick Direct Sign In / Register Links */}
@@ -1459,11 +1514,17 @@ export function LandingView({
 
               {/* CARD 2: PARENT */}
               <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-slate-200 hover:border-[#1e3a5f] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+                {/* Tozy Buddy Badge */}
+                <div className="absolute top-2.5 right-2.5 bg-sky-50 text-[#1e3a5f] text-[10px] font-black px-2 py-0.5 rounded-full border border-sky-200/80 flex items-center gap-1">
+                  <span>🐘</span>
+                  <span>Guide with Tozy</span>
+                </div>
+
                 {/* Brush-Splash Character Illustration */}
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center">
+                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
                   <img
                     src="/images/parent_brush_portrait.jpg"
-                    alt="Parent reviewing student progress on tablet"
+                    alt="Parent reviewing student progress with Newtoz"
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>
@@ -1512,11 +1573,17 @@ export function LandingView({
 
               {/* CARD 3: TUTOR */}
               <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-amber-100 hover:border-[#b47a16] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+                {/* Tozy Buddy Badge */}
+                <div className="absolute top-2.5 right-2.5 bg-amber-50 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-200/80 flex items-center gap-1">
+                  <span>🐘</span>
+                  <span>Mentor with Tozy</span>
+                </div>
+
                 {/* Teacher / Educator Character Illustration */}
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center">
+                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
                   <img
                     src="/images/tutor_brush_portrait.jpg"
-                    alt="Teacher and Tutor educator"
+                    alt="Teacher and Tutor educator with Newtoz"
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 rounded-2xl"
                   />
                 </div>
@@ -1961,7 +2028,7 @@ export function LandingView({
                   className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-sm py-3 px-8 rounded-full shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer group"
                 >
                   <GraduationCap className="h-4 w-4" />
-                  <span>Join LimaT Student Station Now</span>
+                  <span>Join Newtoz Student Station Now</span>
                   <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </button>
 
@@ -2213,7 +2280,7 @@ export function LandingView({
                   className="bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-sm py-3 px-8 rounded-full shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer group"
                 >
                   <Users className="h-4 w-4" />
-                  <span>Join LimaT Guardian Desk Now</span>
+                  <span>Join Newtoz Guardian Desk Now</span>
                   <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </button>
 
@@ -2546,12 +2613,16 @@ export function LandingView({
         }`}>
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-[#f3b738] flex items-center justify-center text-slate-950 font-black text-base">
-                L
+              <div className="relative h-9 w-9 rounded-xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-xs shrink-0 ring-1 ring-emerald-500/20">
+                <img
+                  src="/images/tozy_icon.jpg"
+                  alt="Tozy - Newtoz Mascot"
+                  className="w-full h-full object-cover rounded-[10px] bg-white"
+                />
               </div>
               <div className="text-left">
-                <p className="font-black text-[#0d2b26]">LimaT Smart Book</p>
-                <p className="text-[10px] text-[#0d5c4d] font-bold">LEARN · GROW · LEAD</p>
+                <p className="font-black text-[#0d2b26]">Newtoz • <span className="font-bold text-[#0d5c4d]">Shape Your Future</span></p>
+                <p className="text-[10px] text-[#0d5c4d] font-bold">newtoz.com • Guided by Tozy 🐘🪽</p>
               </div>
             </div>
 
@@ -2628,11 +2699,16 @@ export function LandingView({
             {/* Drawer Header */}
             <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-b from-[#f8fbf9] to-white shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-[#f3b738] flex items-center justify-center text-slate-950 font-black text-lg shadow-2xs font-sans">
-                  L
+                <div className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-2xs shrink-0 ring-1 ring-emerald-500/20">
+                  <img
+                    src="/images/tozy_icon.jpg"
+                    alt="Tozy - Newtoz Mascot"
+                    className="w-full h-full object-cover rounded-[10px] bg-white"
+                  />
+                  <span className="absolute -top-1 -right-1 text-[10px]">🪽</span>
                 </div>
                 <div>
-                  <h3 className="font-black text-base text-[#0d2b26]">LimaT Smart Book</h3>
+                  <h3 className="font-black text-base text-[#0d2b26]">Newtoz</h3>
                   <p className="text-[10px] uppercase font-bold text-[#0d5c4d]">
                     {selectedRole === "parent"
                       ? "Parent & Guardian Desk"

@@ -6,6 +6,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ToastContainer } from "@/components/ui/toast";
 import { LandingView } from "@/components/auth/LandingView";
+import { TozyCompanion } from "@/components/tozy";
 import {
   StudentDashboard,
   CourseViews,
@@ -43,6 +44,7 @@ export default function HomePage() {
     return (
       <div className={theme === "dark" ? "dark bg-slate-950" : "bg-slate-50"}>
         <LandingView onEnterApp={() => setIsLanding(false)} />
+        <TozyCompanion />
         <ToastContainer />
       </div>
     );
@@ -250,7 +252,8 @@ export default function HomePage() {
         </main>
       </div>
 
-      {/* Floating Notifications */}
+      {/* Floating Notifications & Tozy Student Companion */}
+      <TozyCompanion />
       <ToastContainer />
     </div>
   );

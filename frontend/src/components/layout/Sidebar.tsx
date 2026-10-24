@@ -784,12 +784,18 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                   )
                 ) : (
                   <>
-                    <p className="font-bold text-[#0d2b26] flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-[#f3b738]" />
-                      LimaT Smart Book Platform
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <img
+                        src="/images/tozy_icon.jpg"
+                        alt="Tozy"
+                        className="w-5 h-5 rounded-full object-cover ring-1 ring-emerald-400"
+                      />
+                      <p className="font-black text-xs text-[#0d2b26]">
+                        Newtoz • <span className="text-[#0d5c4d] font-bold">Shape Your Future</span>
+                      </p>
+                    </div>
                     <p className="text-[10px] leading-relaxed text-slate-500">
-                      Educating, inspiring, and connecting learners across Sri Lanka.
+                      Guided by Tozy 🐘🪽 • <span className="font-semibold text-emerald-700">newtoz.com</span>
                     </p>
                   </>
                 )}

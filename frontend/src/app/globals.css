@@ -54,8 +54,77 @@ body {
   width: 0 !important;
   height: 0 !important;
 }
-.no-scrollbar {
-  -ms-overflow-style: none !important; /* IE and Edge */
-  scrollbar-width: none !important; /* Firefox */
+
+/* Newtoz & Tozy Animations */
+@keyframes tozy-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1.5deg);
+  }
 }
+
+@keyframes tozy-wing-left {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+    transform-origin: right center;
+  }
+  50% {
+    transform: rotate(-22deg) scale(0.95);
+    transform-origin: right center;
+  }
+}
+
+@keyframes tozy-wing-right {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+    transform-origin: left center;
+  }
+  50% {
+    transform: rotate(22deg) scale(0.95);
+    transform-origin: left center;
+  }
+}
+
+@keyframes tozy-sparkle {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2) rotate(180deg);
+  }
+}
+
+@keyframes tozy-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.3), 0 0 30px rgba(13, 92, 77, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(56, 189, 248, 0.6), 0 0 45px rgba(243, 183, 56, 0.3);
+  }
+}
+
+.animate-tozy-float {
+  animation: tozy-float 3.5s ease-in-out infinite;
+}
+
+.animate-tozy-wing-left {
+  animation: tozy-wing-left 0.75s ease-in-out infinite;
+}
+
+.animate-tozy-wing-right {
+  animation: tozy-wing-right 0.75s ease-in-out infinite;
+}
+
+.animate-tozy-sparkle {
+  animation: tozy-sparkle 2s ease-in-out infinite;
+}
+
+.animate-tozy-glow {
+  animation: tozy-pulse-glow 2.5s ease-in-out infinite;
+}
+
 

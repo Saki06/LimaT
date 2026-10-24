@@ -10,9 +10,12 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "LimaT Tutor & Sports SaaS — Empowering Independent Tutors & Sports Tournaments",
+  title: "Newtoz | Shape Your Future — Learning Ecosystem",
   description:
-    "LimaT SaaS brings independent tutor course packages, syllabus builder, student subscriptions, bank slip approvals, and campus sports tournaments into one unified platform."
+    "Newtoz (newtoz.com) — Shape Your Future. Smart interactive learning ecosystem guided by Tozy, the friendly winged baby elephant student companion.",
+  icons: {
+    icon: "/images/tozy_icon.jpg"
+  }
 };
 
 export default function RootLayout({

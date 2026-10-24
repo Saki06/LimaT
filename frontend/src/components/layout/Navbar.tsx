@@ -56,27 +56,32 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
           <Menu className="h-5 w-5" />
         </button>
 
-        {/* LimaT Smart Book Brand & Active Tenant Badge */}
+        {/* Newtoz Brand & Tozy Winged Mascot */}
         <div
           onClick={() => setCurrentView("dashboard")}
           className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group min-w-0"
         >
-          {/* Honey Gold Logo with Bold letter 'L' */}
-          <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-[#f3b738] flex items-center justify-center text-slate-950 font-black text-lg sm:text-xl shadow-sm group-hover:scale-105 transition-transform font-sans shrink-0">
-            L
+          {/* Tozy Winged Mascot Logo */}
+          <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm group-hover:scale-105 transition-all shrink-0 ring-2 ring-emerald-500/20">
+            <img
+              src="/images/tozy_icon.jpg"
+              alt="Tozy - Newtoz Mascot"
+              className="w-full h-full object-cover rounded-[14px] bg-white"
+            />
+            <span className="absolute -top-1 -right-1 text-xs animate-bounce pointer-events-none">✨</span>
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base sm:text-xl tracking-tight text-[#0d2b26] truncate">
-                LimaT Tutor & Sports
+              <span className="font-black text-base sm:text-xl tracking-tight text-[#0d2b26] truncate">
+                Newtoz
               </span>
-              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-[10px] font-bold shrink-0">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#0d5c4d]" />
-                {activeTenant?.name || "Tutor SaaS Platform"}
+              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#0d5c4d] border border-emerald-200 text-[10px] font-extrabold shrink-0 shadow-2xs">
+                <span className="text-[10px]">🪽</span>
+                <span>newtoz.com</span>
               </span>
             </div>
-            <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d]/80 font-bold hidden sm:block truncate">
-              Independent Tutors & Sports Tournaments Ecosystem
+            <p className="text-[10px] uppercase tracking-wider text-[#0d5c4d] font-black hidden sm:block truncate">
+              Shape Your Future • Guided by Tozy 🐘
             </p>
           </div>
         </div>
