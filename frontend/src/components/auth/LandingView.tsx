@@ -1517,33 +1517,13 @@ export function LandingView({
               </div>
             </div>
 
-            {/* Clean Minimal Bottom Footer with Admin Access */}
-            <div className="pt-2 pb-1 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500 border-t border-slate-200/50">
-              <p className="font-bold text-[#0d5c4d] flex items-center gap-1.5">
+            {/* Clean Minimal Bottom Footer */}
+            <div className="pt-2 pb-1 text-center text-[11px] text-slate-500 border-t border-slate-200/50">
+              <p className="font-bold text-[#0d5c4d] inline-flex items-center gap-1.5">
                 <span>Newtoz • Shape Your Future</span>
                 <span className="text-slate-400">•</span>
                 <span className="font-semibold text-slate-600">newtoz.com</span>
               </p>
-
-              <div className="flex items-center gap-3 font-bold text-slate-600 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => openAuth("login", "admin", "drawer")}
-                  className="hover:text-[#0d5c4d] transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <Shield className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                  <span>Admin</span>
-                </button>
-                <span className="text-slate-300">•</span>
-                <button
-                  type="button"
-                  onClick={() => openAuth("login", "super_admin", "drawer")}
-                  className="hover:text-amber-600 transition-colors cursor-pointer flex items-center gap-1 text-slate-700"
-                >
-                  <span>👑</span>
-                  <span>Super Admin</span>
-                </button>
-              </div>
             </div>
           </main>
         </div>
