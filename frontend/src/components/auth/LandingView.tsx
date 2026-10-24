@@ -1146,44 +1146,11 @@ export function LandingView({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            <span className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
-              <Globe className="h-3.5 w-3.5 text-[#0d5c4d]" />
-              Trilingual: EN • SI • TA
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/70 text-[#0d5c4d] text-xs font-bold border border-emerald-200">
+              <Sparkles className="h-3 w-3 text-amber-500" />
+              <span>Portal Selection</span>
             </span>
-
-            {/* Tutor Hub button */}
-            <button
-              type="button"
-              onClick={() => handlePortalSwitch("staff")}
-              className="text-xs font-bold text-amber-800 hover:text-amber-950 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs hover:shadow-xs"
-              title="Enter Tutor Hub & Course Creator Portal"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-              <span>Tutor Hub ↗</span>
-            </button>
-
-            {/* Admin navigation button */}
-            <button
-              type="button"
-              onClick={() => openAuth("login", "admin", "drawer")}
-              className="text-xs font-bold text-slate-700 hover:text-slate-950 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs hover:shadow-xs"
-              title="School Administrator Portal"
-            >
-              <Shield className="h-3.5 w-3.5 text-[#0d5c4d]" />
-              <span>Admin</span>
-            </button>
-
-            {/* Super Admin navigation button */}
-            <button
-              type="button"
-              onClick={() => openAuth("login", "super_admin", "drawer")}
-              className="text-xs font-black text-amber-300 hover:text-amber-100 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-black border border-amber-400/30 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md"
-              title="Super Admin SaaS Platform Control"
-            >
-              <span className="text-xs leading-none">👑</span>
-              <span>Super Admin</span>
-            </button>
           </div>
         </nav>
       )}
@@ -1485,31 +1452,6 @@ export function LandingView({
                 <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
                   Shape your future, learn anytime, fly high!
                 </p>
-
-                {/* Quick Direct Sign In / Register Links */}
-                <div className="flex items-center gap-3 text-xs pt-1.5 font-semibold text-slate-500">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handlePortalSwitch("student");
-                      openAuth("login", "student", "drawer");
-                    }}
-                    className="font-bold text-[#0d5c4d] hover:underline cursor-pointer"
-                  >
-                    Student Sign In →
-                  </button>
-                  <span>•</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handlePortalSwitch("student");
-                      openAuth("signup", "student", "drawer");
-                    }}
-                    className="hover:text-slate-900 cursor-pointer"
-                  >
-                    Register
-                  </button>
-                </div>
               </div>
 
               {/* CARD 2: PARENT */}
@@ -1544,31 +1486,6 @@ export function LandingView({
                 <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
                   Support, monitor, be part of their journey.
                 </p>
-
-                {/* Quick Direct Sign In / Register Links */}
-                <div className="flex items-center gap-3 text-xs pt-1.5 font-semibold text-slate-500">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handlePortalSwitch("parent");
-                      openAuth("login", "parent", "drawer");
-                    }}
-                    className="font-bold text-[#1e3a5f] hover:underline cursor-pointer"
-                  >
-                    Guardian Sign In →
-                  </button>
-                  <span>•</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handlePortalSwitch("parent");
-                      openAuth("signup", "parent", "drawer");
-                    }}
-                    className="hover:text-slate-900 cursor-pointer"
-                  >
-                    Register
-                  </button>
-                </div>
               </div>
 
               {/* CARD 3: TUTOR */}
@@ -1603,59 +1520,36 @@ export function LandingView({
                 <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
                   Teach, broadcast notices, manage batches & fees.
                 </p>
-
-                {/* Quick Direct Sign In / Register Links */}
-                <div className="flex items-center gap-3 text-xs pt-1.5 font-semibold text-slate-500">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handlePortalSwitch("staff");
-                      openAuth("login", "teacher", "drawer");
-                    }}
-                    className="font-bold text-[#b47a16] hover:underline cursor-pointer"
-                  >
-                    Tutor Sign In →
-                  </button>
-                  <span>•</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handlePortalSwitch("staff");
-                      openAuth("signup", "teacher", "drawer");
-                    }}
-                    className="hover:text-slate-900 cursor-pointer"
-                  >
-                    Register
-                  </button>
-                </div>
               </div>
             </div>
 
-            {/* Bottom Playful Tagline */}
-            <div className="flex flex-col items-center justify-center gap-0.5 pt-1 pb-1">
-              <div className="flex items-center gap-2.5 text-amber-500 font-black text-xs sm:text-sm tracking-widest">
-                <span>˗ˏˋ</span>
-                <p className="font-extrabold text-xs text-slate-700 tracking-wide">
-                  Together for a Smarter Tomorrow
-                </p>
-                <span>ˎˊ˗</span>
+            {/* Clean Minimal Bottom Footer with Admin Access */}
+            <div className="pt-2 pb-1 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500 border-t border-slate-200/50">
+              <p className="font-bold text-[#0d5c4d] flex items-center gap-1.5">
+                <span>Newtoz • Shape Your Future</span>
+                <span className="text-slate-400">•</span>
+                <span className="font-semibold text-slate-600">newtoz.com</span>
+              </p>
+
+              <div className="flex items-center gap-3 font-bold text-slate-600 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => openAuth("login", "admin", "drawer")}
+                  className="hover:text-[#0d5c4d] transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <Shield className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                  <span>Admin</span>
+                </button>
+                <span className="text-slate-300">•</span>
+                <button
+                  type="button"
+                  onClick={() => openAuth("login", "super_admin", "drawer")}
+                  className="hover:text-amber-600 transition-colors cursor-pointer flex items-center gap-1 text-slate-700"
+                >
+                  <span>👑</span>
+                  <span>Super Admin</span>
+                </button>
               </div>
-            </div>
-
-            {/* Discreet Footer Link for Faculty */}
-            <div className="pb-1.5 pt-1 flex flex-col sm:flex-row items-center justify-between gap-1.5 text-[11px] text-slate-500 border-t border-slate-200/60">
-              <button
-                type="button"
-                onClick={() => openAuth("login", "teacher", "drawer")}
-                className="font-bold text-slate-600 hover:text-[#0d5c4d] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-                <span>Tutor or Course Creator? Access Tutor Cockpit →</span>
-              </button>
-
-              <span className="text-[10px] text-slate-400">
-                Trilingual Medium: English • සිංහල • தமிழ்
-              </span>
             </div>
           </main>
         </div>
