@@ -1146,12 +1146,6 @@ export function LandingView({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/70 text-[#0d5c4d] text-xs font-bold border border-emerald-200">
-              <Sparkles className="h-3 w-3 text-amber-500" />
-              <span>Portal Selection</span>
-            </span>
-          </div>
         </nav>
       )}
 
