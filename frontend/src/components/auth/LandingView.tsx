@@ -1614,10 +1614,6 @@ export function LandingView({
             {/* ========================================================= */}
             <section className="space-y-6 pt-4">
               <div className="text-center max-w-xl mx-auto space-y-1.5">
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[#0d5c4d] bg-white px-3.5 py-1 rounded-full border border-emerald-200 shadow-2xs">
-                  <Sparkles className="h-3 w-3 text-amber-500" />
-                  <span>Student Exploration Stations</span>
-                </span>
                 <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0d2b26]">
                   Your Complete Digital Learning Studio
                 </h2>
@@ -1652,9 +1648,6 @@ export function LandingView({
                     Research Archive
                   </h4>
                   <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Past Papers &amp; Schemes</p>
-                  <span className="text-[10px] font-black text-[#0d5c4d] mt-2 group-hover:underline flex items-center gap-0.5">
-                    Browse Papers →
-                  </span>
                 </div>
 
                 {/* Card 2: Video Repository */}
@@ -1681,9 +1674,6 @@ export function LandingView({
                     Video Repository
                   </h4>
                   <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Recorded Lessons</p>
-                  <span className="text-[10px] font-black text-[#0d5c4d] mt-2 group-hover:underline flex items-center gap-0.5">
-                    Watch Lessons →
-                  </span>
                 </div>
 
                 {/* Card 3: Online Library */}
@@ -1710,9 +1700,6 @@ export function LandingView({
                     Online Library
                   </h4>
                   <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Books, Tutes &amp; Notes</p>
-                  <span className="text-[10px] font-black text-[#0d5c4d] mt-2 group-hover:underline flex items-center gap-0.5">
-                    Read Notes →
-                  </span>
                 </div>
 
                 {/* Card 4: Student Help Desk */}
@@ -1739,9 +1726,6 @@ export function LandingView({
                     Student Help Desk
                   </h4>
                   <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Advising &amp; Guidance</p>
-                  <span className="text-[10px] font-black text-[#0d5c4d] mt-2 group-hover:underline flex items-center gap-0.5">
-                    Ask Mentors →
-                  </span>
                 </div>
 
                 {/* Card 5: Sports & Championship Hub */}
@@ -1768,9 +1752,6 @@ export function LandingView({
                     Sports &amp; Games
                   </h4>
                   <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-1">Scores &amp; Tournaments</p>
-                  <span className="text-[10px] font-black text-[#0d5c4d] mt-2 group-hover:underline flex items-center gap-0.5">
-                    View Match Hub →
-                  </span>
                 </div>
               </div>
             </section>
