@@ -1175,30 +1175,11 @@ export function LandingView({
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
               type="button"
-              onClick={() => handlePortalSwitch("gateway")}
-              className="text-xs font-bold text-slate-600 hover:text-[#0d5c4d] px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
-              title="All Portals"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">All Portals</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => openAuth("login", "student", "drawer")}
               className="text-xs font-bold text-slate-700 hover:text-[#0d5c4d] px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
             >
               <LogIn className="h-3.5 w-3.5 text-[#0d5c4d]" />
               <span>Sign In</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => openAuth("signup", "student", "drawer")}
-              className="text-xs font-black bg-[#0d5c4d] hover:bg-[#083e34] text-white rounded-full px-3.5 sm:px-5 py-2 sm:py-2.5 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-            >
-              <UserPlus className="h-3.5 w-3.5" />
-              <span><span className="hidden sm:inline">Join as </span>Student</span>
             </button>
           </div>
         </nav>
@@ -1613,7 +1594,7 @@ export function LandingView({
                   </div>
 
                   {/* Main Action Buttons */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1 w-full">
+                  <div className="flex items-center gap-3 pt-1 w-full">
                     <button
                       type="button"
                       onClick={() => openAuth("signup", "student", "drawer")}
@@ -1623,56 +1604,6 @@ export function LandingView({
                       <span>Join as Student</span>
                       <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={() => openAuth("login", "student", "drawer")}
-                      className="bg-white/95 backdrop-blur-md border-2 border-emerald-100 hover:border-[#0d5c4d] text-slate-800 font-extrabold text-sm px-6 py-3.5 rounded-full shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
-                    >
-                      <LogIn className="h-4 w-4 text-[#0d5c4d]" />
-                      <span>Student Sign In</span>
-                    </button>
-                  </div>
-
-                  {/* High-Trust Benefit Pills */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px] font-bold text-slate-700">
-                    <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-emerald-100/90 shadow-2xs">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-[#0d5c4d] shrink-0" />
-                      <span>12,000+ Past Papers</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-emerald-100/90 shadow-2xs">
-                      <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                      <span>Timed Online Exams</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-emerald-100/90 shadow-2xs">
-                      <Trophy className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                      <span>Sports League</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-emerald-100/90 shadow-2xs">
-                      <Globe className="h-3.5 w-3.5 text-sky-500 shrink-0" />
-                      <span>Trilingual Medium</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column: Floating Modern Glass Badges Over Classroom Scene */}
-                <div className="lg:col-span-5 hidden lg:flex flex-col items-end justify-between h-full min-h-[360px] py-4 pointer-events-none">
-                  {/* Top Floating Badge */}
-                  <div className="bg-white/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-emerald-100 shadow-lg flex items-center gap-2 text-xs font-black text-[#0d2b26] animate-in fade-in slide-in-from-top-4 duration-500">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Smart Interactive Tuition Classroom</span>
-                  </div>
-
-                  {/* Middle Floating Badge */}
-                  <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-amber-200 shadow-lg flex items-center gap-2 text-xs font-black text-amber-900">
-                    <Sparkles className="h-4 w-4 text-amber-500" />
-                    <span>Grades 1 – 13 All Streams</span>
-                  </div>
-
-                  {/* Bottom Floating Badge */}
-                  <div className="bg-white/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-emerald-100 shadow-lg flex items-center gap-2 text-xs font-black text-[#0d5c4d]">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    <span>National Syllabus &amp; Model Papers</span>
                   </div>
                 </div>
               </div>
