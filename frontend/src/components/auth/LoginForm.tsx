@@ -190,7 +190,7 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
                   : selectedRole === "super_admin"
                   ? "Super Admin Master Email"
                   : selectedRole === "admin"
-                  ? "School Admin Email Address"
+                  ? "Admin Email Address"
                   : "Tutor Email or Mobile Number"}
               </label>
               <div className="relative">
@@ -305,7 +305,7 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
                       : selectedRole === "parent"
                       ? "Parent Portal"
                       : selectedRole === "admin"
-                      ? "School Admin Desk"
+                      ? "Admin Desk"
                       : selectedRole === "super_admin"
                       ? "Super Admin Console"
                       : "Tutor Cockpit"}

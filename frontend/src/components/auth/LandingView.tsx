@@ -207,7 +207,7 @@ export function LandingView({
           ? "Tutor"
           : role === "super_admin"
           ? "Super Admin"
-          : "School Admin"
+          : "Admin"
       }`,
       message: `Welcome back, ${rolePresetCredentials[role].name}!`
     });
@@ -281,7 +281,7 @@ export function LandingView({
           : selectedRole === "super_admin"
           ? "Welcome to Super Admin Console! Platform master controls loaded."
           : selectedRole === "admin"
-          ? "Welcome to School Admin Operations Desk!"
+          ? "Welcome to Admin Operations Desk!"
           : "Welcome back to Newtoz! Shape Your Future!"
     });
     onEnterApp();
@@ -373,7 +373,7 @@ export function LandingView({
                 : selectedRole === "parent"
                 ? "Parent & Guardian Portal"
                 : selectedRole === "admin"
-                ? "School Admin Operations"
+                ? "Admin Operations"
                 : selectedRole === "super_admin"
                 ? "Super Admin SaaS Console"
                 : "Tutor Cockpit"}
@@ -542,7 +542,7 @@ export function LandingView({
                       : selectedRole === "parent"
                       ? "Parent Mobile No or Email Address"
                       : selectedRole === "admin"
-                      ? "School Admin Email Address"
+                      ? "Admin Email Address"
                       : selectedRole === "super_admin"
                       ? "Super Admin Master Email"
                       : "Tutor Email or Mobile Number"}
@@ -650,7 +650,7 @@ export function LandingView({
                       : selectedRole === "parent"
                       ? "Parent Portal"
                       : selectedRole === "admin"
-                      ? "School Admin Desk"
+                      ? "Admin Desk"
                       : selectedRole === "super_admin"
                       ? "Super Admin Console"
                       : "Tutor Cockpit"}
@@ -1033,9 +1033,17 @@ export function LandingView({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full">
             {/* Left Info Column */}
             <div className="lg:col-span-5 space-y-5 hidden lg:block">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-xs font-black">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-xs font-black">
                 <span className="h-2 w-2 rounded-full bg-[#0d5c4d]" />
-                <span>{selectedRole === "student" ? "Student Learning Portal" : selectedRole === "parent" ? "Parent & Guardian Desk" : "Tutor Cockpit"}</span>
+                <span>
+                  {selectedRole === "student"
+                    ? "Student Learning Portal"
+                    : selectedRole === "parent"
+                    ? "Parent & Guardian Desk"
+                    : selectedRole === "admin"
+                    ? "Admin Operations Desk"
+                    : "Tutor Cockpit"}
+                </span>
               </div>
 
               <h2 className="text-3xl font-black text-[#0d2b26] leading-tight">
@@ -1043,6 +1051,8 @@ export function LandingView({
                   ? "Welcome to your digital tuition classroom."
                   : selectedRole === "parent"
                   ? "Monitor tuition fee receipts and attendance."
+                  : selectedRole === "admin"
+                  ? "Manage academy operations & tuition administration."
                   : "Empowering tutors & course creators."}
               </h2>
 
@@ -1051,6 +1061,8 @@ export function LandingView({
                   ? "Study course units, download term past papers with marking schemes, complete timed quizzes, and check your rank."
                   : selectedRole === "parent"
                   ? "Upload monthly tuition fee slips, review attendance scan records, and monitor academic progress."
+                  : selectedRole === "admin"
+                  ? "Oversee student admissions, review tutor courses, reconcile tuition fees, and manage academy batches."
                   : "Publish interactive study notes, schedule online classes, track monthly tuition fee payments, and post instant batch announcements."}
               </p>
 
@@ -1074,19 +1086,19 @@ export function LandingView({
             {/* Right Form Column */}
             <div className="lg:col-span-7">
               <div className="bg-white border-2 border-[#c4e9e0] rounded-3xl shadow-xl p-6 sm:p-8 space-y-5 max-w-lg mx-auto">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div>
-                    <h3 className="text-xl font-black text-[#0d2b26]">
-                      {authTab === "login" ? "Sign In to Newtoz" : "Create Newtoz Account"}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {selectedRole === "student" ? "Student Learning Portal • Shape Your Future" : selectedRole === "parent" ? "Parent & Guardian Desk" : "Tutor Portal"}
-                    </p>
-                  </div>
-
-                  <span className="h-9 w-9 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center font-bold">
-                    {selectedRole === "student" ? <GraduationCap className="h-5 w-5" /> : selectedRole === "parent" ? <Users className="h-5 w-5" /> : <Sparkles className="h-5 w-5 text-[#b47a16]" />}
-                  </span>
+                <div className="pb-3 border-b border-slate-100">
+                  <h3 className="text-xl font-black text-[#0d2b26]">
+                    {authTab === "login" ? "Sign In to Newtoz" : "Create Newtoz Account"}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {selectedRole === "student"
+                      ? "Student Learning Portal • Shape Your Future"
+                      : selectedRole === "parent"
+                      ? "Parent & Guardian Desk"
+                      : selectedRole === "admin"
+                      ? "Admin Operations Desk"
+                      : "Tutor Portal"}
+                  </p>
                 </div>
 
                 {renderAuthContent()}
@@ -1160,10 +1172,6 @@ export function LandingView({
                 <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
                   Newtoz
                 </span>
-                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/80 text-[#0d5c4d] border border-emerald-200/80 text-[10px] font-extrabold shrink-0 shadow-2xs">
-                  <GraduationCap className="h-3 w-3" />
-                  Student Portal
-                </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block truncate">
                 Shape Your Future
@@ -1202,10 +1210,6 @@ export function LandingView({
                 <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
                   Newtoz
                 </span>
-                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/80 text-[#1e3a5f] border border-sky-200/80 text-[10px] font-extrabold shrink-0 shadow-2xs">
-                  <Users className="h-3 w-3 text-[#1e3a5f]" />
-                  Parent Portal
-                </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#1e3a5f] font-black hidden sm:block truncate">
                 Shape Your Future
@@ -1216,30 +1220,11 @@ export function LandingView({
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
               type="button"
-              onClick={() => handlePortalSwitch("gateway")}
-              className="text-xs font-bold text-slate-600 hover:text-[#1e3a5f] px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
-              title="All Portals"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">All Portals</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => openAuth("login", "parent", "drawer")}
               className="text-xs font-bold text-slate-700 hover:text-[#1e3a5f] px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
             >
               <LogIn className="h-3.5 w-3.5 text-[#1e3a5f]" />
               <span><span className="hidden sm:inline">Guardian </span>Sign In</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => openAuth("signup", "parent", "drawer")}
-              className="text-xs font-black bg-[#1e3a5f] hover:bg-[#152a45] text-white rounded-full px-3.5 sm:px-5 py-2 sm:py-2.5 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-            >
-              <UserPlus className="h-3.5 w-3.5" />
-              <span><span className="hidden sm:inline">Register </span>Guardian</span>
             </button>
           </div>
         </nav>
@@ -1262,10 +1247,6 @@ export function LandingView({
                 <span className="font-black text-base sm:text-2xl tracking-tight text-[#0d2b26] truncate">
                   Newtoz
                 </span>
-                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/80 text-[#b47a16] border border-amber-200/80 text-[10px] font-extrabold shrink-0 shadow-2xs">
-                  <Sparkles className="h-3 w-3 text-[#b47a16]" />
-                  Tutor Cockpit
-                </span>
               </div>
               <p className="text-[9px] uppercase tracking-widest text-[#0d5c4d] font-black hidden sm:block truncate">
                 Shape Your Future
@@ -1276,30 +1257,11 @@ export function LandingView({
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
               type="button"
-              onClick={() => handlePortalSwitch("gateway")}
-              className="text-xs font-bold text-slate-600 hover:text-[#0d5c4d] px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
-              title="All Portals"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">All Portals</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => openAuth("login", "teacher", "drawer")}
               className="text-xs font-bold text-slate-700 hover:text-[#0d5c4d] px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-xl hover:bg-white/60 transition-colors flex items-center gap-1 cursor-pointer"
             >
               <LogIn className="h-3.5 w-3.5 text-[#0d5c4d]" />
               <span>Tutor Sign In</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => openAuth("signup", "teacher", "drawer")}
-              className="text-xs font-black bg-[#b47a16] hover:bg-[#8d5f10] text-white rounded-full px-3.5 sm:px-5 py-2 sm:py-2.5 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-            >
-              <UserPlus className="h-3.5 w-3.5" />
-              <span>Register as Tutor</span>
             </button>
           </div>
         </nav>
@@ -1574,10 +1536,6 @@ export function LandingView({
               <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center p-6 sm:p-10 lg:p-14 w-full">
                 {/* Left Column: Typography & CTAs (Crisp & High-Contrast) */}
                 <div className="lg:col-span-7 space-y-6 max-w-2xl">
-                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md text-[#0d5c4d] border border-emerald-200/80 text-xs font-black shadow-xs">
-                    <span className="h-2 w-2 rounded-full bg-[#0d5c4d] animate-pulse" />
-                    <span>🎓 Student Learning Station • Sri Lankan Tuition &amp; Academics (Grades 1–13)</span>
-                  </div>
 
                   <div className="space-y-2">
                     <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.12]">
@@ -1895,11 +1853,6 @@ export function LandingView({
             <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
               {/* Left Column: Typography & CTAs */}
               <div className="lg:col-span-7 space-y-6">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md text-[#1e3a5f] border border-sky-200/80 text-xs font-black shadow-xs">
-                  <span className="h-2 w-2 rounded-full bg-[#1e3a5f] animate-pulse" />
-                  <span>👨‍👩‍👧 Parent &amp; Guardian Desk • Sri Lankan Tuition &amp; Classes</span>
-                </div>
-
                 <div className="space-y-2">
                   <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.12]">
                     Stay connected with your <br />
@@ -1935,26 +1888,6 @@ export function LandingView({
                     <span>Register Parent Account</span>
                   </button>
                 </div>
-
-                {/* High-Trust Benefit Pills */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px] font-bold text-slate-700">
-                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-sky-100/80">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-[#1e3a5f] shrink-0" />
-                    <span>SMS Attendance Alerts</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-sky-100/80">
-                    <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                    <span>Term Report Cards</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-sky-100/80">
-                    <Mail className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
-                    <span>Tutor Consultations</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-sky-100/80">
-                    <Shield className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                    <span>Tuition Fee Receipts</span>
-                  </div>
-                </div>
               </div>
 
               {/* Right Column: Clean, Cheerful Parent Illustration Card (Matching Gateway DNA) */}
@@ -1982,18 +1915,6 @@ export function LandingView({
                     <p className="text-xs text-slate-600 font-medium max-w-xs">
                       Monitor progress, attendance &amp; fees with real-time confidence.
                     </p>
-                  </div>
-
-                  {/* Clean Feature Highlights (No duplicate buttons) */}
-                  <div className="w-full grid grid-cols-2 gap-2 pt-3 mt-1 border-t border-sky-100/70 text-[11px] font-bold text-slate-700">
-                    <div className="bg-[#f0f6fc] px-2.5 py-2 rounded-xl text-[#1e3a5f] border border-sky-100/80 flex items-center justify-center gap-1.5 shadow-2xs">
-                      <BarChart3 className="h-3.5 w-3.5 text-[#1e3a5f] shrink-0" />
-                      <span>Term Reports</span>
-                    </div>
-                    <div className="bg-[#ecf8f5] px-2.5 py-2 rounded-xl text-emerald-800 border border-emerald-100/80 flex items-center justify-center gap-1.5 shadow-2xs">
-                      <Shield className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                      <span>Fee Slips</span>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -2134,11 +2055,6 @@ export function LandingView({
             <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
               {/* Left Column: Typography & CTAs */}
               <div className="lg:col-span-7 space-y-6">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md text-[#b47a16] border border-amber-200/80 text-xs font-black shadow-xs">
-                  <span className="h-2 w-2 rounded-full bg-[#b47a16] animate-pulse" />
-                  <span>🧑‍🏫 Tutor Command Center • Independent Educators &amp; Academies</span>
-                </div>
-
                 <div className="space-y-2">
                   <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0d2b26] leading-[1.12]">
                     Lead your private tuition <br />
@@ -2174,26 +2090,6 @@ export function LandingView({
                     <span>Register as Tutor</span>
                   </button>
                 </div>
-
-                {/* High-Trust Benefit Pills */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px] font-bold text-slate-700">
-                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-amber-100/80">
-                    <Send className="h-3.5 w-3.5 text-[#b47a16] shrink-0" />
-                    <span>Feed Broadcaster</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-amber-100/80">
-                    <Zap className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                    <span>Auto Quiz Grading</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-amber-100/80">
-                    <CreditCard className="h-3.5 w-3.5 text-[#0d5c4d] shrink-0" />
-                    <span>Fee Reconciliation</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-white/70 backdrop-blur-xs px-2.5 py-1.5 rounded-xl border border-amber-100/80">
-                    <BarChart3 className="h-3.5 w-3.5 text-sky-600 shrink-0" />
-                    <span>Progress Insights</span>
-                  </div>
-                </div>
               </div>
 
               {/* Right Column: Clean, Cheerful Tutor Illustration Card (Matching Gateway DNA) */}
@@ -2222,18 +2118,6 @@ export function LandingView({
                       Manage students, batches, notices &amp; fee settlements seamlessly.
                     </p>
                   </div>
-
-                  {/* Clean Feature Highlights (No duplicate buttons) */}
-                  <div className="w-full grid grid-cols-2 gap-2 pt-3 mt-1 border-t border-amber-100/70 text-[11px] font-bold text-slate-700">
-                    <div className="bg-[#fef8eb] px-2.5 py-2 rounded-xl text-[#b47a16] border border-amber-200/80 flex items-center justify-center gap-1.5 shadow-2xs">
-                      <Send className="h-3.5 w-3.5 text-[#b47a16] shrink-0" />
-                      <span>Direct Broadcasts</span>
-                    </div>
-                    <div className="bg-[#ecf8f5] px-2.5 py-2 rounded-xl text-emerald-800 border border-emerald-100/80 flex items-center justify-center gap-1.5 shadow-2xs">
-                      <Zap className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                      <span>Auto Grading</span>
-                    </div>
-                  </div>
                 </div>
               </div>
             </section>
@@ -2241,10 +2125,6 @@ export function LandingView({
             {/* 6 EDUCATOR CAPABILITIES GRID */}
             <section className="space-y-6 pt-2">
               <div className="text-center max-w-2xl mx-auto space-y-1.5">
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-900 bg-amber-100/80 px-3 py-1 rounded-full border border-amber-300/60 shadow-2xs">
-                  <span>★</span>
-                  <span>Exclusively For Educators</span>
-                </span>
                 <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26]">
                   Everything You Need to Run Your Classes
                 </h2>
@@ -2484,7 +2364,7 @@ export function LandingView({
                       : selectedRole === "student"
                       ? "Student Portal"
                       : selectedRole === "admin"
-                      ? "School Admin Operations"
+                      ? "Admin Operations"
                       : selectedRole === "super_admin"
                       ? "Super Admin SaaS Console"
                       : "Tutor Cockpit"}

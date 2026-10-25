@@ -107,7 +107,7 @@ export function AuthDrawer({
                 : selectedRole === "teacher"
                 ? "Tutor Cockpit"
                 : selectedRole === "admin"
-                ? "School Admin Operations"
+                ? "Admin Operations"
                 : "Super Admin SaaS Console"}
             </span>
           </div>
