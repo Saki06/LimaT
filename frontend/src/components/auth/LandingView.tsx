@@ -1849,10 +1849,6 @@ export function LandingView({
             {/* ========================================================= */}
             <section className="space-y-6 pt-2">
               <div className="text-center max-w-xl mx-auto space-y-1.5">
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100/80 px-3 py-1 rounded-full border border-amber-300/60 shadow-2xs">
-                  <span>★</span>
-                  <span>Engineered For Sri Lankan Students</span>
-                </span>
                 <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26]">
                   Everything You Need to Succeed
                 </h2>
@@ -1913,7 +1909,7 @@ export function LandingView({
                 <span>ˎˊ˗</span>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <div className="flex items-center justify-center">
                 <button
                   type="button"
                   onClick={() => openAuth("signup", "student", "drawer")}
@@ -1922,15 +1918,6 @@ export function LandingView({
                   <GraduationCap className="h-4 w-4" />
                   <span>Join Newtoz Student Station Now</span>
                   <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handlePortalSwitch("gateway")}
-                  className="bg-white/90 border border-slate-300 hover:bg-slate-50 text-slate-700 font-extrabold text-xs py-3 px-5 rounded-full shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
-                  <span>← Back to Role Gateway</span>
                 </button>
               </div>
             </section>
@@ -2103,10 +2090,6 @@ export function LandingView({
             {/* 4 FEATURE PILLARS FOR PARENTS */}
             <section className="space-y-6 pt-2">
               <div className="text-center max-w-xl mx-auto space-y-1.5">
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-[#1e3a5f] bg-sky-100/80 px-3 py-1 rounded-full border border-sky-300/60 shadow-2xs">
-                  <span>★</span>
-                  <span>Engineered For Sri Lankan Parents</span>
-                </span>
                 <h2 className="text-2xl sm:text-3xl font-black text-[#0d2b26]">
                   Designed for Sri Lankan Parents &amp; Guardians
                 </h2>
@@ -2165,7 +2148,7 @@ export function LandingView({
                 <span>ˎˊ˗</span>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <div className="flex items-center justify-center">
                 <button
                   type="button"
                   onClick={() => openAuth("signup", "parent", "drawer")}
@@ -2174,15 +2157,6 @@ export function LandingView({
                   <Users className="h-4 w-4" />
                   <span>Join Newtoz Guardian Desk Now</span>
                   <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handlePortalSwitch("gateway")}
-                  className="bg-white/90 border border-slate-300 hover:bg-slate-50 text-slate-700 font-extrabold text-xs py-3 px-5 rounded-full shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
-                  <span>← Back to Role Gateway</span>
                 </button>
               </div>
             </section>
@@ -2435,7 +2409,7 @@ export function LandingView({
                 <span>ˎˊ˗</span>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <div className="flex items-center justify-center">
                 <button
                   type="button"
                   onClick={() => openAuth("signup", "teacher", "drawer")}
@@ -2444,15 +2418,6 @@ export function LandingView({
                   <Sparkles className="h-4 w-4 text-[#fde047]" />
                   <span>Register Tutor Account Now</span>
                   <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handlePortalSwitch("gateway")}
-                  className="bg-white/90 border border-slate-300 hover:bg-slate-50 text-slate-700 font-extrabold text-xs py-3 px-5 rounded-full shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
-                  <span>← Back to Role Gateway</span>
                 </button>
               </div>
             </section>
