@@ -51,6 +51,7 @@ import {
 } from '@/data/mockData';
 import { getTranslation } from '@/lib/i18n';
 import { api } from '@/lib/api';
+import { mapBackendTenant } from '@/lib/tenantMapper';
 
 interface ToastMessage {
   id: string;
@@ -281,13 +282,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isFeatureEnabled = (feature: string): boolean => {
-    if (!activeTenant || !activeTenant.enabledFeatures) return true;
-    return activeTenant.enabledFeatures[feature] ?? true;
-  };
+  if (authUser?.role === 'SUPER_ADMIN' && !activeTenant) {
+    return false;
+  }
+
+  if (!activeTenant || !activeTenant.enabledFeatures) {
+    return true;
+  }
+
+  return activeTenant.enabledFeatures[feature] ?? true;
+};
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState<any | null>(null);
+
+  // Load real tenants for authenticated Super Admin
+  // Load real tenants for authenticated Super Admin
+  useEffect(() => {
+    if (authUser?.role !== 'SUPER_ADMIN' || !authToken) {
+      return;
+    }
+
+    let cancelled = false;
+
+    // Do not show mock tenants while loading real Super Admin data
+    setTenants([]);
+    setActiveTenantId('');
+
+    const loadTenants = async () => {
+      try {
+        const result = await api.tenants.getAll();
+
+        if (cancelled) return;
+
+        const realTenants: Tenant[] = result.data.map(mapBackendTenant);
+
+        setTenants(realTenants);
+        setActiveTenantId(realTenants[0]?.id ?? '');
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error('Failed to load tenants:', error);
+        setTenants([]);
+        setActiveTenantId('');
+      }
+    };
+
+    loadTenants();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.role, authToken]);
 
   // Restore authenticated session from localStorage on initial load
   useEffect(() => {

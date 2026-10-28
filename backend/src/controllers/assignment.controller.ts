@@ -59,6 +59,14 @@ export const createAssignment = async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
+    if (!user.tenantId) {
+  res.status(403).json({
+    success: false,
+    message: 'A tenant is required to create assignments.',
+  });
+  return;
+}
+
     const {
       title,
       instructions,

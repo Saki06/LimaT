@@ -24,6 +24,143 @@ export interface AuthResponse {
 }
 
 export const api = {
+  // Super Admin - Tenant API
+  tenants: {
+    async getAll() {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/tenants`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to load tenants');
+      }
+
+      return result;
+    },
+       async create(data: {
+  name: string;
+  subdomain: string;
+  plan: string;
+  adminEmail: string;
+  adminName: string;
+  contactPhone: string;
+  monthlyFeeLkr: number;
+  address: string;
+  type: string;
+  enabledFeatures: Record<string, boolean>;
+}) {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/tenants`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to create tenant');
+      }
+
+      return result;
+    },
+
+      async updateFeatures(
+      tenantId: string,
+      enabledFeatures: Record<string, boolean>
+    ) {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error("Authentication required");
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/tenants/${tenantId}/features`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ enabledFeatures }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to update tenant features"
+        );
+      }
+
+      return result;
+    },
+      async update(
+  tenantId: string,
+  data: {
+    name?: string;
+    plan?: string;
+    adminEmail?: string;
+    adminName?: string;
+    contactPhone?: string;
+    monthlyFeeLkr?: number;
+    address?: string;
+    type?: string;
+    status?: "ACTIVE" | "INACTIVE" | "SUSPENDED" | "TRIAL";
+    tagline?: string;
+  }
+) {
+  const token = api.token.get();
+
+  if (!token) {
+    throw new Error("Authentication required");
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/tenants/${tenantId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok || !result.success) {
+    throw new Error(
+      result.message || "Failed to update tenant"
+    );
+  }
+
+  return result;
+    },
+  },
   // Auth API
   auth: {
     async login(credentials: { email: string; password: string }): Promise<AuthResponse> {
