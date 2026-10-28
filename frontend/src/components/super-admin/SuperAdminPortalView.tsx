@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useApp } from "@/context/AppContext";
 import { Tenant, FeatureCategory } from "@/types/tenant";
 import { HIERARCHICAL_MODULES } from "@/data/tenantMockData";
@@ -19,6 +19,8 @@ import { TenantSchools } from "./TenantSchools";
 import { FeatureMatrix } from "./FeatureMatrix";
 import { SaasBilling } from "./SaasBilling";
 import { CreateTenantModal, EditTenantModal, DeleteTenantModal } from "./CreateTenantModal";
+import { api } from "@/lib/api";
+import { TENANT_PRESETS } from "@/data/tenantMockData";
 
 type SuperAdminTab = "tenants" | "feature_matrix" | "pricing_plans";
 
@@ -83,6 +85,82 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
   // Current tenant for matrix
   const matrixTenant = tenants.find((t) => t.id === selectedTenantForMatrix) || activeTenant;
 
+  const [isSavingFeatures, setIsSavingFeatures] = useState(false);
+
+const featureSaveQueue = useRef<Promise<void>>(Promise.resolve());
+
+const latestFeatures = useRef<
+  Record<string, Record<string, boolean>>
+>({});
+
+const saveTenantFeatures = (
+  tenant: Tenant,
+  changes: Record<string, boolean>,
+  replace = false
+) => {
+  const currentFeatures =
+    latestFeatures.current[tenant.id] ?? tenant.enabledFeatures;
+
+  const updatedFeatures = replace
+    ? { ...changes }
+    : { ...currentFeatures, ...changes };
+
+  latestFeatures.current[tenant.id] = updatedFeatures;
+
+  setIsSavingFeatures(true);
+
+  featureSaveQueue.current = featureSaveQueue.current
+    .catch(() => {})
+    .then(async () => {
+      try {
+        await api.tenants.updateFeatures(
+          tenant.id,
+          updatedFeatures
+        );
+
+        updateTenant({
+          ...tenant,
+          enabledFeatures: updatedFeatures,
+        });
+
+        showToast(`Feature settings saved for ${tenant.name}`);
+      } catch (error) {
+        console.error("Feature save failed:", error);
+
+        alert(
+          error instanceof Error
+            ? error.message
+            : "Failed to save feature settings"
+        );
+
+        // Reload the authoritative database state after failure.
+        try {
+          const result = await api.tenants.getAll();
+          const savedTenant = result.data.find(
+            (item: { id: string }) => item.id === tenant.id
+          );
+
+          if (savedTenant) {
+            const settings = savedTenant.settings ?? {};
+            const savedFeatures = settings.enabledFeatures ?? {};
+
+            latestFeatures.current[tenant.id] = savedFeatures;
+
+            updateTenant({
+              ...tenant,
+              enabledFeatures: savedFeatures,
+            });
+          }
+        } catch (reloadError) {
+          console.error("Failed to reload features:", reloadError);
+        }
+      }
+    })
+    .finally(() => {
+      setIsSavingFeatures(false);
+    });
+};
+
   // Platform Metrics
   const totalRevenue = tenants.reduce((acc, t) => acc + (t.status === "active" ? t.monthlyFeeLkr : 0), 0);
   const totalStudents = tenants.reduce((acc, t) => acc + t.studentCount, 0);
@@ -95,25 +173,49 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
     showToast(`Switched active workspace to: ${tenant.name} (${tenant.type.toUpperCase()})`);
   };
 
-  const handleBatchToggleCategory = (category: FeatureCategory, enable: boolean) => {
-    const categoryModules = HIERARCHICAL_MODULES.filter((m) => m.category === category);
-    categoryModules.forEach((mod) => {
-      updateTenantFeature(matrixTenant.id, mod.key, enable);
-      mod.subOptions.forEach((sub) => {
-        updateTenantFeature(matrixTenant.id, sub.key, enable);
-      });
-    });
-    showToast(`${enable ? "Enabled" : "Disabled"} all modules in "${category}" for ${matrixTenant.name}`);
-  };
+  const handleBatchToggleCategory = (
+  category: FeatureCategory,
+  enable: boolean
+) => {
+  if (!matrixTenant) return;
 
-  const handleBatchToggleSubOptions = (moduleKey: string, enable: boolean) => {
-    const targetModule = HIERARCHICAL_MODULES.find((m) => m.key === moduleKey);
-    if (!targetModule) return;
-    targetModule.subOptions.forEach((sub) => {
-      updateTenantFeature(matrixTenant.id, sub.key, enable);
+  const changes: Record<string, boolean> = {};
+
+  const categoryModules = HIERARCHICAL_MODULES.filter(
+    (m) => m.category === category
+  );
+
+  categoryModules.forEach((mod) => {
+    changes[mod.key] = enable;
+
+    mod.subOptions.forEach((sub) => {
+      changes[sub.key] = enable;
     });
-    showToast(`${enable ? "Enabled" : "Disabled"} all sub-options for "${targetModule.label}"`);
-  };
+  });
+
+  void saveTenantFeatures(matrixTenant, changes);
+};
+
+  const handleBatchToggleSubOptions = (
+  moduleKey: string,
+  enable: boolean
+) => {
+  if (!matrixTenant) return;
+
+  const targetModule = HIERARCHICAL_MODULES.find(
+    (m) => m.key === moduleKey
+  );
+
+  if (!targetModule) return;
+
+  const changes: Record<string, boolean> = {};
+
+  targetModule.subOptions.forEach((sub) => {
+    changes[sub.key] = enable;
+  });
+
+  void saveTenantFeatures(matrixTenant, changes);
+};
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-20">
@@ -170,10 +272,10 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
               <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded bg-[#0d5c4d] text-white">
                 Active Tutor Simulator
               </span>
-              <span className="text-xs font-mono text-slate-500">[{activeTenant.code}]</span>
+              <span className="text-xs font-mono text-slate-500">[{activeTenant?.code ?? 'NO-TENANT'}]</span>
             </div>
             <p className="text-sm font-black text-[#0d2b26] mt-0.5">
-              {activeTenant.name}{" "}
+              {activeTenant?.name ?? 'No tenant selected'}{" "}
               <span className="text-xs font-normal text-slate-500">
                 &bull; Independent Solo Educator Studio
               </span>
@@ -310,13 +412,23 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
           selectedTenantForMatrix={selectedTenantForMatrix}
           onSelectTenantForMatrix={setSelectedTenantForMatrix}
           onApplyPreset={(presetId) => {
-            applyTenantPreset(matrixTenant.id, presetId);
-            showToast(`Applied preset bundle to ${matrixTenant.name}!`);
-          }}
+  if (!matrixTenant) return;
+
+  const preset = TENANT_PRESETS.find(
+    (p) => p.id === presetId
+  );
+
+  if (!preset) return;
+
+  void saveTenantFeatures(matrixTenant, preset.features, true);
+}}
           onToggleFeature={(key, enabled) => {
-            updateTenantFeature(matrixTenant.id, key, enabled);
-            showToast(`${enabled ? "Enabled" : "Disabled"} feature for ${matrixTenant.name}`);
-          }}
+  if (!matrixTenant) return;
+
+  void saveTenantFeatures(matrixTenant, {
+    [key]: enabled,
+  });
+}}
           onBatchToggleCategory={handleBatchToggleCategory}
           onBatchToggleSubOptions={handleBatchToggleSubOptions}
         />
@@ -342,14 +454,44 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
       />
 
       <EditTenantModal
-        tenant={editingTenant}
-        onClose={() => setEditingTenant(null)}
-        onUpdateTenant={(updated) => {
-          updateTenant(updated);
-          setEditingTenant(null);
-          showToast(`Updated details for "${updated.name}".`);
-        }}
-      />
+  tenant={editingTenant}
+  onClose={() => setEditingTenant(null)}
+  onUpdateTenant={async (updated) => {
+    try {
+     const result = await api.tenants.update(updated.id, {
+  name: updated.name.trim(),
+  adminName: updated.adminName,
+  monthlyFeeLkr: updated.monthlyFeeLkr,
+  tagline: updated.tagline ?? "",
+  status:
+  updated.status === "trial"
+    ? "TRIAL"
+    : updated.status === "suspended"
+      ? "SUSPENDED"
+      : updated.status === "inactive"
+        ? "INACTIVE"
+        : "ACTIVE",
+});
+
+      if (!result.success) {
+        throw new Error("Failed to update tenant");
+      }
+
+      updateTenant(updated);
+      setEditingTenant(null);
+
+      showToast(`Updated details for "${updated.name}".`);
+    } catch (error) {
+      console.error("Tenant update failed:", error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to update tenant"
+      );
+    }
+  }}
+/>
 
       <DeleteTenantModal
         tenant={deletingTenant}

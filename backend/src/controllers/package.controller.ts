@@ -55,10 +55,19 @@ export const createPackage = async (req: AuthenticatedRequest, res: Response): P
       return;
     }
 
-    const teacherProfile = await getOrCreateTeacherProfile(user.userId);
     const tenantId = user.tenantId;
 
-    const packageSlug = slug
+if (!tenantId) {
+  res.status(403).json({
+    success: false,
+    message: 'A tenant is required to create packages.',
+  });
+  return;
+}
+
+const teacherProfile = await getOrCreateTeacherProfile(user.userId);
+
+const packageSlug = slug
       ? slug.trim().toLowerCase()
       : title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now().toString().slice(-4);
 

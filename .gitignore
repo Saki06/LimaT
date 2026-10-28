@@ -39,3 +39,8 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Environment backups and secrets
+.env.*
+!.env.example
+*.env.backup

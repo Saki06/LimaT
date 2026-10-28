@@ -62,10 +62,19 @@ export const createLiveClass = async (req: AuthenticatedRequest, res: Response):
       return;
     }
 
-    const teacherProfile = await getOrCreateTeacherProfile(user.userId);
     const tenantId = user.tenantId;
 
-    // Generate room identifier if JITSI and no URL is provided
+if (!tenantId) {
+  res.status(403).json({
+    success: false,
+    message: 'A tenant is required to create live classes.',
+  });
+  return;
+}
+
+const teacherProfile = await getOrCreateTeacherProfile(user.userId);
+
+// Generate room identifier if JITSI and no URL is provided
     let finalMeetingUrl = meetingUrl;
     let finalMeetingId = meetingId;
     if (platform === 'JITSI') {

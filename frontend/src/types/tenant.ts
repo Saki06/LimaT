@@ -4,7 +4,7 @@ export type TenantType = 'school' | 'tuition_center' | 'individual_teacher';
 
 export type TenantPlan = 'starter' | 'pro' | 'enterprise';
 
-export type TenantStatus = 'active' | 'trial' | 'suspended';
+export type TenantStatus = 'active' | 'inactive' | 'trial' | 'suspended';
 
 export type FeatureCategory =
   | 'Batch Management & Announcements'

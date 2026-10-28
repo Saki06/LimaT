@@ -66,6 +66,18 @@ export function FeatureMatrix({
     "Tutor Branding & Monetization"
   ];
 
+    if (!matrixTenant) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
+        <h3 className="text-lg font-bold text-slate-800">
+          No tenants available
+        </h3>
+        <p className="mt-2 text-sm text-slate-500">
+          Create a tenant before configuring feature permissions.
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       {/* Target Tenant Selector & Preset Bar */}
@@ -76,8 +88,8 @@ export function FeatureMatrix({
               Target Customer Tenant
             </span>
             <h3 className="text-xl font-black text-[#0d2b26] flex items-center gap-2 mt-1">
-              {matrixTenant.name}
-              <span className="text-xs font-mono text-slate-500 font-normal">[{matrixTenant.code}]</span>
+              {matrixTenant?.name ?? 'No tenant selected'}
+              <span className="text-xs font-mono text-slate-500 font-normal">[{matrixTenant?.code ?? 'NO-TENANT'}]</span>
             </h3>
             <p className="text-xs text-slate-500">
               Toggle individual parent modules and granular sub-features to customize this customer&apos;s exact LMS capabilities.

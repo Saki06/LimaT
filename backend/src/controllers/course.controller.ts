@@ -50,7 +50,15 @@ export const createCourse = async (req: AuthenticatedRequest, res: Response): Pr
 
     const tenantId = user.tenantId;
 
-    // Check if course code already exists in this tenant
+if (!tenantId) {
+  res.status(403).json({
+    success: false,
+    message: 'A tenant is required to create courses.',
+  });
+  return;
+}
+
+// Check if course code already exists in this tenant
     const existing = await prisma.course.findUnique({
       where: {
         tenantId_code: {

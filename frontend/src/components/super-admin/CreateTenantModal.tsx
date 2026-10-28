@@ -5,6 +5,8 @@ import { Tenant, TenantType, TenantPlan, TenantStatus } from "@/types/tenant";
 import { TENANT_PRESETS } from "@/data/tenantMockData";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api";
+import { mapBackendTenant } from "@/lib/tenantMapper";
 
 interface CreateTenantModalProps {
   isOpen: boolean;
@@ -13,6 +15,8 @@ interface CreateTenantModalProps {
 }
 
 export function CreateTenantModal({ isOpen, onClose, onAddTenant }: CreateTenantModalProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [newTenantData, setNewTenantData] = useState({
     name: "",
     code: "",
@@ -27,9 +31,14 @@ export function CreateTenantModal({ isOpen, onClose, onAddTenant }: CreateTenant
     teacherCount: 1
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTenantData.name.trim() || !newTenantData.code.trim()) return;
+
+if (isSubmitting) return;
+
+if (!newTenantData.name.trim() || !newTenantData.code.trim()) return;
+
+setIsSubmitting(true);
 
     const preset =
       TENANT_PRESETS.find((p) => p.type === newTenantData.type) || TENANT_PRESETS[0];
@@ -53,8 +62,32 @@ export function CreateTenantModal({ isOpen, onClose, onAddTenant }: CreateTenant
       enabledFeatures: { ...preset.features }
     };
 
-    onAddTenant(createdTenant);
-    onClose();
+        try {
+     const result = await api.tenants.create({
+  name: newTenantData.name.trim(),
+  subdomain: newTenantData.code.trim(),
+  plan: newTenantData.plan.toUpperCase(),
+  adminEmail: newTenantData.contactEmail.trim(),
+  adminName: newTenantData.adminName.trim(),
+  contactPhone: newTenantData.contactPhone.trim(),
+  monthlyFeeLkr: Number(newTenantData.monthlyFeeLkr),
+  address: newTenantData.address.trim(),
+  type: newTenantData.type,
+  enabledFeatures: { ...preset.features },
+});
+
+      onAddTenant(mapBackendTenant(result.data));
+
+      onClose();
+    } catch (error) {
+  alert(
+    error instanceof Error
+      ? error.message
+      : "Failed to create tenant"
+  );
+} finally {
+  setIsSubmitting(false);
+}
   };
 
   return (
@@ -163,11 +196,12 @@ export function CreateTenantModal({ isOpen, onClose, onAddTenant }: CreateTenant
             Cancel
           </Button>
           <Button
-            type="submit"
-            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold cursor-pointer"
-          >
-            Onboard &amp; Activate Client
-          </Button>
+  type="submit"
+  disabled={isSubmitting}
+  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold cursor-pointer"
+>
+  {isSubmitting ? "Creating..." : "Save Changes"}
+</Button>
         </div>
       </form>
     </Modal>
@@ -177,11 +211,22 @@ export function CreateTenantModal({ isOpen, onClose, onAddTenant }: CreateTenant
 interface EditTenantModalProps {
   tenant: Tenant | null;
   onClose: () => void;
-  onUpdateTenant: (tenant: Tenant) => void;
+  onUpdateTenant: (tenant: Tenant) => Promise<void>;
 }
 
-export function EditTenantModal({ tenant, onClose, onUpdateTenant }: EditTenantModalProps) {
-  if (!tenant) return null;
+export function EditTenantModal({
+  tenant,
+  onClose,
+  onUpdateTenant,
+}: EditTenantModalProps) {
+  const [draft, setDraft] = React.useState<Tenant | null>(null);
+  const [isSaving, setIsSaving] = React.useState(false);
+
+  React.useEffect(() => {
+  setDraft(tenant ? { ...tenant } : null);
+}, [tenant]);
+
+  if (!tenant || !draft) return null;
 
   return (
     <Modal
@@ -190,20 +235,31 @@ export function EditTenantModal({ tenant, onClose, onUpdateTenant }: EditTenantM
       title="Edit Client Tenant Profile"
       description="Update contact info, subscription status, and monthly pricing."
     >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onUpdateTenant(tenant);
-        }}
-        className="space-y-4 pt-2"
-      >
+     <form
+  onSubmit={async (e) => {
+    e.preventDefault();
+
+    if (isSaving) return;
+
+    setIsSaving(true);
+
+    try {
+      await onUpdateTenant(draft);
+    } finally {
+      setIsSaving(false);
+    }
+  }}
+  className="space-y-4 pt-2"
+>
         <div>
           <label className="block text-xs font-bold text-slate-700 mb-1">Institution Name</label>
           <input
             type="text"
             required
-            value={tenant.name}
-            onChange={(e) => onUpdateTenant({ ...tenant, name: e.target.value })}
+            value={draft.name}
+onChange={(e) =>
+  setDraft({ ...draft, name: e.target.value })
+}
             className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden"
           />
         </div>
@@ -213,8 +269,10 @@ export function EditTenantModal({ tenant, onClose, onUpdateTenant }: EditTenantM
             <label className="block text-xs font-bold text-slate-700 mb-1">Subject Specialization</label>
             <input
               type="text"
-              value={tenant.tagline || ""}
-              onChange={(e) => onUpdateTenant({ ...tenant, tagline: e.target.value })}
+              value={draft.tagline || ""}
+onChange={(e) =>
+  setDraft({ ...draft, tagline: e.target.value })
+}
               placeholder="e.g. A/L Combined Mathematics"
               className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900"
             />
@@ -223,13 +281,19 @@ export function EditTenantModal({ tenant, onClose, onUpdateTenant }: EditTenantM
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Subscription Status</label>
             <select
-              value={tenant.status}
-              onChange={(e) => onUpdateTenant({ ...tenant, status: e.target.value as TenantStatus })}
-              className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white"
-            >
+  value={draft.status}
+  onChange={(e) =>
+    setDraft({
+      ...draft,
+      status: e.target.value as TenantStatus,
+    })
+  }
+  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white"
+>
               <option value="active">Active</option>
-              <option value="trial">Trial</option>
-              <option value="suspended">Suspended</option>
+<option value="inactive">Inactive</option>
+<option value="trial">Trial</option>
+<option value="suspended">Suspended</option>
             </select>
           </div>
         </div>
@@ -239,8 +303,13 @@ export function EditTenantModal({ tenant, onClose, onUpdateTenant }: EditTenantM
             <label className="block text-xs font-bold text-slate-700 mb-1">Monthly Fee (LKR)</label>
             <input
               type="number"
-              value={tenant.monthlyFeeLkr}
-              onChange={(e) => onUpdateTenant({ ...tenant, monthlyFeeLkr: Number(e.target.value) })}
+              value={draft.monthlyFeeLkr}
+onChange={(e) =>
+  setDraft({
+    ...draft,
+    monthlyFeeLkr: Number(e.target.value),
+  })
+}
               className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-mono text-slate-900"
             />
           </div>
@@ -249,8 +318,13 @@ export function EditTenantModal({ tenant, onClose, onUpdateTenant }: EditTenantM
             <label className="block text-xs font-bold text-slate-700 mb-1">Admin / Principal Name</label>
             <input
               type="text"
-              value={tenant.adminName}
-              onChange={(e) => onUpdateTenant({ ...tenant, adminName: e.target.value })}
+              value={draft.adminName}
+onChange={(e) =>
+  setDraft({
+    ...draft,
+    adminName: e.target.value,
+  })
+}
               className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900"
             />
           </div>
@@ -266,11 +340,12 @@ export function EditTenantModal({ tenant, onClose, onUpdateTenant }: EditTenantM
             Cancel
           </Button>
           <Button
-            type="submit"
-            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold cursor-pointer"
-          >
-            Save Changes
-          </Button>
+  type="submit"
+  disabled={isSaving}
+  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold cursor-pointer"
+>
+  {isSaving ? "Saving..." : "Save Changes"}
+</Button>
         </div>
       </form>
     </Modal>

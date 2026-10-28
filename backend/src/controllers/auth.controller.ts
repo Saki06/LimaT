@@ -15,25 +15,72 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email },
-      include: {
-        tenant: true,
-        studentProfile: true,
-        teacherProfile: true,
-        parentProfile: true,
+  where: { email },
+  include: {
+    tenant: true,
+    studentProfile: true,
+    teacherProfile: {
+      select: {
+        id: true,
+        userId: true,
+        employeeNo: true,
+        specialization: true,
       },
-    });
+    },
+    parentProfile: true,
+  },
+});
 
     if (!user) {
-      res.status(401).json({ success: false, message: 'Invalid email or password.' });
-      return;
-    }
+  res.status(401).json({
+    success: false,
+    message: 'Invalid email or password.',
+  });
+  return;
+}
 
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+if (!user.isActive) {
+  res.status(403).json({
+    success: false,
+    message: 'Your account is inactive. Please contact the administrator.',
+  });
+  return;
+}
+
+// Only global Super Admin can log in without a tenant
+if (!user.tenantId && user.role !== Role.SUPER_ADMIN) {
+  res.status(403).json({
+    success: false,
+    message: 'Your account is not assigned to an organization.',
+  });
+  return;
+}
+
+const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
       res.status(401).json({ success: false, message: 'Invalid email or password.' });
       return;
     }
+
+    // Validate tenant status before issuing a JWT
+if (user.tenantId) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: user.tenantId },
+    select: { status: true },
+  });
+
+  if (
+    !tenant ||
+    tenant.status === 'SUSPENDED' ||
+    tenant.status === 'INACTIVE'
+  ) {
+    res.status(403).json({
+      success: false,
+      message: 'Your organization is currently inactive or suspended.',
+    });
+    return;
+  }
+}
 
     const payload = {
       userId: user.id,
@@ -94,6 +141,23 @@ export const registerStudent = async (req: Request, res: Response): Promise<void
       res.status(400).json({ success: false, message: 'No valid tenant found to register student' });
       return;
     }
+
+    const selectedTenant = await prisma.tenant.findUnique({
+  where: { id: selectedTenantId },
+  select: { status: true },
+});
+
+if (
+  !selectedTenant ||
+  selectedTenant.status === 'SUSPENDED' ||
+  selectedTenant.status === 'INACTIVE'
+) {
+  res.status(403).json({
+    success: false,
+    message: 'Registration is unavailable for this organization.',
+  });
+  return;
+}
 
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -159,6 +223,31 @@ export const registerTutor = async (req: Request, res: Response): Promise<void> 
       selectedTenantId = defaultTenant?.id;
     }
 
+    if (!selectedTenantId) {
+  res.status(400).json({
+    success: false,
+    message: 'No valid tenant found to register teacher.',
+  });
+  return;
+}
+
+const selectedTenant = await prisma.tenant.findUnique({
+  where: { id: selectedTenantId },
+  select: { status: true },
+});
+
+if (
+  !selectedTenant ||
+  selectedTenant.status === 'SUSPENDED' ||
+  selectedTenant.status === 'INACTIVE'
+) {
+  res.status(403).json({
+    success: false,
+    message: 'Registration is unavailable for this organization.',
+  });
+  return;
+}
+
     const passwordHash = await bcrypt.hash(password, 10);
 
     const newUser = await prisma.user.create({
@@ -222,6 +311,31 @@ export const registerParent = async (req: Request, res: Response): Promise<void>
       const defaultTenant = await prisma.tenant.findFirst();
       selectedTenantId = defaultTenant?.id;
     }
+
+    if (!selectedTenantId) {
+  res.status(400).json({
+    success: false,
+    message: 'No valid tenant found to register parent.',
+  });
+  return;
+}
+
+const selectedTenant = await prisma.tenant.findUnique({
+  where: { id: selectedTenantId },
+  select: { status: true },
+});
+
+if (
+  !selectedTenant ||
+  selectedTenant.status === 'SUSPENDED' ||
+  selectedTenant.status === 'INACTIVE'
+) {
+  res.status(403).json({
+    success: false,
+    message: 'Registration is unavailable for this organization.',
+  });
+  return;
+}
 
     const passwordHash = await bcrypt.hash(password, 10);
 

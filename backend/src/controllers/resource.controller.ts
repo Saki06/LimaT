@@ -49,14 +49,23 @@ const getStudentProfile = async (userId: string) => {
 export const createResource = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const user = req.user;
-    if (!user) {
-      res.status(401).json({ success: false, message: 'Unauthorized' });
-      return;
-    }
 
-    const {
-      title,
-      description,
+if (!user) {
+  res.status(401).json({ success: false, message: 'Unauthorized' });
+  return;
+}
+
+if (!user.tenantId) {
+  res.status(403).json({
+    success: false,
+    message: 'A tenant is required to create resources.',
+  });
+  return;
+}
+
+const {
+  title,
+  description,
       resourceType = 'PAST_PAPER',
       subject,
       topic,
@@ -174,9 +183,27 @@ export const getResources = async (req: AuthenticatedRequest, res: Response): Pr
     const { resourceType, subject, year, medium, examType, search, mine } = req.query;
 
     const whereClause: any = {};
-    if (user?.tenantId) {
-      whereClause.tenantId = user.tenantId;
-    }
+
+    // Temporary protection until public tenant scoping is implemented
+if (!user) {
+  res.status(401).json({
+    success: false,
+    message: 'Authentication required to list resources.',
+  });
+  return;
+}
+
+if (user && user.role !== 'SUPER_ADMIN') {
+  if (!user.tenantId) {
+    res.status(403).json({
+      success: false,
+      message: 'Tenant access is required.',
+    });
+    return;
+  }
+
+  whereClause.tenantId = user.tenantId;
+}
 
     if (resourceType && typeof resourceType === 'string') {
       const typeUpper = resourceType.toUpperCase();
@@ -202,12 +229,16 @@ export const getResources = async (req: AuthenticatedRequest, res: Response): Pr
     }
 
     if (search && typeof search === 'string') {
-      whereClause.OR = [
+  whereClause.AND = [
+    {
+      OR: [
         { title: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
         { topic: { contains: search, mode: 'insensitive' } },
-      ];
-    }
+      ],
+    },
+  ];
+}
 
     // Role-based visibility and access logic
     let teacherProfile: any = null;
@@ -222,13 +253,17 @@ export const getResources = async (req: AuthenticatedRequest, res: Response): Pr
         if (mine === 'true' && teacherProfile) {
           // Tutor specifically viewing ONLY their own uploaded items in their workspace desk
           whereClause.teacherId = teacherProfile.id;
-        } else if (teacherProfile) {
-          // In general library, teachers can see all PUBLIC items + their own uploaded items
-          whereClause.OR = [
-            { visibility: 'PUBLIC' },
-            { teacherId: teacherProfile.id },
-          ];
-        }
+        } else {
+  // Teachers can see public resources and their own uploads
+  whereClause.OR = teacherProfile
+    ? [
+        { visibility: 'PUBLIC', status: 'published' },
+        { teacherId: teacherProfile.id },
+      ]
+    : [
+        { visibility: 'PUBLIC', status: 'published' },
+      ];
+}
       } else if (user.role === 'STUDENT') {
         studentProfile = await getStudentProfile(user.userId);
         // Only show published resources to students
@@ -354,6 +389,55 @@ export const getResourceById = async (req: AuthenticatedRequest, res: Response):
       return;
     }
 
+    // Prevent access to resources from another tenant
+if (
+  user?.role !== 'SUPER_ADMIN' &&
+  user?.tenantId &&
+  resource.tenantId !== user.tenantId
+) {
+  res.status(404).json({
+    success: false,
+    message: 'Resource not found',
+  });
+  return;
+}
+
+// Guests must not access resources without tenant context.
+// Public access will require an explicitly validated tenant scope.
+if (!user) {
+  res.status(401).json({
+    success: false,
+    message: 'Authentication required to view this resource.',
+  });
+  return;
+}
+
+// Only the resource owner, tenant admin, or super admin
+// may view unpublished resources.
+if (resource.status !== 'published') {
+  const isSuperAdmin = user.role === 'SUPER_ADMIN';
+  const isTenantAdmin = user.role === 'ADMIN';
+
+  let isOwner = false;
+
+  if (user.role === 'TEACHER') {
+    const teacher = await prisma.teacherProfile.findUnique({
+      where: { userId: user.userId },
+      select: { id: true },
+    });
+
+    isOwner = teacher?.id === resource.teacherId;
+  }
+
+  if (!isSuperAdmin && !isTenantAdmin && !isOwner) {
+    res.status(404).json({
+      success: false,
+      message: 'Resource not found',
+    });
+    return;
+  }
+}
+
     let isLocked = false;
     let isOwner = false;
 
@@ -363,7 +447,12 @@ export const getResourceById = async (req: AuthenticatedRequest, res: Response):
         isOwner = teacher?.id === resource.teacherId;
       }
 
-      if (resource.visibility === 'SUBSCRIBERS_ONLY' && !isOwner && user.role !== 'ADMIN') {
+      if (
+  resource.visibility === 'SUBSCRIBERS_ONLY' &&
+  !isOwner &&
+  user.role !== 'ADMIN' &&
+  user.role !== 'SUPER_ADMIN'
+) {
         const student = await getStudentProfile(user.userId);
         const hasSub = student?.packageSubscriptions?.some((sub: any) => {
           if (resource.packageId && sub.packageId === resource.packageId) return true;
@@ -382,6 +471,7 @@ export const getResourceById = async (req: AuthenticatedRequest, res: Response):
         ...resource,
         fileUrl: isLocked ? null : resource.fileUrl,
         markingSchemeUrl: isLocked ? null : resource.markingSchemeUrl,
+        markingSchemeNotes: isLocked ? null : resource.markingSchemeNotes,
         isLocked,
         isOwner,
       },
@@ -412,6 +502,18 @@ export const updateResource = async (req: AuthenticatedRequest, res: Response): 
       res.status(404).json({ success: false, message: 'Resource not found' });
       return;
     }
+
+    // Prevent cross-tenant resource updates
+if (
+  user.role !== 'SUPER_ADMIN' &&
+  (!user.tenantId || existing.tenantId !== user.tenantId)
+) {
+  res.status(403).json({
+    success: false,
+    message: 'Forbidden: Resource does not belong to your tenant.',
+  });
+  return;
+}
 
     // Check ownership if teacher
     if (user.role === 'TEACHER') {
@@ -515,6 +617,18 @@ export const deleteResource = async (req: AuthenticatedRequest, res: Response): 
       res.status(404).json({ success: false, message: 'Resource not found' });
       return;
     }
+
+    // Prevent cross-tenant resource deletion
+if (
+  user.role !== 'SUPER_ADMIN' &&
+  (!user.tenantId || existing.tenantId !== user.tenantId)
+) {
+  res.status(403).json({
+    success: false,
+    message: 'Forbidden: Resource does not belong to your tenant.',
+  });
+  return;
+}
 
     if (user.role === 'TEACHER') {
       const teacher = await prisma.teacherProfile.findUnique({ where: { userId: user.userId } });

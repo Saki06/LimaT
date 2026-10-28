@@ -20,6 +20,7 @@ enum TenantStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+  TRIAL
 }
 
 enum EventStatus {
@@ -114,8 +115,8 @@ model Tenant {
 // Core User Account
 model User {
   id                  String               @id @default(uuid())
-  tenantId            String
-  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId            String?
+  tenant              Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   email               String               @unique
   passwordHash        String
   role                Role
