@@ -19,12 +19,12 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 
 export function QuizViews() {
-  const { quizzes, selectedQuizId, submitQuizAttempt, t } = useApp();
+  const { quizzes, selectedQuizId, setSelectedQuizId, submitQuizAttempt, t } = useApp();
 
   const currentQuiz = quizzes.find((q) => q.id === selectedQuizId) || quizzes[0];
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number | string>>({});
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, any>>({});
   const [secondsRemaining, setSecondsRemaining] = useState(600);
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [evaluationResult, setEvaluationResult] = useState<{
@@ -53,6 +53,16 @@ export function QuizViews() {
     setCurrentQuestionIndex(0);
     setSelectedAnswers({});
     setSecondsRemaining(currentQuiz.durationMinutes * 60);
+  };
+
+  const handleToggleMultiOption = (questionId: string, optionIndex: number) => {
+    setSelectedAnswers((prev) => {
+      const curr = Array.isArray(prev[questionId]) ? (prev[questionId] as number[]) : [];
+      const next = curr.includes(optionIndex)
+        ? curr.filter((i) => i !== optionIndex)
+        : [...curr, optionIndex];
+      return { ...prev, [questionId]: next };
+    });
   };
 
   const handleSelectOption = (questionId: string, optionIndex: number) => {
@@ -93,7 +103,47 @@ export function QuizViews() {
         </div>
       </div>
 
-      {!isPlaying ? (
+      {/* Quiz Selector when multiple quizzes exist */}
+      {!isPlaying && quizzes.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {quizzes.map((qz) => {
+            const isSelected = (selectedQuizId || quizzes[0]?.id) === qz.id;
+            const hasAttempted = qz.userAttempt?.score !== undefined;
+
+            return (
+              <button
+                key={qz.id}
+                type="button"
+                onClick={() => setSelectedQuizId(qz.id)}
+                className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border ${
+                  isSelected
+                    ? "bg-[#0d5c4d] text-white border-[#0d5c4d] shadow-xs"
+                    : "bg-white text-slate-700 border-[#e6ece8] hover:border-slate-300"
+                }`}
+              >
+                <span>{qz.title}</span>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    isSelected
+                      ? "bg-white/20 text-white"
+                      : hasAttempted
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {hasAttempted ? `${qz.userAttempt?.score}/${qz.totalMarks} Marks` : `${qz.durationMinutes}m`}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {!currentQuiz ? (
+        <div className="p-8 text-center rounded-2xl bg-white border border-[#e6ece8]">
+          <p className="text-sm font-bold text-slate-700">No quizzes available at the moment.</p>
+        </div>
+      ) : !isPlaying ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
           <Card className="border-[#e6ece8] bg-white shadow-xs">
             <CardHeader className="p-6 border-b border-[#e6ece8]">
@@ -174,7 +224,7 @@ export function QuizViews() {
             <ul className="text-xs text-slate-600 space-y-2.5 list-disc list-inside leading-relaxed">
               <li>Once started, the timer will count down and submit automatically at 00:00.</li>
               <li>Each question is evaluated immediately upon submission.</li>
-              <li>You can navigate back and forth between questions before submitting.</li>
+              <li>Supports Single Choice, Multi-Select Checkboxes, True/False, and Fill-in-Blank questions.</li>
               <li>Full answers and solution rationale will be revealed immediately after.</li>
             </ul>
           </div>
@@ -210,34 +260,119 @@ export function QuizViews() {
               {activeQuestion.questionText}
             </h3>
 
+            {/* QUESTION INPUTS BY TYPE */}
             <div className="space-y-3">
-              {activeQuestion.options?.map((option, idx) => {
-                const isSelected = selectedAnswers[activeQuestion.id] === idx;
+              {/* Type: MCQ or True/False */}
+              {(activeQuestion.type === "mcq" || activeQuestion.type === "true_false") && (
+                <div className="space-y-2.5">
+                  {activeQuestion.options?.map((option, idx) => {
+                    const isSelected = selectedAnswers[activeQuestion.id] === idx;
 
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSelectOption(activeQuestion.id, idx)}
-                    className={`w-full p-4 rounded-xl border text-left text-sm font-semibold transition-all flex items-center justify-between ${
-                      isSelected
-                        ? "bg-[#ecf8f5] border-[#0d5c4d] text-[#0d5c4d] shadow-xs ring-1 ring-[#0d5c4d]"
-                        : "bg-[#f8faf9] border-[#e6ece8] text-slate-700 hover:bg-[#edf4f1]"
-                    }`}
-                  >
-                    <span>{option}</span>
-                    <span
-                      className={`h-6 w-6 rounded-full border flex items-center justify-center text-xs font-bold ${
-                        isSelected
-                          ? "border-[#0d5c4d] bg-[#0d5c4d] text-white"
-                          : "border-slate-300 text-slate-500"
-                      }`}
-                    >
-                      {String.fromCharCode(65 + idx)}
-                    </span>
-                  </button>
-                );
-              })}
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSelectOption(activeQuestion.id, idx)}
+                        className={`w-full p-4 rounded-xl border text-left text-sm font-semibold transition-all flex items-center justify-between cursor-pointer ${
+                          isSelected
+                            ? "bg-[#ecf8f5] border-[#0d5c4d] text-[#0d5c4d] shadow-xs ring-1 ring-[#0d5c4d]"
+                            : "bg-[#f8faf9] border-[#e6ece8] text-slate-700 hover:bg-[#edf4f1]"
+                        }`}
+                      >
+                        <span>{option}</span>
+                        <span
+                          className={`h-6 w-6 rounded-full border flex items-center justify-center text-xs font-bold ${
+                            isSelected
+                              ? "border-[#0d5c4d] bg-[#0d5c4d] text-white"
+                              : "border-slate-300 text-slate-500"
+                          }`}
+                        >
+                          {String.fromCharCode(65 + idx)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Type: Multi-Select (Checkboxes) */}
+              {activeQuestion.type === "multi_select" && (
+                <div className="space-y-2.5">
+                  <p className="text-xs text-slate-500 font-medium pb-1">
+                    ☑️ Select all correct choices that apply:
+                  </p>
+                  {activeQuestion.options?.map((option, idx) => {
+                    const currentArr: number[] = Array.isArray(selectedAnswers[activeQuestion.id])
+                      ? (selectedAnswers[activeQuestion.id] as number[])
+                      : [];
+                    const isSelected = currentArr.includes(idx);
+
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleToggleMultiOption(activeQuestion.id, idx)}
+                        className={`w-full p-4 rounded-xl border text-left text-sm font-semibold transition-all flex items-center justify-between cursor-pointer ${
+                          isSelected
+                            ? "bg-[#ecf8f5] border-[#0d5c4d] text-[#0d5c4d] shadow-xs ring-1 ring-[#0d5c4d]"
+                            : "bg-[#f8faf9] border-[#e6ece8] text-slate-700 hover:bg-[#edf4f1]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            readOnly
+                            className="h-4 w-4 rounded text-[#0d5c4d] focus:ring-[#0d5c4d] pointer-events-none"
+                          />
+                          <span>{option}</span>
+                        </div>
+                        <span
+                          className={`h-6 w-6 rounded-lg border flex items-center justify-center text-xs font-bold ${
+                            isSelected
+                              ? "border-[#0d5c4d] bg-[#0d5c4d] text-white"
+                              : "border-slate-300 text-slate-500"
+                          }`}
+                        >
+                          {String.fromCharCode(65 + idx)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Type: Short Answer or Numerical */}
+              {(activeQuestion.type === "short_answer" || activeQuestion.type === "numerical") && (
+                <div className="space-y-3 p-5 rounded-2xl bg-[#f8faf9] border border-[#e6ece8]">
+                  <label className="block text-xs font-bold text-slate-700">
+                    {activeQuestion.type === "numerical"
+                      ? "Enter Numerical Solution:"
+                      : "Type Your Answer Phrase / Key Term:"}
+                  </label>
+                  <input
+                    type={activeQuestion.type === "numerical" ? "number" : "text"}
+                    value={String(selectedAnswers[activeQuestion.id] ?? "")}
+                    onChange={(e) =>
+                      setSelectedAnswers((prev) => ({
+                        ...prev,
+                        [activeQuestion.id]: e.target.value
+                      }))
+                    }
+                    placeholder={
+                      activeQuestion.type === "numerical"
+                        ? "e.g. 120 or 9.8"
+                        : "Type your answer here..."
+                    }
+                    className="w-full text-sm p-3.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0d5c4d] font-semibold text-slate-800 bg-white"
+                  />
+                  <p className="text-[11px] text-slate-500 italic">
+                    {activeQuestion.type === "numerical"
+                      ? "Enter numbers only. Decimals are supported."
+                      : "Answers are evaluated case-insensitively."}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-[#e6ece8]">
@@ -252,7 +387,7 @@ export function QuizViews() {
               {isLastQuestion ? (
                 <Button
                   onClick={handleAutoSubmit}
-                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-2"
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-2 cursor-pointer"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   {t.academic.submitQuiz}
@@ -260,7 +395,7 @@ export function QuizViews() {
               ) : (
                 <Button
                   onClick={() => setCurrentQuestionIndex((prev) => prev + 1)}
-                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5"
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5 cursor-pointer"
                 >
                   Next Question <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -285,10 +420,10 @@ export function QuizViews() {
               Evaluation Completed Instantly
             </span>
             <p className="text-4xl font-black text-[#0d5c4d]">
-              {currentQuiz.userAttempt?.score || 30} / {currentQuiz.totalMarks}
+              {currentQuiz.userAttempt?.score !== undefined ? currentQuiz.userAttempt.score : (evaluationResult?.score || 0)} / {currentQuiz.totalMarks}
             </p>
             <p className="text-xs font-bold text-slate-600">
-              Score: {Math.round(((currentQuiz.userAttempt?.score || 30) / currentQuiz.totalMarks) * 100)}% • Grade: Distinction (A)
+              Score: {Math.round((((currentQuiz.userAttempt?.score !== undefined ? currentQuiz.userAttempt.score : evaluationResult?.score) || 0) / currentQuiz.totalMarks) * 100)}% Proficiency
             </p>
           </div>
 
@@ -299,7 +434,26 @@ export function QuizViews() {
             </h4>
 
             {currentQuiz.questions.map((q, idx) => {
-              const isCorrect = true; // In our sample attempt
+              const studentVal = selectedAnswers[q.id];
+
+              let isQuestionCorrect = false;
+              if (q.type === "short_answer" || q.type === "numerical") {
+                isQuestionCorrect =
+                  String(studentVal || "").trim().toLowerCase() ===
+                  String(q.correctAnswer).trim().toLowerCase();
+              } else if (q.type === "multi_select") {
+                const correctArr = Array.isArray(q.correctAnswer)
+                  ? q.correctAnswer.map(String).sort()
+                  : [String(q.correctAnswer)];
+                const studentArr = Array.isArray(studentVal)
+                  ? (studentVal as any[]).map(String).sort()
+                  : [String(studentVal)];
+                isQuestionCorrect =
+                  studentArr.length === correctArr.length &&
+                  studentArr.every((v, i) => v === correctArr[i]);
+              } else {
+                isQuestionCorrect = String(studentVal) === String(q.correctAnswer);
+              }
 
               return (
                 <div
@@ -307,38 +461,68 @@ export function QuizViews() {
                   className="p-5 rounded-2xl bg-[#f8faf9] border border-[#e6ece8] space-y-3"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-500">Question {idx + 1}</span>
-                    <Badge variant="success" className="text-[10px] gap-1 font-bold">
-                      <CheckCircle2 className="h-3 w-3" /> Correct (+{q.marks} Marks)
+                    <span className="text-xs font-bold text-slate-500">
+                      Question {idx + 1} ({q.type.toUpperCase()})
+                    </span>
+                    <Badge
+                      variant={isQuestionCorrect ? "success" : "secondary"}
+                      className="text-[10px] gap-1 font-bold"
+                    >
+                      {isQuestionCorrect ? (
+                        <>
+                          <CheckCircle2 className="h-3 w-3" /> Correct (+{q.marks} Marks)
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-3 w-3" /> 0 Marks
+                        </>
+                      )}
                     </Badge>
                   </div>
 
                   <p className="text-sm font-bold text-[#0d2b26]">{q.questionText}</p>
 
-                  {/* Options */}
-                  <div className="space-y-1.5 pt-1">
-                    {q.options?.map((opt, optIdx) => {
-                      const isOptionCorrect = optIdx === Number(q.correctAnswer);
+                  {/* Render based on Question Type */}
+                  {q.options && q.options.length > 0 ? (
+                    <div className="space-y-1.5 pt-1">
+                      {q.options.map((opt, optIdx) => {
+                        const isOptionCorrect = Array.isArray(q.correctAnswer)
+                          ? q.correctAnswer.map(Number).includes(optIdx)
+                          : optIdx === Number(q.correctAnswer);
 
-                      return (
-                        <div
-                          key={optIdx}
-                          className={`p-2.5 rounded-xl text-xs font-medium flex items-center justify-between ${
-                            isOptionCorrect
-                              ? "bg-[#ecf8f5] border border-[#c4e9e0] text-[#0d5c4d] font-bold"
-                              : "bg-white border border-[#e6ece8] text-slate-600"
-                          }`}
-                        >
-                          <span>{opt}</span>
-                          {isOptionCorrect && (
-                            <span className="text-[10px] font-bold text-[#0d5c4d] flex items-center gap-1">
-                              ✓ Correct Answer
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                        return (
+                          <div
+                            key={optIdx}
+                            className={`p-2.5 rounded-xl text-xs font-medium flex items-center justify-between ${
+                              isOptionCorrect
+                                ? "bg-[#ecf8f5] border border-[#c4e9e0] text-[#0d5c4d] font-bold"
+                                : "bg-white border border-[#e6ece8] text-slate-600"
+                            }`}
+                          >
+                            <span>{opt}</span>
+                            {isOptionCorrect && (
+                              <span className="text-[10px] font-bold text-[#0d5c4d] flex items-center gap-1">
+                                ✓ Correct Answer
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-white border border-[#e6ece8] text-xs space-y-1">
+                      <p className="font-bold text-[#0d5c4d]">
+                        Expected Correct Answer:{" "}
+                        <span className="font-mono text-slate-800">{String(q.correctAnswer)}</span>
+                      </p>
+                      {studentVal !== undefined && (
+                        <p className="text-slate-600">
+                          Your Input:{" "}
+                          <span className="font-mono font-bold text-slate-800">{String(studentVal)}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Theory Explanation */}
                   {q.explanation && (

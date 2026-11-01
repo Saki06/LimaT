@@ -36,7 +36,14 @@ import {
   MicOff,
   VideoOff,
   PhoneOff,
-  MessageSquare
+  MessageSquare,
+  FileText,
+  Download,
+  Eye,
+  Paperclip,
+  ChevronRight,
+  ThumbsUp,
+  MessageCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,6 +68,10 @@ export interface LiveSlot {
   recordingUrl?: string;
   courseId?: string;
   packageId?: string;
+  handoutUrl?: string;
+  handoutName?: string;
+  duration?: string;
+  viewsCount?: number;
 }
 
 const INITIAL_SLOTS: LiveSlot[] = [
@@ -79,7 +90,11 @@ const INITIAL_SLOTS: LiveSlot[] = [
     type: "Live Masterclass + Q&A",
     enrolledCount: 142,
     status: "live_now",
-    recordingUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    recordingUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    handoutUrl: "https://example.com/handouts/calculus_limits_tute.pdf",
+    handoutName: "Unit 02 Calculus Handout & Problem Set #4.pdf",
+    duration: "2h 00m",
+    viewsCount: 184
   },
   {
     id: "slot-2",
@@ -95,7 +110,11 @@ const INITIAL_SLOTS: LiveSlot[] = [
     passcode: "PHYS2026",
     type: "Problem Solving Lab",
     enrolledCount: 142,
-    status: "scheduled"
+    status: "scheduled",
+    handoutUrl: "https://example.com/handouts/applied_math_mechanics.pdf",
+    handoutName: "Newton's Laws & Friction Workshop Problems.pdf",
+    duration: "2h 00m",
+    viewsCount: 0
   },
   {
     id: "slot-3",
@@ -111,7 +130,11 @@ const INITIAL_SLOTS: LiveSlot[] = [
     passcode: "AL2026",
     type: "Paper Marking Session",
     enrolledCount: 142,
-    status: "scheduled"
+    status: "scheduled",
+    handoutUrl: "https://example.com/handouts/al_model_paper_2025.pdf",
+    handoutName: "G.C.E. A/L Model Paper 2025 (Pure & Applied).pdf",
+    duration: "2h 30m",
+    viewsCount: 0
   },
   {
     id: "slot-4",
@@ -128,7 +151,11 @@ const INITIAL_SLOTS: LiveSlot[] = [
     type: "Special Concept Booster",
     enrolledCount: 98,
     status: "completed",
-    recordingUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    recordingUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    handoutUrl: "https://example.com/handouts/trigonometry_complex_numbers.pdf",
+    handoutName: "Complex Numbers Argand Diagrams Summary.pdf",
+    duration: "1h 55m",
+    viewsCount: 312
   }
 ];
 
@@ -178,7 +205,11 @@ export function LiveScheduleView() {
     status: "scheduled",
     recordingUrl: "",
     courseId: "",
-    packageId: ""
+    packageId: "",
+    handoutUrl: "",
+    handoutName: "",
+    duration: "2h 00m",
+    viewsCount: 0
   });
 
   // Delete & Broadcast Modals
@@ -186,6 +217,82 @@ export function LiveScheduleView() {
   const [broadcastingSlot, setBroadcastingSlot] = useState<LiveSlot | null>(null);
   const [recordingModalSlot, setRecordingModalSlot] = useState<LiveSlot | null>(null);
   const [recordingInputUrl, setRecordingInputUrl] = useState("");
+
+  // In-App Video Replay Theater Modal State
+  const [viewingReplaySlot, setViewingReplaySlot] = useState<LiveSlot | null>(null);
+  const [replayActiveTab, setReplayActiveTab] = useState<"chapters" | "handout" | "qa">("chapters");
+  const [comments, setComments] = useState<{ id: string; author: string; time: string; text: string; likes: number; reply?: string }[]>([
+    { id: "c1", author: "Sathurjan K.", time: "1 day ago", text: "At 40:30, why did we multiply by the conjugate instead of standard expansion?", likes: 4, reply: "Good question! In the G.C.E. A/L exam scheme, algebraic conjugation is required for full step marks." },
+    { id: "c2", author: "Anuki Silva", time: "2 days ago", text: "The summary formula sheet in the handout is super helpful, thank you sir!", likes: 7 }
+  ]);
+  const [newCommentText, setNewCommentText] = useState("");
+
+  // Attendance Roster Modal (for Teachers)
+  const [attendanceSlot, setAttendanceSlot] = useState<LiveSlot | null>(null);
+  const [attendanceSearch, setAttendanceSearch] = useState("");
+
+  const mockAttendance = [
+    { id: "att-1", studentName: "Sathurjan K.", indexNo: "AL-2026-4401", joinTime: "07:02 PM", duration: "1h 55m", status: "Present" },
+    { id: "att-2", studentName: "Kasun Bandara", indexNo: "AL-2026-4402", joinTime: "07:05 PM", duration: "1h 50m", status: "Present" },
+    { id: "att-3", studentName: "Anuki Silva", indexNo: "AL-2026-4403", joinTime: "07:01 PM", duration: "1h 58m", status: "Present" },
+    { id: "att-4", studentName: "Dineth Perera", indexNo: "AL-2026-4404", joinTime: "07:15 PM", duration: "1h 40m", status: "Late Arrival" },
+    { id: "att-5", studentName: "Tharushi Fernando", indexNo: "AL-2026-4405", joinTime: "07:04 PM", duration: "1h 52m", status: "Present" },
+    { id: "att-6", studentName: "Kavindu Wickramasinghe", indexNo: "AL-2026-4406", joinTime: "07:00 PM", duration: "2h 00m", status: "Present" },
+    { id: "att-7", studentName: "Praveen Jayawardena", indexNo: "AL-2026-4407", joinTime: "07:22 PM", duration: "1h 35m", status: "Late Arrival" }
+  ];
+
+  const lectureChapters = [
+    { time: "00:00", title: "Introduction, Unit Outline & Standard Formula Review", duration: "12m" },
+    { time: "12:15", title: "Rigorous Proofs: Limit Theorems & Indeterminate Forms", duration: "28m" },
+    { time: "40:30", title: "Worked Problem Set: Trigonometric & Exponential Limits", duration: "35m" },
+    { time: "1:15:30", title: "A/L Past Paper 2024 Exam Question Discussion", duration: "25m" },
+    { time: "1:40:30", title: "Student Live Doubt Resolution & Practice Homework", duration: "19m" }
+  ];
+
+  const getEmbedUrl = (url?: string) => {
+    if (!url) return "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1";
+    if (url.includes("watch?v=")) {
+      const videoId = url.split("watch?v=")[1]?.split("&")[0];
+      return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`;
+    }
+    if (url.includes("youtu.be/")) {
+      const videoId = url.split("youtu.be/")[1]?.split("?")[0];
+      return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`;
+    }
+    return url;
+  };
+
+  const handleExportAttendanceCSV = (slot: LiveSlot) => {
+    const csvHeader = "Index No,Student Name,Class,Join Time,Duration,Attendance Status\n";
+    const csvRows = mockAttendance.map((a) => `"${a.indexNo}","${a.studentName}","Grade 12 Physical Science","${a.joinTime}","${a.duration}","${a.status}"`).join("\n");
+    const blob = new Blob([csvHeader + csvRows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Attendance_${slot.title.replace(/[^a-zA-Z0-9]/g, "_")}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast({
+      type: "success",
+      title: "Attendance Exported",
+      message: `Downloaded attendance spreadsheet for "${slot.title}".`
+    });
+  };
+
+  const handleAddComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCommentText.trim()) return;
+    const newC = {
+      id: `c-${Date.now()}`,
+      author: currentUser?.name || (isTeacher ? "Tutor Host" : "Enrolled Student"),
+      time: "Just now",
+      text: newCommentText.trim(),
+      likes: 0
+    };
+    setComments((prev) => [newC, ...prev]);
+    setNewCommentText("");
+  };
 
   // 1. Fetch live classes from backend on mount
   useEffect(() => {
@@ -270,7 +377,11 @@ export function LiveScheduleView() {
       status: "scheduled",
       recordingUrl: "",
       courseId: contextCourses?.[0]?.id || "",
-      packageId: availablePackages?.[0]?.id || ""
+      packageId: availablePackages?.[0]?.id || "",
+      handoutUrl: "https://example.com/handouts/calculus_mastery.pdf",
+      handoutName: "Topic Revision Handout.pdf",
+      duration: "2h 00m",
+      viewsCount: 0
     });
     setIsModalOpen(true);
   };
@@ -294,7 +405,11 @@ export function LiveScheduleView() {
       status: slot.status,
       recordingUrl: slot.recordingUrl || "",
       courseId: slot.courseId || "",
-      packageId: slot.packageId || ""
+      packageId: slot.packageId || "",
+      handoutUrl: slot.handoutUrl || "",
+      handoutName: slot.handoutName || "",
+      duration: slot.duration || "2h 00m",
+      viewsCount: slot.viewsCount || 0
     });
     setIsModalOpen(true);
   };
@@ -784,6 +899,7 @@ export function LiveScheduleView() {
       {/* =================================================================== */}
       {/* CLASS SLOTS LISTING                                                 */}
       {/* =================================================================== */}
+      {/* CLASS SLOTS LISTING */}
       {filteredSlots.length === 0 ? (
         <Card className="border-dashed border-2 border-slate-200 bg-white p-12 text-center">
           <div className="h-12 w-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
@@ -796,7 +912,152 @@ export function LiveScheduleView() {
               : "Check back later for newly scheduled live lectures."}
           </p>
         </Card>
+      ) : selectedTab === "recordings" ? (
+        /* =================================================================== */
+        /* VOD RECORDINGS REPLAY GALLERY                                       */
+        /* =================================================================== */
+        <div className="space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-[#0d2b26] to-[#0d5c4d] text-white">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0">
+                <Play className="h-5 w-5 fill-current" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Class Recordings Archive &bull; Video Replay Library</span>
+                  <Badge className="bg-emerald-400/20 text-emerald-200 border-emerald-400/30 text-[10px]">
+                    On-Demand
+                  </Badge>
+                </h3>
+                <p className="text-xs text-white/80">
+                  Catch up on missed lectures, review exam derivations, and replay interactive masterclasses.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs text-emerald-200 bg-white/10 px-3 py-1.5 rounded-xl font-mono">
+                {slots.filter((s) => !!s.recordingUrl).length} Video Lectures Ready
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredSlots.map((slot) => (
+              <Card
+                key={slot.id}
+                className="overflow-hidden border-[#e6ece8] bg-white hover:border-[#a2dfd2] hover:shadow-md transition-all duration-200 flex flex-col justify-between group"
+              >
+                <div>
+                  {/* 16:9 Video Thumbnail Canvas */}
+                  <div
+                    onClick={() => setViewingReplaySlot(slot)}
+                    className="aspect-video w-full bg-gradient-to-br from-slate-950 via-slate-900 to-[#0d2b26] relative flex items-center justify-center p-4 cursor-pointer overflow-hidden"
+                  >
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(13,92,77,0.4)_0,transparent_70%)]" />
+                    
+                    {/* Center Big Play Button */}
+                    <div className="h-14 w-14 rounded-full bg-rose-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 group-hover:bg-rose-600 transition-all z-10">
+                      <Play className="h-6 w-6 ml-0.5 fill-current" />
+                    </div>
+
+                    {/* Top Badges */}
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-10">
+                      <span className="px-2.5 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-bold backdrop-blur-xs border border-white/10">
+                        {slot.subject}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-mono font-bold backdrop-blur-xs border border-white/10">
+                        {slot.duration || "2h 00m"}
+                      </span>
+                    </div>
+
+                    {/* Bottom Info bar */}
+                    <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-[11px] text-white/80 z-10">
+                      <span className="flex items-center gap-1 font-medium">
+                        <Calendar className="h-3 w-3" /> {slot.day}
+                      </span>
+                      <span className="flex items-center gap-1 font-medium">
+                        <Eye className="h-3 w-3" /> {slot.viewsCount || 184} Views
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Content */}
+                  <div className="p-4 space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-[#ecf8f5] text-[#0d5c4d] border-[#c4e9e0] text-[10px] font-bold">
+                        {slot.grade}
+                      </Badge>
+                      <span className="text-[11px] text-slate-500 font-medium">{slot.type}</span>
+                    </div>
+
+                    <h4 
+                      onClick={() => setViewingReplaySlot(slot)}
+                      className="text-sm font-black text-[#0d2b26] line-clamp-2 hover:text-[#0d5c4d] cursor-pointer transition-colors"
+                    >
+                      {slot.title}
+                    </h4>
+
+                    {/* Handout preview pill */}
+                    {slot.handoutName && (
+                      <div className="p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-[11px]">
+                        <span className="truncate flex items-center gap-1 text-slate-700 font-medium">
+                          <Paperclip className="h-3 w-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{slot.handoutName}</span>
+                        </span>
+                        <a
+                          href={slot.handoutUrl || "#"}
+                          download
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[#0d5c4d] hover:underline font-bold shrink-0 ml-1 flex items-center gap-0.5"
+                        >
+                          <Download className="h-3 w-3" /> Tute
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card Action Footer */}
+                <div className="p-4 pt-2 border-t border-slate-100 flex items-center justify-between gap-2 bg-[#fcfdfc]">
+                  <Button
+                    size="sm"
+                    onClick={() => setViewingReplaySlot(slot)}
+                    className="flex-1 bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs h-8 rounded-xl shadow-2xs gap-1.5 cursor-pointer"
+                  >
+                    <Play className="h-3 w-3 fill-current" /> Watch Replay
+                  </Button>
+
+                  {isTeacher ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAttendanceSlot(slot)}
+                      className="border-slate-300 text-slate-700 hover:bg-slate-50 h-8 px-2.5 text-xs font-bold cursor-pointer"
+                      title="View Attendance Log"
+                    >
+                      <Users className="h-3.5 w-3.5 text-slate-600" />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCopyLink(slot.recordingUrl || slot.meetingUrl, slot.title)}
+                      className="border-slate-300 text-slate-700 hover:bg-slate-50 h-8 px-2.5 text-xs font-bold cursor-pointer"
+                      title="Copy Share Link"
+                    >
+                      <Share2 className="h-3.5 w-3.5 text-slate-600" />
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
       ) : (
+        /* =================================================================== */
+        /* STANDARD CLASS SLOTS GRID                                           */
+        /* =================================================================== */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {filteredSlots.map((slot) => {
             const isLive = slot.status === "live_now";
@@ -900,20 +1161,38 @@ export function LiveScheduleView() {
                       </p>
                     </div>
 
+                    {/* Pre-class Handout Attached Note */}
+                    {slot.handoutName && (
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/70 border border-[#c4e9e0] text-[#0d5c4d] text-xs font-semibold">
+                        <span className="flex items-center gap-1.5 truncate">
+                          <Paperclip className="h-3.5 w-3.5 text-[#0d5c4d] shrink-0" />
+                          <span className="truncate">{slot.handoutName}</span>
+                        </span>
+                        <a
+                          href={slot.handoutUrl || "#"}
+                          download
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[#0d5c4d] hover:text-[#083e34] font-bold flex items-center gap-1 shrink-0 ml-2"
+                        >
+                          <Download className="h-3.5 w-3.5" /> Download
+                        </a>
+                      </div>
+                    )}
+
                     {/* Recording Attached Note */}
                     {slot.recordingUrl && (
                       <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
                         <span className="flex items-center gap-1.5">
-                          <Play className="h-3.5 w-3.5 text-amber-600" /> Video Recording Ready
+                          <Play className="h-3.5 w-3.5 text-amber-600 fill-current" /> Video Replay Available
                         </span>
-                        <a
-                          href={slot.recordingUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-amber-800 hover:text-amber-950 font-bold underline flex items-center gap-1"
+                        <Button
+                          size="sm"
+                          onClick={() => setViewingReplaySlot(slot)}
+                          className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold h-7 px-3 rounded-lg shadow-2xs gap-1 cursor-pointer"
                         >
-                          Watch Replay ↗
-                        </a>
+                          <Play className="h-3 w-3 fill-current" /> Watch In-App Replay ↗
+                        </Button>
                       </div>
                     )}
                   </CardContent>
@@ -932,15 +1211,26 @@ export function LiveScheduleView() {
                     </Button>
 
                     {isTeacher && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setBroadcastingSlot(slot)}
-                        className="border-amber-300 text-amber-900 hover:bg-amber-50 text-xs font-bold cursor-pointer"
-                        title="Send SMS & In-App notification to enrolled students"
-                      >
-                        <Send className="h-3.5 w-3.5 mr-1" /> Broadcast
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAttendanceSlot(slot)}
+                          className="border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-bold cursor-pointer"
+                          title="View Attendance Log"
+                        >
+                          <Users className="h-3.5 w-3.5 mr-1 text-[#0d5c4d]" /> Attendance
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setBroadcastingSlot(slot)}
+                          className="border-amber-300 text-amber-900 hover:bg-amber-50 text-xs font-bold cursor-pointer"
+                          title="Send SMS & In-App notification to enrolled students"
+                        >
+                          <Send className="h-3.5 w-3.5 mr-1" /> Broadcast
+                        </Button>
+                      </>
                     )}
                   </div>
 
@@ -962,17 +1252,29 @@ export function LiveScheduleView() {
                             <Video className="h-3.5 w-3.5" /> Enter Studio ↗
                           </Button>
                         ) : isCompleted ? (
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setRecordingModalSlot(slot);
-                              setRecordingInputUrl(slot.recordingUrl || "");
-                            }}
-                            className="border-slate-300 text-slate-700 text-xs font-bold cursor-pointer"
-                          >
-                            <Play className="h-3.5 w-3.5 mr-1 text-[#0d5c4d]" />{" "}
-                            {slot.recordingUrl ? "Update Recording" : "+ Add Recording"}
-                          </Button>
+                          <div className="flex items-center gap-1.5">
+                            {slot.recordingUrl && (
+                              <Button
+                                size="sm"
+                                onClick={() => setViewingReplaySlot(slot)}
+                                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold cursor-pointer gap-1"
+                              >
+                                <Play className="h-3 w-3 fill-current" /> Preview Replay
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setRecordingModalSlot(slot);
+                                setRecordingInputUrl(slot.recordingUrl || "");
+                              }}
+                              className="border-slate-300 text-slate-700 text-xs font-bold cursor-pointer"
+                            >
+                              <Play className="h-3.5 w-3.5 mr-1 text-[#0d5c4d]" />{" "}
+                              {slot.recordingUrl ? "Update URL" : "+ Add URL"}
+                            </Button>
+                          </div>
                         ) : (
                           <Button
                             onClick={() => handleToggleStatus(slot, "live_now")}
@@ -992,14 +1294,13 @@ export function LiveScheduleView() {
                             <Radio className="h-3.5 w-3.5" /> Join Live Classroom 🚀
                           </Button>
                         ) : slot.recordingUrl ? (
-                          <a
-                            href={slot.recordingUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="py-1.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                          <Button
+                            size="sm"
+                            onClick={() => setViewingReplaySlot(slot)}
+                            className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                           >
-                            <Play className="h-3.5 w-3.5 text-rose-400" /> Watch Replay ↗
-                          </a>
+                            <Play className="h-3.5 w-3.5 text-rose-400 fill-current" /> Watch Replay ↗
+                          </Button>
                         ) : (
                           <span className="text-xs font-semibold text-slate-500 px-3 py-1 bg-slate-100 rounded-xl">
                             Starts {slot.day}
@@ -1291,6 +1592,34 @@ export function LiveScheduleView() {
             </div>
           </div>
 
+          {/* Pre-class Lecture Handout Attachment */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Handout / Tute Name (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Limits & Calculus Problem Set #04.pdf"
+                value={formData.handoutName || ""}
+                onChange={(e) => setFormData({ ...formData, handoutName: e.target.value })}
+                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Handout PDF Download Link (Optional)
+              </label>
+              <input
+                type="url"
+                placeholder="https://example.com/handouts/tute.pdf"
+                value={formData.handoutUrl || ""}
+                onChange={(e) => setFormData({ ...formData, handoutUrl: e.target.value })}
+                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono focus:outline-hidden focus:border-[#0d5c4d]"
+              />
+            </div>
+          </div>
+
           {/* Form Actions */}
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
             <Button
@@ -1441,6 +1770,337 @@ export function LiveScheduleView() {
                 className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold cursor-pointer"
               >
                 Save Recording Link
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* =================================================================== */}
+      {/* MODAL 6: IN-APP VIDEO REPLAY THEATER (VOD Player + Chapters + QA)    */}
+      {/* =================================================================== */}
+      {viewingReplaySlot && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-slate-950 border border-white/10 rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            {/* Replay Header */}
+            <div className="p-4 px-5 bg-gradient-to-r from-slate-950 via-slate-900 to-[#0d2b26] border-b border-white/10 flex items-center justify-between text-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-rose-600/20 text-rose-400 border border-rose-500/30 flex items-center justify-center">
+                  <Play className="h-4 w-4 fill-current ml-0.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-white leading-tight flex items-center gap-2">
+                    <span className="line-clamp-1">{viewingReplaySlot.title}</span>
+                    <Badge className="bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px]">
+                      HD Replay
+                    </Badge>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {viewingReplaySlot.subject} &bull; {viewingReplaySlot.grade} &bull; Duration: {viewingReplaySlot.duration || "2h 00m"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open(viewingReplaySlot.recordingUrl || viewingReplaySlot.meetingUrl, "_blank")}
+                  className="border-white/20 text-white hover:bg-white/10 text-xs font-bold hidden sm:flex"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 mr-1" /> External Tab
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setViewingReplaySlot(null)}
+                  className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold rounded-xl h-8 px-3 cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Video Player + Interactive Workspace */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 overflow-hidden">
+              {/* Left Column: Video Embed (8 cols) */}
+              <div className="lg:col-span-8 bg-black flex flex-col justify-center relative">
+                <div className="aspect-video w-full bg-black">
+                  <iframe
+                    src={getEmbedUrl(viewingReplaySlot.recordingUrl)}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="w-full h-full border-0"
+                    title={viewingReplaySlot.title}
+                  />
+                </div>
+                {/* Under player quick bar */}
+                <div className="p-3 bg-slate-900/90 border-t border-white/5 flex items-center justify-between text-xs text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
+                      Interactive Playback
+                    </span>
+                    <span className="text-slate-400 font-mono text-[11px]">
+                      Held on {viewingReplaySlot.day} ({viewingReplaySlot.startTime})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <Eye className="h-3.5 w-3.5" /> {viewingReplaySlot.viewsCount || 184} Replays
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3.5 w-3.5" /> {viewingReplaySlot.enrolledCount} Enrolled
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Chapters, Handouts, Q&A (4 cols) */}
+              <div className="lg:col-span-4 bg-slate-900 flex flex-col border-t lg:border-t-0 lg:border-l border-white/10 max-h-[380px] lg:max-h-none overflow-hidden">
+                {/* Tabs Header */}
+                <div className="flex items-center border-b border-white/10 bg-slate-950 p-1.5 shrink-0">
+                  <button
+                    onClick={() => setReplayActiveTab("chapters")}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                      replayActiveTab === "chapters"
+                        ? "bg-[#0d5c4d] text-white"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Chapters
+                  </button>
+                  <button
+                    onClick={() => setReplayActiveTab("handout")}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                      replayActiveTab === "handout"
+                        ? "bg-[#0d5c4d] text-white"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Handout
+                  </button>
+                  <button
+                    onClick={() => setReplayActiveTab("qa")}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                      replayActiveTab === "qa"
+                        ? "bg-[#0d5c4d] text-white"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Q&amp;A Doubts
+                  </button>
+                </div>
+
+                {/* Tab 1: Chapters */}
+                {replayActiveTab === "chapters" && (
+                  <div className="p-4 space-y-2.5 overflow-y-auto flex-1">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      Key Topics &amp; Timestamps
+                    </p>
+                    <div className="space-y-2">
+                      {lectureChapters.map((ch, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all flex items-start justify-between gap-2 cursor-pointer group"
+                        >
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-semibold text-slate-200 group-hover:text-emerald-300 transition-colors line-clamp-2">
+                              {ch.title}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-mono">
+                              Duration: {ch.duration}
+                            </span>
+                          </div>
+                          <span className="font-mono text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 shrink-0">
+                            {ch.time}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab 2: Handout */}
+                {replayActiveTab === "handout" && (
+                  <div className="p-4 space-y-3 overflow-y-auto flex-1 text-xs">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      Lecture Material &amp; Homework Set
+                    </p>
+                    <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-9 w-9 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="truncate">
+                          <p className="font-bold text-white truncate">
+                            {viewingReplaySlot.handoutName || "Class Lecture Notes & Worked Examples.pdf"}
+                          </p>
+                          <p className="text-[11px] text-slate-400">G.C.E. A/L Comprehensive Problem Set</p>
+                        </div>
+                      </div>
+
+                      <a
+                        href={viewingReplaySlot.handoutUrl || "#"}
+                        download
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full py-2 px-3 rounded-xl bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                      >
+                        <Download className="h-3.5 w-3.5" /> Download Full Handout PDF
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab 3: Q&A */}
+                {replayActiveTab === "qa" && (
+                  <div className="p-4 flex flex-col justify-between flex-1 overflow-hidden">
+                    <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        Student Discussion ({comments.length})
+                      </p>
+                      {comments.map((cm) => (
+                        <div key={cm.id} className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-white">{cm.author}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{cm.time}</span>
+                          </div>
+                          <p className="text-slate-300 leading-relaxed text-[11px]">{cm.text}</p>
+                          {cm.reply && (
+                            <div className="p-2 rounded-lg bg-[#0d5c4d]/20 border border-[#0d5c4d]/40 text-[11px] text-emerald-200 mt-1.5">
+                              <span className="font-bold text-emerald-300 block mb-0.5">Teacher Reply:</span>
+                              {cm.reply}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <form onSubmit={handleAddComment} className="pt-3 border-t border-white/10 flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Ask a question about this lecture..."
+                        value={newCommentText}
+                        onChange={(e) => setNewCommentText(e.target.value)}
+                        className="flex-1 p-2 rounded-xl bg-white/10 border border-white/10 text-xs text-white placeholder-slate-400 focus:outline-hidden focus:border-emerald-400"
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold px-3 shrink-0 cursor-pointer"
+                      >
+                        Post
+                      </Button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* MODAL 7: CLASS ATTENDANCE ROSTER & PARTICIPATION LOG               */}
+      {/* =================================================================== */}
+      <Modal
+        isOpen={!!attendanceSlot}
+        onClose={() => setAttendanceSlot(null)}
+        title="Class Attendance & Participation Log"
+        description={`Student check-in timestamps and duration records for "${attendanceSlot?.title || ""}"`}
+      >
+        {attendanceSlot && (
+          <div className="space-y-4 pt-1">
+            {/* KPI Cards Row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="p-3 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0]">
+                <p className="text-[10px] font-bold uppercase text-[#0d5c4d]">Enrolled</p>
+                <p className="text-lg font-black text-[#0d2b26] mt-0.5">{attendanceSlot.enrolledCount}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                <p className="text-[10px] font-bold uppercase text-emerald-700">Attended</p>
+                <p className="text-lg font-black text-emerald-900 mt-0.5">128 (90.1%)</p>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="text-[10px] font-bold uppercase text-slate-600">On Time</p>
+                <p className="text-lg font-black text-slate-800 mt-0.5">119</p>
+              </div>
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
+                <p className="text-[10px] font-bold uppercase text-amber-700">Late Check-in</p>
+                <p className="text-lg font-black text-amber-900 mt-0.5">9</p>
+              </div>
+            </div>
+
+            {/* Filter & Export Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Filter student by name or index..."
+                  value={attendanceSearch}
+                  onChange={(e) => setAttendanceSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
+                />
+              </div>
+              <Button
+                size="sm"
+                onClick={() => handleExportAttendanceCSV(attendanceSlot)}
+                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold gap-1.5 shadow-2xs cursor-pointer shrink-0"
+              >
+                <Download className="h-3.5 w-3.5" /> Export Attendance CSV
+              </Button>
+            </div>
+
+            {/* Attendance Records Table */}
+            <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-64 overflow-y-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-[10px] sticky top-0">
+                  <tr>
+                    <th className="py-2.5 px-3">Student Name</th>
+                    <th className="py-2.5 px-3">Index No</th>
+                    <th className="py-2.5 px-3">Join Time</th>
+                    <th className="py-2.5 px-3">Duration</th>
+                    <th className="py-2.5 px-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {mockAttendance
+                    .filter((st) =>
+                      !attendanceSearch.trim() ||
+                      st.studentName.toLowerCase().includes(attendanceSearch.toLowerCase()) ||
+                      st.indexNo.toLowerCase().includes(attendanceSearch.toLowerCase())
+                    )
+                    .map((st) => (
+                      <tr key={st.id} className="hover:bg-slate-50">
+                        <td className="py-2 px-3 font-bold text-slate-900">{st.studentName}</td>
+                        <td className="py-2 px-3 font-mono text-slate-500">{st.indexNo}</td>
+                        <td className="py-2 px-3 font-mono text-slate-600">{st.joinTime}</td>
+                        <td className="py-2 px-3 text-slate-600">{st.duration}</td>
+                        <td className="py-2 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              st.status === "Present"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}
+                          >
+                            {st.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAttendanceSlot(null)}
+                className="text-xs font-bold"
+              >
+                Close Log
               </Button>
             </div>
           </div>

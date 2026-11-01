@@ -7,11 +7,20 @@ import { cn } from "@/lib/utils";
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title: string | React.ReactNode;
   description?: string;
   children: React.ReactNode;
   maxWidth?: string;
+  size?: "sm" | "md" | "lg" | "xl" | "full";
 }
+
+const sizeMap: Record<string, string> = {
+  sm: "max-w-md",
+  md: "max-w-lg",
+  lg: "max-w-2xl",
+  xl: "max-w-4xl",
+  full: "max-w-5xl"
+};
 
 export function Modal({
   isOpen,
@@ -19,8 +28,10 @@ export function Modal({
   title,
   description,
   children,
-  maxWidth = "max-w-2xl"
+  maxWidth = "max-w-2xl",
+  size
 }: ModalProps) {
+  const effectiveMaxWidth = size ? (sizeMap[size] || maxWidth) : maxWidth;
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -49,7 +60,7 @@ export function Modal({
       <div
         className={cn(
           "relative z-50 w-full overflow-hidden rounded-3xl border border-[#c4e9e0] bg-white p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200",
-          maxWidth
+          effectiveMaxWidth
         )}
       >
         <div className="flex items-center justify-between pb-4 border-b border-[#e6ece8]">

@@ -42,7 +42,11 @@ import {
   ZoomOut,
   ChevronRight,
   GraduationCap,
-  CheckCheck
+  CheckCheck,
+  HelpCircle,
+  RotateCcw,
+  Lock,
+  Globe
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,13 +61,16 @@ import {
   Tooltip,
   CartesianGrid
 } from "recharts";
-import { Assignment, Course, Announcement } from "@/types/lms";
+import { Assignment, Course, Announcement, Quiz, QuizQuestion, LibraryResource } from "@/types/lms";
+import { QuizBuilderModal } from "./QuizBuilderModal";
+import { ResourceUploadModal } from "./ResourceUploadModal";
 
 interface TeacherViewsProps {
   initialTab?: "home" | "grading" | "assignments" | "analytics";
+  initialSubTab?: "assignments" | "quizzes" | "resources";
 }
 
-export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
+export function TeacherViews({ initialTab = "home", initialSubTab = "assignments" }: TeacherViewsProps) {
   const {
     courses,
     assignments,
@@ -73,6 +80,11 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
     updateAssignment,
     deleteAssignment,
     createLesson,
+    quizzes,
+    createQuiz,
+    updateQuiz,
+    deleteQuiz,
+    setSelectedQuizId,
     announcements,
     createAnnouncement,
     updateAnnouncement,
@@ -82,7 +94,13 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
     setSelectedCourseId,
     currentUser,
     t,
-    activeTenant
+    activeTenant,
+    libraryResources,
+    createLibraryResource,
+    updateLibraryResource,
+    deleteLibraryResource,
+    recordResourceView,
+    recordResourceDownload
   } = useApp();
 
   // Filter courses strictly for this individual Tutor's workspace
@@ -94,17 +112,45 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
   }, [courses, currentUser]);
 
   const [activeTab, setActiveTab] = useState<"home" | "grading" | "assignments" | "analytics">(
-    currentView === "assignments"
+    currentView === "assignments" || currentView === "quizzes" || currentView === "resources" || currentView === "materials" || currentView === "library"
       ? "assignments"
       : currentView === "submissions"
       ? "grading"
       : initialTab
   );
 
+  const [courseworkSubTab, setCourseworkSubTab] = useState<"assignments" | "quizzes" | "resources">(
+    initialSubTab || (currentView === "quizzes" ? "quizzes" : currentView === "resources" || currentView === "materials" || currentView === "library" ? "resources" : "assignments")
+  );
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+  const [quizToEdit, setQuizToEdit] = useState<Quiz | null>(null);
+  const [previewQuiz, setPreviewQuiz] = useState<Quiz | null>(null);
+  const [previewAnswers, setPreviewAnswers] = useState<Record<string, any>>({});
+  const [previewResult, setPreviewResult] = useState<{ score: number; totalMarks: number } | null>(null);
+  const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
+
+  // Resources & Tutes State
+  const [isResourceModalOpen, setIsResourceModalOpen] = useState(false);
+  const [resourceToEdit, setResourceToEdit] = useState<LibraryResource | null>(null);
+  const [inspectingResource, setInspectingResource] = useState<LibraryResource | null>(null);
+  const [resourceTypeFilter, setResourceTypeFilter] = useState<"all" | "tute" | "past_paper" | "book">("all");
+  const [resourceVisibilityFilter, setResourceVisibilityFilter] = useState<"all" | "public" | "subscribers_only">("all");
+  const [resourceSearch, setResourceSearch] = useState<string>("");
+  const [resourceViewerTab, setResourceViewerTab] = useState<"document" | "marking" | "toc">("document");
+  const [resourceViewerPage, setResourceViewerPage] = useState<number>(1);
+  const [resourceViewerZoom, setResourceViewerZoom] = useState<number>(100);
+
   // Sync tab if currentView changes externally from sidebar
   useEffect(() => {
     if (currentView === "assignments") {
       setActiveTab("assignments");
+      setCourseworkSubTab("assignments");
+    } else if (currentView === "quizzes") {
+      setActiveTab("assignments");
+      setCourseworkSubTab("quizzes");
+    } else if (currentView === "resources" || currentView === "materials" || currentView === "library" || currentView === "tutes") {
+      setActiveTab("assignments");
+      setCourseworkSubTab("resources");
     } else if (currentView === "submissions") {
       setActiveTab("grading");
     } else if (currentView === "dashboard") {
@@ -191,6 +237,66 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
       u.topics.map((t) => `${u.title} • ${t.title}`)
     );
   }, [currentEditAsgCourse]);
+
+  // Filter study materials & past papers uploaded by or belonging to this teacher
+  const myTeacherResources: LibraryResource[] = useMemo(() => {
+    return libraryResources.filter((r) => {
+      const isAuthor =
+        r.author === currentUser?.name ||
+        r.teacherId === currentUser?.id ||
+        Boolean(r.isOwner);
+      const isSubjectMatch = teacherCourses.some(
+        (c) =>
+          c.subjectId === r.subject ||
+          c.title.toLowerCase().includes(r.subject.toLowerCase()) ||
+          r.subject.toLowerCase().includes(c.title.toLowerCase())
+      );
+      return isAuthor || isSubjectMatch || r.id.startsWith("lib_") || r.id.startsWith("tute_") || r.id.startsWith("pp_");
+    });
+  }, [libraryResources, currentUser, teacherCourses]);
+
+  const filteredTeacherResources: LibraryResource[] = useMemo(() => {
+    return myTeacherResources.filter((r) => {
+      if (resourceTypeFilter !== "all" && r.resourceType !== resourceTypeFilter) return false;
+      if (resourceVisibilityFilter !== "all" && r.visibility !== resourceVisibilityFilter) return false;
+      if (resourceSearch.trim()) {
+        const q = resourceSearch.toLowerCase();
+        return (
+          r.title.toLowerCase().includes(q) ||
+          (r.topic && r.topic.toLowerCase().includes(q)) ||
+          r.subject.toLowerCase().includes(q) ||
+          (r.description && r.description.toLowerCase().includes(q)) ||
+          (r.year && String(r.year).includes(q))
+        );
+      }
+      return true;
+    });
+  }, [myTeacherResources, resourceTypeFilter, resourceVisibilityFilter, resourceSearch]);
+
+  const handleDownloadResource = (resource: LibraryResource) => {
+    recordResourceDownload(resource.id);
+    const sampleContent = `========================================================\n` +
+      `${resource.title.toUpperCase()}\n` +
+      `Subject: ${resource.subject} | Type: ${resource.resourceType.toUpperCase()}\n` +
+      `Author: ${resource.author} | Year: ${resource.year || '2025/2026'}\n` +
+      `Access: ${resource.visibility === 'subscribers_only' ? 'Subscribers Only' : 'Public'}\n` +
+      `========================================================\n\n` +
+      `Description:\n${resource.description}\n\n` +
+      (resource.markingSchemeNotes ? `Marking Scheme Notes:\n${resource.markingSchemeNotes}\n\n` : '') +
+      `Table of Contents:\n` +
+      (resource.tableOfContents?.map((t) => `- Page ${t.page}: ${t.title}`).join('\n') || '- Section 1: Theory Notes\n- Section 2: Model Questions') +
+      `\n\n[Certified by LMS Educator Faculty]`;
+
+    const blob = new Blob([sampleContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${resource.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // New lesson form state with full multi-format upload support
   const [lessonCourseId, setLessonCourseId] = useState(courses[0]?.id || "crs_math_12");
@@ -596,6 +702,13 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
     { name: "Tharushi Fernando", index: "AL-2026-4405", class: "12-Physical Science", submitted: 2, avg: "68%", status: "Credit" }
   ];
 
+  // Executive Overview KPIs
+  const totalEnrolledStudents = 136; // Sum of active cohort students across Grade 12 & 13 Batches
+  const activeBatchesCount = teacherCourses.length;
+  const pendingReviewsCount = submissions.filter((s) => s.status === "submitted").length;
+  const liveSessionsTodayCount = todaySchedule.length;
+  const liveNowSession = todaySchedule.find((s) => s.status === "in_progress");
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Teacher Header */}
@@ -606,23 +719,23 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
             <span className="text-xs font-bold uppercase tracking-wider text-[#0d5c4d]">
               {currentView === "submissions"
                 ? "Assessments & Review"
-                : currentView === "assignments"
-                ? "Coursework Management"
+                : currentView === "assignments" || currentView === "quizzes"
+                ? (courseworkSubTab === "quizzes" ? "MCQ & Exam Arena" : "Coursework Management")
                 : "Faculty Management System"}
             </span>
           </div>
           <h1 className="text-2xl font-black text-[#0d2b26] mt-1">
             {currentView === "submissions"
               ? "Submissions & Grading Desk"
-              : currentView === "assignments"
-              ? "Course Assignments"
+              : currentView === "assignments" || currentView === "quizzes"
+              ? (courseworkSubTab === "quizzes" ? "Interactive MCQ Quizzes" : "Course Assignments")
               : "Teaching Studio · Home"}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             {currentView === "submissions"
               ? "Review student submissions, assign marks based on curriculum rubrics, and release results."
-              : currentView === "assignments"
-              ? "Publish and manage coursework assignments, problem sets, and submission deadlines."
+              : currentView === "assignments" || currentView === "quizzes"
+              ? (courseworkSubTab === "quizzes" ? "Build, test, and publish interactive multiple choice diagnostic quizzes." : "Publish and manage coursework assignments, problem sets, and submission deadlines.")
               : "Overview of your classes, student performance analytics, and institutional activity."}
           </p>
         </div>
@@ -652,7 +765,9 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white backdrop-blur-xs">
                   Daily Cockpit
                 </span>
-                <span className="text-xs text-white/80 font-medium">Welcome back, Mr. Samantha Perera</span>
+                <span className="text-xs text-white/80 font-medium">
+                  Welcome back, {currentUser?.name || "Mr. Samantha Perera"}
+                </span>
               </div>
               <h2 className="text-lg font-black text-white mt-1">Teaching &amp; Assessment Control Center</h2>
               <p className="text-xs text-white/80 mt-0.5">
@@ -680,6 +795,139 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
                 <Bell className="h-3.5 w-3.5 mr-1" /> Post Notice
               </Button>
             </div>
+          </div>
+
+          {/* Top 4 Executive KPI Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Total Enrolled Students */}
+            <Card 
+              onClick={() => setCurrentView("connect")}
+              className="border-[#e6ece8] bg-white hover:border-[#a2dfd2] hover:bg-emerald-50/20 transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Total Enrolled Students
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-black text-[#0d2b26]">
+                      {totalEnrolledStudents}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
+                      +12 this term
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-[#0d5c4d] font-semibold flex items-center gap-1">
+                    View Subscribers Roster <ChevronRight className="h-3 w-3" />
+                  </p>
+                </div>
+                <div className="h-11 w-11 rounded-2xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <Users className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 2: Active Batches */}
+            <Card 
+              onClick={() => {
+                setSelectedCourseId(teacherCourses[0]?.id || "crs_math_12");
+                setCurrentView("course-detail");
+              }}
+              className="border-[#e6ece8] bg-white hover:border-[#a2dfd2] transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Active Batches
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-black text-[#0d2b26]">
+                      {activeBatchesCount}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] font-semibold text-teal-700 bg-teal-50 border-teal-200">
+                      A/L Curricula
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                    Avg. 68% Syllabus covered <ChevronRight className="h-3 w-3 text-slate-400" />
+                  </p>
+                </div>
+                <div className="h-11 w-11 rounded-2xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <BookOpen className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 3: Pending Reviews */}
+            <Card 
+              onClick={() => {
+                setSubFilter("pending");
+                setActiveTab("grading");
+              }}
+              className="border-[#e6ece8] bg-white hover:border-amber-300 hover:bg-amber-50/20 transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Pending Reviews
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-black text-amber-900">
+                      {pendingReviewsCount}
+                    </span>
+                    <Badge variant="warning" className="text-[10px] font-bold">
+                      Needs Marking
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-amber-700 font-semibold flex items-center gap-1">
+                    Open Grading Desk <ChevronRight className="h-3 w-3" />
+                  </p>
+                </div>
+                <div className="h-11 w-11 rounded-2xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <ClipboardCheck className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 4: Today's Live Sessions */}
+            <Card 
+              onClick={() => {
+                if (liveNowSession) {
+                  setLiveClassSession(liveNowSession);
+                } else if (todaySchedule[0]) {
+                  setLiveClassSession(todaySchedule[0]);
+                }
+              }}
+              className="border-[#e6ece8] bg-white hover:border-rose-300 hover:bg-rose-50/20 transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Today&apos;s Live Sessions
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-black text-rose-950">
+                      {liveSessionsTodayCount}
+                    </span>
+                    {liveNowSession ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-rose-600 animate-pulse" /> Live Now
+                      </span>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] text-slate-600 border-slate-200">
+                        Scheduled
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-rose-700 font-semibold flex items-center gap-1">
+                    {liveNowSession ? "Join Live Stream" : "View Timetable"} <ChevronRight className="h-3 w-3" />
+                  </p>
+                </div>
+                <div className="h-11 w-11 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <Video className="h-5 w-5" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Grid Layout: Left Column (Timetable & Active Classes & Submissions) + Right Column (Action Required & Doubts) */}
@@ -1733,133 +1981,778 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
         );
       })()}
 
-      {/* TAB 2: Course Assignments Manager (Section 6.3) */}
+      {/* TAB 2: Course Assignments & Quizzes Manager */}
       {activeTab === "assignments" && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-extrabold text-[#0d2b26] flex items-center gap-2">
-                <FileText className="h-5 w-5 text-[#0d5c4d]" />
-                Course Assignments Manager (Section 6.3)
-              </h2>
-              <p className="text-xs text-slate-500">
-                Track homework tasks, deadline compliance, and launch grading sessions.
-              </p>
+        <div className="space-y-5">
+          {/* SubTab Segmented Controller: Assignments vs Quizzes vs Resources */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-[#f8faf9] border border-[#e6ece8] rounded-2xl">
+            <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200 shadow-2xs overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setCourseworkSubTab("assignments")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  courseworkSubTab === "assignments"
+                    ? "bg-[#0d5c4d] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                }`}
+              >
+                <FileText className="h-4 w-4" />
+                <span>Written Assignments ({assignments.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCourseworkSubTab("quizzes")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  courseworkSubTab === "quizzes"
+                    ? "bg-[#0d5c4d] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                }`}
+              >
+                <GraduationCap className="h-4 w-4" />
+                <span>Online Quizzes & MCQs ({quizzes.length})</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  courseworkSubTab === "quizzes" ? "bg-white/20 text-white" : "bg-[#ecf8f5] text-[#0d5c4d]"
+                }`}>
+                  Interactive
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCourseworkSubTab("resources")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  courseworkSubTab === "resources"
+                    ? "bg-[#0d5c4d] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                }`}
+              >
+                <BookOpen className="h-4 w-4" />
+                <span>Tutes & Study Materials ({myTeacherResources.length})</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  courseworkSubTab === "resources" ? "bg-white/20 text-white" : "bg-[#ecf8f5] text-[#0d5c4d]"
+                }`}>
+                  Hub
+                </span>
+              </button>
             </div>
 
-            <Button
-              onClick={() => setIsCreateAsgModalOpen(true)}
-              className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5 text-xs shadow-xs"
-            >
-              <Plus className="h-3.5 w-3.5" /> Create Assignment
-            </Button>
+            {courseworkSubTab === "assignments" ? (
+              <Button
+                onClick={() => setIsCreateAsgModalOpen(true)}
+                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5 text-xs shadow-xs cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" /> Create Assignment
+              </Button>
+            ) : courseworkSubTab === "quizzes" ? (
+              <Button
+                onClick={() => {
+                  setQuizToEdit(null);
+                  setIsQuizModalOpen(true);
+                }}
+                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5 text-xs shadow-xs cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" /> Create MCQ Quiz
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  setResourceToEdit(null);
+                  setIsResourceModalOpen(true);
+                }}
+                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5 text-xs shadow-xs cursor-pointer"
+              >
+                <UploadCloud className="h-3.5 w-3.5" /> Upload Material
+              </Button>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {assignments.map((asg) => {
-              const submissionCount = submissions.filter((s) => s.assignmentId === asg.id).length;
-              const pendingCount = submissions.filter(
-                (s) => s.assignmentId === asg.id && s.status === "submitted"
-              ).length;
+          {/* SUB-VIEW 1: Written Assignments */}
+          {courseworkSubTab === "assignments" && (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-extrabold text-[#0d2b26] flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-[#0d5c4d]" />
+                    Course Assignments Manager
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Track homework tasks, deadline compliance, and launch grading sessions.
+                  </p>
+                </div>
+              </div>
 
-              return (
-                <Card key={asg.id} className="border-[#e6ece8] bg-white shadow-2xs hover:shadow-xs transition-shadow">
-                  <CardHeader className="p-5 pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-black text-[#0d5c4d] bg-[#ecf8f5] border border-[#c4e9e0] px-2.5 py-0.5 rounded-full">
-                          📚 {asg.subjectName || "Combined Mathematics"}
-                        </span>
-                        <Badge variant="outline" className="text-[10px] font-bold text-slate-700 bg-slate-50 border-slate-200">
-                          {asg.topicName}
-                        </Badge>
-                      </div>
-                      <Badge variant="outline" className="text-xs font-mono font-bold">
-                        {asg.maxMarks} Marks
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-base font-black text-[#0d2b26] mt-2">
-                      {asg.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-5 pt-0 space-y-4">
-                    <p className="text-xs text-slate-600 line-clamp-2">
-                      {asg.instructions}
-                    </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {assignments.map((asg) => {
+                  const submissionCount = submissions.filter((s) => s.assignmentId === asg.id).length;
+                  const pendingCount = submissions.filter(
+                    (s) => s.assignmentId === asg.id && s.status === "submitted"
+                  ).length;
 
-                    {asg.attachmentName && (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] text-xs text-[#0d5c4d]">
-                        <FileText className="h-4 w-4 shrink-0 text-[#0d5c4d]" />
-                        <span className="font-bold truncate flex-1">{asg.attachmentName}</span>
-                        <span className="text-[10px] font-mono uppercase bg-white/80 px-2 py-0.5 rounded border border-[#c4e9e0] shrink-0">
-                          Question PDF
-                        </span>
-                      </div>
-                    )}
+                  return (
+                    <Card key={asg.id} className="border-[#e6ece8] bg-white shadow-2xs hover:shadow-xs transition-shadow">
+                      <CardHeader className="p-5 pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-black text-[#0d5c4d] bg-[#ecf8f5] border border-[#c4e9e0] px-2.5 py-0.5 rounded-full">
+                              📚 {asg.subjectName || "Combined Mathematics"}
+                            </span>
+                            <Badge variant="outline" className="text-[10px] font-bold text-slate-700 bg-slate-50 border-slate-200">
+                              {asg.topicName}
+                            </Badge>
+                          </div>
+                          <Badge variant="outline" className="text-xs font-mono font-bold">
+                            {asg.maxMarks} Marks
+                          </Badge>
+                        </div>
+                        <CardTitle className="text-base font-black text-[#0d2b26] mt-2">
+                          {asg.title}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-5 pt-0 space-y-4">
+                        <p className="text-xs text-slate-600 line-clamp-2">
+                          {asg.instructions}
+                        </p>
 
-                    <div className="p-3 rounded-xl bg-[#f8faf9] border border-[#e6ece8] space-y-2">
-                      <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-                        <span>Submissions Progress</span>
-                        <span>{submissionCount} / 35 Enrolled (80%)</span>
-                      </div>
-                      <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
-                        <div className="h-full bg-[#0d5c4d] rounded-full" style={{ width: "80%" }}></div>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                        <span className="flex items-center gap-1 text-[#b47a16] font-bold">
-                          <Clock className="h-3 w-3" /> Due: {asg.dueDate}
-                        </span>
-                        {pendingCount > 0 && (
-                          <span className="text-[#b47a16] font-bold">
-                            {pendingCount} Pending Review
-                          </span>
+                        {asg.attachmentName && (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] text-xs text-[#0d5c4d]">
+                            <FileText className="h-4 w-4 shrink-0 text-[#0d5c4d]" />
+                            <span className="font-bold truncate flex-1">{asg.attachmentName}</span>
+                            <span className="text-[10px] font-mono uppercase bg-white/80 px-2 py-0.5 rounded border border-[#c4e9e0] shrink-0">
+                              Question PDF
+                            </span>
+                          </div>
                         )}
-                      </div>
-                    </div>
 
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                      <div className="flex items-center gap-1.5">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleOpenEditAssignment(asg)}
-                          className="border-[#c4e9e0] text-[#0d5c4d] hover:bg-[#ecf8f5] text-xs font-bold gap-1 cursor-pointer h-8"
-                          title="Edit Assignment"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                          <span>Edit</span>
-                        </Button>
+                        <div className="p-3 rounded-xl bg-[#f8faf9] border border-[#e6ece8] space-y-2">
+                          <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                            <span>Submissions Progress</span>
+                            <span>{submissionCount} / 35 Enrolled (80%)</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                            <div className="h-full bg-[#0d5c4d] rounded-full" style={{ width: "80%" }}></div>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                            <span className="flex items-center gap-1 text-[#b47a16] font-bold">
+                              <Clock className="h-3 w-3" /> Due: {asg.dueDate}
+                            </span>
+                            {pendingCount > 0 && (
+                              <span className="text-[#b47a16] font-bold">
+                                {pendingCount} Pending Review
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-                        <button
-                          onClick={() => {
-                            if (confirm(`Remove assignment "${asg.title}"?`)) {
-                              deleteAssignment(asg.id);
-                            }
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          title="Delete Assignment"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenEditAssignment(asg)}
+                              className="border-[#c4e9e0] text-[#0d5c4d] hover:bg-[#ecf8f5] text-xs font-bold gap-1 cursor-pointer h-8"
+                              title="Edit Assignment"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                              <span>Edit</span>
+                            </Button>
 
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remove assignment "${asg.title}"?`)) {
+                                  deleteAssignment(asg.id);
+                                }
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete Assignment"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setAssignmentFilter(asg.id);
+                              setCurrentView("submissions");
+                              setActiveTab("grading");
+                            }}
+                            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs gap-1.5 shadow-2xs h-8 cursor-pointer"
+                          >
+                            <ClipboardCheck className="h-3.5 w-3.5" /> Review Submissions
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* SUB-VIEW 2: Online Quizzes & MCQ Arena */}
+          {courseworkSubTab === "quizzes" && (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-extrabold text-[#0d2b26] flex items-center gap-2">
+                    <GraduationCap className="h-5 w-5 text-[#0d5c4d]" />
+                    Online Quizzes & Timed Examination Arena
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Construct automated multiple-choice tests, inspect answer keys, and simulate candidate tests.
+                  </p>
+                </div>
+              </div>
+
+              {quizzes.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl border-2 border-dashed border-slate-200 bg-white space-y-3">
+                  <div className="p-3 bg-[#ecf8f5] text-[#0d5c4d] rounded-full w-fit mx-auto">
+                    <HelpCircle className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-800">No Online Quizzes Yet</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    Create your first interactive MCQ quiz with automated grading and instant rationale.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setQuizToEdit(null);
+                      setIsQuizModalOpen(true);
+                    }}
+                    className="bg-[#0d5c4d] text-white font-bold text-xs"
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Create First Quiz
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {quizzes.map((quiz) => {
+                    const isExpanded = expandedQuizId === quiz.id;
+
+                    return (
+                      <Card key={quiz.id} className="border-[#e6ece8] bg-white shadow-2xs hover:shadow-xs transition-shadow">
+                        <CardHeader className="p-5 pb-3">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="text-xs font-black text-[#0d5c4d] bg-[#ecf8f5] border border-[#c4e9e0] px-2.5 py-0.5 rounded-full">
+                              📚 {quiz.subjectName || "Combined Mathematics"}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <Badge
+                                variant={quiz.status === "published" ? "success" : "secondary"}
+                                className="text-[10px] uppercase font-bold"
+                              >
+                                {quiz.status === "published" ? "🟢 Published" : "🟡 Draft"}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs font-mono font-bold">
+                                {quiz.totalMarks} Marks
+                              </Badge>
+                            </div>
+                          </div>
+                          <CardTitle className="text-base font-black text-[#0d2b26] mt-2">
+                            {quiz.title}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-5 pt-0 space-y-4">
+                          <p className="text-xs text-slate-600 line-clamp-2">
+                            {quiz.instructions}
+                          </p>
+
+                          {/* Metric stats pills */}
+                          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                            <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8]">
+                              <span className="text-slate-400 block text-[10px] font-bold uppercase">Time Limit</span>
+                              <span className="font-bold text-[#b47a16] flex items-center justify-center gap-1 mt-0.5">
+                                <Clock className="h-3 w-3" /> {quiz.durationMinutes}m
+                              </span>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8]">
+                              <span className="text-slate-400 block text-[10px] font-bold uppercase">Questions</span>
+                              <span className="font-bold text-slate-800 mt-0.5 block">
+                                {quiz.totalQuestions || quiz.questions.length} MCQs
+                              </span>
+                            </div>
+                            <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8]">
+                              <span className="text-slate-400 block text-[10px] font-bold uppercase">Due Date</span>
+                              <span className="font-bold text-slate-700 text-[11px] mt-0.5 block truncate">
+                                {quiz.dueDate ? quiz.dueDate.split(" ")[0] : "No limit"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Cohort attempts & average banner */}
+                          {quiz.attempts && quiz.attempts.length > 0 && (
+                            <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] text-xs">
+                              <span className="text-[#0d5c4d] font-black flex items-center gap-1.5">
+                                <Users className="h-3.5 w-3.5" />
+                                <span>{quiz.attempts.length} Candidates Submitted</span>
+                              </span>
+                              <span className="font-mono font-black text-slate-800 text-xs">
+                                Cohort Avg: {Math.round(quiz.attempts.reduce((acc, a) => acc + a.percentage, 0) / quiz.attempts.length)}%
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Question list preview toggle */}
+                          <div className="border border-slate-100 rounded-xl overflow-hidden bg-slate-50/50">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedQuizId(isExpanded ? null : quiz.id)}
+                              className="w-full px-3 py-2 text-xs font-bold text-slate-700 flex items-center justify-between hover:bg-slate-100/70 cursor-pointer"
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <HelpCircle className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                                Inspect Questions &amp; Answer Keys ({quiz.questions.length})
+                              </span>
+                              <span className="text-slate-400 text-[10px]">
+                                {isExpanded ? "▲ Hide" : "▼ Preview"}
+                              </span>
+                            </button>
+
+                            {isExpanded && (
+                              <div className="p-3 pt-0 space-y-2 border-t border-slate-200/60 max-h-60 overflow-y-auto">
+                                {quiz.questions.map((q, qIdx) => (
+                                  <div
+                                    key={q.id || qIdx}
+                                    className="p-2.5 rounded-lg bg-white border border-slate-200 text-xs space-y-1.5"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-[#0d5c4d]">
+                                        Q{qIdx + 1}. {q.type.toUpperCase()} ({q.marks} Marks)
+                                      </span>
+                                      <span className="text-[10px] font-mono text-emerald-700 font-bold">
+                                        Answer:{" "}
+                                        {Array.isArray(q.correctAnswer)
+                                          ? q.correctAnswer.map((idx) => String.fromCharCode(65 + Number(idx))).join(", ")
+                                          : typeof q.correctAnswer === "number"
+                                          ? `Choice ${String.fromCharCode(65 + q.correctAnswer)}`
+                                          : String(q.correctAnswer)}
+                                      </span>
+                                    </div>
+                                    <p className="font-medium text-slate-800 line-clamp-2">
+                                      {q.questionText}
+                                    </p>
+                                    {q.options && q.options.length > 0 && (
+                                      <div className="grid grid-cols-2 gap-1 text-[11px] pt-1">
+                                        {q.options.map((opt, oIdx) => {
+                                          const isOptionCorrect = Array.isArray(q.correctAnswer)
+                                            ? q.correctAnswer.map(Number).includes(oIdx)
+                                            : oIdx === Number(q.correctAnswer);
+
+                                          return (
+                                            <div
+                                              key={oIdx}
+                                              className={`px-2 py-0.5 rounded text-[10px] truncate ${
+                                                isOptionCorrect
+                                                  ? "bg-emerald-50 text-emerald-800 font-bold border border-emerald-200"
+                                                  : "text-slate-500"
+                                              }`}
+                                            >
+                                              {String.fromCharCode(65 + oIdx)}. {opt}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                    {q.explanation && (
+                                      <p className="text-[10px] text-slate-500 italic pt-1 border-t border-slate-100">
+                                        Rationale: {q.explanation}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Action Footer */}
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setQuizToEdit(quiz);
+                                  setIsQuizModalOpen(true);
+                                }}
+                                className="border-[#c4e9e0] text-[#0d5c4d] hover:bg-[#ecf8f5] text-xs font-bold gap-1 cursor-pointer h-8"
+                                title="Edit Quiz Questions"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                                <span>Edit</span>
+                              </Button>
+
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Delete quiz "${quiz.title}"?`)) {
+                                    deleteQuiz(quiz.id);
+                                  }
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete Quiz"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setPreviewQuiz(quiz);
+                                setPreviewAnswers({});
+                                setPreviewResult(null);
+                              }}
+                              className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs gap-1.5 shadow-2xs h-8 cursor-pointer"
+                            >
+                              <Eye className="h-3.5 w-3.5" /> Test as Student
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SUB-VIEW 3: Tutes & Study Materials Hub */}
+          {courseworkSubTab === "resources" && (
+            <div className="space-y-5">
+              {/* Hub Intro & Header */}
+              <div>
+                <h2 className="text-base font-extrabold text-[#0d2b26] flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-[#0d5c4d]" />
+                  Resource &amp; Tute Upload Hub
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Publish class tutes, past papers, model exams, and revision guides. Set access controls (Public or Subscribers Only).
+                </p>
+              </div>
+
+              {/* KPI Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Total Materials</span>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-xl font-black text-[#0d2b26]">{myTeacherResources.length}</span>
+                    <Badge variant="outline" className="text-[10px] font-bold text-[#0d5c4d] bg-[#ecf8f5] border-[#c4e9e0]">
+                      Active
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Class Tutes</span>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-xl font-black text-[#0d5c4d]">
+                      {myTeacherResources.filter((r) => r.resourceType === "tute").length}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">Handouts</span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Past Papers & Models</span>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-xl font-black text-amber-600">
+                      {myTeacherResources.filter((r) => r.resourceType === "past_paper").length}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">Exam Sets</span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Subscribers-Only</span>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="text-xl font-black text-slate-800">
+                      {myTeacherResources.filter((r) => r.visibility === "subscribers_only").length}
+                    </span>
+                    <Badge variant="warning" className="text-[10px]">
+                      🔒 Protected
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter & Search Bar */}
+              <div className="p-3 bg-white border border-[#e6ece8] rounded-2xl shadow-2xs space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  {/* Search box */}
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={resourceSearch}
+                      onChange={(e) => setResourceSearch(e.target.value)}
+                      placeholder="Search by title, syllabus topic, year (e.g. 2025), or subject..."
+                      className="w-full pl-9 pr-8 h-9 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
+                    />
+                    {resourceSearch && (
+                      <button
+                        onClick={() => setResourceSearch("")}
+                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Visibility Filter */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-bold text-slate-500">Access:</span>
+                    <select
+                      value={resourceVisibilityFilter}
+                      onChange={(e) => setResourceVisibilityFilter(e.target.value as any)}
+                      className="h-9 px-3 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
+                    >
+                      <option value="all">All Access Levels</option>
+                      <option value="public">🌐 Public Access</option>
+                      <option value="subscribers_only">🔒 Subscribers Only</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Type pills filter */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-100">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Type:</span>
+                  {[
+                    { id: "all", label: "All Items", count: myTeacherResources.length },
+                    {
+                      id: "tute",
+                      label: "📝 Class Tutes",
+                      count: myTeacherResources.filter((r) => r.resourceType === "tute").length
+                    },
+                    {
+                      id: "past_paper",
+                      label: "📑 Past Papers & Model Exams",
+                      count: myTeacherResources.filter((r) => r.resourceType === "past_paper").length
+                    },
+                    {
+                      id: "book",
+                      label: "📖 Books & Guides",
+                      count: myTeacherResources.filter((r) => r.resourceType === "book").length
+                    }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setResourceTypeFilter(tab.id as any)}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                        resourceTypeFilter === tab.id
+                          ? "bg-[#0d5c4d] text-white shadow-xs"
+                          : "bg-[#f8faf9] text-slate-600 hover:bg-slate-100 border border-slate-200"
+                      }`}
+                    >
+                      {tab.label} ({tab.count})
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Resource Card Grid */}
+              {filteredTeacherResources.length === 0 ? (
+                <div className="p-10 text-center rounded-2xl border-2 border-dashed border-slate-200 bg-white space-y-3">
+                  <div className="p-3 bg-[#ecf8f5] text-[#0d5c4d] rounded-full w-fit mx-auto">
+                    <BookOpen className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-800">No Study Materials Found</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    {resourceSearch || resourceTypeFilter !== "all" || resourceVisibilityFilter !== "all"
+                      ? "No materials match the chosen filter criteria. Try clearing the search or switching types."
+                      : "Upload your first PDF tute, model exam paper, or study guide for your students."}
+                  </p>
+                  <div className="flex items-center justify-center gap-2 pt-2">
+                    {(resourceSearch || resourceTypeFilter !== "all" || resourceVisibilityFilter !== "all") && (
                       <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => {
-                          setAssignmentFilter(asg.id);
-                          setCurrentView("submissions");
-                          setActiveTab("grading");
+                          setResourceSearch("");
+                          setResourceTypeFilter("all");
+                          setResourceVisibilityFilter("all");
                         }}
-                        className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs gap-1.5 shadow-2xs h-8 cursor-pointer"
+                        className="text-xs font-bold"
                       >
-                        <ClipboardCheck className="h-3.5 w-3.5" /> Review Submissions
+                        Clear Filters
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setResourceToEdit(null);
+                        setIsResourceModalOpen(true);
+                      }}
+                      className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs"
+                    >
+                      <UploadCloud className="h-3.5 w-3.5 mr-1" /> Upload Material
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredTeacherResources.map((res) => {
+                    const isTute = res.resourceType === "tute";
+                    const isPastPaper = res.resourceType === "past_paper";
+                    const isSubscribersOnly = res.visibility === "subscribers_only";
+
+                    return (
+                      <Card
+                        key={res.id}
+                        className="border-[#e6ece8] bg-white shadow-2xs hover:shadow-sm transition-all overflow-hidden flex flex-col justify-between"
+                      >
+                        {/* Cover Image Banner */}
+                        <div className="relative h-32 w-full bg-slate-900 overflow-hidden">
+                          <img
+                            src={res.coverImage || "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=600&auto=format&fit=crop&q=80"}
+                            alt={res.title}
+                            className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+
+                          {/* Top Badges */}
+                          <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1.5 flex-wrap">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-black/60 text-white backdrop-blur-xs border border-white/20">
+                              {isTute ? "📝 Class Tute" : isPastPaper ? "📑 Past Paper" : "📖 Study Guide"}
+                            </span>
+
+                            <Badge
+                              variant={isSubscribersOnly ? "warning" : "success"}
+                              className="text-[10px] font-bold shadow-xs backdrop-blur-xs"
+                            >
+                              {isSubscribersOnly ? "🔒 Subscribers" : "🌐 Public"}
+                            </Badge>
+                          </div>
+
+                          {/* Bottom info on banner */}
+                          <div className="absolute bottom-2 left-2.5 right-2.5 flex items-center justify-between text-white text-[11px] font-bold">
+                            <span className="truncate max-w-[180px] bg-[#0d5c4d]/90 px-2 py-0.5 rounded-md backdrop-blur-xs border border-white/10">
+                              📚 {res.subject}
+                            </span>
+                            {res.year && (
+                              <span className="bg-amber-500/90 text-white px-2 py-0.5 rounded-md font-mono text-[10px]">
+                                {res.year} A/L
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Card Content Body */}
+                        <CardContent className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                          <div className="space-y-2">
+                            {res.topic && (
+                              <p className="text-[11px] font-bold text-[#0d5c4d] truncate">
+                                📌 {res.topic}
+                              </p>
+                            )}
+
+                            <h3 className="text-sm font-black text-[#0d2b26] line-clamp-2 leading-snug" title={res.title}>
+                              {res.title}
+                            </h3>
+
+                            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                              {res.description || "Curriculum-aligned lecture guide with worked solutions."}
+                            </p>
+
+                            {/* Past Paper Specific Badges */}
+                            {isPastPaper && (
+                              <div className="flex flex-wrap gap-1 pt-1">
+                                {res.medium && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold">
+                                    🗣️ {res.medium} Medium
+                                  </span>
+                                )}
+                                {res.paperPart && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-bold">
+                                    {res.paperPart}
+                                  </span>
+                                )}
+                                {res.hasMarkingScheme && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold flex items-center gap-0.5">
+                                    <Check className="h-3 w-3" /> Marking Scheme
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Specs and stats pill */}
+                            <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100">
+                              <span className="font-mono text-slate-500 font-semibold">
+                                {res.fileType || "PDF"} &bull; {res.fileSize || "4.2 MB"} &bull; {res.pageCount || 20} Pages
+                              </span>
+                              <span className="flex items-center gap-2">
+                                <span className="flex items-center gap-0.5" title="Student Views">
+                                  <Eye className="h-3 w-3 text-slate-400" /> {res.viewsCount || 0}
+                                </span>
+                                <span className="flex items-center gap-0.5 text-[#0d5c4d] font-bold" title="Downloads">
+                                  <Download className="h-3 w-3" /> {res.downloadsCount || 0}
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Actions Footer */}
+                          <div className="flex items-center justify-between gap-1.5 pt-3 border-t border-slate-100">
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  recordResourceView(res.id);
+                                  setInspectingResource(res);
+                                  setResourceViewerPage(1);
+                                  setResourceViewerTab("document");
+                                }}
+                                className="h-7 text-xs font-bold text-[#0d5c4d] border-[#c4e9e0] hover:bg-[#ecf8f5] px-2 cursor-pointer"
+                                title="Inspect & Read Document"
+                              >
+                                <Eye className="h-3.5 w-3.5 mr-1" /> Read
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setResourceToEdit(res);
+                                  setIsResourceModalOpen(true);
+                                }}
+                                className="h-7 text-xs font-bold text-slate-700 hover:bg-slate-50 px-2 cursor-pointer"
+                                title="Edit Material"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                              </Button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`Delete material "${res.title}" from library?`)) {
+                                    deleteLibraryResource(res.id);
+                                  }
+                                }}
+                                className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete Material"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+
+                            <Button
+                              size="sm"
+                              onClick={() => handleDownloadResource(res)}
+                              className="h-7 text-xs font-bold bg-[#0d5c4d] hover:bg-[#083e34] text-white gap-1 px-2.5 cursor-pointer shadow-2xs"
+                              title="Download File"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              <span>Download</span>
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -3327,6 +4220,608 @@ export function TeacherViews({ initialTab = "home" }: TeacherViewsProps) {
           </div>
         </div>
       </Modal>
+
+      {/* QUIZ BUILDER MODAL */}
+      <QuizBuilderModal
+        isOpen={isQuizModalOpen}
+        onClose={() => {
+          setIsQuizModalOpen(false);
+          setQuizToEdit(null);
+        }}
+        quizToEdit={quizToEdit}
+        courses={teacherCourses}
+        onSave={(data) => {
+          if (quizToEdit) {
+            updateQuiz(quizToEdit.id, data);
+          } else {
+            createQuiz(data);
+          }
+        }}
+      />
+
+      {/* TUTOR TEST PREVIEW MODAL */}
+      {previewQuiz && (
+        <Modal
+          isOpen={Boolean(previewQuiz)}
+          onClose={() => {
+            setPreviewQuiz(null);
+            setPreviewResult(null);
+          }}
+          title={
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-[#ecf8f5] text-[#0d5c4d]">
+                <Eye className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-[#0d2b26]">
+                  Candidate Exam Simulation & Diagnostic Preview
+                </h3>
+                <p className="text-xs text-slate-500 font-normal">
+                  Testing "{previewQuiz.title}" as an enrolled student.
+                </p>
+              </div>
+            </div>
+          }
+          size="lg"
+        >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-[#f8faf9] border border-[#e6ece8] text-xs font-bold">
+              <span className="text-[#0d5c4d]">📚 {previewQuiz.subjectName}</span>
+              <span className="text-slate-600">⏱️ {previewQuiz.durationMinutes} Minutes</span>
+              <span className="text-slate-800">🏆 {previewQuiz.totalMarks} Total Marks</span>
+            </div>
+
+            {previewResult ? (
+              <div className="p-6 rounded-2xl bg-[#ecf8f5] border border-[#c4e9e0] text-center space-y-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#0d5c4d]">
+                  Instant Automated Result
+                </span>
+                <p className="text-3xl font-black text-[#0d5c4d]">
+                  Score: {previewResult.score} / {previewResult.totalMarks}
+                </p>
+                <p className="text-xs text-slate-600">
+                  {Math.round((previewResult.score / previewResult.totalMarks) * 100)}% Proficiency Benchmark
+                </p>
+                <Button
+                  onClick={() => {
+                    setPreviewAnswers({});
+                    setPreviewResult(null);
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="border-[#c4e9e0] text-[#0d5c4d] text-xs font-bold"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" /> Try Again
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                {previewQuiz.questions.map((q, idx) => (
+                  <div key={q.id || idx} className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#0d5c4d]">
+                        Question {idx + 1} of {previewQuiz.questions.length}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-slate-500">
+                        {q.marks} Marks
+                      </span>
+                    </div>
+
+                    <p className="text-xs font-bold text-[#0d2b26] leading-relaxed">
+                      {q.questionText}
+                    </p>
+
+                    {/* Question Options or Text Inputs */}
+                    {(q.type === "mcq" || q.type === "true_false") && (
+                      <div className="space-y-1.5 pt-1">
+                        {q.options?.map((opt, optIdx) => {
+                          const isChosen = previewAnswers[q.id] === optIdx;
+
+                          return (
+                            <button
+                              key={optIdx}
+                              type="button"
+                              onClick={() =>
+                                setPreviewAnswers((prev) => ({
+                                  ...prev,
+                                  [q.id]: optIdx
+                                }))
+                              }
+                              className={`w-full text-left p-2.5 rounded-xl text-xs font-medium flex items-center gap-2.5 border transition-all cursor-pointer ${
+                                isChosen
+                                  ? "bg-[#ecf8f5] border-[#0d5c4d] text-[#0d5c4d] font-bold"
+                                  : "bg-[#f8faf9] border-slate-200 hover:border-slate-300 text-slate-700"
+                              }`}
+                            >
+                              <span
+                                className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                  isChosen ? "bg-[#0d5c4d] text-white" : "bg-slate-200 text-slate-600"
+                                }`}
+                              >
+                                {String.fromCharCode(65 + optIdx)}
+                              </span>
+                              <span>{opt}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {q.type === "multi_select" && (
+                      <div className="space-y-1.5 pt-1">
+                        <p className="text-[11px] text-slate-500 font-medium">☑️ Select all that apply:</p>
+                        {q.options?.map((opt, optIdx) => {
+                          const currArr: number[] = Array.isArray(previewAnswers[q.id])
+                            ? (previewAnswers[q.id] as number[])
+                            : [];
+                          const isChosen = currArr.includes(optIdx);
+
+                          return (
+                            <button
+                              key={optIdx}
+                              type="button"
+                              onClick={() => {
+                                const nextArr = isChosen
+                                  ? currArr.filter((i) => i !== optIdx)
+                                  : [...currArr, optIdx];
+                                setPreviewAnswers((prev) => ({
+                                  ...prev,
+                                  [q.id]: nextArr
+                                }));
+                              }}
+                              className={`w-full text-left p-2.5 rounded-xl text-xs font-medium flex items-center gap-2.5 border transition-all cursor-pointer ${
+                                isChosen
+                                  ? "bg-[#ecf8f5] border-[#0d5c4d] text-[#0d5c4d] font-bold"
+                                  : "bg-[#f8faf9] border-slate-200 hover:border-slate-300 text-slate-700"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChosen}
+                                readOnly
+                                className="h-4 w-4 rounded text-[#0d5c4d] pointer-events-none"
+                              />
+                              <span>{opt}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {(q.type === "short_answer" || q.type === "numerical") && (
+                      <div className="pt-1">
+                        <input
+                          type={q.type === "numerical" ? "number" : "text"}
+                          value={String(previewAnswers[q.id] ?? "")}
+                          onChange={(e) =>
+                            setPreviewAnswers((prev) => ({
+                              ...prev,
+                              [q.id]: e.target.value
+                            }))
+                          }
+                          placeholder={
+                            q.type === "numerical" ? "Enter numerical value..." : "Type answer phrase..."
+                          }
+                          className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0d5c4d] font-semibold text-slate-800 bg-white"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPreviewQuiz(null);
+                  setPreviewResult(null);
+                }}
+                className="text-xs font-bold"
+              >
+                Close Simulation
+              </Button>
+
+              {!previewResult && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    let score = 0;
+                    previewQuiz.questions.forEach((q) => {
+                      const studentAns = previewAnswers[q.id];
+                      if (studentAns !== undefined && studentAns !== null && studentAns !== "") {
+                        const marks = Number(q.marks) || 10;
+                        if (q.type === "short_answer" || q.type === "numerical") {
+                          if (
+                            String(studentAns).trim().toLowerCase() ===
+                            String(q.correctAnswer).trim().toLowerCase()
+                          ) {
+                            score += marks;
+                          }
+                        } else if (q.type === "multi_select") {
+                          const correctArr = Array.isArray(q.correctAnswer)
+                            ? q.correctAnswer.map(String).sort()
+                            : [String(q.correctAnswer)];
+                          const studentArr = Array.isArray(studentAns)
+                            ? (studentAns as any[]).map(String).sort()
+                            : [String(studentAns)];
+                          if (
+                            studentArr.length === correctArr.length &&
+                            studentArr.every((v, i) => v === correctArr[i])
+                          ) {
+                            score += marks;
+                          }
+                        } else {
+                          if (String(studentAns) === String(q.correctAnswer)) {
+                            score += marks;
+                          }
+                        }
+                      }
+                    });
+                    setPreviewResult({ score, totalMarks: previewQuiz.totalMarks });
+                  }}
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Evaluate Test Attempt
+                </Button>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal: Upload & Edit Resource */}
+      <ResourceUploadModal
+        isOpen={isResourceModalOpen}
+        onClose={() => {
+          setIsResourceModalOpen(false);
+          setResourceToEdit(null);
+        }}
+        resourceToEdit={resourceToEdit}
+        courses={teacherCourses}
+        onSave={(data, publish) => {
+          if (resourceToEdit) {
+            updateLibraryResource(resourceToEdit.id, {
+              ...data,
+              status: publish ? "published" : "draft"
+            });
+          } else {
+            createLibraryResource({
+              ...data,
+              status: publish ? "published" : "draft",
+              author: currentUser?.name || "Tutor Faculty",
+              teacherId: currentUser?.id
+            });
+          }
+          setIsResourceModalOpen(false);
+          setResourceToEdit(null);
+        }}
+      />
+
+      {/* Modal: Interactive Document Reader & Inspection */}
+      {inspectingResource && (
+        <Modal
+          isOpen={true}
+          onClose={() => setInspectingResource(null)}
+          title={
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-[#ecf8f5] text-[#0d5c4d]">
+                <BookOpen className="h-4 w-4" />
+              </span>
+              <span className="truncate max-w-[400px]">{inspectingResource.title}</span>
+              <Badge
+                variant={inspectingResource.visibility === "subscribers_only" ? "warning" : "success"}
+                className="text-[10px]"
+              >
+                {inspectingResource.visibility === "subscribers_only" ? "🔒 Subscribers Only" : "🌐 Public"}
+              </Badge>
+            </div>
+          }
+          size="xl"
+        >
+          <div className="space-y-4">
+            {/* Toolbar: Sub-tabs (Document Reader vs Marking Scheme vs Table of Contents) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-[#f8faf9] rounded-xl border border-slate-200">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setResourceViewerTab("document")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    resourceViewerTab === "document"
+                      ? "bg-[#0d5c4d] text-white"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
+                >
+                  📄 Document Pages
+                </button>
+
+                {inspectingResource.hasMarkingScheme && (
+                  <button
+                    type="button"
+                    onClick={() => setResourceViewerTab("marking")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${
+                      resourceViewerTab === "marking"
+                        ? "bg-[#0d5c4d] text-white"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>📑 Marking Scheme &amp; Answers</span>
+                    <Badge variant="success" className="text-[9px] px-1 py-0">
+                      Verified
+                    </Badge>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setResourceViewerTab("toc")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    resourceViewerTab === "toc"
+                      ? "bg-[#0d5c4d] text-white"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
+                >
+                  📑 Table of Contents
+                </button>
+              </div>
+
+              {/* Zoom & Page Stepper */}
+              {resourceViewerTab === "document" && (
+                <div className="flex items-center gap-2 self-end sm:self-auto text-xs">
+                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                    <button
+                      onClick={() => setResourceViewerZoom((z) => Math.max(75, z - 10))}
+                      className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
+                      title="Zoom Out"
+                    >
+                      <ZoomOut className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="font-mono font-bold text-[11px] w-10 text-center">{resourceViewerZoom}%</span>
+                    <button
+                      onClick={() => setResourceViewerZoom((z) => Math.min(150, z + 10))}
+                      className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
+                      title="Zoom In"
+                    >
+                      <ZoomIn className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                    <button
+                      disabled={resourceViewerPage <= 1}
+                      onClick={() => setResourceViewerPage((p) => Math.max(1, p - 1))}
+                      className="p-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
+                    >
+                      ◀
+                    </button>
+                    <span className="font-mono text-[11px] font-bold">
+                      Page {resourceViewerPage} of {inspectingResource.pageCount || 20}
+                    </span>
+                    <button
+                      disabled={resourceViewerPage >= (inspectingResource.pageCount || 20)}
+                      onClick={() => setResourceViewerPage((p) => Math.min(inspectingResource.pageCount || 20, p + 1))}
+                      className="p-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
+                    >
+                      ▶
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* TAB 1: Document Page Reader Preview */}
+            {resourceViewerTab === "document" && (
+              <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 overflow-y-auto max-h-[500px] flex justify-center">
+                <div
+                  className="bg-white rounded-xl shadow-md border border-slate-300 p-8 text-slate-900 transition-all font-serif"
+                  style={{
+                    width: `${Math.round(620 * (resourceViewerZoom / 100))}px`,
+                    minHeight: "750px"
+                  }}
+                >
+                  {/* Institutional Header */}
+                  <div className="border-b-2 border-slate-900 pb-4 mb-6 flex items-start justify-between">
+                    <div>
+                      <p className="text-[10px] uppercase font-sans font-black tracking-widest text-slate-500">
+                        SRI LANKA G.C.E. (A/L) EDUCATIONAL WORKSPACE &bull; ADVANCED LEVEL
+                      </p>
+                      <h2 className="text-xl font-black font-sans text-slate-900 mt-1">
+                        {inspectingResource.subject}
+                      </h2>
+                      {inspectingResource.topic && (
+                        <p className="text-xs font-sans font-bold text-[#0d5c4d] mt-0.5">
+                          {inspectingResource.topic}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="text-right text-xs font-sans">
+                      <span className="font-mono font-black text-slate-800 block">
+                        {inspectingResource.year ? `${inspectingResource.year} Examination` : "Curriculum Tute"}
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        {inspectingResource.resourceType.toUpperCase()} &bull; Page {resourceViewerPage}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Document Page Simulated Content */}
+                  <div className="space-y-6 text-sm text-slate-800 leading-relaxed font-sans">
+                    <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200 text-xs space-y-1">
+                      <span className="font-bold text-amber-900 uppercase tracking-wide block">
+                        Instructor Overview &amp; Study Objective:
+                      </span>
+                      <p className="text-amber-800">
+                        {inspectingResource.description ||
+                          "This document presents verified mathematical derivations, theorems, and model problems intended to prepare candidates for examination mastery."}
+                      </p>
+                    </div>
+
+                    {/* Problem / Section Sample */}
+                    <div className="space-y-3 font-mono text-xs">
+                      <p className="font-bold text-[#0d2b26] font-sans text-sm">
+                        Section {resourceViewerPage}: Structured Problem Formulation &amp; Analysis
+                      </p>
+                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                        <p className="font-bold text-slate-700">Problem {resourceViewerPage}.1:</p>
+                        <p className="text-slate-800 italic font-serif text-sm">
+                          {inspectingResource.subject.toLowerCase().includes("math")
+                            ? `Let f(x) = ax² + bx + c, where a ≠ 0 and roots are α, β. Prove that α + β = -b/a and αβ = c/a. Hence, find the cubic equation whose roots are α², β² and α + β.`
+                            : inspectingResource.subject.toLowerCase().includes("phys")
+                            ? `A uniform solid sphere of mass M and radius R rolls without slipping down an inclined plane of angle θ. Calculate the linear acceleration and the frictional force acting at the point of contact.`
+                            : `Examine the reaction kinetics and thermodynamic equilibrium of the system at temperature T = 298K. Determine the reaction quotient Q and compare with Kc.`}
+                        </p>
+                      </div>
+
+                      <div className="p-4 bg-[#ecf8f5] rounded-xl border border-[#c4e9e0] space-y-2">
+                        <p className="font-bold text-[#0d5c4d] font-sans text-xs">
+                          Faculty Solution &amp; Step-by-Step Derivation:
+                        </p>
+                        <p className="text-slate-800 text-xs font-sans leading-relaxed">
+                          Applying standard algebraic decomposition and symmetric polynomial transformations:
+                          <br />
+                          1. Express sum of roots: S = (α² + β²) + (α + β) = (α + β)² - 2αβ + (α + β).
+                          <br />
+                          2. Express pairwise products and constant term: P = α²β²(α + β).
+                          <br />
+                          3. Substitute given coefficients and verify discriminants Δ &gt; 0.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Watermark / Footer */}
+                    <div className="pt-6 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 font-sans">
+                      <span>Author: {inspectingResource.author}</span>
+                      <span>Sri Lankan National Examination Portal</span>
+                      <span>Page {resourceViewerPage} of {inspectingResource.pageCount || 20}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: Marking Scheme & Model Answers */}
+            {resourceViewerTab === "marking" && (
+              <div className="p-5 bg-white rounded-2xl border border-slate-200 space-y-4 max-h-[500px] overflow-y-auto">
+                <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+                    <span className="font-black text-emerald-950">
+                      Official Marking Scheme &amp; Evaluation Guide
+                    </span>
+                  </div>
+                  <p className="text-emerald-800">
+                    {inspectingResource.markingSchemeNotes ||
+                      "Detailed marks allocation scheme prepared strictly adhering to Department of Examinations conventions."}
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {[
+                    {
+                      section: "Part A — Question 1 (Algebra)",
+                      step1: "Correct setup of quadratic discriminant formula: Δ = b² - 4ac",
+                      marks1: "03 Marks (Method)",
+                      step2: "Condition for real and distinct roots Δ > 0 correctly established",
+                      marks2: "04 Marks (Accuracy)",
+                      step3: "Final simplified inequality correctly derived and bounded",
+                      marks3: "03 Marks (Final)"
+                    },
+                    {
+                      section: "Part A — Question 2 (Calculus)",
+                      step1: "First derivative f'(x) found using chain rule",
+                      marks1: "04 Marks (Method)",
+                      step2: "Critical stationary points set to zero and solved",
+                      marks2: "03 Marks (Accuracy)",
+                      step3: "Second derivative test applied to verify local maximum",
+                      marks3: "03 Marks (Conclusion)"
+                    }
+                  ].map((rubric, idx) => (
+                    <div key={idx} className="p-4 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs space-y-2">
+                      <p className="font-black text-[#0d2b26]">{rubric.section}</p>
+                      <div className="space-y-1.5 pl-2 border-l-2 border-[#0d5c4d]">
+                        <div className="flex items-center justify-between text-slate-700">
+                          <span>&bull; {rubric.step1}</span>
+                          <span className="font-mono font-bold text-[#0d5c4d]">{rubric.marks1}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-700">
+                          <span>&bull; {rubric.step2}</span>
+                          <span className="font-mono font-bold text-[#0d5c4d]">{rubric.marks2}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-700">
+                          <span>&bull; {rubric.step3}</span>
+                          <span className="font-mono font-bold text-[#0d5c4d]">{rubric.marks3}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: Table of Contents */}
+            {resourceViewerTab === "toc" && (
+              <div className="p-5 bg-white rounded-2xl border border-slate-200 space-y-3 max-h-[500px] overflow-y-auto">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Curriculum Table of Contents &amp; Sections:
+                </h4>
+                <div className="divide-y divide-slate-100">
+                  {(inspectingResource.tableOfContents && inspectingResource.tableOfContents.length > 0
+                    ? inspectingResource.tableOfContents
+                    : [
+                        { title: "Unit Overview, Formula Sheet & Definitions", page: 1 },
+                        { title: "Standard Problem Set & Worked Examples", page: 5 },
+                        { title: "Past Examination Questions (2018 - 2024)", page: 12 },
+                        { title: "Speed Drill Model Questions & Solutions", page: 18 }
+                      ]
+                  ).map((item, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => {
+                        setResourceViewerPage(item.page);
+                        setResourceViewerTab("document");
+                      }}
+                      className="w-full py-3 flex items-center justify-between hover:bg-slate-50 px-2 rounded-lg text-left cursor-pointer transition-colors"
+                    >
+                      <span className="text-xs font-bold text-slate-800">
+                        {i + 1}. {item.title}
+                      </span>
+                      <span className="font-mono text-xs font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2.5 py-0.5 rounded-full">
+                        Page {item.page} &rarr;
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setInspectingResource(null)}
+                className="text-xs font-bold"
+              >
+                Close Viewer
+              </Button>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => handleDownloadResource(inspectingResource)}
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs gap-1.5"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download Full Document
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

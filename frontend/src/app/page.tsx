@@ -111,16 +111,19 @@ export default function HomePage() {
         case "submissions":
           return <TeacherViews initialTab="grading" />;
         case "assignments":
+          return <TeacherViews initialTab="assignments" initialSubTab="assignments" />;
         case "quizzes":
-          return <TeacherViews initialTab="assignments" />;
+          return <TeacherViews initialTab="assignments" initialSubTab="quizzes" />;
         case "courses":
         case "syllabus":
           return <SyllabusBuilderView />;
         case "past_papers":
         case "pastPapers":
-          return <LibraryViews key="past_papers" initialTab="past_papers" />;
         case "library":
-          return <LibraryViews key="library_manage" initialTab="manage" />;
+        case "resources":
+        case "materials":
+        case "tutes":
+          return <TeacherViews initialTab="assignments" initialSubTab="resources" />;
         case "batches":
         case "announcements":
           return <AnnouncementsView />;

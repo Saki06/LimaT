@@ -156,14 +156,33 @@ export interface StudentSubmission {
   markedAt?: string;
 }
 
+export type QuizQuestionType = 'mcq' | 'true_false' | 'short_answer' | 'multi_select' | 'numerical';
+
 export interface QuizQuestion {
   id: string;
   questionText: string;
-  type: 'mcq' | 'true_false' | 'short_answer';
-  options?: string[]; // for mcq
-  correctAnswer: string | number; // index or string
+  type: QuizQuestionType;
+  options?: string[]; // for mcq & multi_select
+  correctAnswer: string | number | (string | number)[]; // index, string, or array
   explanation?: string;
   marks: number;
+}
+
+export interface QuizAttemptRecord {
+  id: string;
+  quizId: string;
+  studentId: string;
+  studentName: string;
+  studentAvatar?: string;
+  indexNo: string;
+  classBatch: string;
+  score: number;
+  totalMarks: number;
+  percentage: number;
+  grade: 'A' | 'B' | 'C' | 'S' | 'F';
+  timeSpentSeconds: number;
+  submittedAt: string;
+  answers: Record<string, any>;
 }
 
 export interface Quiz {
@@ -183,6 +202,7 @@ export interface Quiz {
     score?: number;
     completedAt?: string;
   };
+  attempts?: QuizAttemptRecord[];
 }
 
 export interface Sport {

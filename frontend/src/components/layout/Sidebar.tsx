@@ -241,6 +241,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
     ...(isFeatureEnabled("assignments_grading")
       ? [
           { id: "assignments", label: t.nav.assignments, icon: FileText, group: "Assessments & Review" },
+          { id: "quizzes", label: "Online Quizzes (MCQ)", icon: GraduationCap, group: "Assessments & Review" },
           {
             id: "submissions",
             label: t.nav.submissions,

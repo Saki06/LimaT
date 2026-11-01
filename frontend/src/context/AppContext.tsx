@@ -118,7 +118,10 @@ interface AppContextType {
   markLessonComplete: (lessonId: string) => void;
   submitAssignment: (assignmentId: string, text: string, fileName?: string) => void;
   gradeSubmission: (submissionId: string, marks: number, feedback: string, release: boolean) => void;
-  submitQuizAttempt: (quizId: string, answers: Record<string, number | string>) => number;
+  submitQuizAttempt: (quizId: string, answers: Record<string, any>) => number;
+  createQuiz: (quiz: Partial<Quiz>) => void;
+  updateQuiz: (id: string, updates: Partial<Quiz>) => void;
+  deleteQuiz: (id: string) => void;
   registerEvent: (eventId: string) => void;
   createTimetableEntry: (entry: Omit<TimetableEntry, 'id'>) => void;
   updateTimetableEntry: (id: string, updates: Omit<TimetableEntry, 'id'>) => void;
@@ -653,7 +656,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Student submits quiz attempt
   const submitQuizAttempt = (
     quizId: string,
-    answers: Record<string, number | string>
+    answers: Record<string, any>
   ) => {
     const quiz = quizzes.find((q) => q.id === quizId);
     if (!quiz) return 0;
@@ -661,10 +664,58 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let score = 0;
     quiz.questions.forEach((q) => {
       const studentAns = answers[q.id];
-      if (studentAns !== undefined && String(studentAns) === String(q.correctAnswer)) {
-        score += q.marks;
+      if (studentAns !== undefined && studentAns !== null && studentAns !== '') {
+        const questionMarks = Number(q.marks) || 10;
+
+        if (q.type === 'short_answer' || q.type === 'numerical') {
+          // Normalize whitespace and case
+          const cleanStudent = String(studentAns).trim().toLowerCase();
+          const cleanCorrect = String(q.correctAnswer).trim().toLowerCase();
+          if (cleanStudent === cleanCorrect) {
+            score += questionMarks;
+          }
+        } else if (q.type === 'multi_select') {
+          const correctArr = Array.isArray(q.correctAnswer)
+            ? q.correctAnswer.map(String).sort()
+            : [String(q.correctAnswer)];
+          const studentArr = Array.isArray(studentAns)
+            ? studentAns.map(String).sort()
+            : [String(studentAns)];
+
+          if (
+            studentArr.length === correctArr.length &&
+            studentArr.every((val, i) => val === correctArr[i])
+          ) {
+            score += questionMarks;
+          }
+        } else {
+          // Standard MCQ or True/False
+          if (String(studentAns) === String(q.correctAnswer)) {
+            score += questionMarks;
+          }
+        }
       }
     });
+
+    const percent = Math.round((score / quiz.totalMarks) * 100);
+    const calculatedGrade: 'A' | 'B' | 'C' | 'S' | 'F' =
+      percent >= 75 ? 'A' : percent >= 65 ? 'B' : percent >= 55 ? 'C' : percent >= 35 ? 'S' : 'F';
+
+    const newAttemptRecord = {
+      id: `att_${Date.now()}`,
+      quizId,
+      studentId: currentUser.id,
+      studentName: currentUser.name,
+      indexNo: (currentUser as any).indexNumber || 'ST-2026-042',
+      classBatch: (currentUser as any).class || '12-Physical Science A',
+      score,
+      totalMarks: quiz.totalMarks,
+      percentage: percent,
+      grade: calculatedGrade,
+      timeSpentSeconds: 420,
+      submittedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      answers
+    };
 
     setQuizzes((prev) =>
       prev.map((q) => {
@@ -675,7 +726,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               status: 'result_released',
               score,
               completedAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
-            }
+            },
+            attempts: [newAttemptRecord, ...(q.attempts || [])]
           };
         }
         return q;
@@ -689,6 +741,87 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
 
     return score;
+  };
+
+  // Tutor creates new Quiz
+  const createQuiz = (qz: Partial<Quiz>) => {
+    const targetCourse = courses.find((c) => c.id === qz.courseId);
+    const resolvedSubjectName = qz.subjectName || targetCourse?.title || 'Combined Mathematics';
+
+    const tempId = `qz_${Date.now()}`;
+    const questions = qz.questions && qz.questions.length > 0 ? qz.questions : [
+      {
+        id: `q_${Date.now()}_1`,
+        questionText: 'Sample MCQ Question',
+        type: 'mcq' as const,
+        options: ['Option A', 'Option B', 'Option C', 'Option D'],
+        correctAnswer: 0,
+        explanation: 'Standard conceptual rationale for this question.',
+        marks: 10
+      }
+    ];
+
+    const totalMarks = questions.reduce((sum, q) => sum + (Number(q.marks) || 10), 0);
+
+    const newQuiz: Quiz = {
+      id: tempId,
+      courseId: qz.courseId || targetCourse?.id || 'crs_math_12',
+      subjectName: resolvedSubjectName,
+      title: qz.title || 'New Online Quiz',
+      instructions: qz.instructions || 'Answer all questions within the allocated time limit.',
+      durationMinutes: qz.durationMinutes || 15,
+      dueDate: qz.dueDate || '2026-11-15 23:59',
+      status: qz.status || 'published',
+      totalQuestions: questions.length,
+      totalMarks: qz.totalMarks || totalMarks,
+      questions: questions,
+      userAttempt: {
+        status: 'available'
+      }
+    };
+
+    setQuizzes((prev) => [newQuiz, ...prev]);
+    addToast({
+      type: 'success',
+      title: 'Quiz Published Successfully! 🎯',
+      message: `"${newQuiz.title}" is now available (${newQuiz.totalQuestions} questions, ${newQuiz.totalMarks} marks).`
+    });
+  };
+
+  // Tutor updates existing Quiz
+  const updateQuiz = (id: string, updates: Partial<Quiz>) => {
+    setQuizzes((prev) =>
+      prev.map((q) => {
+        if (q.id !== id) return q;
+        const targetCourse = updates.courseId ? courses.find((c) => c.id === updates.courseId) : undefined;
+        const updatedQuestions = updates.questions || q.questions;
+        const calculatedMarks = updatedQuestions.reduce((sum, item) => sum + (Number(item.marks) || 10), 0);
+
+        return {
+          ...q,
+          ...updates,
+          subjectName: updates.subjectName || targetCourse?.title || q.subjectName,
+          totalQuestions: updatedQuestions.length,
+          totalMarks: updates.totalMarks !== undefined ? updates.totalMarks : calculatedMarks,
+          questions: updatedQuestions
+        };
+      })
+    );
+    addToast({
+      type: 'success',
+      title: 'Quiz Updated! 📝',
+      message: 'Questions and evaluation parameters saved successfully.'
+    });
+  };
+
+  // Tutor deletes Quiz
+  const deleteQuiz = (id: string) => {
+    setQuizzes((prev) => prev.filter((q) => q.id !== id));
+    addToast({
+      type: 'warning',
+      title: 'Quiz Removed',
+      message: 'The quiz has been removed from the curriculum.'
+    });
   };
 
   // Event RSVP
@@ -1681,6 +1814,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         submitAssignment,
         gradeSubmission,
         submitQuizAttempt,
+        createQuiz,
+        updateQuiz,
+        deleteQuiz,
         registerEvent,
         createTimetableEntry,
         updateTimetableEntry,
