@@ -978,6 +978,95 @@ export const api = {
     },
   },
 
+  // Announcements & Notice Board API
+  announcements: {
+    async getAll(params?: { search?: string; priority?: string; audience?: string; role?: string }) {
+      const query = new URLSearchParams();
+      if (params?.search) query.append('search', params.search);
+      if (params?.priority) query.append('priority', params.priority);
+      if (params?.audience) query.append('audience', params.audience);
+      if (params?.role) query.append('role', params.role);
+
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements?${query.toString()}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getById(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements/${id}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async create(data: {
+      title: string;
+      message: string;
+      targetAudience?: string;
+      priority?: 'normal' | 'high' | 'urgent';
+      isPinned?: boolean;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async update(id: string, data: Partial<{
+      title: string;
+      message: string;
+      targetAudience: string;
+      priority: 'normal' | 'high' | 'urgent';
+      isPinned: boolean;
+    }>) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async delete(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements/${id}`, {
+        method: 'DELETE',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async togglePin(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements/${id}/pin`, {
+        method: 'PATCH',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+  },
+
   // Token and Local Storage Helpers
   token: {
     get(): string | null {

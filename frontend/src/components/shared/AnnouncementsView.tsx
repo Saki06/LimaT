@@ -29,6 +29,7 @@ import {
   Sparkles,
   Clock,
   Globe,
+  RotateCw,
   X
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,6 +57,24 @@ export function getAudienceCategory(targetAudience: string): "all" | "teachers" 
   return "all";
 }
 
+// Category detector helper
+export function getAnnouncementCategory(a: Announcement): "exam" | "holiday" | "academic" | "sports" | "general" {
+  const text = `${a.title} ${a.message}`.toLowerCase();
+  if (text.includes("exam") || text.includes("timetable") || text.includes("hall ticket") || text.includes("admission card") || text.includes("test")) {
+    return "exam";
+  }
+  if (text.includes("holiday") || text.includes("closed") || text.includes("closure") || text.includes("festival") || text.includes("vacation")) {
+    return "holiday";
+  }
+  if (text.includes("sport") || text.includes("tournament") || text.includes("athletic") || text.includes("match") || text.includes("squad") || text.includes("team")) {
+    return "sports";
+  }
+  if (text.includes("math") || text.includes("science") || text.includes("physics") || text.includes("class") || text.includes("masterclass") || text.includes("syllabus") || text.includes("revision") || text.includes("library") || text.includes("paper")) {
+    return "academic";
+  }
+  return "general";
+}
+
 export function AnnouncementsView() {
   const { announcements, t, currentRole, currentUser, createAnnouncement, updateAnnouncement, deleteAnnouncement } = useApp();
   const isAdmin = currentRole === "admin";
@@ -66,6 +85,8 @@ export function AnnouncementsView() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterAudience, setFilterAudience] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<"all" | "exam" | "holiday" | "academic" | "sports">("all");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Expandable cards
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
@@ -161,6 +182,11 @@ export function AnnouncementsView() {
         return false;
       }
 
+      // Category filter
+      if (selectedCategory !== "all" && getAnnouncementCategory(ann) !== selectedCategory) {
+        return false;
+      }
+
       // Priority filter
       if (filterPriority !== "all" && ann.priority !== filterPriority) {
         return false;
@@ -187,7 +213,43 @@ export function AnnouncementsView() {
 
       return true;
     });
-  }, [announcements, isStudent, filterPriority, filterAudience, searchQuery]);
+  }, [announcements, isStudent, selectedCategory, filterPriority, filterAudience, searchQuery]);
+
+  // Category Badge Helper
+  const renderCategoryBadge = (category: string) => {
+    switch (category) {
+      case "exam":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-300">
+            📝 Examination
+          </span>
+        );
+      case "holiday":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+            🏖️ Holiday Notice
+          </span>
+        );
+      case "sports":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-300">
+            🏆 Sports Meet
+          </span>
+        );
+      case "academic":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-teal-50 text-teal-800 border border-teal-200">
+            📚 Academic
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
+            📢 General
+          </span>
+        );
+    }
+  };
 
   // Priority Badge Helper
   const renderPriorityBadge = (priority: Announcement["priority"]) => {
@@ -339,11 +401,25 @@ export function AnnouncementsView() {
           <div>
             <h1 className="text-2xl font-black text-[#0d2b26] flex items-center gap-2">
               <Bell className="h-6 w-6 text-[#0d5c4d]" />
-              Platform Announcements
+              Official Notice Board &amp; School Circulars
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              Official platform updates, tutor notices, tournament schedules, and system alerts.
+              Live school announcements, exam schedules, holiday notices, and masterclass updates.
             </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                setIsRefreshing(true);
+                setTimeout(() => setIsRefreshing(false), 500);
+              }}
+              variant="outline"
+              className="h-9 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <RotateCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin text-[#0d5c4d]" : "text-slate-500"}`} />
+              <span>Refresh Board</span>
+            </Button>
           </div>
         </div>
       )}
@@ -454,6 +530,31 @@ export function AnnouncementsView() {
             Students & Subscribers ({studentsCount})
           </button>
         </div>
+
+        {/* Category Pill Filters (Exams, Holidays, Academics, Sports) */}
+        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Notice Category:</span>
+
+          {[
+            { id: "all", label: "All Categories" },
+            { id: "exam", label: "📝 Exams & Timetables" },
+            { id: "holiday", label: "🏖️ Holidays & Closures" },
+            { id: "academic", label: "📚 Academic Masterclasses" },
+            { id: "sports", label: "🏆 Sports & Athletics" },
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id as any)}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedCategory === cat.id
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ============================================================ */}
@@ -488,9 +589,10 @@ export function AnnouncementsView() {
                 {/* Card Header */}
                 <CardHeader className="p-5 pb-3 border-b border-[#f0f4f1] space-y-3">
                   <div className="flex items-center justify-between gap-3">
-                    {/* Audience & Priority Badges */}
+                    {/* Audience, Category & Priority Badges */}
                     <div className="flex flex-wrap items-center gap-2">
                       {renderAudienceBadge(ann.targetAudience)}
+                      {renderCategoryBadge(getAnnouncementCategory(ann))}
                       {renderPriorityBadge(ann.priority)}
                     </div>
 

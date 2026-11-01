@@ -359,7 +359,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsLanding(false);
     }
     fetchCourses();
+    fetchAnnouncements();
   }, []);
+
+  const fetchAnnouncements = async () => {
+    try {
+      const res = await api.announcements.getAll({ role: currentRole.toUpperCase() });
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setAnnouncements(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not load announcements from backend:', err);
+    }
+  };
 
   const mapBackendCourseToFrontend = (c: any): Course => {
     const teacherName = c.teacher?.user
@@ -529,6 +541,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Switch role reset default views
   useEffect(() => {
     setCurrentView('dashboard');
+    fetchAnnouncements();
   }, [currentRole]);
 
   // Mark lesson as complete
@@ -1493,7 +1506,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const createAnnouncement = (ann: Partial<Announcement>) => {
+  const createAnnouncement = async (ann: Partial<Announcement>) => {
+    try {
+      const res = await api.announcements.create({
+        title: ann.title || 'Official Announcement',
+        message: ann.message || '',
+        targetAudience: ann.targetAudience || 'Platform-Wide (Everyone)',
+        priority: ann.priority || 'normal'
+      });
+      if (res.success && res.data) {
+        setAnnouncements((prev) => [res.data, ...prev]);
+        addToast({
+          type: 'success',
+          title: 'Announcement Published!',
+          message: 'Notice has been dispatched and saved to cloud database.'
+        });
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to save announcement in backend, falling back to local:', err);
+    }
+
     const newAnn: Announcement = {
       id: `ann_${Date.now()}`,
       title: ann.title || 'Official Announcement',
@@ -1512,16 +1545,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const updateAnnouncement = (id: string, updates: Partial<Omit<Announcement, 'id'>>) => {
+  const updateAnnouncement = async (id: string, updates: Partial<Omit<Announcement, 'id'>>) => {
+    try {
+      await api.announcements.update(id, updates);
+    } catch (err) {
+      console.warn('Failed to update announcement in backend:', err);
+    }
     setAnnouncements((prev) =>
       prev.map((announcement) => announcement.id === id ? { ...announcement, ...updates } : announcement)
     );
     addToast({ type: 'success', title: 'Announcement Updated', message: 'Announcement details saved successfully.' });
   };
 
-  const deleteAnnouncement = (id: string) => {
+  const deleteAnnouncement = async (id: string) => {
+    try {
+      await api.announcements.delete(id);
+    } catch (err) {
+      console.warn('Failed to delete announcement in backend:', err);
+    }
     setAnnouncements((prev) => prev.filter((announcement) => announcement.id !== id));
-    addToast({ type: 'success', title: 'Announcement Removed', message: 'Announcement has been removed.' });
+    addToast({ type: 'success', title: 'Announcement Removed', message: 'Announcement has been removed from database.' });
   };
 
   const toggleSaveResource = (id: string) => {

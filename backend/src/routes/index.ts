@@ -9,6 +9,7 @@ import assignmentRoutes from './assignment.routes';
 import resourceRoutes from './resource.routes';
 import teacherRoutes from './teacher.routes';
 import studentRoutes from './student.routes';
+import announcementRoutes from './announcement.routes';
 
 const router = Router();
 
@@ -33,5 +34,6 @@ router.use('/assignments', assignmentRoutes);
 router.use('/resources', resourceRoutes);
 router.use('/teachers', teacherRoutes);
 router.use('/students', studentRoutes);
+router.use('/announcements', announcementRoutes);
 
 export default router;

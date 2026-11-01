@@ -166,6 +166,16 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
         ]
       : []),
 
+    // School Life & Notice Board
+    {
+      id: "announcements",
+      label: "Notice Board & Circulars",
+      icon: Bell,
+      badge: "Notices",
+      badgeVariant: "default" as const,
+      group: "School Life"
+    },
+
     // Sports & Tournaments with Sub-headings
     {
       id: "sports",

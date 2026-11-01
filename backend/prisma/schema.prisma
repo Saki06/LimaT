@@ -274,11 +274,17 @@ model Announcement {
   title         String
   content       String
   targetRole    Role?
+  priority      String?     @default("normal")
+  authorName    String?     @default("Principal's Office")
+  authorRole    String?     @default("ADMIN")
+  targetAudience String?    @default("Platform-Wide (Everyone)")
+  category      String?     @default("GENERAL")
   isPinned      Boolean     @default(false)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   @@index([tenantId, targetRole])
+  @@index([tenantId, isPinned])
 }
 
 model Package {
