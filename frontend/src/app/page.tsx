@@ -89,6 +89,9 @@ export default function HomePage() {
           return <SportsView key="standings" initialTab="standings" />;
         case "events":
           return <EventsView />;
+        case "timetable":
+        case "student_timetable":
+          return <TimetableView />;
         case "live_schedule":
         case "liveSchedule":
           return <LiveScheduleView />;
@@ -216,6 +219,8 @@ export default function HomePage() {
           return <AdminViews initialTab="settings" />;
         case "announcements":
           return <AnnouncementsView />;
+        case "timetable":
+          return <TimetableView />;
         case "sports":
         case "sports_tournaments":
           return <SportsView key="tournaments" initialTab="tournaments" />;

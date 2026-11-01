@@ -122,11 +122,20 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
         ]
       : []),
     {
+      id: "timetable",
+      label: "Weekly Timetable",
+      icon: Calendar,
+      badge: "Schedule",
+      badgeVariant: "gold" as const,
+      group: "Core Learning"
+    },
+    {
       id: "my_learning",
       label: t.nav.myLearning || "My Learning",
       icon: BookOpen,
       group: "Core Learning",
       children: [
+        { id: "timetable", label: "Weekly Timetable", icon: Calendar },
         ...(isFeatureEnabled("syllabus_builder")
           ? [{ id: "courses", label: "Syllabus & Lessons", icon: BookOpen }]
           : []),
@@ -294,6 +303,12 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
             id: "announcements",
             label: "Class Notices & Alerts",
             icon: Bell,
+            group: "Tutor Operations"
+          },
+          {
+            id: "timetable",
+            label: "Class Timetable",
+            icon: Calendar,
             group: "Tutor Operations"
           }
         ]

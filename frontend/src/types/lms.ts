@@ -65,6 +65,11 @@ export interface TimetableEntry {
   startTime: string;
   endTime: string;
   room: string;
+  subjectCode?: string;
+  periodType?: string;
+  platform?: string;
+  meetingUrl?: string;
+  isLiveNow?: boolean;
 }
 
 export interface Subject {

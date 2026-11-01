@@ -1547,30 +1547,103 @@ export const getMyTimetable = async (
       orderBy: { startTime: 'asc' },
     });
 
-    const daysName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const timetableEntries = liveSessions.map((sess) => {
+    const daysName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+    const timetableEntries: any[] = liveSessions.map((sess) => {
       const d = new Date(sess.startTime);
       const day = daysName[d.getDay()];
-      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const endTimeStr = sess.endTime
-        ? new Date(sess.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : '9:00 PM';
+      const hours = d.getHours().toString().padStart(2, '0');
+      const minutes = d.getMinutes().toString().padStart(2, '0');
+      const startTime = `${hours}:${minutes}`;
+
+      let endTime = '10:30';
+      if (sess.endTime) {
+        const ed = new Date(sess.endTime);
+        endTime = `${ed.getHours().toString().padStart(2, '0')}:${ed.getMinutes().toString().padStart(2, '0')}`;
+      } else {
+        const endHour = ((d.getHours() + 2) % 24).toString().padStart(2, '0');
+        endTime = `${endHour}:${minutes}`;
+      }
 
       return {
         id: sess.id,
         day,
-        subjectName: sess.course?.title || sess.topic || 'Academic Session',
-        className: profile.gradeLevel || 'Grade 12 / 13',
+        classId: sess.courseId || 'cls_cohort',
+        className: profile.gradeLevel || 'Grade 12 / 13 A/L',
+        subjectId: sess.courseId || 'subj_live',
+        subjectName: sess.course?.title || sess.topic || 'Academic Masterclass',
+        subjectCode: sess.course?.code || 'LIVE-101',
+        teacherId: sess.teacherId,
         teacherName: sess.teacher?.user
           ? `${sess.teacher.user.firstName} ${sess.teacher.user.lastName}`
-          : 'Assigned Tutor',
-        startTime: timeStr,
-        endTime: endTimeStr,
-        room: `Live Studio (${sess.platform})`,
-        platform: sess.platform,
-        meetingUrl: sess.meetingUrl,
+          : 'Lead Specialist Educator',
+        startTime,
+        endTime,
+        room: `Live Studio (${sess.platform || 'Jitsi HD'})`,
+        periodType: 'MASTERCLASS',
+        platform: sess.platform || 'JITSI',
+        meetingUrl: sess.meetingUrl || `https://meet.jit.si/LimatLive_${sess.id.slice(0, 8)}`,
+        isLiveNow: sess.status === 'LIVE',
       };
     });
+
+    // If fewer than 5 periods exist, combine with standard weekly periods for student's courses
+    if (timetableEntries.length < 5) {
+      const courses = await prisma.course.findMany({
+        where: {
+          OR: [
+            { enrollments: { some: { studentId: profile.id } } },
+            ...(tenantId ? [{ tenantId }] : []),
+          ],
+        },
+        include: {
+          teacher: { include: { user: { select: { firstName: true, lastName: true } } } },
+        },
+        take: 5,
+      });
+
+      const routineTemplates = [
+        { day: 'Monday' as const, startTime: '08:30', endTime: '10:30', room: 'Lecture Theatre 1 (Main Hall)', periodType: 'LECTURE' },
+        { day: 'Tuesday' as const, startTime: '09:00', endTime: '11:00', room: 'Advanced Physics Lab A', periodType: 'LAB' },
+        { day: 'Wednesday' as const, startTime: '08:30', endTime: '10:30', room: 'Lecture Theatre 2', periodType: 'LECTURE' },
+        { day: 'Thursday' as const, startTime: '13:30', endTime: '15:30', room: 'Studio 1 (Live Video)', periodType: 'MASTERCLASS' },
+        { day: 'Friday' as const, startTime: '10:30', endTime: '12:30', room: 'Chemistry Analytical Lab 2', periodType: 'LAB' },
+        { day: 'Saturday' as const, startTime: '09:00', endTime: '12:00', room: 'Auditorium Special Seminar Wing', periodType: 'TUTORIAL' },
+        { day: 'Sunday' as const, startTime: '14:00', endTime: '16:00', room: 'Online Broadcast Studio', periodType: 'MASTERCLASS' },
+      ];
+
+      courses.forEach((c, idx) => {
+        const template = routineTemplates[idx % routineTemplates.length];
+        const teacherName = c.teacher?.user
+          ? `${c.teacher.user.firstName} ${c.teacher.user.lastName}`
+          : 'Lead Specialist Educator';
+
+        // Check if day already has this subject
+        const alreadyHas = timetableEntries.some(
+          (entry) => entry.day === template.day && entry.subjectName === c.title
+        );
+
+        if (!alreadyHas) {
+          timetableEntries.push({
+            id: `tt_${c.id}_${template.day.toLowerCase()}`,
+            day: template.day,
+            classId: c.id,
+            className: profile.gradeLevel || 'Grade 12 / 13 A/L',
+            subjectId: c.id,
+            subjectName: c.title,
+            subjectCode: c.code,
+            teacherId: c.teacherId,
+            teacherName,
+            startTime: template.startTime,
+            endTime: template.endTime,
+            room: template.room,
+            periodType: template.periodType,
+            platform: 'JITSI',
+            meetingUrl: `https://meet.jit.si/LimatLive_${c.id.slice(0, 8)}`,
+            isLiveNow: false,
+          });
+        }
+      });
+    }
 
     res.status(200).json({
       success: true,
