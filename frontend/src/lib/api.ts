@@ -799,6 +799,50 @@ export const api = {
       });
       return res.json();
     },
+
+    async getMyCourses() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-courses`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async enrollCourse(courseId: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/courses/${courseId}/enroll`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getMyPackages() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-packages`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async subscribePackage(packageId: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/packages/${packageId}/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
   },
 
   // Token and Local Storage Helpers
