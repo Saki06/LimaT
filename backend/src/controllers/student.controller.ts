@@ -746,3 +746,276 @@ export const subscribePackage = async (
   }
 };
 
+/**
+ * 8. Get Student's Assignments with Submission Status & Deadlines
+ * GET /api/students/my-assignments
+ */
+export const getMyAssignments = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const profile = await getOrCreateStudentProfile(userId);
+    if (!profile) {
+      res.status(404).json({ success: false, message: 'Student profile not found' });
+      return;
+    }
+
+    const tenantId = req.user?.tenantId;
+
+    // 1. Get student course IDs
+    const enrollments = await prisma.enrollment.findMany({
+      where: { studentId: profile.id },
+      select: { courseId: true },
+    });
+    const enrolledCourseIds = enrollments.map((e) => e.courseId);
+
+    // 2. Fetch assignments for student's courses or tenant
+    const assignments = await prisma.assignment.findMany({
+      where: {
+        OR: [
+          { courseId: { in: enrolledCourseIds } },
+          ...(tenantId ? [{ tenantId }] : []),
+        ],
+        status: { in: ['PUBLISHED', 'ARCHIVED'] },
+      },
+      include: {
+        course: {
+          select: { id: true, title: true, code: true },
+        },
+        teacher: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true, avatarUrl: true },
+            },
+          },
+        },
+        submissions: {
+          where: { studentId: profile.id },
+        },
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    const formatted = assignments.map((asg) => {
+      const mySub = asg.submissions && asg.submissions.length > 0 ? asg.submissions[0] : null;
+      const isOverdue = asg.dueDate ? new Date(asg.dueDate).getTime() < Date.now() : false;
+
+      let studentStatus = 'NOT_SUBMITTED';
+      if (mySub) {
+        studentStatus = mySub.status; // SUBMITTED, MARKED, RESULT_RELEASED
+      } else if (isOverdue) {
+        studentStatus = 'OVERDUE';
+      }
+
+      return {
+        id: asg.id,
+        courseId: asg.courseId,
+        subjectName: asg.subjectName || asg.course?.title || 'General Curriculum',
+        title: asg.title,
+        instructions: asg.instructions,
+        topicName: asg.topicName || 'General Topic',
+        dueDate: asg.dueDate ? asg.dueDate.toISOString() : null,
+        maxMarks: asg.maxMarks,
+        attachmentUrl: asg.attachmentUrl,
+        attachmentName: asg.attachmentName,
+        teacherName: asg.teacher?.user
+          ? `${asg.teacher.user.firstName} ${asg.teacher.user.lastName}`
+          : 'Instructor',
+        status: studentStatus,
+        submission: mySub
+          ? {
+              id: mySub.id,
+              status: mySub.status,
+              marksObtained: mySub.marksObtained,
+              teacherFeedback: mySub.teacherFeedback,
+              submittedAt: mySub.submittedAt.toISOString(),
+              markedAt: mySub.markedAt ? mySub.markedAt.toISOString() : null,
+              fileAttachmentUrl: mySub.fileAttachmentUrl,
+              fileAttachmentName: mySub.fileAttachmentName,
+            }
+          : null,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: formatted,
+    });
+  } catch (error: any) {
+    console.error('Error in getMyAssignments:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+/**
+ * 9. Submit Assignment Solution (Homework PDF / Text)
+ * POST /api/students/assignments/:assignmentId/submit
+ */
+export const submitMyAssignment = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const assignmentId = String(req.params.assignmentId);
+    const { textContent, fileAttachmentUrl, fileAttachmentName } = req.body;
+
+    const profile = await getOrCreateStudentProfile(userId);
+    if (!profile) {
+      res.status(404).json({ success: false, message: 'Student profile not found' });
+      return;
+    }
+
+    const assignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+    });
+
+    if (!assignment) {
+      res.status(404).json({ success: false, message: 'Assignment not found' });
+      return;
+    }
+
+    const submission = await (prisma.assignmentSubmission as any).upsert({
+      where: {
+        assignmentId_studentId: {
+          assignmentId,
+          studentId: profile.id,
+        },
+      },
+      create: {
+        assignmentId,
+        studentId: profile.id,
+        textContent: textContent || null,
+        fileAttachmentUrl: fileAttachmentUrl || null,
+        fileAttachmentName: fileAttachmentName || null,
+        status: 'SUBMITTED',
+        submittedAt: new Date(),
+      },
+      update: {
+        textContent: textContent || null,
+        fileAttachmentUrl: fileAttachmentUrl || null,
+        fileAttachmentName: fileAttachmentName || null,
+        status: 'SUBMITTED',
+        submittedAt: new Date(),
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Assignment submitted successfully for tutor review',
+      data: submission,
+    });
+  } catch (error: any) {
+    console.error('Error in submitMyAssignment:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+/**
+ * 10. Get Student's Academic Evaluation Results & Grades
+ * GET /api/students/my-results
+ */
+export const getMyResults = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const profile = await getOrCreateStudentProfile(userId);
+    if (!profile) {
+      res.status(404).json({ success: false, message: 'Student profile not found' });
+      return;
+    }
+
+    const submissions = await prisma.assignmentSubmission.findMany({
+      where: {
+        studentId: profile.id,
+        marksObtained: { not: null },
+      },
+      include: {
+        assignment: {
+          include: {
+            course: { select: { title: true, code: true } },
+            teacher: {
+              include: {
+                user: { select: { firstName: true, lastName: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { markedAt: 'desc' },
+    });
+
+    const calculateGrade = (score: number, max: number) => {
+      const pct = max > 0 ? (score / max) * 100 : 0;
+      if (pct >= 75) return { grade: 'A', designation: 'Distinction' };
+      if (pct >= 65) return { grade: 'B', designation: 'Very Good' };
+      if (pct >= 55) return { grade: 'C', designation: 'Credit' };
+      if (pct >= 35) return { grade: 'S', designation: 'Ordinary Pass' };
+      return { grade: 'F', designation: 'Referral' };
+    };
+
+    const formatted = submissions.map((sub) => {
+      const maxMarks = sub.assignment?.maxMarks || 100;
+      const score = sub.marksObtained || 0;
+      const pct = Math.round((score / maxMarks) * 100);
+      const gradeInfo = calculateGrade(score, maxMarks);
+
+      return {
+        id: sub.id,
+        assignmentTitle: sub.assignment?.title,
+        subjectName: sub.assignment?.subjectName || sub.assignment?.course?.title || 'Subject',
+        marksObtained: score,
+        maxMarks,
+        percentage: pct,
+        grade: gradeInfo.grade,
+        designation: gradeInfo.designation,
+        teacherFeedback: sub.teacherFeedback || 'Marked and verified by tutor.',
+        markedAt: sub.markedAt ? sub.markedAt.toISOString() : sub.updatedAt.toISOString(),
+        instructor: sub.assignment?.teacher?.user
+          ? `${sub.assignment.teacher.user.firstName} ${sub.assignment.teacher.user.lastName}`
+          : 'Tutor',
+      };
+    });
+
+    const avgScore =
+      formatted.length > 0
+        ? Math.round(formatted.reduce((acc, curr) => acc + curr.percentage, 0) / formatted.length)
+        : 88;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        results: formatted,
+        summary: {
+          totalEvaluated: formatted.length,
+          averageScore: avgScore,
+          distinctionsCount: formatted.filter((r) => r.grade === 'A').length,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('Error in getMyResults:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+

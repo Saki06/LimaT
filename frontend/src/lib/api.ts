@@ -843,6 +843,39 @@ export const api = {
       });
       return res.json();
     },
+
+    async getMyAssignments() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-assignments`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async submitAssignment(assignmentId: string, data: { textContent?: string; fileAttachmentUrl?: string; fileAttachmentName?: string }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/assignments/${assignmentId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async getMyResults() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-results`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
   },
 
   // Token and Local Storage Helpers

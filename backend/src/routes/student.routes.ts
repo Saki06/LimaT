@@ -7,6 +7,9 @@ import {
   enrollInCourse,
   getMyPackages,
   subscribePackage,
+  getMyAssignments,
+  submitMyAssignment,
+  getMyResults,
 } from '../controllers/student.controller';
 import { authenticateToken } from '../middlewares/auth.middleware';
 
@@ -29,5 +32,12 @@ router.post('/courses/:courseId/enroll', enrollInCourse);
 // 4. Packages & Subscriptions
 router.get('/my-packages', getMyPackages);
 router.post('/packages/:packageId/subscribe', subscribePackage);
+
+// 5. Assignments & Homework Submissions
+router.get('/my-assignments', getMyAssignments);
+router.post('/assignments/:assignmentId/submit', submitMyAssignment);
+
+// 6. Academic Results & Grades
+router.get('/my-results', getMyResults);
 
 export default router;

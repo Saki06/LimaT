@@ -603,10 +603,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
 
     try {
-      await api.assignments.submit(assignmentId, {
-        textContent: text,
-        fileAttachmentName: fileName || 'Student_Submission.pdf',
-      });
+      if (api.students?.submitAssignment) {
+        await api.students.submitAssignment(assignmentId, {
+          textContent: text,
+          fileAttachmentName: fileName || 'Student_Submission.pdf',
+        });
+      } else {
+        await api.assignments.submit(assignmentId, {
+          textContent: text,
+          fileAttachmentName: fileName || 'Student_Submission.pdf',
+        });
+      }
     } catch (err) {
       console.warn('Backend submit assignment skipped:', err);
     }

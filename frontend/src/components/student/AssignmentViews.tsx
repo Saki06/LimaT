@@ -38,6 +38,7 @@ export function AssignmentViews() {
 
   const [activeFilter, setActiveFilter] = useState<"all" | "pending" | "graded">("all");
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string>("My_Solution_AnswerSheet.pdf");
 
   const currentAssignment =
@@ -60,11 +61,16 @@ export function AssignmentViews() {
     }
   });
 
-  const onSubmit = (data: SubmissionFormData) => {
+  const onSubmit = async (data: SubmissionFormData) => {
     if (!currentAssignment) return;
-    submitAssignment(currentAssignment.id, data.textContent, selectedFileName);
-    setIsSubmitModalOpen(false);
-    reset();
+    setIsSubmitting(true);
+    try {
+      await submitAssignment(currentAssignment.id, data.textContent, selectedFileName);
+      setIsSubmitModalOpen(false);
+      reset();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const filteredAssignments = assignments.filter((asg) => {
@@ -350,10 +356,11 @@ export function AssignmentViews() {
             </Button>
             <Button
               type="submit"
+              disabled={isSubmitting}
               className="bg-[#0d5c4d] hover:bg-[#083e34] text-white gap-2 font-bold shadow-sm"
             >
-              <Send className="h-4 w-4" />
-              {t.common.submit}
+              <Send className={`h-4 w-4 ${isSubmitting ? "animate-spin" : ""}`} />
+              {isSubmitting ? "Submitting..." : t.common.submit}
             </Button>
           </div>
         </form>
