@@ -466,3 +466,132 @@ export const getPublicTutorProfile = async (req: Request, res: Response): Promis
     res.status(500).json({ error: 'Failed to fetch public tutor profile' });
   }
 };
+
+/**
+ * 4. Get Public Tutor Marketplace Directory
+ * GET /api/teachers/marketplace
+ * Public / Student facing endpoint (no auth required)
+ */
+export const getTutorsMarketplace = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { subject, medium, district, search } = req.query;
+
+    const whereClause: any = {};
+
+    if (subject && typeof subject === 'string' && subject !== 'all') {
+      whereClause.OR = [
+        { specialization: { contains: subject, mode: 'insensitive' } },
+        { title: { contains: subject, mode: 'insensitive' } },
+        { bio: { contains: subject, mode: 'insensitive' } },
+      ];
+    }
+
+    if (medium && typeof medium === 'string' && medium !== 'all') {
+      whereClause.mediums = { has: medium };
+    }
+
+    if (district && typeof district === 'string' && district !== 'all') {
+      whereClause.district = { contains: district, mode: 'insensitive' };
+    }
+
+    if (search && typeof search === 'string' && search.trim()) {
+      whereClause.OR = [
+        { specialization: { contains: search, mode: 'insensitive' } },
+        { title: { contains: search, mode: 'insensitive' } },
+        { bio: { contains: search, mode: 'insensitive' } },
+        {
+          user: {
+            OR: [
+              { firstName: { contains: search, mode: 'insensitive' } },
+              { lastName: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+        },
+      ];
+    }
+
+    const tutors = await prisma.teacherProfile.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            email: true,
+          },
+        },
+        packages: {
+          where: { isPublished: true },
+          select: {
+            id: true,
+            title: true,
+            price: true,
+            billingCycle: true,
+            features: true,
+          },
+        },
+        courses: {
+          select: {
+            id: true,
+            title: true,
+            code: true,
+          },
+        },
+        _count: {
+          select: {
+            packages: true,
+            courses: true,
+            liveClasses: true,
+            libraryResources: true,
+          },
+        },
+      },
+      orderBy: { rating: 'desc' },
+    });
+
+    const formatted = tutors.map((t) => {
+      const parsedQ = parseQualificationsField(t.qualifications);
+      const lowestFee =
+        t.packages.length > 0
+          ? Math.min(...t.packages.map((p) => p.price))
+          : 3500;
+
+      return {
+        id: t.id,
+        userId: t.userId,
+        name: `${t.user.firstName} ${t.user.lastName}`,
+        email: t.user.email,
+        avatarUrl: t.user.avatarUrl,
+        title: t.title || 'Specialist Educator',
+        specialization: t.specialization,
+        bio: t.bio,
+        rating: t.rating || 4.9,
+        isVerified: t.isVerified,
+        mediums: t.mediums,
+        experienceYears: t.experienceYears || 5,
+        city: t.city || 'Colombo',
+        district: t.district || 'Colombo',
+        coverImageUrl: t.coverImageUrl,
+        publicSlug: t.publicSlug,
+        youtubeUrl: t.youtubeUrl,
+        whatsappNumber: t.whatsappNumber,
+        qualifications: parsedQ.qualifications,
+        packagesCount: t._count.packages,
+        coursesCount: t._count.courses,
+        monthlyFeeLkr: lowestFee,
+        packages: t.packages,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: formatted,
+    });
+  } catch (error: any) {
+    console.error('Error fetching tutor marketplace:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+

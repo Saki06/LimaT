@@ -757,6 +757,22 @@ export const api = {
       const res = await fetch(`${API_BASE_URL}/teachers/public/${slugOrId}`);
       return res.json();
     },
+
+    async getMarketplace(params?: {
+      subject?: string;
+      medium?: string;
+      district?: string;
+      search?: string;
+    }) {
+      const query = new URLSearchParams();
+      if (params?.subject) query.append('subject', params.subject);
+      if (params?.medium) query.append('medium', params.medium);
+      if (params?.district) query.append('district', params.district);
+      if (params?.search) query.append('search', params.search);
+
+      const res = await fetch(`${API_BASE_URL}/teachers/marketplace?${query.toString()}`);
+      return res.json();
+    },
   },
 
   // Student Workspace APIs (Profile, Dashboard Cockpit, Learning Analytics)

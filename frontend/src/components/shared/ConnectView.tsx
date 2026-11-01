@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import { useHubSettings } from "@/context/AdminContext";
+import { api } from "@/lib/api";
 import {
   ConnectTeacher,
   ConnectStudent,
@@ -100,6 +101,55 @@ export function ConnectView() {
   const [students, setStudents] = useState<ConnectStudent[]>(initialConnectStudents);
   const [studyGroups, setStudyGroups] = useState<ConnectStudyGroup[]>(initialConnectStudyGroups);
   const [purchases, setPurchases] = useState<ConnectPurchase[]>(initialConnectPurchases);
+
+  // Load live tutors and packages from backend Marketplace API
+  useEffect(() => {
+    async function loadMarketplace() {
+      try {
+        const res = await api.teachers.getMarketplace();
+        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          const mappedTutors: ConnectTeacher[] = res.data.map((t: any) => {
+            const nameParts = (t.name || "Tutor").split(" ");
+            const initials = nameParts.length > 1
+              ? `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase()
+              : nameParts[0].substring(0, 2).toUpperCase();
+
+            return {
+              id: t.id,
+              name: t.name,
+              initials,
+              avatarColor: "bg-[#0d5c4d]",
+              verified: Boolean(t.isVerified),
+              title: t.title || "Specialist Educator",
+              subject: t.specialization || "Combined Mathematics",
+              studentsCount: 142,
+              lessonsCount: t.coursesCount || 18,
+              liveClassesCount: 4,
+              monthlyFee: t.monthlyFeeLkr || 3500,
+              currency: "LKR",
+              rating: t.rating || 4.9,
+              tags: Array.isArray(t.mediums) && t.mediums.length > 0 ? t.mediums : ["A/L", "Provincial"],
+              meetUrl: t.websiteUrl || "https://meet.google.com/limat-math-master",
+              bio: t.bio || "Specialist educator with extensive curriculum experience.",
+              qualifications: Array.isArray(t.qualifications) && t.qualifications.length > 0
+                ? t.qualifications.map((q: any) => `${q.degree || q.title || 'Degree'} (${q.institution || 'University'})`).join(", ")
+                : "B.Sc (Hons), PGDE",
+              sampleVideoTitle: "Introductory Masterclass: Core Fundamentals"
+            };
+          });
+
+          // Merge live tutors with mock tutors without duplicating
+          setTeachers((prev) => {
+            const liveIds = new Set(mappedTutors.map((m) => m.id));
+            return [...mappedTutors, ...prev.filter((p) => !liveIds.has(p.id))];
+          });
+        }
+      } catch (err) {
+        console.warn("Could not load backend tutors marketplace:", err);
+      }
+    }
+    loadMarketplace();
+  }, []);
 
   // Filters for Teachers tab
   const [selectedSubject, setSelectedSubject] = useState<string>("all");
