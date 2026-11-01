@@ -160,6 +160,82 @@ export const api = {
 
   return result;
     },
+
+    async getArchived() {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error("Authentication required");
+      }
+
+      const response = await fetch(`${API_BASE_URL}/tenants/archived`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to load archived tenants");
+      }
+
+      return result;
+    },
+
+    async archive(tenantId: string) {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error("Authentication required");
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/tenants/${encodeURIComponent(tenantId)}/archive`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to archive tenant");
+      }
+
+      return result;
+    },
+
+    async restore(tenantId: string) {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error("Authentication required");
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/tenants/${encodeURIComponent(tenantId)}/restore`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to restore tenant");
+      }
+
+      return result;
+    },
+
   },
   // Auth API
   auth: {

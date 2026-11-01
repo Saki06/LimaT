@@ -265,9 +265,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const addTenant = (tenant: Tenant) => {
-    setTenants((prev) => [tenant, ...prev]);
-  };
+
+const addTenant = (tenant: Tenant) => {
+  setTenants((prev) => {
+    const existingTenant = prev.find((t) => t.id === tenant.id);
+
+    if (existingTenant) {
+      return prev.map((t) =>
+        t.id === tenant.id ? tenant : t
+      );
+    }
+
+    return [tenant, ...prev];
+  });
+};
+
 
   const updateTenant = (updated: Tenant) => {
     setTenants((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
@@ -1420,7 +1432,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       description: resource.description || 'Comprehensive learning resource uploaded for student study and curriculum preparation.',
       topic: resource.topic || (isBook ? undefined : 'General Module'),
       category: resource.category || (isPastPaper ? 'Past Papers & Model Exams' : 'Advanced Level'),
-      coverImage: resource.coverImage || (isBook 
+      coverImage: resource.coverImage || (isBook
         ? 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80'
         : isPastPaper
         ? 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=600&auto=format&fit=crop&q=80'

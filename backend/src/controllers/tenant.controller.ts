@@ -4,7 +4,10 @@ import { prisma } from '../config/prisma';
 export const listTenants = async (req: Request, res: Response): Promise<void> => {
   try {
     const tenants = await prisma.tenant.findMany({
-      include: {
+  where: {
+    deletedAt: null,
+  },
+  include: {
         _count: {
           select: {
             users: true,
@@ -180,6 +183,14 @@ if (typeof id !== 'string' || !id.trim()) {
       return;
     }
 
+    if (tenant.deletedAt !== null) {
+  res.status(403).json({
+    success: false,
+    message: 'Archived tenant features cannot be updated',
+  });
+  return;
+}
+
     const existingSettings =
       tenant.settings &&
       typeof tenant.settings === 'object' &&
@@ -347,6 +358,14 @@ if (tagline !== undefined && typeof tagline !== "string") {
       return;
     }
 
+    if (tenant.deletedAt !== null) {
+  res.status(403).json({
+    success: false,
+    message: 'Archived tenants cannot be updated',
+  });
+  return;
+}
+
     const existingSettings =
       tenant.settings &&
       typeof tenant.settings === 'object' &&
@@ -389,6 +408,185 @@ if (tagline !== undefined && typeof tagline !== "string") {
     res.status(500).json({
       success: false,
       message: 'Failed to update tenant'
+    });
+  }
+};
+
+
+export const listArchivedTenants = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenants = await prisma.tenant.findMany({
+      where: {
+        deletedAt: {
+          not: null,
+        },
+      },
+      include: {
+        _count: {
+          select: {
+            users: true,
+            courses: true,
+          },
+        },
+      },
+      orderBy: {
+        deletedAt: 'desc',
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: tenants,
+    });
+  } catch (error: any) {
+    console.error('Error listing archived tenants:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to list archived tenants',
+    });
+  }
+};
+
+
+export const archiveTenant = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = req.params.id;
+
+if (typeof id !== 'string' || !id.trim()) {
+  res.status(400).json({
+    success: false,
+    message: 'Invalid tenant ID',
+  });
+  return;
+}
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id },
+    });
+
+    if (!tenant) {
+      res.status(404).json({
+        success: false,
+        message: 'Tenant not found',
+      });
+      return;
+    }
+
+    if (tenant.deletedAt !== null) {
+      res.status(409).json({
+        success: false,
+        message: 'Tenant is already archived',
+      });
+      return;
+    }
+
+    const result = await prisma.tenant.updateMany({
+      where: {
+        id,
+        deletedAt: null,
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
+    if (result.count === 0) {
+      res.status(409).json({
+        success: false,
+        message: 'Tenant is already archived',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Tenant archived successfully',
+    });
+  } catch (error) {
+    console.error('Error archiving tenant:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to archive tenant',
+    });
+  }
+};
+
+
+export const restoreTenant = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = req.params.id;
+
+    if (typeof id !== 'string' || !id.trim()) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid tenant ID',
+      });
+      return;
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!tenant) {
+      res.status(404).json({
+        success: false,
+        message: 'Tenant not found',
+      });
+      return;
+    }
+
+    if (tenant.deletedAt === null) {
+      res.status(409).json({
+        success: false,
+        message: 'Tenant is not archived',
+      });
+      return;
+    }
+
+    const result = await prisma.tenant.updateMany({
+      where: {
+        id,
+        deletedAt: { not: null },
+      },
+      data: {
+        deletedAt: null,
+      },
+    });
+
+    if (result.count === 0) {
+      res.status(409).json({
+        success: false,
+        message: 'Tenant is already restored',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Tenant restored successfully',
+    });
+  } catch (error) {
+    console.error('Error restoring tenant:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to restore tenant',
     });
   }
 };
