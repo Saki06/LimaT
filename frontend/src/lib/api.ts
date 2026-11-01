@@ -860,6 +860,35 @@ export const api = {
       return res.json();
     },
 
+    async checkoutPackage(packageId: string, data?: {
+      paymentMethod?: string;
+      bankRefNo?: string;
+      slipUrl?: string;
+      slipFileName?: string;
+      paymentNotes?: string;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/packages/${packageId}/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data || {}),
+      });
+      return res.json();
+    },
+
+    async getMyPurchases() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-purchases`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
     async getMyAssignments() {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/students/my-assignments`, {

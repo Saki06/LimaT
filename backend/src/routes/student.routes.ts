@@ -7,6 +7,8 @@ import {
   enrollInCourse,
   getMyPackages,
   subscribePackage,
+  getMyPurchases,
+  checkoutPackage,
   getMyAssignments,
   submitMyAssignment,
   getMyResults,
@@ -33,9 +35,11 @@ router.get('/dashboard', getStudentDashboardOverview);
 router.get('/my-courses', getMyCourses);
 router.post('/courses/:courseId/enroll', enrollInCourse);
 
-// 4. Packages & Subscriptions
+// 4. Packages & Subscriptions / Tuition Payments
 router.get('/my-packages', getMyPackages);
 router.post('/packages/:packageId/subscribe', subscribePackage);
+router.post('/packages/:packageId/checkout', checkoutPackage);
+router.get('/my-purchases', getMyPurchases);
 
 // 5. Assignments & Homework Submissions
 router.get('/my-assignments', getMyAssignments);
