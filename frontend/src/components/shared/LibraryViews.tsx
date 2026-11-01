@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import { LibraryResource, LibraryResourceType } from "@/types/lms";
 import { initialTutorPackages } from "@/data/connectMockData";
+import { api } from "@/lib/api";
 import {
   Library,
   BookOpen,
@@ -123,22 +124,102 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
   const [viewerCurrentPage, setViewerCurrentPage] = useState(1);
   const [viewerZoom, setViewerZoom] = useState(100);
 
+  // Live Backend Resources Fetching
+  const [backendResources, setBackendResources] = useState<LibraryResource[]>([]);
+
+  useEffect(() => {
+    async function loadBackendResources() {
+      try {
+        let res: any = null;
+        if (currentRole === "student" && api.students?.getMyLibraryResources) {
+          res = await api.students.getMyLibraryResources({
+            resourceType: initialTab === "past_papers" ? "PAST_PAPER" : undefined,
+          });
+        }
+        if (!res || !res.success || !Array.isArray(res.data) || res.data.length === 0) {
+          res = await api.resources.getAll({
+            resourceType: initialTab === "past_papers" ? "PAST_PAPER" : undefined,
+          });
+        }
+
+        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          const mapped: LibraryResource[] = res.data.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description || "",
+            resourceType: (item.resourceType?.toLowerCase() === "past_paper"
+              ? "past_paper"
+              : item.resourceType?.toLowerCase() === "book"
+              ? "book"
+              : "tute") as LibraryResourceType,
+            subject: item.subject,
+            author: item.author || "Certified Tutor",
+            teacherId: item.teacherId,
+            isOwner: item.isOwner || false,
+            topic: item.topic || "Core Curriculum",
+            category:
+              item.category ||
+              (item.resourceType?.toLowerCase() === "past_paper"
+                ? "Past Papers & Model Exams"
+                : "Advanced Level"),
+            coverImage:
+              item.coverImage ||
+              "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=600&auto=format&fit=crop&q=80",
+            fileUrl: item.fileUrl,
+            fileType: item.fileType || "PDF",
+            fileSize: item.fileSize || "2.4 MB",
+            pageCount: item.pageCount || 18,
+            uploadedDate: item.createdAt ? item.createdAt.split("T")[0] : "2026-10-15",
+            status: item.status || "published",
+            visibility: item.visibility || "public",
+            packageId: item.packageId,
+            packageName: item.packageName,
+            isLocked: item.isLocked || false,
+            year: item.year,
+            medium: item.medium || "Tamil",
+            examType: item.examType || "G.C.E. A/L",
+            paperPart: item.paperPart || "Part I & II (Combined)",
+            hasMarkingScheme: Boolean(item.hasMarkingScheme),
+            markingSchemeUrl: item.markingSchemeUrl,
+            markingSchemeNotes: item.markingSchemeNotes,
+            timeAllowedMinutes: item.timeAllowedMinutes || 180,
+            allowDownload: item.allowDownload !== false,
+            downloadsCount: item.downloadsCount || 0,
+            viewsCount: item.viewsCount || 1,
+            rating: item.rating || 4.9,
+            featured: item.featured || false,
+          }));
+          setBackendResources(mapped);
+        }
+      } catch (err) {
+        console.warn("Could not load backend library resources:", err);
+      }
+    }
+    loadBackendResources();
+  }, [currentRole, initialTab]);
+
+  const combinedResources = useMemo(() => {
+    if (backendResources.length === 0) return libraryResources;
+    const existingIds = new Set(backendResources.map((b) => b.id));
+    return [...backendResources, ...libraryResources.filter((r) => !existingIds.has(r.id))];
+  }, [backendResources, libraryResources]);
+
   // Quick subjects & categories from data
   const availableSubjects = useMemo(() => {
     const subs = new Set<string>();
-    libraryResources.forEach((r) => subs.add(r.subject));
+    combinedResources.forEach((r) => subs.add(r.subject));
     return Array.from(subs);
-  }, [libraryResources]);
+  }, [combinedResources]);
 
   const availableCategories = useMemo(() => {
     const cats = new Set<string>();
-    libraryResources.forEach((r) => cats.add(r.category));
+    combinedResources.forEach((r) => cats.add(r.category));
     return Array.from(cats);
-  }, [libraryResources]);
+  }, [combinedResources]);
 
   // Filtered resources for Student View
   const filteredResources = useMemo(() => {
-    return libraryResources.filter((resource) => {
+    return combinedResources.filter((resource) => {
       // Must be published for students (or drafts/unpublished can show if teacher is viewing general library)
       if (currentRole === "student" && resource.status !== "published") {
         return false;
@@ -215,19 +296,19 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
 
   // Featured / Popular resources for showcase
   const popularResources = useMemo(() => {
-    return [...libraryResources]
+    return [...combinedResources]
       .filter((r) => r.status === "published")
       .sort((a, b) => b.viewsCount + b.downloadsCount - (a.viewsCount + a.downloadsCount))
       .slice(0, 3);
-  }, [libraryResources]);
+  }, [combinedResources]);
 
   // Filter resources uploaded by this specific teacher (or all if admin)
   const myTeacherResources = useMemo(() => {
     if (currentRole === "admin" || currentRole === "super_admin") {
-      return libraryResources;
+      return combinedResources;
     }
     const teacherName = (currentUser.name || "").toLowerCase().trim();
-    return libraryResources.filter((r) => {
+    return combinedResources.filter((r) => {
       const author = (r.author || "").toLowerCase().trim();
       return (
         r.isOwner === true ||
@@ -237,7 +318,7 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
         teacherName.includes(author)
       );
     });
-  }, [libraryResources, currentUser.name, currentUser.id, currentRole]);
+  }, [combinedResources, currentUser.name, currentUser.id, currentRole]);
 
   // Teacher Management filtered resources
   const teacherManagedResources = useMemo(() => {

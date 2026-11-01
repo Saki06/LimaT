@@ -13,6 +13,7 @@ import {
   getMyLiveClasses,
   joinMyLiveClass,
   getMyTimetable,
+  getMyLibraryResources,
 } from '../controllers/student.controller';
 import { authenticateToken } from '../middlewares/auth.middleware';
 
@@ -49,5 +50,8 @@ router.post('/live-classes/:sessionId/join', joinMyLiveClass);
 
 // 8. Weekly Academic Timetable
 router.get('/my-timetable', getMyTimetable);
+
+// 9. Study Resources & Past Papers
+router.get('/my-resources', getMyLibraryResources);
 
 export default router;

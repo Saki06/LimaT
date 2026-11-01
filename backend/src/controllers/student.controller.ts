@@ -1293,5 +1293,144 @@ export const getMyTimetable = async (
   }
 };
 
+/**
+ * 14. Get Student's Accessible Library Resources & Past Papers
+ * GET /api/students/my-resources
+ */
+export const getMyLibraryResources = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const profile = await getOrCreateStudentProfile(userId);
+    if (!profile) {
+      res.status(404).json({ success: false, message: 'Student profile not found' });
+      return;
+    }
+
+    const tenantId = req.user?.tenantId;
+    const { resourceType, subject, year, medium, search } = req.query;
+
+    // Get student's active package subscriptions
+    const subscriptions = await prisma.packageSubscription.findMany({
+      where: {
+        studentId: profile.id,
+        status: 'ACTIVE',
+        endDate: { gte: new Date() },
+      },
+      select: { packageId: true },
+    });
+    const subscribedPackageIds = subscriptions.map((s) => s.packageId);
+
+    const whereClause: any = {
+      status: 'published',
+      ...(tenantId ? { tenantId } : {}),
+      OR: [
+        { visibility: 'PUBLIC' },
+        { packageId: { in: subscribedPackageIds } },
+      ],
+    };
+
+    if (resourceType && typeof resourceType === 'string' && resourceType !== 'all') {
+      const typeUpper = resourceType.toUpperCase();
+      if (['PAST_PAPER', 'TUTE', 'BOOK'].includes(typeUpper)) {
+        whereClause.resourceType = typeUpper;
+      }
+    }
+
+    if (subject && typeof subject === 'string' && subject !== 'all') {
+      whereClause.subject = { contains: subject, mode: 'insensitive' };
+    }
+
+    if (year && typeof year === 'string' && year !== 'all') {
+      whereClause.year = parseInt(year, 10);
+    }
+
+    if (medium && typeof medium === 'string' && medium !== 'all') {
+      whereClause.medium = { contains: medium, mode: 'insensitive' };
+    }
+
+    if (search && typeof search === 'string' && search.trim()) {
+      whereClause.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { subject: { contains: search, mode: 'insensitive' } },
+        { topic: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const resources = await prisma.libraryResource.findMany({
+      where: whereClause,
+      include: {
+        teacher: {
+          include: {
+            user: {
+              select: { firstName: true, lastName: true, avatarUrl: true },
+            },
+          },
+        },
+        package: {
+          select: { id: true, title: true, price: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formatted = resources.map((r) => {
+      const isSubOnly = r.visibility === 'SUBSCRIBERS_ONLY';
+      const hasAccess = !isSubOnly || (r.packageId ? subscribedPackageIds.includes(r.packageId) : false);
+
+      return {
+        id: r.id,
+        title: r.title,
+        description: r.description || '',
+        resourceType: r.resourceType.toLowerCase(),
+        subject: r.subject,
+        topic: r.topic || undefined,
+        category: r.category || 'General',
+        year: r.year || undefined,
+        medium: r.medium || undefined,
+        examType: r.examType || undefined,
+        paperPart: r.paperPart || undefined,
+        fileUrl: hasAccess ? r.fileUrl : null,
+        fileName: r.fileName || 'Resource.pdf',
+        fileSize: r.fileSize || '2.4 MB',
+        fileType: r.fileType || 'pdf',
+        coverImage: r.coverImage || undefined,
+        hasMarkingScheme: r.hasMarkingScheme,
+        markingSchemeUrl: hasAccess ? r.markingSchemeUrl : null,
+        markingSchemeNotes: hasAccess ? r.markingSchemeNotes : null,
+        timeAllowedMinutes: r.timeAllowedMinutes || 180,
+        visibility: r.visibility.toLowerCase(),
+        status: r.status,
+        allowDownload: r.allowDownload,
+        viewsCount: r.viewsCount,
+        downloadsCount: r.downloadsCount,
+        author: r.teacher?.user ? `${r.teacher.user.firstName} ${r.teacher.user.lastName}` : 'Tutor',
+        authorAvatar: r.teacher?.user?.avatarUrl || undefined,
+        teacherId: r.teacherId,
+        packageId: r.packageId,
+        packageName: r.package?.title || undefined,
+        isLocked: !hasAccess,
+        createdAt: r.createdAt.toISOString(),
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: formatted,
+    });
+  } catch (error: any) {
+    console.error('Error in getMyLibraryResources:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+
 
 

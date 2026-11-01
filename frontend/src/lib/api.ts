@@ -908,6 +908,29 @@ export const api = {
       });
       return res.json();
     },
+
+    async getMyLibraryResources(params?: {
+      resourceType?: string;
+      subject?: string;
+      year?: string | number;
+      medium?: string;
+      search?: string;
+    }) {
+      const token = api.token.get();
+      const query = new URLSearchParams();
+      if (params?.resourceType) query.append('resourceType', params.resourceType);
+      if (params?.subject) query.append('subject', params.subject);
+      if (params?.year) query.append('year', params.year.toString());
+      if (params?.medium) query.append('medium', params.medium);
+      if (params?.search) query.append('search', params.search);
+
+      const res = await fetch(`${API_BASE_URL}/students/my-resources?${query.toString()}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
   },
 
   // Token and Local Storage Helpers
