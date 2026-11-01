@@ -876,6 +876,38 @@ export const api = {
       });
       return res.json();
     },
+
+    async getMyLiveClasses() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-live-classes`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async joinLiveClass(sessionId: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/live-classes/${sessionId}/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getMyTimetable() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-timetable`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
   },
 
   // Token and Local Storage Helpers

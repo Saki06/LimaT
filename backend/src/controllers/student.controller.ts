@@ -1018,4 +1018,280 @@ export const getMyResults = async (
   }
 };
 
+/**
+ * 11. Get Student's Live Classes & Masterclasses
+ * GET /api/students/my-live-classes
+ */
+export const getMyLiveClasses = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const profile = await getOrCreateStudentProfile(userId);
+    if (!profile) {
+      res.status(404).json({ success: false, message: 'Student profile not found' });
+      return;
+    }
+
+    const tenantId = req.user?.tenantId;
+
+    // 1. Enrolled course IDs
+    const enrollments = await prisma.enrollment.findMany({
+      where: { studentId: profile.id },
+      select: { courseId: true },
+    });
+    const enrolledCourseIds = enrollments.map((e) => e.courseId);
+
+    // 2. Subscribed tuition packages
+    const subscriptions = await prisma.packageSubscription.findMany({
+      where: {
+        studentId: profile.id,
+        status: 'ACTIVE',
+        endDate: { gte: new Date() },
+      },
+      select: { packageId: true },
+    });
+    const subscribedPackageIds = subscriptions.map((s) => s.packageId);
+
+    // 3. Fetch all live sessions for student's courses or packages
+    const sessions = await prisma.liveClassSession.findMany({
+      where: {
+        OR: [
+          { courseId: { in: enrolledCourseIds } },
+          { packageId: { in: subscribedPackageIds } },
+          ...(tenantId ? [{ tenantId }] : []),
+        ],
+      },
+      include: {
+        course: { select: { id: true, title: true, code: true } },
+        package: { select: { id: true, title: true, price: true } },
+        teacher: {
+          include: {
+            user: { select: { firstName: true, lastName: true, avatarUrl: true } },
+          },
+        },
+        attendances: {
+          where: { studentId: profile.id },
+        },
+      },
+      orderBy: { startTime: 'asc' },
+    });
+
+    const now = new Date();
+    const formatted = sessions.map((sess) => {
+      const isAttended = sess.attendances && sess.attendances.length > 0;
+      const myAttendance = isAttended ? sess.attendances[0] : null;
+      const isPast = sess.endTime ? sess.endTime < now : sess.startTime < new Date(now.getTime() - 2 * 3600000);
+      const isLiveNow = sess.status === 'LIVE' || (!isPast && sess.startTime <= now);
+
+      return {
+        id: sess.id,
+        title: sess.title,
+        description: sess.description,
+        topic: sess.topic || 'Curriculum Masterclass',
+        subject: sess.course?.title || sess.package?.title || 'Combined Mathematics',
+        courseId: sess.courseId,
+        packageId: sess.packageId,
+        startTime: sess.startTime.toISOString(),
+        endTime: sess.endTime ? sess.endTime.toISOString() : null,
+        durationMinutes: sess.durationMinutes || 60,
+        status: isLiveNow ? 'LIVE' : isPast ? 'COMPLETED' : sess.status,
+        platform: sess.platform,
+        meetingUrl: sess.meetingUrl || `https://meet.jit.si/${sess.meetingId || 'limat-live'}`,
+        meetingId: sess.meetingId,
+        passcode: sess.passcode,
+        recordingUrl: sess.recordingUrl,
+        instructor: sess.teacher?.user
+          ? `${sess.teacher.user.firstName} ${sess.teacher.user.lastName}`
+          : 'Instructor',
+        instructorAvatar: sess.teacher?.user?.avatarUrl,
+        hasAttended: isAttended,
+        joinedAt: myAttendance?.joinedAt ? myAttendance.joinedAt.toISOString() : null,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: formatted,
+    });
+  } catch (error: any) {
+    console.error('Error in getMyLiveClasses:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+/**
+ * 12. Student Joins Live Class & Confirms Attendance
+ * POST /api/students/live-classes/:sessionId/join
+ */
+export const joinMyLiveClass = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const sessionId = String(req.params.sessionId);
+    const profile = await getOrCreateStudentProfile(userId);
+    if (!profile) {
+      res.status(404).json({ success: false, message: 'Student profile not found' });
+      return;
+    }
+
+    const session = await prisma.liveClassSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        teacher: {
+          include: {
+            user: { select: { firstName: true, lastName: true, avatarUrl: true } },
+          },
+        },
+        course: { select: { title: true } },
+        package: { select: { title: true } },
+      },
+    });
+
+    if (!session) {
+      res.status(404).json({ success: false, message: 'Live class session not found' });
+      return;
+    }
+
+    // Upsert attendance record
+    const attendance = await prisma.liveClassAttendance.upsert({
+      where: {
+        sessionId_studentId: {
+          sessionId,
+          studentId: profile.id,
+        },
+      },
+      create: {
+        sessionId,
+        studentId: profile.id,
+        joinedAt: new Date(),
+      },
+      update: {
+        joinedAt: new Date(),
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Attendance verified and recorded',
+      data: {
+        attendance,
+        session: {
+          id: session.id,
+          title: session.title,
+          platform: session.platform,
+          meetingUrl: session.meetingUrl || `https://meet.jit.si/${session.meetingId || 'limat-live'}`,
+          meetingId: session.meetingId,
+          passcode: session.passcode,
+          instructor: session.teacher?.user
+            ? `${session.teacher.user.firstName} ${session.teacher.user.lastName}`
+            : 'Instructor',
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('Error in joinMyLiveClass:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+/**
+ * 13. Get Student Weekly Timetable Schedule
+ * GET /api/students/my-timetable
+ */
+export const getMyTimetable = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const profile = await getOrCreateStudentProfile(userId);
+    if (!profile) {
+      res.status(404).json({ success: false, message: 'Student profile not found' });
+      return;
+    }
+
+    const tenantId = req.user?.tenantId;
+
+    // 1. Enrolled courses
+    const enrollments = await prisma.enrollment.findMany({
+      where: { studentId: profile.id },
+      select: { courseId: true },
+    });
+    const enrolledCourseIds = enrollments.map((e) => e.courseId);
+
+    // 2. Live sessions scheduled for this week
+    const liveSessions = await prisma.liveClassSession.findMany({
+      where: {
+        OR: [
+          { courseId: { in: enrolledCourseIds } },
+          ...(tenantId ? [{ tenantId }] : []),
+        ],
+        status: { in: ['SCHEDULED', 'LIVE'] },
+      },
+      include: {
+        course: { select: { title: true, code: true } },
+        teacher: {
+          include: {
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+      orderBy: { startTime: 'asc' },
+    });
+
+    const daysName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const timetableEntries = liveSessions.map((sess) => {
+      const d = new Date(sess.startTime);
+      const day = daysName[d.getDay()];
+      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const endTimeStr = sess.endTime
+        ? new Date(sess.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : '9:00 PM';
+
+      return {
+        id: sess.id,
+        day,
+        subjectName: sess.course?.title || sess.topic || 'Academic Session',
+        className: profile.gradeLevel || 'Grade 12 / 13',
+        teacherName: sess.teacher?.user
+          ? `${sess.teacher.user.firstName} ${sess.teacher.user.lastName}`
+          : 'Assigned Tutor',
+        startTime: timeStr,
+        endTime: endTimeStr,
+        room: `Live Studio (${sess.platform})`,
+        platform: sess.platform,
+        meetingUrl: sess.meetingUrl,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: timetableEntries,
+    });
+  } catch (error: any) {
+    console.error('Error in getMyTimetable:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+
 

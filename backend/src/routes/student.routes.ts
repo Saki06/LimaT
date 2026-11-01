@@ -10,6 +10,9 @@ import {
   getMyAssignments,
   submitMyAssignment,
   getMyResults,
+  getMyLiveClasses,
+  joinMyLiveClass,
+  getMyTimetable,
 } from '../controllers/student.controller';
 import { authenticateToken } from '../middlewares/auth.middleware';
 
@@ -39,5 +42,12 @@ router.post('/assignments/:assignmentId/submit', submitMyAssignment);
 
 // 6. Academic Results & Grades
 router.get('/my-results', getMyResults);
+
+// 7. Live Video Masterclasses & Attendance
+router.get('/my-live-classes', getMyLiveClasses);
+router.post('/live-classes/:sessionId/join', joinMyLiveClass);
+
+// 8. Weekly Academic Timetable
+router.get('/my-timetable', getMyTimetable);
 
 export default router;

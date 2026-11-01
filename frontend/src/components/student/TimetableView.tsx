@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import { useStaff } from "@/context/AdminContext";
 import { TimetableDay, TimetableEntry } from "@/types/lms";
@@ -8,6 +8,7 @@ import { Calendar, Clock3, MapPin, Pencil, Plus, Trash2, Users } from "lucide-re
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { api } from "@/lib/api";
 
 const DAYS: TimetableDay[] = [
   "Monday",
@@ -57,12 +58,33 @@ export function TimetableView() {
   const [editingEntry, setEditingEntry] = useState<TimetableEntry | null>(null);
   const [entryToDelete, setEntryToDelete] = useState<TimetableEntry | null>(null);
   const [draft, setDraft] = useState<TimetableDraft>(EMPTY_DRAFT);
+  const [backendEntries, setBackendEntries] = useState<TimetableEntry[]>([]);
+
+  useEffect(() => {
+    async function loadBackendTimetable() {
+      try {
+        const res = await api.students.getMyTimetable();
+        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          setBackendEntries(res.data);
+        }
+      } catch (err) {
+        console.warn("Could not load backend student timetable:", err);
+      }
+    }
+    loadBackendTimetable();
+  }, []);
+
+  const combinedTimetable = useMemo(() => {
+    if (backendEntries.length === 0) return timetable;
+    const existingIds = new Set(backendEntries.map((b) => b.id));
+    return [...backendEntries, ...timetable.filter((t) => !existingIds.has(t.id))];
+  }, [backendEntries, timetable]);
 
   const displayedEntries = useMemo(
-    () => timetable
+    () => combinedTimetable
       .filter((entry) => selectedDay === "All" || entry.day === selectedDay)
       .sort((a, b) => dayOrder(a.day) - dayOrder(b.day) || a.startTime.localeCompare(b.startTime)),
-    [selectedDay, timetable]
+    [selectedDay, combinedTimetable]
   );
 
   const openCreate = () => {
