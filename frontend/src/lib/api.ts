@@ -759,6 +759,48 @@ export const api = {
     },
   },
 
+  // Student Workspace APIs (Profile, Dashboard Cockpit, Learning Analytics)
+  students: {
+    async getMyProfile() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/me`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async updateMyProfile(data: {
+      firstName?: string;
+      lastName?: string;
+      avatarUrl?: string;
+      gradeLevel?: string;
+      section?: string;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/me`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async getDashboardOverview() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/dashboard`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+  },
+
   // Token and Local Storage Helpers
   token: {
     get(): string | null {
