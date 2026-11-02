@@ -23,6 +23,17 @@ export interface AuthResponse {
   };
 }
 
+interface SportsEventApiResponse {
+  id: string;
+  title: string;
+  sportType: string;
+  startDate: string;
+  venue: string;
+  status: 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'CANCELLED';
+  registrations?: { userId: string }[];
+  _count?: { registrations: number };
+}
+
 export const api = {
   // Super Admin - Tenant API
   tenants: {
@@ -161,6 +172,66 @@ export const api = {
   return result;
     },
   },
+
+  // Sports API
+  sports: {
+    async getEvents(): Promise<{
+      success: boolean;
+      data?: SportsEventApiResponse[];
+      message?: string;
+    }> {
+      const token = api.token.get();
+      const response = await fetch(`${API_BASE_URL}/sports/events`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return response.json();
+    },
+
+    async getMyRegistrations() {
+      const token = api.token.get();
+      const response = await fetch(`${API_BASE_URL}/sports/my-registrations`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return response.json();
+    },
+
+    async register(data: {
+      eventId: string;
+      jerseyNumber?: number | string;
+      roleInTeam?: string;
+      notes?: string;
+    }) {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/sports/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to register for sports event');
+      }
+
+      return result;
+    },
+  },
+
   // Auth API
   auth: {
     async login(credentials: { email: string; password: string }): Promise<AuthResponse> {

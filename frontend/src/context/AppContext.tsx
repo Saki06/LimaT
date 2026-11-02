@@ -195,6 +195,48 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const fetchSportsEvents = async (
+  setEvents: React.Dispatch<React.SetStateAction<SchoolEvent[]>>,
+  currentUserId?: string
+) => {
+  try {
+    const res = await api.sports.getEvents();
+
+    if (!res.success || !res.data) {
+      return;
+    }
+
+    const userId = currentUserId ?? api.user.get()?.id;
+    const mappedEvents: SchoolEvent[] = res.data.map((event) => ({
+      id: event.id,
+      title: event.title,
+      description: event.sportType || 'Sports event',
+      date: new Date(event.startDate).toISOString().slice(0, 10),
+      time: new Date(event.startDate).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      venue: event.venue,
+      organizer: 'School Sports Office',
+      capacity: 200,
+      registeredCount: event._count?.registrations ?? 0,
+      audience: 'students',
+      status: event.status === 'COMPLETED' ? 'completed' : 'published',
+      isRegisteredByCurrentUser: Array.isArray(event.registrations)
+        ? event.registrations.some((registration) => registration.userId === userId)
+        : false,
+    }));
+
+    setEvents((prev) => {
+      const backendIds = new Set(mappedEvents.map((event) => event.id));
+      const nonDuplicatePrev = prev.filter((event) => !backendIds.has(event.id));
+      return [...mappedEvents, ...nonDuplicatePrev];
+    });
+  } catch (err) {
+    console.warn('Sports events backend not available yet:', err);
+  }
+};
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentRole, setCurrentRole] = useState<UserRole>('student');
   const [locale, setLocale] = useState<LocaleCode>('en');
@@ -339,28 +381,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [authUser?.role, authToken]);
 
-  // Restore authenticated session from localStorage on initial load
-  useEffect(() => {
-    const token = api.token.get();
-    const user = api.user.get();
-    if (token && user) {
-      setAuthToken(token);
-      setAuthUser(user);
-      const roleMap: Record<string, UserRole> = {
-        STUDENT: 'student',
-        TEACHER: 'teacher',
-        PARENT: 'parent',
-        ADMIN: 'admin',
-        SUPER_ADMIN: 'super_admin'
-      };
-      if (user.role && roleMap[user.role]) {
-        setCurrentRole(roleMap[user.role]);
-      }
-      setIsLanding(false);
-    }
-    fetchCourses();
-  }, []);
-
   const mapBackendCourseToFrontend = (c: any): Course => {
     const teacherName = c.teacher?.user
       ? `${c.teacher.user.firstName} ${c.teacher.user.lastName || ''}`.trim()
@@ -418,6 +438,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       console.warn('Backend courses API not reachable yet:', err);
     }
   };
+
+  // Restore authenticated session from localStorage on initial load
+  useEffect(() => {
+    const token = api.token.get();
+    const user = api.user.get();
+    if (token && user) {
+      setAuthToken(token);
+      setAuthUser(user);
+      const roleMap: Record<string, UserRole> = {
+        STUDENT: 'student',
+        TEACHER: 'teacher',
+        PARENT: 'parent',
+        ADMIN: 'admin',
+        SUPER_ADMIN: 'super_admin'
+      };
+      if (user.role && roleMap[user.role]) {
+        setCurrentRole(roleMap[user.role]);
+      }
+      setIsLanding(false);
+    }
+    fetchCourses();
+  }, []);
+
+  useEffect(() => {
+    void fetchSportsEvents(setEvents, authUser?.id);
+  }, [authUser?.id]);
 
   const createCourse = async (data: {
     title: string;
@@ -825,7 +871,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Event RSVP
-  const registerEvent = (eventId: string) => {
+  const registerEvent = async (eventId: string) => {
+    if (authToken) {
+      try {
+        const result = await api.sports.register({ eventId });
+
+        if (result.success) {
+          await fetchSportsEvents(setEvents, authUser?.id);
+          addToast({
+            type: 'success',
+            title: 'Event Registration Updated',
+            message: result.message || 'Your participation status has been updated in school records.'
+          });
+        } else {
+          throw new Error(result.message || 'Failed to register for sports event');
+        }
+      } catch (error) {
+        console.warn('Backend sports registration failed:', error);
+        addToast({
+          type: 'error',
+          title: 'Registration failed',
+          message: error instanceof Error ? error.message : 'Could not register for this event.'
+        });
+      }
+
+      return;
+    }
+
     setEvents((prev) =>
       prev.map((evt) => {
         if (evt.id === eventId) {
