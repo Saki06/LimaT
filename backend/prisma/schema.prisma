@@ -91,23 +91,24 @@ enum ResourceType {
 
 // Multi-tenant School / Institution
 model Tenant {
-  id             String          @id @default(uuid())
-  slug           String          @unique
-  name           String
-  domain         String?         @unique
-  status         TenantStatus    @default(ACTIVE)
-  plan           String          @default("PRO")
-  settings       Json?
-  users          User[]
-  courses        Course[]
-  packages       Package[]
-  liveClasses    LiveClassSession[]
-  assignments    Assignment[]
+  id               String             @id @default(uuid())
+  slug             String             @unique
+  name             String
+  domain           String?            @unique
+  status           TenantStatus       @default(ACTIVE)
+  plan             String             @default("PRO")
+  settings         Json?
+  users            User[]
+  courses          Course[]
+  packages         Package[]
+  liveClasses      LiveClassSession[]
+  assignments      Assignment[]
   libraryResources LibraryResource[]
-  sportsEvents   SportsEvent[]
-  announcements  Announcement[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  sportsEvents     SportsEvent[]
+  announcements    Announcement[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
 
   @@index([slug])
 }
@@ -127,6 +128,7 @@ model User {
   studentProfile      StudentProfile?
   teacherProfile      TeacherProfile?
   parentProfile       ParentProfile?
+  superAdminProfile   SuperAdminProfile?
   sportsRegistrations SportsRegistration[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
@@ -136,27 +138,27 @@ model User {
 }
 
 model StudentProfile {
-  id            String       @id @default(uuid())
-  userId        String       @unique
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  studentIdNo   String       @unique
-  gradeLevel    String
-  section       String?
-  guardianId    String?
-  guardian      ParentProfile? @relation(fields: [guardianId], references: [id])
-  enrollments   Enrollment[]
-  packageSubscriptions PackageSubscription[]
-  liveAttendances LiveClassAttendance[]
+  id                    String                 @id @default(uuid())
+  userId                String                 @unique
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentIdNo           String                 @unique
+  gradeLevel            String
+  section               String?
+  guardianId            String?
+  guardian              ParentProfile?         @relation(fields: [guardianId], references: [id])
+  enrollments           Enrollment[]
+  packageSubscriptions  PackageSubscription[]
+  liveAttendances       LiveClassAttendance[]
   assignmentSubmissions AssignmentSubmission[]
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 }
 
 model TeacherProfile {
-  id                String            @id @default(uuid())
-  userId            String            @unique
-  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  employeeNo        String            @unique
+  id                String             @id @default(uuid())
+  userId            String             @unique
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeNo        String             @unique
   specialization    String
   title             String?
   bio               String?
@@ -167,69 +169,69 @@ model TeacherProfile {
   province          String?
   postalCode        String?
   sltsRegNo         String?
-  mediums           String[]          @default([])
-  experienceYears   Int?              @default(0)
-  qualifications    Json?             @default("[]")
+  mediums           String[]           @default([])
+  experienceYears   Int?               @default(0)
+  qualifications    Json?              @default("[]")
   bankName          String?
   bankAccountName   String?
   bankAccountNumber String?
   bankBranch        String?
   bankBranchCode    String?
-  publicSlug        String?           @unique
+  publicSlug        String?            @unique
   youtubeUrl        String?
   telegramUrl       String?
   whatsappNumber    String?
   websiteUrl        String?
   coverImageUrl     String?
-  rating            Float?            @default(4.9)
-  isVerified        Boolean           @default(true)
+  rating            Float?             @default(4.9)
+  isVerified        Boolean            @default(true)
   courses           Course[]
   packages          Package[]
   liveClasses       LiveClassSession[]
   assignments       Assignment[]
   libraryResources  LibraryResource[]
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
 model ParentProfile {
-  id            String           @id @default(uuid())
-  userId        String           @unique
-  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  phoneNumber   String?
-  students      StudentProfile[]
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id          String           @id @default(uuid())
+  userId      String           @unique
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phoneNumber String?
+  students    StudentProfile[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 }
 
 model Course {
-  id            String        @id @default(uuid())
-  tenantId      String
-  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  teacherId     String
-  teacher       TeacherProfile @relation(fields: [teacherId], references: [id])
-  title         String
-  code          String
-  description   String?
-  syllabus      Json?
-  enrollments   Enrollment[]
+  id             String             @id @default(uuid())
+  tenantId       String
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  teacherId      String
+  teacher        TeacherProfile     @relation(fields: [teacherId], references: [id])
+  title          String
+  code           String
+  description    String?
+  syllabus       Json?
+  enrollments    Enrollment[]
   packageCourses PackageCourse[]
-  liveClasses   LiveClassSession[]
-  assignments   Assignment[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  liveClasses    LiveClassSession[]
+  assignments    Assignment[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   @@unique([tenantId, code])
 }
 
 model Enrollment {
-  id            String         @id @default(uuid())
-  courseId      String
-  course        Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  studentId     String
-  student       StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  grade         Float?
-  enrolledAt    DateTime       @default(now())
+  id         String         @id @default(uuid())
+  courseId   String
+  course     Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  studentId  String
+  student    StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  grade      Float?
+  enrolledAt DateTime       @default(now())
 
   @@unique([courseId, studentId])
 }
@@ -252,65 +254,65 @@ model SportsEvent {
 }
 
 model SportsRegistration {
-  id            String             @id @default(uuid())
-  eventId       String
-  event         SportsEvent        @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jerseyNumber  Int?
-  roleInTeam    String?
-  status        RegistrationStatus @default(PENDING)
-  notes         String?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  id           String             @id @default(uuid())
+  eventId      String
+  event        SportsEvent        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jerseyNumber Int?
+  roleInTeam   String?
+  status       RegistrationStatus @default(PENDING)
+  notes        String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   @@unique([eventId, userId])
 }
 
 model Announcement {
-  id            String      @id @default(uuid())
-  tenantId      String
-  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  title         String
-  content       String
-  targetRole    Role?
-  isPinned      Boolean     @default(false)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title      String
+  content    String
+  targetRole Role?
+  isPinned   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([tenantId, targetRole])
 }
 
 model Package {
-  id            String                @id @default(uuid())
-  tenantId      String
-  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  teacherId     String
-  teacher       TeacherProfile        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  title         String
-  slug          String?
-  description   String?
-  price         Float                 @default(0.0)
-  billingCycle  BillingCycle          @default(MONTHLY)
-  durationDays  Int                   @default(30)
-  features      Json?
-  isPublished   Boolean               @default(true)
-  courses       PackageCourse[]
-  subscriptions PackageSubscription[]
-  liveClasses   LiveClassSession[]
+  id               String                @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  teacherId        String
+  teacher          TeacherProfile        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  title            String
+  slug             String?
+  description      String?
+  price            Float                 @default(0.0)
+  billingCycle     BillingCycle          @default(MONTHLY)
+  durationDays     Int                   @default(30)
+  features         Json?
+  isPublished      Boolean               @default(true)
+  courses          PackageCourse[]
+  subscriptions    PackageSubscription[]
+  liveClasses      LiveClassSession[]
   libraryResources LibraryResource[]
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 
   @@index([tenantId, isPublished])
 }
 
 model PackageCourse {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   packageId String
-  package   Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
   courseId  String
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course    Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([packageId, courseId])
 }
@@ -333,30 +335,30 @@ model PackageSubscription {
 }
 
 model LiveClassSession {
-  id              String               @id @default(uuid())
+  id              String                @id @default(uuid())
   tenantId        String
-  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   teacherId       String
-  teacher         TeacherProfile       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacher         TeacherProfile        @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   courseId        String?
-  course          Course?              @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  course          Course?               @relation(fields: [courseId], references: [id], onDelete: SetNull)
   packageId       String?
-  package         Package?             @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  package         Package?              @relation(fields: [packageId], references: [id], onDelete: SetNull)
   title           String
   description     String?
   topic           String?
   startTime       DateTime
   endTime         DateTime?
-  durationMinutes Int                  @default(60)
-  status          LiveClassStatus      @default(SCHEDULED)
-  platform        LiveMeetingPlatform  @default(JITSI)
+  durationMinutes Int                   @default(60)
+  status          LiveClassStatus       @default(SCHEDULED)
+  platform        LiveMeetingPlatform   @default(JITSI)
   meetingUrl      String?
   meetingId       String?
   passcode        String?
   recordingUrl    String?
   attendances     LiveClassAttendance[]
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
   @@index([tenantId, status])
   @@index([teacherId, status])
@@ -379,25 +381,25 @@ model LiveClassAttendance {
 }
 
 model Assignment {
-  id                 String                 @id @default(uuid())
-  tenantId           String
-  tenant             Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  courseId           String?
-  course             Course?                @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  teacherId          String
-  teacher            TeacherProfile         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  subjectName        String?
-  title              String
-  instructions       String?
-  topicName          String?
-  dueDate            DateTime?
-  maxMarks           Float                  @default(100.0)
-  status             AssignmentStatus       @default(PUBLISHED)
-  attachmentUrl      String?
-  attachmentName     String?
-  submissions        AssignmentSubmission[]
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id             String                 @id @default(uuid())
+  tenantId       String
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  courseId       String?
+  course         Course?                @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  teacherId      String
+  teacher        TeacherProfile         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectName    String?
+  title          String
+  instructions   String?
+  topicName      String?
+  dueDate        DateTime?
+  maxMarks       Float                  @default(100.0)
+  status         AssignmentStatus       @default(PUBLISHED)
+  attachmentUrl  String?
+  attachmentName String?
+  submissions    AssignmentSubmission[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
   @@index([tenantId, status])
   @@index([teacherId])
@@ -426,39 +428,39 @@ model AssignmentSubmission {
 }
 
 model LibraryResource {
-  id                 String              @id @default(uuid())
+  id                 String             @id @default(uuid())
   tenantId           String
-  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   teacherId          String
-  teacher            TeacherProfile      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacher            TeacherProfile     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   packageId          String?
-  package            Package?            @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  package            Package?           @relation(fields: [packageId], references: [id], onDelete: SetNull)
   title              String
   description        String?
-  resourceType       ResourceType        @default(PAST_PAPER)
+  resourceType       ResourceType       @default(PAST_PAPER)
   subject            String
   topic              String?
   category           String?
   year               Int?
-  medium             String?             // e.g. "Tamil", "English", "Sinhala"
-  examType           String?             // e.g. "G.C.E. A/L", "Term Test"
-  paperPart          String?             // e.g. "Part I (MCQ)", "Part II"
+  medium             String? // e.g. "Tamil", "English", "Sinhala"
+  examType           String? // e.g. "G.C.E. A/L", "Term Test"
+  paperPart          String? // e.g. "Part I (MCQ)", "Part II"
   fileUrl            String?
   fileName           String?
   fileSize           String?
-  fileType           String              @default("pdf")
+  fileType           String             @default("pdf")
   coverImage         String?
-  hasMarkingScheme   Boolean             @default(false)
+  hasMarkingScheme   Boolean            @default(false)
   markingSchemeUrl   String?
   markingSchemeNotes String?
-  timeAllowedMinutes Int?                @default(180)
-  visibility         ResourceVisibility  @default(PUBLIC)
-  status             String              @default("published")
-  allowDownload      Boolean             @default(true)
-  viewsCount         Int                 @default(0)
-  downloadsCount     Int                 @default(0)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  timeAllowedMinutes Int?               @default(180)
+  visibility         ResourceVisibility @default(PUBLIC)
+  status             String             @default("published")
+  allowDownload      Boolean            @default(true)
+  viewsCount         Int                @default(0)
+  downloadsCount     Int                @default(0)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   @@index([tenantId, visibility])
   @@index([teacherId])
@@ -466,4 +468,21 @@ model LibraryResource {
   @@index([packageId])
 }
 
+model SuperAdminProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  fullName      String?
+  preferredName String?
+  phone         String?
+  altPhone      String?
+  address       String?
+  city          String?
+  district      String?
+  province      String?
+  postalCode    String?
+  bio           String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

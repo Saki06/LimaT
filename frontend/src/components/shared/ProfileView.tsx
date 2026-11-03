@@ -62,6 +62,7 @@ import {
   TeacherSocialChannel
 } from "@/types/lms";
 import { initialExams, initialExamTermResult } from "@/data/mockData";
+import { api } from "@/lib/api";
 
 type ProfileTab =
   | "personal"
@@ -560,6 +561,55 @@ export function ProfileView() {
     }
   }, [defaultProfile, currentRole]);
 
+    // Load Super Admin profile from PostgreSQL
+  useEffect(() => {
+    if (currentRole !== "super_admin") return;
+
+    let cancelled = false;
+
+    const loadSuperAdminProfile = async () => {
+      try {
+        const response = await api.superAdminProfile.get();
+
+        if (!response.success || cancelled) return;
+
+        const savedProfile = response.data?.superAdminProfile;
+
+        if (!savedProfile) return;
+
+        setProfileData((previous) => ({
+          ...previous,
+          fullName: savedProfile.fullName ?? previous.fullName,
+          name: savedProfile.preferredName ?? previous.name,
+          phone: savedProfile.phone ?? previous.phone,
+          altPhone: savedProfile.altPhone ?? previous.altPhone,
+          address: savedProfile.address ?? previous.address,
+          city: savedProfile.city ?? previous.city,
+          district: savedProfile.district ?? previous.district,
+          province: savedProfile.province ?? previous.province,
+          postalCode: savedProfile.postalCode ?? previous.postalCode,
+          bio: savedProfile.bio ?? previous.bio,
+        }));
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error("Failed to load Super Admin profile:", error);
+
+        addToast({
+          type: "error",
+          title: "Profile Load Failed",
+          message: "Unable to load Super Admin profile from server.",
+        });
+      }
+    };
+
+    loadSuperAdminProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, currentUser.id, addToast]);
+
   const [avatarPreset, setAvatarPreset] = useState<string>("default");
   const [selectedScheduleDay, setSelectedScheduleDay] = useState<
     "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"
@@ -856,6 +906,50 @@ export function ProfileView() {
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+
+        if (currentRole === "super_admin") {
+      setIsSavingProfile(true);
+
+      try {
+        const response = await api.superAdminProfile.update({
+          fullName: profileData.fullName,
+          preferredName: profileData.name,
+          phone: profileData.phone,
+          altPhone: profileData.altPhone,
+          address: profileData.address,
+          city: profileData.city,
+          district: profileData.district,
+          province: profileData.province,
+          postalCode: profileData.postalCode,
+          bio: profileData.bio,
+        });
+
+        if (!response.success) {
+          throw new Error(response.message || "Profile update failed");
+        }
+
+        setIsEditing(false);
+
+        addToast({
+          type: "success",
+          title: "Profile Saved",
+          message: "Super Admin profile saved to database.",
+        });
+      } catch (error) {
+        addToast({
+          type: "error",
+          title: "Save Failed",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Unable to update Super Admin profile.",
+        });
+      } finally {
+        setIsSavingProfile(false);
+      }
+
+      return;
+    }
 
     if (currentRole === "teacher") {
       setIsSavingProfile(true);

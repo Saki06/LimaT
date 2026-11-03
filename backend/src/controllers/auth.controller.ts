@@ -65,15 +65,19 @@ const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     // Validate tenant status before issuing a JWT
 if (user.tenantId) {
   const tenant = await prisma.tenant.findUnique({
-    where: { id: user.tenantId },
-    select: { status: true },
-  });
+  where: { id: user.tenantId },
+  select: {
+    status: true,
+    deletedAt: true,
+  },
+});
 
   if (
-    !tenant ||
-    tenant.status === 'SUSPENDED' ||
-    tenant.status === 'INACTIVE'
-  ) {
+  !tenant ||
+  tenant.deletedAt !== null ||
+  tenant.status === 'SUSPENDED' ||
+  tenant.status === 'INACTIVE'
+) {
     res.status(403).json({
       success: false,
       message: 'Your organization is currently inactive or suspended.',
@@ -133,7 +137,12 @@ export const registerStudent = async (req: Request, res: Response): Promise<void
     // Default to first tenant if none specified
     let selectedTenantId = tenantId;
     if (!selectedTenantId) {
-      const defaultTenant = await prisma.tenant.findFirst();
+      const defaultTenant = await prisma.tenant.findFirst({
+  where: {
+    deletedAt: null,
+    status: { notIn: ['SUSPENDED', 'INACTIVE'] },
+  },
+});
       selectedTenantId = defaultTenant?.id;
     }
 
@@ -144,11 +153,15 @@ export const registerStudent = async (req: Request, res: Response): Promise<void
 
     const selectedTenant = await prisma.tenant.findUnique({
   where: { id: selectedTenantId },
-  select: { status: true },
+  select: {
+  status: true,
+  deletedAt: true,
+},
 });
 
 if (
   !selectedTenant ||
+  selectedTenant.deletedAt !== null ||
   selectedTenant.status === 'SUSPENDED' ||
   selectedTenant.status === 'INACTIVE'
 ) {
@@ -219,7 +232,12 @@ export const registerTutor = async (req: Request, res: Response): Promise<void> 
 
     let selectedTenantId = tenantId;
     if (!selectedTenantId) {
-      const defaultTenant = await prisma.tenant.findFirst();
+      const defaultTenant = await prisma.tenant.findFirst({
+  where: {
+    deletedAt: null,
+    status: { notIn: ['SUSPENDED', 'INACTIVE'] },
+  },
+});
       selectedTenantId = defaultTenant?.id;
     }
 
@@ -233,11 +251,15 @@ export const registerTutor = async (req: Request, res: Response): Promise<void> 
 
 const selectedTenant = await prisma.tenant.findUnique({
   where: { id: selectedTenantId },
-  select: { status: true },
+  select: {
+  status: true,
+  deletedAt: true,
+},
 });
 
 if (
   !selectedTenant ||
+  selectedTenant.deletedAt !== null ||
   selectedTenant.status === 'SUSPENDED' ||
   selectedTenant.status === 'INACTIVE'
 ) {
@@ -308,7 +330,12 @@ export const registerParent = async (req: Request, res: Response): Promise<void>
 
     let selectedTenantId = tenantId;
     if (!selectedTenantId) {
-      const defaultTenant = await prisma.tenant.findFirst();
+      const defaultTenant = await prisma.tenant.findFirst({
+  where: {
+    deletedAt: null,
+    status: { notIn: ['SUSPENDED', 'INACTIVE'] },
+  },
+});
       selectedTenantId = defaultTenant?.id;
     }
 
@@ -322,11 +349,15 @@ export const registerParent = async (req: Request, res: Response): Promise<void>
 
 const selectedTenant = await prisma.tenant.findUnique({
   where: { id: selectedTenantId },
-  select: { status: true },
+  select: {
+  status: true,
+  deletedAt: true,
+},
 });
 
 if (
   !selectedTenant ||
+  selectedTenant.deletedAt !== null ||
   selectedTenant.status === 'SUSPENDED' ||
   selectedTenant.status === 'INACTIVE'
 ) {

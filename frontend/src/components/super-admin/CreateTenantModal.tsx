@@ -352,28 +352,41 @@ onChange={(e) =>
   );
 }
 
+
 interface DeleteTenantModalProps {
   tenant: Tenant | null;
   onClose: () => void;
-  onConfirmDelete: (tenantId: string) => void;
+  onConfirmDelete: (tenantId: string) => Promise<void>;
+  isArchiving?: boolean;
 }
 
-export function DeleteTenantModal({ tenant, onClose, onConfirmDelete }: DeleteTenantModalProps) {
+export function DeleteTenantModal({
+  tenant,
+  onClose,
+  onConfirmDelete,
+  isArchiving = false,
+}: DeleteTenantModalProps) {
   if (!tenant) return null;
 
   return (
     <Modal
       isOpen={!!tenant}
-      onClose={onClose}
-      title="Delete Client Tenant"
-      description="Are you sure you want to permanently remove this customer tenant and all associated data from the platform?"
+      onClose={() => {
+        if (!isArchiving) onClose();
+      }}
+      title="Archive Client Tenant"
+      description="Archive this tenant without permanently deleting its data."
     >
       <div className="space-y-4 pt-2">
-        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-1">
-          <p className="font-bold text-sm text-rose-950">{tenant.name}</p>
-          <p>Code: {tenant.code} &bull; Type: {tenant.type}</p>
-          <p className="text-[11px] text-rose-700 pt-1">
-            Warning: This will terminate the client&apos;s SaaS instance and remove all student/staff access.
+        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+          <p className="font-bold text-sm">{tenant.name}</p>
+          <p>
+            Code: {tenant.code} &bull; Type: {tenant.type}
+          </p>
+          <p className="text-[11px] pt-1">
+            Archiving will block tenant users from accessing the
+            platform. Tenant data will be preserved and can be
+            restored later.
           </p>
         </div>
 
@@ -381,18 +394,18 @@ export function DeleteTenantModal({ tenant, onClose, onConfirmDelete }: DeleteTe
           <Button
             variant="outline"
             onClick={onClose}
+            disabled={isArchiving}
             className="text-xs font-bold"
           >
             Cancel
           </Button>
+
           <Button
-            onClick={() => {
-              onConfirmDelete(tenant.id);
-              onClose();
-            }}
-            className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
+            onClick={() => void onConfirmDelete(tenant.id)}
+            disabled={isArchiving}
+            className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold"
           >
-            Delete Client Tenant
+            {isArchiving ? "Archiving..." : "Archive Tenant"}
           </Button>
         </div>
       </div>

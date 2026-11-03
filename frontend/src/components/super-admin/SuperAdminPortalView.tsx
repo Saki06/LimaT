@@ -20,6 +20,7 @@ import { FeatureMatrix } from "./FeatureMatrix";
 import { SaasBilling } from "./SaasBilling";
 import { CreateTenantModal, EditTenantModal, DeleteTenantModal } from "./CreateTenantModal";
 import { api } from "@/lib/api";
+import { mapBackendTenant } from "@/lib/tenantMapper";
 import { TENANT_PRESETS } from "@/data/tenantMockData";
 
 type SuperAdminTab = "tenants" | "feature_matrix" | "pricing_plans";
@@ -81,6 +82,88 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [deletingTenant, setDeletingTenant] = useState<Tenant | null>(null);
+  const [isArchiving, setIsArchiving] = useState(false);
+
+
+const [tenantListView, setTenantListView] = useState<"active" | "archived">("active");
+
+const [archivedTenants, setArchivedTenants] = useState<Tenant[]>([]);
+
+const [isLoadingArchived, setIsLoadingArchived] = useState(false);
+
+const [isRestoring, setIsRestoring] = useState(false);
+
+
+const loadArchivedTenants = async () => {
+  setIsLoadingArchived(true);
+
+  try {
+    const result = await api.tenants.getArchived();
+
+    const mappedTenants: Tenant[] = result.data.map(mapBackendTenant);
+
+    setArchivedTenants(mappedTenants);
+  } catch (error) {
+    showToast(
+      error instanceof Error
+        ? error.message
+        : "Failed to load archived tenants"
+    );
+  } finally {
+    setIsLoadingArchived(false);
+  }
+};
+
+
+
+const handleRestoreTenant = async (tenantId: string) => {
+  if (isRestoring) return;
+
+  setIsRestoring(true);
+
+  try {
+    // Step 1: Restore tenant in backend
+    await api.tenants.restore(tenantId);
+  } catch (error) {
+    showToast(
+      error instanceof Error
+        ? error.message
+        : "Failed to restore tenant"
+    );
+    setIsRestoring(false);
+    return;
+  }
+
+  // Backend restore has succeeded.
+  // Update the UI separately from the restore request.
+  try {
+    setArchivedTenants((prev) =>
+      prev.filter((tenant) => tenant.id !== tenantId)
+    );
+
+    const result = await api.tenants.getAll();
+
+    const restoredTenantData = result.data.find(
+      (tenant: { id: string }) => tenant.id === tenantId
+    );
+
+    if (restoredTenantData) {
+      addTenant(mapBackendTenant(restoredTenantData));
+      showToast("Tenant restored successfully.");
+    } else {
+      showToast(
+        "Tenant restored. Refresh the page to update the active list."
+      );
+    }
+  } catch (error) {
+    console.error("Failed to refresh tenants after restore:", error);
+    showToast(
+      "Tenant restored successfully. Refresh the page to update the list."
+    );
+  } finally {
+    setIsRestoring(false);
+  }
+};
 
   // Current tenant for matrix
   const matrixTenant = tenants.find((t) => t.id === selectedTenantForMatrix) || activeTenant;
@@ -389,20 +472,105 @@ const saveTenantFeatures = (
         </button>
       </div>
 
-      {/* TAB 1: CLIENT TENANTS DIRECTORY */}
-      {activeTab === "tenants" && (
-        <TenantSchools
-          tenants={tenants}
-          activeTenantId={activeTenantId}
-          onSimulateTenant={handleSimulateTenant}
-          onEditTenant={(tenant) => setEditingTenant(tenant)}
-          onDeleteTenant={(tenant) => setDeletingTenant(tenant)}
-          onConfigureFeatures={(tenantId) => {
-            setSelectedTenantForMatrix(tenantId);
-            handleTabChange("feature_matrix");
-          }}
-        />
-      )}
+
+{/* TAB 1: CLIENT TENANTS DIRECTORY */}
+{activeTab === "tenants" && (
+  <div className="space-y-4">
+    {/* Active / Archived Sub-Tabs */}
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={() => setTenantListView("active")}
+        className={`rounded-xl px-4 py-2 text-sm font-bold ${
+          tenantListView === "active"
+            ? "bg-[#0d5c4d] text-white"
+            : "bg-white border border-slate-200 text-slate-700"
+        }`}
+      >
+        Active Tenants
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          setTenantListView("archived");
+          void loadArchivedTenants();
+        }}
+        className={`rounded-xl px-4 py-2 text-sm font-bold ${
+          tenantListView === "archived"
+            ? "bg-[#0d5c4d] text-white"
+            : "bg-white border border-slate-200 text-slate-700"
+        }`}
+      >
+        Archived Tenants
+      </button>
+    </div>
+
+    {tenantListView === "active" ? (
+      <TenantSchools
+        tenants={tenants}
+        activeTenantId={activeTenantId}
+        onSimulateTenant={handleSimulateTenant}
+        onEditTenant={(tenant) => setEditingTenant(tenant)}
+        onDeleteTenant={(tenant) => setDeletingTenant(tenant)}
+        onConfigureFeatures={(tenantId) => {
+          setSelectedTenantForMatrix(tenantId);
+          handleTabChange("feature_matrix");
+        }}
+      />
+    ) : (
+      <div className="rounded-2xl border border-[#e6ece8] bg-white p-5 space-y-4">
+        <h3 className="text-lg font-bold text-[#0d2b26]">
+          Archived Tenants
+        </h3>
+
+        {isLoadingArchived ? (
+          <p className="text-sm text-slate-500">
+            Loading archived tenants...
+          </p>
+        ) : archivedTenants.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            No archived tenants found.
+          </p>
+        ) : (
+          archivedTenants.map((tenant) => (
+            <div
+              key={tenant.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
+            >
+              <div>
+                <p className="font-bold text-slate-900">
+                  {tenant.name}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {tenant.code}
+                </p>
+              </div>
+
+
+<div className="flex items-center gap-3">
+  <span className="rounded-lg bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+    Archived
+  </span>
+
+  <button
+    type="button"
+    onClick={() => void handleRestoreTenant(tenant.id)}
+    disabled={isRestoring}
+    className="rounded-lg bg-[#0d5c4d] px-4 py-2 text-xs font-bold text-white hover:bg-[#094638] disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    {isRestoring ? "Restoring..." : "Restore Tenant"}
+  </button>
+</div>
+
+            </div>
+          ))
+        )}
+      </div>
+    )}
+  </div>
+)}
+
 
       {/* TAB 2: GRANULAR SUB-FEATURE MATRIX */}
       {activeTab === "feature_matrix" && (
@@ -493,15 +661,49 @@ const saveTenantFeatures = (
   }}
 />
 
-      <DeleteTenantModal
-        tenant={deletingTenant}
-        onClose={() => setDeletingTenant(null)}
-        onConfirmDelete={(id) => {
-          deleteTenant(id);
-          showToast("Deleted client tenant.");
-          setDeletingTenant(null);
-        }}
-      />
+
+<DeleteTenantModal
+  tenant={deletingTenant}
+  isArchiving={isArchiving}
+  onClose={() => {
+    if (!isArchiving) setDeletingTenant(null);
+  }}
+  onConfirmDelete={async (id) => {
+    if (isArchiving) return;
+
+    setIsArchiving(true);
+
+    try {
+
+await api.tenants.archive(id);
+
+// Update frontend only after backend confirms success
+const archivedTenant = tenants.find((tenant) => tenant.id === id);
+
+deleteTenant(id);
+
+if (archivedTenant) {
+  setArchivedTenants((prev) => [
+    archivedTenant,
+    ...prev.filter((tenant) => tenant.id !== id),
+  ]);
+}
+
+showToast("Tenant archived successfully.");
+
+      setDeletingTenant(null);
+    } catch (error) {
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "Failed to archive tenant"
+      );
+    } finally {
+      setIsArchiving(false);
+    }
+  }}
+/>
+
     </div>
   );
 }

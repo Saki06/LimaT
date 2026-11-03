@@ -160,6 +160,82 @@ export const api = {
 
   return result;
     },
+
+    async getArchived() {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error("Authentication required");
+      }
+
+      const response = await fetch(`${API_BASE_URL}/tenants/archived`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to load archived tenants");
+      }
+
+      return result;
+    },
+
+    async archive(tenantId: string) {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error("Authentication required");
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/tenants/${encodeURIComponent(tenantId)}/archive`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to archive tenant");
+      }
+
+      return result;
+    },
+
+    async restore(tenantId: string) {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error("Authentication required");
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/tenants/${encodeURIComponent(tenantId)}/restore`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to restore tenant");
+      }
+
+      return result;
+    },
+
   },
   // Auth API
   auth: {
@@ -759,6 +835,59 @@ export const api = {
     },
   },
 
+    // Super Admin Profile APIs
+  superAdminProfile: {
+    async get() {
+      const token = api.token.get();
+
+      const res = await fetch(`${API_BASE_URL}/super-admin/profile`, {
+        method: 'GET',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.message || 'Failed to fetch Super Admin profile');
+      }
+
+      return result;
+    },
+
+    async update(data: {
+      fullName?: string | null;
+      preferredName?: string | null;
+      phone?: string | null;
+      altPhone?: string | null;
+      address?: string | null;
+      city?: string | null;
+      district?: string | null;
+      province?: string | null;
+      postalCode?: string | null;
+      bio?: string | null;
+    }) {
+      const token = api.token.get();
+
+      const res = await fetch(`${API_BASE_URL}/super-admin/profile`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.message || 'Failed to update Super Admin profile');
+      }
+
+      return result;
+    },
+  },
   // Token and Local Storage Helpers
   token: {
     get(): string | null {
