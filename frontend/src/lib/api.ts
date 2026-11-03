@@ -23,15 +23,153 @@ export interface AuthResponse {
   };
 }
 
-interface SportsEventApiResponse {
+export type SportsEventStatus = 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'CANCELLED';
+export type SportsRegistrationStatus = 'PENDING' | 'CONFIRMED' | 'WAITLISTED' | 'REJECTED';
+
+export interface SportsEvent {
   id: string;
   title: string;
   sportType: string;
-  startDate: string;
+  disciplineId: string | null;
+  ageCategory: string | null;
+  gender: string | null;
+  fee: number;
+  maxParticipants: number | null;
+  description: string | null;
+  isTeamSport: boolean;
   venue: string;
-  status: 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'CANCELLED';
-  registrations?: { userId: string }[];
-  _count?: { registrations: number };
+  startDate: string;
+  endDate: string | null;
+  status: SportsEventStatus;
+  registrationCount: number;
+  isRegistered: boolean;
+}
+
+export interface SportsRegistration {
+  id: string;
+  eventId: string;
+  userId: string;
+  jerseyNumber: number | null;
+  roleInTeam: string | null;
+  status: SportsRegistrationStatus;
+  notes: string | null;
+  registrationNumber: string | null;
+  athleteDetails: unknown;
+  paymentStatus: string;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  event?: Omit<SportsEvent, 'registrationCount' | 'isRegistered'>;
+}
+
+export interface SportsRegistrationInput {
+  eventId: string;
+  jerseyNumber?: number;
+  roleInTeam?: string;
+  notes?: string;
+}
+
+export interface SportsDiscipline {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  iconName: string;
+  isTeamSport: boolean;
+}
+
+export interface SportsTeamRecord {
+  id: string;
+  sportName: string;
+  name: string;
+  coachName: string;
+  trainingSchedule: string;
+  status: SportsTeamStatus;
+  playersCount: number;
+  players: { id: string; name: string; position: string; grade: string }[];
+}
+
+export type SportsTeamStatus = 'draft' | 'active' | 'completed';
+
+export interface SportsTournamentRecord {
+  id: string;
+  name: string;
+  sportName: string;
+  category: string;
+  format: string;
+  startDate: string;
+  endDate: string;
+  venue: string;
+  organizer: string;
+  teamsCount: number;
+  participatingTeams: string[];
+  status: string;
+  trophyTitle: string;
+  description: string;
+  rules: string | null;
+  currentRound: string | null;
+  champion: string | null;
+  runnerUp: string | null;
+}
+
+export interface SportsFixtureRecord {
+  id: string;
+  tournamentId: string | null;
+  sportName: string;
+  homeTeam: string;
+  awayTeam: string;
+  date: string;
+  time: string;
+  venue: string;
+  competitionName: string;
+  status: string;
+  homeDistrict: string | null;
+  awayDistrict: string | null;
+  roundName: string | null;
+  homeScore: string | null;
+  awayScore: string | null;
+  outcome: string | null;
+  recordedAt: string | null;
+}
+
+export interface SportsStandingRecord {
+  id: string;
+  rank: number;
+  teamName: string;
+  schoolName: string;
+  sport: string;
+  division: string;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  scoredFor: number;
+  scoredAgainst: number;
+  diffOrNrr: string;
+  points: number;
+  form: ('W' | 'D' | 'L')[];
+  statusText: string;
+  statusType: 'qualified' | 'playoff' | 'neutral' | 'danger';
+  groupKey: string;
+}
+
+async function sportsRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = api.token.get();
+  if (!token) throw new Error('Authentication required');
+
+  const response = await fetch(`${API_BASE_URL}/sports${path}`, {
+    ...init,
+    headers: {
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      Authorization: `Bearer ${token}`,
+      ...init?.headers,
+    },
+  });
+  const result: { success: boolean; message?: string; data?: T } = await response.json();
+  if (!response.ok || !result.success || result.data === undefined) {
+    throw new Error(result.message || 'Sports request failed');
+  }
+  return result.data;
 }
 
 export const api = {
@@ -170,65 +308,6 @@ export const api = {
   }
 
   return result;
-    },
-  },
-
-  // Sports API
-  sports: {
-    async getEvents(): Promise<{
-      success: boolean;
-      data?: SportsEventApiResponse[];
-      message?: string;
-    }> {
-      const token = api.token.get();
-      const response = await fetch(`${API_BASE_URL}/sports/events`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      return response.json();
-    },
-
-    async getMyRegistrations() {
-      const token = api.token.get();
-      const response = await fetch(`${API_BASE_URL}/sports/my-registrations`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      return response.json();
-    },
-
-    async register(data: {
-      eventId: string;
-      jerseyNumber?: number | string;
-      roleInTeam?: string;
-      notes?: string;
-    }) {
-      const token = api.token.get();
-
-      if (!token) {
-        throw new Error('Authentication required');
-      }
-
-      const response = await fetch(`${API_BASE_URL}/sports/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Failed to register for sports event');
-      }
-
-      return result;
     },
   },
 
@@ -827,6 +906,204 @@ export const api = {
     async getPublicProfile(slugOrId: string) {
       const res = await fetch(`${API_BASE_URL}/teachers/public/${slugOrId}`);
       return res.json();
+    },
+  },
+
+  // Sports Events and Registrations
+  sports: {
+    async getEvents(): Promise<SportsEvent[]> {
+      const result = await sportsRequest<Array<{
+        id: string;
+        title: string;
+        sportType: string;
+        disciplineId: string | null;
+        ageCategory: string | null;
+        gender: string | null;
+        fee: number;
+        maxParticipants: number | null;
+        description: string | null;
+        isTeamSport: boolean;
+        venue: string;
+        startDate: string;
+        endDate: string | null;
+        status: SportsEventStatus;
+        _count: { registrations: number };
+        registrations: Array<{ userId: string }>;
+      }>>('/events');
+      return result.map((event) => ({
+        id: event.id,
+        title: event.title,
+        sportType: event.sportType,
+        disciplineId: event.disciplineId,
+        ageCategory: event.ageCategory,
+        gender: event.gender,
+        fee: event.fee,
+        maxParticipants: event.maxParticipants,
+        description: event.description,
+        isTeamSport: event.isTeamSport,
+        venue: event.venue,
+        startDate: event.startDate,
+        endDate: event.endDate,
+        status: event.status,
+        registrationCount: event._count.registrations,
+        isRegistered: event.registrations.length > 0,
+      }));
+    },
+
+    async getMyRegistrations(): Promise<SportsRegistration[]> {
+      return sportsRequest<SportsRegistration[]>('/registrations/me');
+    },
+
+    async register(input: SportsRegistrationInput): Promise<SportsRegistration> {
+      return sportsRequest<SportsRegistration>('/register', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async getDisciplines(): Promise<Array<SportsDiscipline & { events: SportsEvent[] }>> {
+      const data = await sportsRequest<Array<SportsDiscipline & { events: Array<Record<string, unknown>> }>>(
+        '/disciplines',
+      );
+      return data.map((discipline) => ({
+        ...discipline,
+        events: discipline.events.map((event) => ({
+          id: String(event.id),
+          title: String(event.title),
+          sportType: String(event.sportType),
+          disciplineId: typeof event.disciplineId === 'string' ? event.disciplineId : null,
+          ageCategory: typeof event.ageCategory === 'string' ? event.ageCategory : null,
+          gender: typeof event.gender === 'string' ? event.gender : null,
+          fee: Number(event.fee) || 0,
+          maxParticipants: typeof event.maxParticipants === 'number' ? event.maxParticipants : null,
+          description: typeof event.description === 'string' ? event.description : null,
+          isTeamSport: Boolean(event.isTeamSport),
+          venue: String(event.venue),
+          startDate: String(event.startDate),
+          endDate: typeof event.endDate === 'string' ? event.endDate : null,
+          status: event.status as SportsEventStatus,
+          registrationCount: 0,
+          isRegistered: false,
+        })),
+      }));
+    },
+
+    async createDiscipline(input: Omit<SportsDiscipline, 'id'>): Promise<SportsDiscipline> {
+      return sportsRequest<SportsDiscipline>('/disciplines', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async createEvent(input: {
+      disciplineId: string;
+      title: string;
+      sportType: string;
+      ageCategory: string;
+      gender: string;
+      fee: number;
+      maxParticipants: number;
+      venue: string;
+      startDate: string;
+      description?: string;
+      isTeamSport: boolean;
+    }): Promise<SportsEvent> {
+      return sportsRequest<SportsEvent>('/events', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async registerChampionship(input: {
+      eventIds: string[];
+      registrationNumber: string;
+      athleteDetails: Record<string, unknown>;
+    }): Promise<SportsRegistration[]> {
+      return sportsRequest<SportsRegistration[]>('/registrations/championship', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async getRegistrations(): Promise<SportsRegistration[]> {
+      return sportsRequest<SportsRegistration[]>('/registrations');
+    },
+
+    async updateRegistrationStatus(
+      registrationNumber: string,
+      status: 'Confirmed' | 'Pending' | 'Approved' | 'Rejected',
+    ): Promise<void> {
+      await sportsRequest<{ registrationNumber: string; status: string }>(
+        `/registrations/${encodeURIComponent(registrationNumber)}/status`,
+        { method: 'PATCH', body: JSON.stringify({ status }) },
+      );
+    },
+
+    async getTeams(): Promise<SportsTeamRecord[]> {
+      return sportsRequest<SportsTeamRecord[]>('/teams');
+    },
+
+    async createTeam(input: Omit<SportsTeamRecord, 'id' | 'playersCount'>): Promise<SportsTeamRecord> {
+      return sportsRequest<SportsTeamRecord>('/teams', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async getTournaments(): Promise<SportsTournamentRecord[]> {
+      return sportsRequest<SportsTournamentRecord[]>('/tournaments');
+    },
+
+    async createTournament(
+      input: Omit<SportsTournamentRecord, 'id' | 'teamsCount' | 'champion' | 'runnerUp'>,
+    ): Promise<SportsTournamentRecord> {
+      return sportsRequest<SportsTournamentRecord>('/tournaments', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async updateTournament(
+      id: string,
+      input: Partial<Omit<SportsTournamentRecord, 'id'>>,
+    ): Promise<SportsTournamentRecord> {
+      return sportsRequest<SportsTournamentRecord>(`/tournaments/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async deleteTournament(id: string): Promise<void> {
+      await sportsRequest<{ id: string }>(`/tournaments/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async getFixtures(): Promise<SportsFixtureRecord[]> {
+      return sportsRequest<SportsFixtureRecord[]>('/fixtures');
+    },
+
+    async createFixture(
+      input: Omit<SportsFixtureRecord, 'id' | 'homeDistrict' | 'awayDistrict' | 'roundName' | 'homeScore' | 'awayScore' | 'outcome' | 'recordedAt' | 'tournamentId'> & { tournamentId?: string | null },
+    ): Promise<SportsFixtureRecord> {
+      return sportsRequest<SportsFixtureRecord>('/fixtures', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async recordFixtureResult(
+      id: string,
+      input: { homeScore: string; awayScore: string; outcome: string },
+    ): Promise<SportsFixtureRecord> {
+      return sportsRequest<SportsFixtureRecord>(`/fixtures/${encodeURIComponent(id)}/result`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async getStandings(): Promise<SportsStandingRecord[]> {
+      return sportsRequest<SportsStandingRecord[]>('/standings');
     },
   },
 

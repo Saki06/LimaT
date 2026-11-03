@@ -28,8 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import {
   StoredAthleteRegistration,
-  ChampionshipSportItem,
-  INITIAL_CHAMPIONSHIP_SPORTS
+  ChampionshipSportItem
 } from "@/components/sports/sportsRegistrationData";
 
 interface AdminSportsRegistrationsDeskProps {
@@ -37,20 +36,15 @@ interface AdminSportsRegistrationsDeskProps {
   onUpdateRegistrationStatus: (
     id: string,
     newStatus: "Confirmed" | "Pending" | "Approved" | "Rejected"
-  ) => void;
+  ) => Promise<void>;
   sportsList: ChampionshipSportItem[];
-  onAddSport: (sport: ChampionshipSportItem) => void;
+  onAddSport: (
+    sport: Omit<ChampionshipSportItem, "id" | "events" | "registrationStatus">
+  ) => Promise<void>;
   onAddEvent: (
     sportId: string,
-    event: {
-      id: string;
-      name: string;
-      ageCategory: "U12" | "U14" | "U16" | "U18" | "Open";
-      gender: "Boys" | "Girls" | "Mixed" | "All";
-      fee: number;
-      maxParticipants: number;
-    }
-  ) => void;
+    event: Omit<ChampionshipSportItem["events"][number], "id">
+  ) => Promise<void>;
 }
 
 export function AdminSportsRegistrationsDesk({
@@ -85,12 +79,15 @@ export function AdminSportsRegistrationsDesk({
   const [newSportIsTeam, setNewSportIsTeam] = useState(false);
 
   // New Event Form
-  const [targetSportId, setTargetSportId] = useState(sportsList[0]?.id || "sp_ath");
+  const [targetSportId, setTargetSportId] = useState(sportsList[0]?.id || "");
   const [newEventName, setNewEventName] = useState("");
   const [newEventAge, setNewEventAge] = useState<"U12" | "U14" | "U16" | "U18" | "Open">("U16");
   const [newEventGender, setNewEventGender] = useState<"Boys" | "Girls" | "Mixed" | "All">("Boys");
   const [newEventFee, setNewEventFee] = useState(500);
   const [newEventMax, setNewEventMax] = useState(32);
+  const [newEventVenue, setNewEventVenue] = useState("");
+  const [newEventDate, setNewEventDate] = useState("");
+  const [formError, setFormError] = useState("");
 
   // Filter: Squads vs Individual
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<"All" | "Squads" | "Individual">("All");
@@ -261,47 +258,63 @@ export function AdminSportsRegistrationsDesk({
   };
 
   // Handle Add Sport submission
-  const handleCreateSportSubmit = (e: React.FormEvent) => {
+  const handleCreateSportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSportName.trim()) return;
 
-    const newSport: ChampionshipSportItem = {
-      id: `sp_${newSportName.toLowerCase().replace(/\s+/g, "_")}`,
+    const newSport: Omit<ChampionshipSportItem, "id" | "events" | "registrationStatus"> = {
       name: newSportName,
       category: newSportCategory,
       iconName: "Activity",
       description: newSportDesc || `${newSportName} inter-school championship category.`,
       ageGroups: ["U14", "U16", "U18", "Open"],
       gender: "all",
-      isTeamSport: newSportIsTeam,
-      registrationStatus: "Open",
-      events: []
+      isTeamSport: newSportIsTeam
     };
 
-    onAddSport(newSport);
-    setIsAddSportModalOpen(false);
-    setNewSportName("");
-    setNewSportDesc("");
+    try {
+      setFormError("");
+      await onAddSport(newSport);
+      setIsAddSportModalOpen(false);
+      setNewSportName("");
+      setNewSportDesc("");
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to save this sport.");
+    }
   };
 
   // Handle Add Event submission
-  const handleCreateEventSubmit = (e: React.FormEvent) => {
+  const handleCreateEventSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEventName.trim()) return;
+    if (!newEventName.trim() || !targetSportId || !newEventVenue.trim() || !newEventDate) return;
 
     const newEv = {
-      id: `ev_${Date.now()}`,
       name: newEventName,
       ageCategory: newEventAge,
       gender: newEventGender,
       fee: Number(newEventFee),
-      maxParticipants: Number(newEventMax)
+      maxParticipants: Number(newEventMax),
+      venue: newEventVenue,
+      startDate: newEventDate
     };
 
-    onAddEvent(targetSportId, newEv);
-    setIsAddEventModalOpen(false);
-    setNewEventName("");
+    try {
+      setFormError("");
+      await onAddEvent(targetSportId, newEv);
+      setIsAddEventModalOpen(false);
+      setNewEventName("");
+      setNewEventVenue("");
+      setNewEventDate("");
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to save this event.");
+    }
   };
+
+  React.useEffect(() => {
+    if (!sportsList.some((sport) => sport.id === targetSportId)) {
+      setTargetSportId(sportsList[0]?.id || "");
+    }
+  }, [sportsList, targetSportId]);
 
   return (
     <div className="space-y-6">
@@ -860,6 +873,7 @@ export function AdminSportsRegistrationsDesk({
           title="Add New Championship Sport"
         >
           <form onSubmit={handleCreateSportSubmit} className="space-y-4 text-xs">
+          {formError && <p role="alert" className="text-sm text-rose-700">{formError}</p>}
             <div>
               <label className="font-bold text-slate-700 block mb-1">Sport Name *</label>
               <input
@@ -929,11 +943,13 @@ export function AdminSportsRegistrationsDesk({
           title="Add Event to Sport Discipline"
         >
           <form onSubmit={handleCreateEventSubmit} className="space-y-4 text-xs">
+            {formError && <p role="alert" className="text-sm text-rose-700">{formError}</p>}
             <div>
               <label className="font-bold text-slate-700 block mb-1">Target Sport Discipline *</label>
               <select
                 value={targetSportId}
                 onChange={(e) => setTargetSportId(e.target.value)}
+                required
                 className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold"
               >
                 {sportsList.map((s) => (
@@ -942,6 +958,32 @@ export function AdminSportsRegistrationsDesk({
                   </option>
                 ))}
               </select>
+              {sportsList.length === 0 && (
+                <p className="mt-1 text-[11px] text-amber-700">Create a sport before adding events.</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Venue *</label>
+                <input
+                  type="text"
+                  required
+                  value={newEventVenue}
+                  onChange={(e) => setNewEventVenue(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Event Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={newEventDate}
+                  onChange={(e) => setNewEventDate(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold"
+                />
+              </div>
             </div>
 
             <div>
@@ -1011,6 +1053,7 @@ export function AdminSportsRegistrationsDesk({
 
             <Button
               type="submit"
+              disabled={sportsList.length === 0}
               className="w-full bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold h-10 rounded-xl"
             >
               Save &amp; Open Event Registration

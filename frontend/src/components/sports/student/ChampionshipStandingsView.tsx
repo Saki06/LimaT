@@ -34,6 +34,24 @@ import { Standing, Tournament, Fixture } from "@/types/lms";
 // TYPES & INTERFACES FOR MULTI-SPORT TOURNAMENT STANDINGS
 // =============================================================================
 
+type LiveSportsStanding = {
+  id: string;
+  rank: number;
+  teamName: string;
+  schoolName: string;
+  sport: string;
+  groupKey: string;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  scoredFor: number;
+  scoredAgainst: number;
+  diffOrNrr: string;
+  points: number;
+  form: ("W" | "D" | "L")[];
+};
+
 export type SportCategoryFilter =
   | "all_medals"
   | "football"
@@ -946,7 +964,7 @@ export function ChampionshipStandingsView({
   tournaments = [],
   fixtures = []
 }: {
-  defaultStandings?: Standing[];
+  defaultStandings?: Array<Standing | LiveSportsStanding>;
   tournaments?: Tournament[];
   fixtures?: Fixture[];
 }) {
@@ -954,6 +972,37 @@ export function ChampionshipStandingsView({
   const [selectedDivision, setSelectedDivision] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedEventName, setSelectedEventName] = useState<string>("All Events");
+  const [selectedLiveSport, setSelectedLiveSport] = useState("All sports");
+  const [liveSearchQuery, setLiveSearchQuery] = useState("");
+
+  const liveStandings = useMemo(
+    () =>
+      defaultStandings.filter(
+        (standing): standing is LiveSportsStanding =>
+          "groupKey" in standing && "sport" in standing && "form" in standing,
+      ),
+    [defaultStandings],
+  );
+  const liveSportOptions = useMemo(
+    () => ["All sports", ...Array.from(new Set(liveStandings.map((standing) => standing.sport)))],
+    [liveStandings],
+  );
+  const filteredLiveStandings = useMemo(() => {
+    const query = liveSearchQuery.trim().toLowerCase();
+    return liveStandings
+      .filter(
+        (standing) =>
+          selectedLiveSport === "All sports" || standing.sport === selectedLiveSport,
+      )
+      .filter(
+        (standing) =>
+          !query ||
+          standing.teamName.toLowerCase().includes(query) ||
+          standing.schoolName.toLowerCase().includes(query) ||
+          standing.groupKey.toLowerCase().includes(query),
+      )
+      .sort((a, b) => a.groupKey.localeCompare(b.groupKey) || a.rank - b.rank);
+  }, [liveStandings, liveSearchQuery, selectedLiveSport]);
 
   // Selected School Dossier Modal
   const [inspectedSchool, setInspectedSchool] = useState<SchoolMedalStanding | null>(null);
@@ -1158,6 +1207,109 @@ export function ChampionshipStandingsView({
 
   return (
     <div className="space-y-6">
+      <section className="space-y-5">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 text-xl font-black text-[#0d2b26]">
+              <Trophy className="h-5 w-5 text-[#0d5c4d]" />
+              League Standings
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Standings are calculated from completed fixture results. Wins earn 3 points and draws earn 1.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <label className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                value={liveSearchQuery}
+                onChange={(event) => setLiveSearchQuery(event.target.value)}
+                placeholder="Search teams or competition"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm sm:w-64"
+              />
+            </label>
+            <select
+              value={selectedLiveSport}
+              onChange={(event) => setSelectedLiveSport(event.target.value)}
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+            >
+              {liveSportOptions.map((sport) => (
+                <option key={sport}>{sport}</option>
+              ))}
+            </select>
+          </div>
+        </header>
+
+        {filteredLiveStandings.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+            <Trophy className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-3 font-bold text-slate-700">No standings available yet</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Schedule fixtures and record completed match results to calculate league standings.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-[#e6ece8] bg-white shadow-xs">
+            <table className="w-full min-w-[860px] text-left text-sm">
+              <thead className="bg-[#f8faf9] text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="p-3 text-center">Pos</th>
+                  <th className="p-3">Team / Competition</th>
+                  <th className="p-3 text-center">P</th>
+                  <th className="p-3 text-center">W</th>
+                  <th className="p-3 text-center">D</th>
+                  <th className="p-3 text-center">L</th>
+                  <th className="p-3 text-center">For / Against</th>
+                  <th className="p-3 text-center">Diff</th>
+                  <th className="p-3 text-center">Form</th>
+                  <th className="p-3 text-center">Pts</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredLiveStandings.map((standing) => (
+                  <tr key={standing.id} className="hover:bg-slate-50">
+                    <td className="p-3 text-center font-black">{standing.rank}</td>
+                    <td className="p-3">
+                      <p className="font-bold text-slate-800">{standing.teamName}</p>
+                      <p className="text-xs text-slate-500">{standing.groupKey}</p>
+                    </td>
+                    <td className="p-3 text-center">{standing.played}</td>
+                    <td className="p-3 text-center text-emerald-700">{standing.won}</td>
+                    <td className="p-3 text-center">{standing.drawn}</td>
+                    <td className="p-3 text-center text-rose-600">{standing.lost}</td>
+                    <td className="p-3 text-center">
+                      {standing.scoredFor} / {standing.scoredAgainst}
+                    </td>
+                    <td className="p-3 text-center">{standing.diffOrNrr}</td>
+                    <td className="p-3 text-center">
+                      <div className="flex justify-center gap-1">
+                        {standing.form.map((result, index) => (
+                          <Badge
+                            key={`${standing.id}-${index}`}
+                            variant={
+                              result === "W"
+                                ? "success"
+                                : result === "L"
+                                  ? "destructive"
+                                  : "outline"
+                            }
+                          >
+                            {result}
+                          </Badge>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="p-3 text-center font-black text-[#0d5c4d]">
+                      {standing.points}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       {/* ===================================================================== */}
       {/* 1. HERO BANNER & KPI HIGHLIGHT CARDS                                 */}
       {/* ===================================================================== */}

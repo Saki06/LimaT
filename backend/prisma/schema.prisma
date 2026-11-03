@@ -105,6 +105,10 @@ model Tenant {
   assignments    Assignment[]
   libraryResources LibraryResource[]
   sportsEvents   SportsEvent[]
+  sportsDisciplines SportsDiscipline[]
+  sportsTeams    SportsTeam[]
+  sportsTournaments SportsTournament[]
+  sportsFixtures SportsFixture[]
   announcements  Announcement[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -238,8 +242,16 @@ model SportsEvent {
   id            String               @id @default(uuid())
   tenantId      String
   tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  disciplineId  String?
+  discipline    SportsDiscipline?    @relation(fields: [disciplineId], references: [id], onDelete: SetNull)
   title         String
   sportType     String
+  ageCategory   String?
+  gender        String?
+  fee           Int                  @default(0)
+  maxParticipants Int?
+  description   String?
+  isTeamSport   Boolean              @default(false)
   venue         String
   startDate     DateTime
   endDate       DateTime?
@@ -249,6 +261,22 @@ model SportsEvent {
   updatedAt     DateTime             @updatedAt
 
   @@index([tenantId, status])
+}
+
+model SportsDiscipline {
+  id            String        @id @default(uuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  category      String
+  description   String        @default("")
+  iconName      String        @default("Trophy")
+  isTeamSport   Boolean       @default(false)
+  events        SportsEvent[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([tenantId, name])
 }
 
 model SportsRegistration {
@@ -261,10 +289,88 @@ model SportsRegistration {
   roleInTeam    String?
   status        RegistrationStatus @default(PENDING)
   notes         String?
+  registrationNumber String?
+  athleteDetails Json?
+  paymentStatus String             @default("PENDING")
+  totalAmount   Int                @default(0)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
   @@unique([eventId, userId])
+  @@index([registrationNumber])
+}
+
+model SportsTeam {
+  id                String   @id @default(uuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sportName         String
+  name              String
+  coachName         String   @default("")
+  trainingSchedule  String   @default("")
+  status            String   @default("active")
+  playersCount      Int      @default(0)
+  players           Json     @default("[]")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([tenantId, sportName])
+}
+
+model SportsTournament {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                String
+  sportName           String
+  category            String
+  format              String
+  startDate           DateTime
+  endDate             DateTime
+  venue               String
+  organizer           String
+  teamsCount          Int      @default(0)
+  participatingTeams  String[] @default([])
+  status              String   @default("upcoming")
+  trophyTitle         String
+  description         String
+  rules               String?
+  currentRound        String?
+  champion            String?
+  runnerUp            String?
+  fixtures            SportsFixture[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([tenantId, sportName, status])
+}
+
+model SportsFixture {
+  id                String   @id @default(uuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tournamentId      String?
+  tournament        SportsTournament? @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
+  sportName         String
+  homeTeam          String
+  awayTeam          String
+  homeDistrict      String?
+  awayDistrict      String?
+  competitionName   String
+  roundName         String?
+  date              DateTime
+  time              String
+  venue             String
+  status            String   @default("scheduled")
+  homeScore         String?
+  awayScore         String?
+  outcome           String?
+  recordedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([tenantId, sportName, date])
+  @@index([tenantId, competitionName, status])
 }
 
 model Announcement {
@@ -465,5 +571,3 @@ model LibraryResource {
   @@index([subject])
   @@index([packageId])
 }
-
-

@@ -14,7 +14,6 @@ import {
   Trophy,
   ShieldCheck,
   CreditCard,
-  QrCode,
   Printer,
   Sparkles,
   Check,
@@ -32,8 +31,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  SRI_LANKA_SCHOOL_DATA,
-  INITIAL_CHAMPIONSHIP_SPORTS,
   ChampionshipSportItem,
   StoredAthleteRegistration,
   SquadPlayer,
@@ -41,12 +38,14 @@ import {
 } from "@/components/sports/sportsRegistrationData";
 
 interface SportsRegistrationWizardProps {
-  onRegistrationComplete: (registration: StoredAthleteRegistration) => void;
+  championshipSports: ChampionshipSportItem[];
+  onRegistrationComplete: (registration: StoredAthleteRegistration) => Promise<{ success: boolean; message?: string }>;
   onCancel: () => void;
   currentUser?: { name?: string; role?: string; email?: string } | null;
 }
 
 export function SportsRegistrationWizard({
+  championshipSports,
   onRegistrationComplete,
   onCancel,
   currentUser
@@ -54,54 +53,42 @@ export function SportsRegistrationWizard({
   const [currentStep, setCurrentStep] = useState(1);
 
   // STEP 1: Contact
-  const [mobileNumber, setMobileNumber] = useState("0771234567");
-  const [emailAddress, setEmailAddress] = useState(currentUser?.email || "athlete@gmail.com");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [emailAddress, setEmailAddress] = useState(currentUser?.email || "");
 
   // STEP 2: Athlete Personal Details
-  const [firstName, setFirstName] = useState("Sathurjan");
-  const [lastName, setLastName] = useState("Kavinathan");
-  const [dob, setDob] = useState("2008-05-14");
+  const nameParts = (currentUser?.name || "").trim().split(/\s+/);
+  const [firstName, setFirstName] = useState(nameParts[0] || "");
+  const [lastName, setLastName] = useState(nameParts.slice(1).join(" "));
+  const [dob, setDob] = useState("");
   const [gender, setGender] = useState<"Boys" | "Girls" | "Mixed">("Boys");
-  const [nicOrStudentId, setNicOrStudentId] = useState("200813504921");
+  const [nicOrStudentId, setNicOrStudentId] = useState("");
 
   // Calculate age automatically from DOB
   const calculatedAge = useMemo(() => {
-    if (!dob) return 16;
+    if (!dob) return 0;
     const birthDate = new Date(dob);
-    const today = new Date("2026-10-14");
+    const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const m = today.getMonth() - birthDate.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    return age >= 0 ? age : 16;
+    return age >= 0 ? age : 0;
   }, [dob]);
 
   // STEP 3: School Information (Province -> District -> School hierarchy)
-  const [selectedProvince, setSelectedProvince] = useState("Northern Province");
-  const availableDistricts = useMemo(() => {
-    const prov = SRI_LANKA_SCHOOL_DATA.find((p) => p.province === selectedProvince);
-    return prov ? prov.districts : SRI_LANKA_SCHOOL_DATA[0].districts;
-  }, [selectedProvince]);
-
-  const [selectedDistrict, setSelectedDistrict] = useState("Jaffna");
-  const availableSchools = useMemo(() => {
-    const dist = availableDistricts.find((d) => d.district === selectedDistrict);
-    return dist ? dist.schools : availableDistricts[0]?.schools || [];
-  }, [availableDistricts, selectedDistrict]);
-
-  const [selectedSchool, setSelectedSchool] = useState("Jaffna Central College");
-  const [schoolGrade, setSchoolGrade] = useState("Grade 12");
+  const [selectedProvince, setSelectedProvince] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedSchool, setSelectedSchool] = useState("");
+  const [schoolGrade, setSchoolGrade] = useState("");
   const [schoolType, setSchoolType] = useState("National School (1AB)");
 
   // STEP 4: Sport Selection (Multi-select)
-  const [selectedSportIds, setSelectedSportIds] = useState<string[]>(["sp_ath", "sp_bad"]);
+  const [selectedSportIds, setSelectedSportIds] = useState<string[]>([]);
 
   // STEP 5: Event Selection
-  const [selectedEventIds, setSelectedEventIds] = useState<string[]>([
-    "ath_100m_u18_b",
-    "ath_lj_u16_b"
-  ]);
+  const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
 
   // STEP 7: Team Sport Squad Roster States
   const [isTeamInterest, setIsTeamInterest] = useState(false);
@@ -110,13 +97,7 @@ export function SportsRegistrationWizard({
   const [teamCoachName, setTeamCoachName] = useState("");
   const [teamCoachPhone, setTeamCoachPhone] = useState("");
   const [enteredTeamCode, setEnteredTeamCode] = useState("");
-  const [squadPlayers, setSquadPlayers] = useState<SquadPlayer[]>([
-    { id: "1", name: "Sathurjan Kavinathan", jerseyNumber: "10", role: "Captain", nicOrStudentId: "200813504921" },
-    { id: "2", name: "K. Thuvaragan", jerseyNumber: "07", role: "Vice Captain / Striker", nicOrStudentId: "200814902134" },
-    { id: "3", name: "V. Nivethan", jerseyNumber: "01", role: "Goalkeeper / Wicket Keeper", nicOrStudentId: "200821009843" },
-    { id: "4", name: "S. Mithuran", jerseyNumber: "04", role: "Defender / Bowler", nicOrStudentId: "200833201452" },
-    { id: "5", name: "R. Aravinth", jerseyNumber: "09", role: "Midfielder / All-Rounder", nicOrStudentId: "200844109823" }
-  ]);
+  const [squadPlayers, setSquadPlayers] = useState<SquadPlayer[]>([]);
 
   // Sync Captain (Player 1) with athlete registrant's name & ID
   React.useEffect(() => {
@@ -124,7 +105,7 @@ export function SportsRegistrationWizard({
     if (fullName) {
       setSquadPlayers((prev) => {
         if (prev.length === 0) {
-          return [{ id: "1", name: fullName, jerseyNumber: "10", role: "Captain", nicOrStudentId }];
+          return [          { id: "1", name: fullName, jerseyNumber: "1", role: "Captain", nicOrStudentId }];
         }
         return prev.map((pl, idx) => (idx === 0 ? { ...pl, name: fullName, nicOrStudentId } : pl));
       });
@@ -140,10 +121,10 @@ export function SportsRegistrationWizard({
 
   const hasTeamSportSelected = useMemo(() => {
     return selectedSportIds.some((id) => {
-      const sp = INITIAL_CHAMPIONSHIP_SPORTS.find((s) => s.id === id);
+      const sp = championshipSports.find((s) => s.id === id);
       return sp?.isTeamSport;
     });
-  }, [selectedSportIds]);
+  }, [championshipSports, selectedSportIds]);
 
   const handleAddSquadPlayer = () => {
     const nextNum = squadPlayers.length + 1;
@@ -171,30 +152,25 @@ export function SportsRegistrationWizard({
   };
 
   const handleFillStandard11Squad = () => {
-    setSquadPlayers([
-      { id: "1", name: `${firstName} ${lastName}`.trim(), jerseyNumber: "10", role: "Captain", nicOrStudentId },
-      { id: "2", name: "K. Thuvaragan", jerseyNumber: "07", role: "Vice Captain / Striker", nicOrStudentId: "STU-2026-012" },
-      { id: "3", name: "V. Nivethan", jerseyNumber: "01", role: "Goalkeeper / Wicket Keeper", nicOrStudentId: "STU-2026-014" },
-      { id: "4", name: "S. Mithuran", jerseyNumber: "04", role: "Center Back / Fast Bowler", nicOrStudentId: "STU-2026-018" },
-      { id: "5", name: "R. Aravinth", jerseyNumber: "09", role: "Midfielder / All-Rounder", nicOrStudentId: "STU-2026-022" },
-      { id: "6", name: "M. Danushan", jerseyNumber: "03", role: "Left Back / Opening Batsman", nicOrStudentId: "STU-2026-025" },
-      { id: "7", name: "A. Jeron", jerseyNumber: "02", role: "Right Back / Spin Bowler", nicOrStudentId: "STU-2026-028" },
-      { id: "8", name: "T. Kavin", jerseyNumber: "06", role: "Defensive Midfield / Wicket Keeper", nicOrStudentId: "STU-2026-031" },
-      { id: "9", name: "P. Sanjeev", jerseyNumber: "08", role: "Central Midfielder", nicOrStudentId: "STU-2026-035" },
-      { id: "10", name: "K. Riham", jerseyNumber: "11", role: "Left Winger / Middle Order", nicOrStudentId: "STU-2026-039" },
-      { id: "11", name: "S. Abishek", jerseyNumber: "05", role: "Striker / Middle Order Batsman", nicOrStudentId: "STU-2026-042" }
-    ]);
+    setSquadPlayers(Array.from({ length: 11 }, (_, index) => ({
+      id: `player-${index + 1}`,
+      name: index === 0 ? `${firstName} ${lastName}`.trim() : "",
+      jerseyNumber: String(index + 1),
+      role: index === 0 ? "Captain" : "Squad Player",
+      nicOrStudentId: index === 0 ? nicOrStudentId : "",
+    })));
   };
 
   // STEP 8: Parent / Guardian Details (Mandatory for minors < 18)
-  const [guardianName, setGuardianName] = useState("Mrs. K. Priyadarshani");
-  const [guardianRelationship, setGuardianRelationship] = useState("Mother");
-  const [guardianMobile, setGuardianMobile] = useState("0779876543");
-  const [guardianConsent, setGuardianConsent] = useState(true);
+  const [guardianName, setGuardianName] = useState("");
+  const [guardianRelationship, setGuardianRelationship] = useState("");
+  const [guardianMobile, setGuardianMobile] = useState("");
+  const [guardianConsent, setGuardianConsent] = useState(false);
 
   // STEP 10: Payment Simulation & Confirmed Registration ID
-  const [paymentMethod, setPaymentMethod] = useState<"online" | "bank_slip" | "venue">("online");
   const [confirmedRecord, setConfirmedRecord] = useState<StoredAthleteRegistration | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState("");
 
   // Find all chosen events objects
   const allChosenEvents = useMemo(() => {
@@ -207,7 +183,7 @@ export function SportsRegistrationWizard({
       fee: number;
     }[] = [];
 
-    INITIAL_CHAMPIONSHIP_SPORTS.forEach((sport) => {
+    championshipSports.forEach((sport) => {
       sport.events.forEach((ev) => {
         if (selectedEventIds.includes(ev.id)) {
           events.push({
@@ -222,7 +198,7 @@ export function SportsRegistrationWizard({
       });
     });
     return events;
-  }, [selectedEventIds]);
+  }, [championshipSports, selectedEventIds]);
 
   // Total entry fee
   const totalAmount = useMemo(() => {
@@ -259,7 +235,7 @@ export function SportsRegistrationWizard({
     setSelectedSportIds((prev) => {
       if (prev.includes(sportId)) {
         // remove sport and remove its events
-        const sport = INITIAL_CHAMPIONSHIP_SPORTS.find((s) => s.id === sportId);
+        const sport = championshipSports.find((s) => s.id === sportId);
         if (sport) {
           const sportEventIds = sport.events.map((e) => e.id);
           setSelectedEventIds((evIds) => evIds.filter((id) => !sportEventIds.includes(id)));
@@ -318,13 +294,14 @@ export function SportsRegistrationWizard({
   };
 
   // Final Submission Handler
-  const handleConfirmRegistration = () => {
-    const randomSeq = Math.floor(100000 + Math.random() * 900000);
-    const regId = `EZG26-ATH-${randomSeq}`;
+  const handleConfirmRegistration = async () => {
+    setIsSubmitting(true);
+    setSubmissionError("");
+    const regId = `SPORT-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const generatedTeamCode =
       teamRegistrationMode === "captain"
-        ? `#TEAM-${(selectedSchool || "SCH").slice(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`
-        : enteredTeamCode || `#TEAM-REF-${Math.floor(1000 + Math.random() * 9000)}`;
+        ? `TEAM-${(selectedSchool || "SCH").slice(0, 3).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`
+        : enteredTeamCode;
 
     const teamSquadData: TeamSquadDetails | undefined =
       hasTeamSportSelected || teamRegistrationMode !== "individual"
@@ -354,26 +331,31 @@ export function SportsRegistrationWizard({
       district: selectedDistrict,
       schoolName: selectedSchool,
       grade: schoolGrade,
-      sports: selectedSportIds.map((id) => {
-        const sp = INITIAL_CHAMPIONSHIP_SPORTS.find((s) => s.id === id);
-        return sp ? sp.name : id;
-      }),
+      sports: selectedSportIds.map((id) => championshipSports.find((sport) => sport.id === id)?.name || id),
       selectedEvents: allChosenEvents,
-      isTeamInterest: teamRegistrationMode === "individual",
+      isTeamInterest: teamRegistrationMode !== "individual",
       teamSquad: teamSquadData,
       guardianName: calculatedAge < 18 ? guardianName : undefined,
       guardianRelationship: calculatedAge < 18 ? guardianRelationship : undefined,
       guardianMobile: calculatedAge < 18 ? guardianMobile : undefined,
       consentTimestamp: new Date().toISOString(),
-      paymentStatus: paymentMethod === "online" ? "PAID" : "PENDING",
+      paymentStatus: "PENDING",
       totalAmount,
-      status: "Confirmed",
+      status: "Pending",
       createdAt: new Date().toISOString().split("T")[0]
     };
 
-    setConfirmedRecord(newRecord);
-    setCurrentStep(10);
-    onRegistrationComplete(newRecord);
+    try {
+      const result = await onRegistrationComplete(newRecord);
+      if (!result.success) {
+        setSubmissionError(result.message || "Unable to submit your registration.");
+        return;
+      }
+      setConfirmedRecord(newRecord);
+      setCurrentStep(10);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const stepsList = [
@@ -637,90 +619,46 @@ export function SportsRegistrationWizard({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">Province *</label>
-                    <select
+                    <input
                       value={selectedProvince}
-                      onChange={(e) => {
-                        const newProv = e.target.value;
-                        setSelectedProvince(newProv);
-                        const pData = SRI_LANKA_SCHOOL_DATA.find((p) => p.province === newProv);
-                        if (pData && pData.districts.length > 0) {
-                          setSelectedDistrict(pData.districts[0].district);
-                          setSelectedSchool(pData.districts[0].schools[0]);
-                        }
-                      }}
+                      onChange={(e) => setSelectedProvince(e.target.value)}
+                      placeholder="Enter province"
                       className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
-                    >
-                      {SRI_LANKA_SCHOOL_DATA.map((p) => (
-                        <option key={p.province} value={p.province}>
-                          {p.province}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">District *</label>
-                    <select
+                    <input
                       value={selectedDistrict}
-                      onChange={(e) => {
-                        const newDist = e.target.value;
-                        setSelectedDistrict(newDist);
-                        const dData = availableDistricts.find((d) => d.district === newDist);
-                        if (dData && dData.schools.length > 0) {
-                          setSelectedSchool(dData.schools[0]);
-                        }
-                      }}
+                      onChange={(e) => setSelectedDistrict(e.target.value)}
+                      placeholder="Enter district"
                       className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
-                    >
-                      {availableDistricts.map((d) => (
-                        <option key={d.district} value={d.district}>
-                          {d.district}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
                 </div>
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Select School / Institution *
+                    School / Institution *
                   </label>
-                  <select
+                  <input
                     value={selectedSchool}
                     onChange={(e) => setSelectedSchool(e.target.value)}
+                    placeholder="Enter school or institution"
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
-                  >
-                    {availableSchools.map((sch) => (
-                      <option key={sch} value={sch}>
-                        {sch}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">Current Grade *</label>
-                    <select
+                    <input
                       value={schoolGrade}
                       onChange={(e) => setSchoolGrade(e.target.value)}
+                      placeholder="Enter grade"
                       className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
-                    >
-                      {[
-                        "Grade 6",
-                        "Grade 7",
-                        "Grade 8",
-                        "Grade 9",
-                        "Grade 10",
-                        "Grade 11 (O/L)",
-                        "Grade 12 (A/L)",
-                        "Grade 13 (A/L)"
-                      ].map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   <div>
@@ -757,7 +695,11 @@ export function SportsRegistrationWizard({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                {INITIAL_CHAMPIONSHIP_SPORTS.map((sport) => {
+                {championshipSports.length === 0 ? (
+                  <p className="sm:col-span-2 rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+                    No sports are currently available for registration.
+                  </p>
+                ) : championshipSports.map((sport) => {
                   const isSelected = selectedSportIds.includes(sport.id);
                   return (
                     <div
@@ -820,8 +762,12 @@ export function SportsRegistrationWizard({
               </div>
 
               <div className="space-y-4 pt-2">
-                {selectedSportIds.map((sportId) => {
-                  const sport = INITIAL_CHAMPIONSHIP_SPORTS.find((s) => s.id === sportId);
+                {selectedSportIds.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+                    Select a sport before choosing its events.
+                  </p>
+                ) : selectedSportIds.map((sportId) => {
+                  const sport = championshipSports.find((s) => s.id === sportId);
                   if (!sport) return null;
 
                   return (
@@ -1441,18 +1387,10 @@ export function SportsRegistrationWizard({
                     <p className="text-lg font-black text-emerald-800">LKR {totalAmount.toLocaleString()}</p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={paymentMethod}
-                      onChange={(e) => setPaymentMethod(e.target.value as any)}
-                      className="h-9 px-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white"
-                    >
-                      <option value="online">Online Card Gateway</option>
-                      <option value="bank_slip">Bank Slip Upload</option>
-                      <option value="venue">Payment at Venue Desk</option>
-                    </select>
-                  </div>
                 </div>
+                <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+                  Payment is not available here. Your registration will be saved as pending for sports-office review.
+                </p>
               </div>
 
               <Button
@@ -1460,13 +1398,13 @@ export function SportsRegistrationWizard({
                 className="w-full bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-sm h-12 rounded-xl shadow-md cursor-pointer"
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                Confirm Registration &amp; Issue Entry Pass
+                Submit Registration
               </Button>
             </div>
           )}
 
           {/* ========================================================================= */}
-          {/* STEP 10: REGISTRATION SUCCESS & DIGITAL ENTRY RECEIPT */}
+          {/* STEP 10: REGISTRATION RECEIPT */}
           {/* ========================================================================= */}
           {currentStep === 10 && confirmedRecord && (
             <div className="space-y-6 max-w-xl mx-auto py-2 text-center">
@@ -1476,10 +1414,10 @@ export function SportsRegistrationWizard({
 
               <div>
                 <h3 className="text-xl sm:text-2xl font-black text-[#0d2b26]">
-                  Registration Successfully Confirmed!
+                  Registration Submitted
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Official participation pass generated for Eezhagam / LimaT Sports Championship.
+                  Your registration has been saved. The sports office will review it and update its status.
                 </p>
               </div>
 
@@ -1492,9 +1430,9 @@ export function SportsRegistrationWizard({
                 <div className="bg-[#0d5c4d] -mx-6 -mt-6 p-4 text-white flex items-center justify-between">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-[#f3b738]">
-                      CHAMPIONSHIP ENTRY PASS &bull; 2026
+                      SPORTS REGISTRATION RECEIPT
                     </p>
-                    <p className="text-base font-extrabold">Eezhagam Sports Championship</p>
+                    <p className="text-base font-extrabold">Registration Details</p>
                   </div>
                   <Badge variant="outline" className="bg-white/20 text-white font-mono text-xs border-white/30">
                     {confirmedRecord.paymentStatus}
@@ -1502,8 +1440,8 @@ export function SportsRegistrationWizard({
                 </div>
 
                 {/* Pass Body */}
-                <div className="grid grid-cols-3 gap-4 items-center pt-2">
-                  <div className="col-span-2 space-y-2 text-xs">
+                <div className="grid grid-cols-1 gap-4 pt-2">
+                  <div className="space-y-2 text-xs">
                     <div>
                       <span className="text-[10px] font-bold text-slate-400 block uppercase">
                         Registration Number
@@ -1561,13 +1499,6 @@ export function SportsRegistrationWizard({
                     )}
                   </div>
 
-                  {/* QR Code graphic mockup */}
-                  <div className="flex flex-col items-center justify-center p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
-                    <QrCode className="h-20 w-20 text-[#0d2b26]" />
-                    <span className="text-[9px] font-mono text-slate-500 font-bold mt-1">
-                      SCAN AT GATE
-                    </span>
-                  </div>
                 </div>
 
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 font-medium">
@@ -1584,7 +1515,7 @@ export function SportsRegistrationWizard({
                   className="w-full sm:w-auto text-xs font-bold border-slate-300"
                 >
                   <Printer className="h-4 w-4 mr-1.5" />
-                  Print Entry Pass
+                  Print Registration Receipt
                 </Button>
 
                 <Button

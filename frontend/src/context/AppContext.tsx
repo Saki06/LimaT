@@ -21,13 +21,24 @@ import {
   Sport,
   SportsTeam,
   Fixture,
-  Standing,
   Tournament,
   SchoolEvent,
   Announcement,
   LibraryResource,
   TeacherProfileData
 } from '@/types/lms';
+import {
+  SportsEvent,
+  SportsFixtureRecord,
+  SportsRegistration,
+  SportsStandingRecord,
+  SportsTeamRecord,
+  SportsTournamentRecord,
+} from '@/lib/api';
+import {
+  ChampionshipSportItem,
+  StoredAthleteRegistration,
+} from '@/components/sports/sportsRegistrationData';
 import { Tenant, TenantFeature, TenantType } from '@/types/tenant';
 import { INITIAL_TENANTS, TENANT_PRESETS } from '@/data/tenantMockData';
 import {
@@ -40,11 +51,6 @@ import {
   initialAssignments,
   initialSubmissions,
   initialQuizzes,
-  initialSports,
-  initialTeams,
-  initialFixtures,
-  initialStandings,
-  initialTournaments,
   initialEvents,
   initialAnnouncements,
   initialLibraryResources
@@ -95,9 +101,35 @@ interface AppContextType {
   submissions: StudentSubmission[];
   quizzes: Quiz[];
   sports: Sport[];
+  championshipSports: ChampionshipSportItem[];
+  sportsEvents: SportsEvent[];
+  sportsRegistrations: SportsRegistration[];
+  fetchSportsEvents: () => Promise<void>;
+  fetchMySportsRegistrations: () => Promise<void>;
+  fetchSportsOperations: () => Promise<void>;
+  registerForSport: (input: {
+    eventId: string;
+    jerseyNumber?: number;
+    roleInTeam?: string;
+    notes?: string;
+  }) => Promise<{ success: boolean; message?: string }>;
+  submitChampionshipRegistration: (input: {
+    eventIds: string[];
+    registrationNumber: string;
+    athleteDetails: Record<string, unknown>;
+  }) => Promise<{ success: boolean; message?: string }>;
+  updateChampionshipRegistrationStatus: (
+    registrationNumber: string,
+    status: StoredAthleteRegistration['status']
+  ) => Promise<void>;
+  createChampionshipSport: (sport: Omit<ChampionshipSportItem, 'id' | 'events' | 'registrationStatus'>) => Promise<void>;
+  createChampionshipEvent: (
+    sportId: string,
+    event: Omit<ChampionshipSportItem['events'][number], 'id'>
+  ) => Promise<void>;
   teams: SportsTeam[];
   fixtures: Fixture[];
-  standings: Standing[];
+  standings: SportsStandingRecord[];
   tournaments: Tournament[];
   events: SchoolEvent[];
   announcements: Announcement[];
@@ -127,11 +159,11 @@ interface AppContextType {
   updateTimetableEntry: (id: string, updates: Omit<TimetableEntry, 'id'>) => void;
   deleteTimetableEntry: (id: string) => void;
   updateEvent: (id: string, updates: Partial<Omit<SchoolEvent, 'id'>>) => void;
-  recordMatchResult: (fixtureId: string, homeScore: string, awayScore: string, outcome: string) => void;
-  createTournament: (tournament: Partial<Tournament>) => void;
-  updateTournament: (id: string, updates: Partial<Tournament>) => void;
-  deleteTournament: (id: string) => void;
-  createFixture: (fixture: Partial<Fixture>) => void;
+  recordMatchResult: (fixtureId: string, homeScore: string, awayScore: string, outcome: string) => Promise<void>;
+  createTournament: (tournament: Partial<Tournament>) => Promise<void>;
+  updateTournament: (id: string, updates: Partial<Tournament>) => Promise<void>;
+  deleteTournament: (id: string) => Promise<void>;
+  createFixture: (fixture: Partial<Fixture>) => Promise<void>;
   createAssignment: (assignment: Partial<Assignment>) => void;
   updateAssignment: (id: string, updates: Partial<Assignment>) => void;
   deleteAssignment: (id: string) => void;
@@ -195,42 +227,36 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const fetchSportsEvents = async (
-  setEvents: React.Dispatch<React.SetStateAction<SchoolEvent[]>>,
-  currentUserId?: string
+const sportsEventOrganizer = 'School Sports Office';
+
+const syncSportsCalendarEvents = async (
+  setEvents: React.Dispatch<React.SetStateAction<SchoolEvent[]>>
 ) => {
   try {
-    const res = await api.sports.getEvents();
-
-    if (!res.success || !res.data) {
-      return;
-    }
-
-    const userId = currentUserId ?? api.user.get()?.id;
-    const mappedEvents: SchoolEvent[] = res.data.map((event) => ({
+    const token = api.token.get();
+    if (!token) return;
+    const sportsEvents = await api.sports.getEvents();
+    if (api.token.get() !== token) return;
+    const mappedEvents: SchoolEvent[] = sportsEvents.map((event) => ({
       id: event.id,
       title: event.title,
-      description: event.sportType || 'Sports event',
+      description: event.description || event.sportType || 'Sports event',
       date: new Date(event.startDate).toISOString().slice(0, 10),
       time: new Date(event.startDate).toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
       }),
       venue: event.venue,
-      organizer: 'School Sports Office',
+      organizer: sportsEventOrganizer,
       capacity: 200,
-      registeredCount: event._count?.registrations ?? 0,
+      registeredCount: event.registrationCount,
       audience: 'students',
       status: event.status === 'COMPLETED' ? 'completed' : 'published',
-      isRegisteredByCurrentUser: Array.isArray(event.registrations)
-        ? event.registrations.some((registration) => registration.userId === userId)
-        : false,
+      isRegisteredByCurrentUser: event.isRegistered,
     }));
-
     setEvents((prev) => {
-      const backendIds = new Set(mappedEvents.map((event) => event.id));
-      const nonDuplicatePrev = prev.filter((event) => !backendIds.has(event.id));
-      return [...mappedEvents, ...nonDuplicatePrev];
+      const nonSportsEvents = prev.filter((event) => event.organizer !== sportsEventOrganizer);
+      return [...mappedEvents, ...nonSportsEvents];
     });
   } catch (err) {
     console.warn('Sports events backend not available yet:', err);
@@ -255,11 +281,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
   const [submissions, setSubmissions] = useState<StudentSubmission[]>(initialSubmissions);
   const [quizzes, setQuizzes] = useState<Quiz[]>(initialQuizzes);
-  const [sports, setSports] = useState<Sport[]>(initialSports);
-  const [teams, setTeams] = useState<SportsTeam[]>(initialTeams);
-  const [fixtures, setFixtures] = useState<Fixture[]>(initialFixtures);
-  const [standings, setStandings] = useState<Standing[]>(initialStandings);
-  const [tournaments, setTournaments] = useState<Tournament[]>(initialTournaments);
+  const [sports, setSports] = useState<Sport[]>([]);
+  const [championshipSports, setChampionshipSports] = useState<ChampionshipSportItem[]>([]);
+  const [sportsEvents, setSportsEvents] = useState<SportsEvent[]>([]);
+  const [sportsRegistrations, setSportsRegistrations] = useState<SportsRegistration[]>([]);
+  const [teams, setTeams] = useState<SportsTeam[]>([]);
+  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [standings, setStandings] = useState<SportsStandingRecord[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [events, setEvents] = useState<SchoolEvent[]>(initialEvents);
   const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements);
   const [libraryResources, setLibraryResources] = useState<LibraryResource[]>(initialLibraryResources);
@@ -462,8 +491,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void fetchSportsEvents(setEvents, authUser?.id);
-  }, [authUser?.id]);
+    if (!authToken) return;
+    void syncSportsCalendarEvents(setEvents);
+  }, [authToken]);
 
   const createCourse = async (data: {
     title: string;
@@ -508,6 +538,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (res.success && res.token && res.user) {
         api.token.set(res.token);
         api.user.set(res.user);
+        setEvents((prev) => prev.filter((event) => event.organizer !== sportsEventOrganizer));
         setAuthToken(res.token);
         setAuthUser(res.user);
         const roleMap: Record<string, UserRole> = {
@@ -539,6 +570,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     api.user.remove();
     setAuthToken(null);
     setAuthUser(null);
+    setEvents((prev) => prev.filter((event) => event.organizer !== sportsEventOrganizer));
+    setSports([]);
+    setChampionshipSports([]);
+    setSportsEvents([]);
+    setSportsRegistrations([]);
+    setTeams([]);
+    setFixtures([]);
+    setStandings([]);
+    setTournaments([]);
     setIsLanding(true);
     addToast({
       type: 'info',
@@ -560,17 +600,305 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     : baseUser;
 
-  const addToast = (toast: Omit<ToastMessage, 'id'>) => {
+  const addToast = useCallback((toast: Omit<ToastMessage, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { ...toast, id }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4500);
+  }, [setToasts]);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, [setToasts]);
+
+  const fetchSportsEvents = useCallback(async () => {
+    const token = api.token.get();
+    if (!token) throw new Error('Authentication required');
+
+    const [fetchedEvents, disciplines] = await Promise.all([
+      api.sports.getEvents(),
+      api.sports.getDisciplines(),
+    ]);
+    if (api.token.get() !== token) return;
+
+    setSportsEvents(fetchedEvents);
+    setChampionshipSports(disciplines.map((discipline) => ({
+      id: discipline.id,
+      name: discipline.name,
+      category: discipline.category,
+      iconName: discipline.iconName,
+      description: discipline.description,
+      ageGroups: Array.from(new Set(discipline.events
+        .map((event) => event.ageCategory)
+        .filter((age): age is NonNullable<typeof age> => Boolean(age)))) as ChampionshipSportItem['ageGroups'],
+      gender: 'all',
+      isTeamSport: discipline.isTeamSport,
+      registrationStatus: 'Open',
+      events: discipline.events.map((event) => ({
+        id: event.id,
+        name: event.title,
+        ageCategory: (event.ageCategory || 'Open') as ChampionshipSportItem['events'][number]['ageCategory'],
+        gender: (event.gender || 'All') as ChampionshipSportItem['events'][number]['gender'],
+        fee: event.fee,
+        maxParticipants: event.maxParticipants ?? 0,
+      })),
+    })));
+
+    const sportsByType = new Map<string, Sport>();
+    disciplines.forEach((discipline) => {
+      sportsByType.set(discipline.name.toLowerCase(), {
+        id: discipline.id,
+        name: discipline.name,
+        category: discipline.category,
+        iconName: discipline.iconName,
+        activeTeamsCount: 0,
+      });
+    });
+    fetchedEvents.forEach((event) => {
+      const name = event.sportType.trim();
+      if (!name || sportsByType.has(name.toLowerCase())) return;
+      sportsByType.set(name.toLowerCase(), {
+        id: `sport_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+        name,
+        category: 'Sport',
+        iconName: 'Trophy',
+        activeTeamsCount: 0,
+      });
+    });
+    setSports(Array.from(sportsByType.values()));
+  }, []);
+
+  const fetchMySportsRegistrations = useCallback(async () => {
+    const token = api.token.get();
+    if (!token) throw new Error('Authentication required');
+
+    const registrations = await api.sports.getMyRegistrations();
+    if (api.token.get() !== token) return;
+    setSportsRegistrations(registrations);
+  }, [setSportsRegistrations]);
+
+  const fetchSportsOperations = useCallback(async () => {
+    const token = api.token.get();
+    if (!token) throw new Error('Authentication required');
+    const [records, tournamentsData, fixturesData, standingsData] = await Promise.all([
+      api.sports.getTeams(),
+      api.sports.getTournaments(),
+      api.sports.getFixtures(),
+      api.sports.getStandings(),
+    ]);
+    if (api.token.get() !== token) return;
+
+    setTeams(records.map((team: SportsTeamRecord) => ({
+      id: team.id,
+      sportId: team.sportName,
+      sportName: team.sportName,
+      name: team.name,
+      coachId: '',
+      coachName: team.coachName,
+      playersCount: team.playersCount,
+      status: team.status,
+      trainingSchedule: team.trainingSchedule,
+      players: team.players,
+    })));
+    setTournaments(tournamentsData.map((tournament: SportsTournamentRecord) => ({
+      ...tournament,
+      sportId: tournament.sportName,
+      format: tournament.format as Tournament['format'],
+      startDate: tournament.startDate.substring(0, 10),
+      endDate: tournament.endDate.substring(0, 10),
+      status: tournament.status as Tournament['status'],
+      rules: tournament.rules || undefined,
+      currentRound: tournament.currentRound || undefined,
+      champion: tournament.champion || undefined,
+      runnerUp: tournament.runnerUp || undefined,
+    })));
+    setFixtures(fixturesData.map((fixture: SportsFixtureRecord) => ({
+      id: fixture.id,
+      teamId: '',
+      tournamentId: fixture.tournamentId,
+      sportName: fixture.sportName,
+      homeTeam: fixture.homeTeam,
+      awayTeam: fixture.awayTeam,
+      date: fixture.date.substring(0, 10),
+      time: fixture.time,
+      venue: fixture.venue,
+      competitionName: fixture.competitionName,
+      status: fixture.status === 'completed' ? 'completed' : fixture.status === 'in_progress' ? 'in_progress' : 'scheduled',
+      ...(fixture.homeScore && fixture.awayScore && fixture.outcome
+        ? { result: {
+            homeScore: fixture.homeScore,
+            awayScore: fixture.awayScore,
+            outcome: fixture.outcome,
+            recordedAt: fixture.recordedAt || '',
+          } }
+        : {}),
+    })));
+    setStandings(standingsData);
+  }, []);
+
+  const registerForSport = async (input: {
+    eventId: string;
+    jerseyNumber?: number;
+    roleInTeam?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; message?: string }> => {
+    try {
+      await api.sports.register(input);
+      addToast({
+        type: 'success',
+        title: 'Sports Registration Submitted',
+        message: 'Your registration has been sent for review.',
+      });
+      await Promise.all([
+        fetchSportsEvents().catch((error) => {
+          console.error('Failed to refresh sports events after registration:', error);
+          addToast({
+            type: 'error',
+            title: 'Unable to Refresh Sports Events',
+            message: error instanceof Error ? error.message : 'An unexpected error occurred.',
+          });
+        }),
+        fetchMySportsRegistrations().catch((error) => {
+          console.error('Failed to refresh sports registrations:', error);
+          addToast({
+            type: 'error',
+            title: 'Unable to Refresh Sports Registrations',
+            message: error instanceof Error ? error.message : 'An unexpected error occurred.',
+          });
+        }),
+      ]);
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({
+        type: 'error',
+        title: 'Sports Registration Failed',
+        message,
+      });
+      return { success: false, message };
+    }
   };
 
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+  const submitChampionshipRegistration = async (input: {
+    eventIds: string[];
+    registrationNumber: string;
+    athleteDetails: Record<string, unknown>;
+  }): Promise<{ success: boolean; message?: string }> => {
+    try {
+      await api.sports.registerChampionship(input);
+      await Promise.all([fetchSportsEvents(), fetchMySportsRegistrations()]);
+      addToast({
+        type: 'success',
+        title: 'Championship Registration Submitted',
+        message: 'Your athlete registration has been saved and sent for review.',
+      });
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Championship Registration Failed', message });
+      return { success: false, message };
+    }
   };
+
+  const updateChampionshipRegistrationStatus = async (
+    registrationNumber: string,
+    status: StoredAthleteRegistration['status'],
+  ) => {
+    try {
+      await api.sports.updateRegistrationStatus(registrationNumber, status);
+      addToast({
+        type: 'success',
+        title: 'Registration Status Updated',
+        message: `${registrationNumber} is now ${status}.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Update Registration', message });
+      throw error;
+    }
+  };
+
+  const createChampionshipSport = async (
+    sport: Omit<ChampionshipSportItem, 'id' | 'events' | 'registrationStatus'>,
+  ) => {
+    try {
+      await api.sports.createDiscipline(sport);
+      await fetchSportsEvents();
+      addToast({ type: 'success', title: 'Sport Added', message: `${sport.name} is now available.` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Add Sport', message });
+      throw error;
+    }
+  };
+
+  const createChampionshipEvent = async (
+    sportId: string,
+    event: Omit<ChampionshipSportItem['events'][number], 'id'>,
+  ) => {
+    const sport = championshipSports.find((item) => item.id === sportId);
+    if (!sport) throw new Error('Sports discipline not found.');
+    try {
+      await api.sports.createEvent({
+        disciplineId: sport.id,
+        title: event.name,
+        sportType: sport.name,
+        ageCategory: event.ageCategory,
+        gender: event.gender,
+        fee: event.fee,
+        maxParticipants: event.maxParticipants,
+        venue: event.venue || 'To be announced',
+        startDate: event.startDate || new Date().toISOString(),
+        description: sport.description,
+        isTeamSport: sport.isTeamSport,
+      });
+      await fetchSportsEvents();
+      addToast({ type: 'success', title: 'Sports Event Added', message: `${event.name} is now available.` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Add Event', message });
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    if (!authToken) return;
+
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+
+      void fetchSportsEvents().catch((error) => {
+        console.error('Failed to load sports events:', error);
+        addToast({
+          type: 'error',
+          title: 'Unable to Load Sports Events',
+          message: error instanceof Error ? error.message : 'An unexpected error occurred.',
+        });
+      });
+      void fetchMySportsRegistrations().catch((error) => {
+        console.error('Failed to load sports registrations:', error);
+        addToast({
+          type: 'error',
+          title: 'Unable to Load Sports Registrations',
+          message: error instanceof Error ? error.message : 'An unexpected error occurred.',
+        });
+      });
+      void fetchSportsOperations().catch((error) => {
+        console.error('Failed to load sports operations:', error);
+        addToast({
+          type: 'error',
+          title: 'Unable to Load Sports Operations',
+          message: error instanceof Error ? error.message : 'An unexpected error occurred.',
+        });
+      });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [addToast, authToken, fetchMySportsRegistrations, fetchSportsEvents, fetchSportsOperations]);
 
   // Switch role reset default views
   useEffect(() => {
@@ -873,28 +1201,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Event RSVP
   const registerEvent = async (eventId: string) => {
     if (authToken) {
-      try {
-        const result = await api.sports.register({ eventId });
-
-        if (result.success) {
-          await fetchSportsEvents(setEvents, authUser?.id);
-          addToast({
-            type: 'success',
-            title: 'Event Registration Updated',
-            message: result.message || 'Your participation status has been updated in school records.'
-          });
-        } else {
-          throw new Error(result.message || 'Failed to register for sports event');
-        }
-      } catch (error) {
-        console.warn('Backend sports registration failed:', error);
-        addToast({
-          type: 'error',
-          title: 'Registration failed',
-          message: error instanceof Error ? error.message : 'Could not register for this event.'
-        });
-      }
-
+      const result = await registerForSport({ eventId });
+      if (result.success) await syncSportsCalendarEvents(setEvents);
       return;
     }
 
@@ -942,118 +1250,126 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Sports Match Result
-  const recordMatchResult = (
+  const recordMatchResult = async (
     fixtureId: string,
     homeScore: string,
     awayScore: string,
     outcome: string
   ) => {
-    setFixtures((prev) =>
-      prev.map((fix) => {
-        if (fix.id === fixtureId) {
-          return {
-            ...fix,
-            status: 'completed',
-            result: {
-              homeScore,
-              awayScore,
-              outcome,
-              recordedAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
-            }
-          };
-        }
-        return fix;
-      })
-    );
-
-    addToast({
-      type: 'success',
-      title: 'Match Result Recorded & Published',
-      message: 'Standings table has been updated automatically.'
-    });
+    try {
+      await api.sports.recordFixtureResult(fixtureId, { homeScore, awayScore, outcome });
+      await fetchSportsOperations();
+      addToast({
+        type: 'success',
+        title: 'Match Result Recorded & Published',
+        message: 'Standings have been recalculated from saved match results.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Record Match Result', message });
+    }
   };
 
   // Tournament Management
-  const createTournament = (tr: Partial<Tournament>) => {
-    const newTr: Tournament = {
-      id: `tr_${Date.now()}`,
-      name: tr.name || 'New Inter-School Championship',
-      sportId: tr.sportId || 'sp_cricket',
-      sportName: tr.sportName || 'Cricket',
-      category: tr.category || 'Under-19 Division 1',
-      format: tr.format || 'knockout',
-      startDate: tr.startDate || new Date().toISOString().substring(0, 10),
-      endDate: tr.endDate || '2026-11-15',
-      venue: tr.venue || 'College Main Oval',
-      organizer: tr.organizer || 'School Sports Council',
-      teamsCount: tr.participatingTeams?.length || tr.teamsCount || 8,
-      participatingTeams:
-        tr.participatingTeams && tr.participatingTeams.length > 0
-          ? tr.participatingTeams
-          : [
-              'St. Michael High School',
-              'Trinity Central College',
-              'Royal Academy Colombo',
-              'Ananda College'
-            ],
-      status: tr.status || 'upcoming',
-      trophyTitle: tr.trophyTitle || 'Championship Trophy',
-      description:
-        tr.description ||
-        'Official Inter-School tournament administered under national athletic standards.',
-      rules:
-        tr.rules ||
-        'Standard national inter-school federation regulations and safety guidelines apply.',
-      currentRound: tr.currentRound || 'Group Stage'
-    };
-
-    setTournaments((prev) => [newTr, ...prev]);
-    addToast({
-      type: 'success',
-      title: 'Tournament Created & Published 🏆',
-      message: `${newTr.name} is now live with ${newTr.participatingTeams.length} participating squads.`
-    });
+  const createTournament = async (tr: Partial<Tournament>) => {
+    const startDate = tr.startDate || new Date().toISOString().substring(0, 10);
+    try {
+      const created = await api.sports.createTournament({
+        name: tr.name || '',
+        sportName: tr.sportName || '',
+        category: tr.category || 'Open',
+        format: tr.format || 'knockout',
+        startDate,
+        endDate: tr.endDate || startDate,
+        venue: tr.venue || '',
+        organizer: tr.organizer || '',
+        participatingTeams: tr.participatingTeams || [],
+        status: tr.status || 'upcoming',
+        trophyTitle: tr.trophyTitle || '',
+        description: tr.description || '',
+        rules: tr.rules || null,
+        currentRound: tr.currentRound || null,
+      });
+      setTournaments((prev) => [{
+        ...created,
+        sportId: created.sportName,
+        format: created.format as Tournament['format'],
+        startDate: created.startDate.substring(0, 10),
+        endDate: created.endDate.substring(0, 10),
+        status: created.status as Tournament['status'],
+        rules: created.rules || undefined,
+        currentRound: created.currentRound || undefined,
+        champion: created.champion || undefined,
+        runnerUp: created.runnerUp || undefined,
+      }, ...prev]);
+      addToast({
+        type: 'success',
+        title: 'Tournament Created',
+        message: `${created.name} has been saved.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Create Tournament', message });
+    }
   };
 
-  const updateTournament = (id: string, updates: Partial<Tournament>) => {
-    setTournaments((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
-    );
-    addToast({
-      type: 'success',
-      title: 'Tournament Updated',
-      message: 'Tournament specifications and stages have been updated.'
-    });
+  const updateTournament = async (id: string, updates: Partial<Tournament>) => {
+    try {
+      await api.sports.updateTournament(id, updates);
+      await fetchSportsOperations();
+      addToast({ type: 'success', title: 'Tournament Updated', message: 'Tournament changes were saved.' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Update Tournament', message });
+    }
   };
 
-  const deleteTournament = (id: string) => {
-    setTournaments((prev) => prev.filter((t) => t.id !== id));
-    addToast({
-      type: 'warning',
-      title: 'Tournament Deleted',
-      message: 'Tournament has been removed from records.'
-    });
+  const deleteTournament = async (id: string) => {
+    try {
+      await api.sports.deleteTournament(id);
+      setTournaments((prev) => prev.filter((t) => t.id !== id));
+      addToast({ type: 'success', title: 'Tournament Deleted', message: 'Tournament was removed.' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Delete Tournament', message });
+    }
   };
 
-  const createFixture = (fx: Partial<Fixture>) => {
-    const newFx: Fixture = {
-      id: `fix_${Date.now()}`,
-      teamId: fx.teamId || 'tm_cricket_1st',
-      sportName: fx.sportName || 'Cricket',
-      homeTeam: fx.homeTeam || 'St. Michael High School',
-      awayTeam: fx.awayTeam || 'Opponent College',
-      date: fx.date || new Date().toISOString().substring(0, 10),
-      time: fx.time || '10:00 AM',
-      venue: fx.venue || 'College Main Grounds',
-      competitionName: fx.competitionName || 'Inter-School Championship',
-      status: fx.status || 'scheduled'
-    };
-    setFixtures((prev) => [newFx, ...prev]);
-    addToast({
-      type: 'success',
-      title: 'Match Fixture Scheduled 📅',
-      message: `${newFx.homeTeam} vs ${newFx.awayTeam} scheduled at ${newFx.venue}.`
-    });
+  const createFixture = async (fx: Partial<Fixture>) => {
+    try {
+      const created = await api.sports.createFixture({
+        tournamentId: fx.tournamentId || null,
+        sportName: fx.sportName || '',
+        homeTeam: fx.homeTeam || '',
+        awayTeam: fx.awayTeam || '',
+        date: fx.date || new Date().toISOString().substring(0, 10),
+        time: fx.time || '',
+        venue: fx.venue || '',
+        competitionName: fx.competitionName || '',
+        status: 'scheduled',
+      });
+      setFixtures((prev) => [{
+        id: created.id,
+        teamId: '',
+        tournamentId: created.tournamentId,
+        sportName: created.sportName,
+        homeTeam: created.homeTeam,
+        awayTeam: created.awayTeam,
+        date: created.date.substring(0, 10),
+        time: created.time,
+        venue: created.venue,
+        competitionName: created.competitionName,
+        status: 'scheduled',
+      }, ...prev]);
+      addToast({
+        type: 'success',
+        title: 'Match Fixture Scheduled',
+        message: `${created.homeTeam} vs ${created.awayTeam} was saved.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Schedule Fixture', message });
+    }
   };
 
   const createAssignment = async (asg: Partial<Assignment>) => {
@@ -1866,6 +2182,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         submissions,
         quizzes,
         sports,
+        championshipSports,
+        sportsEvents,
+        sportsRegistrations,
+        fetchSportsEvents,
+        fetchMySportsRegistrations,
+        fetchSportsOperations,
+        registerForSport,
+        submitChampionshipRegistration,
+        updateChampionshipRegistrationStatus,
+        createChampionshipSport,
+        createChampionshipEvent,
         teams,
         fixtures,
         standings,
