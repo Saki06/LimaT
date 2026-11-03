@@ -65,14 +65,16 @@ export default function HomePage() {
         case "assignments":
           return <AssignmentViews />;
         case "quizzes":
-        case "exams":
           return <QuizViews />;
+        case "exams":
+          return <ExamViews />;
         case "past_papers":
         case "pastPapers":
           return <LibraryViews key="past_papers" initialTab="past_papers" />;
         case "results":
+          return <ResultsView />;
         case "progress":
-          return <ExamViews />;
+          return <StudentProgressView />;
         case "library":
           return <LibraryViews key="library" initialTab="all" />;
         case "school_life":

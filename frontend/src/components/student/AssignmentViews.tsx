@@ -64,6 +64,7 @@ export function AssignmentViews() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string>("Alex_Solution_AnswerSheet.pdf");
   const [selectedFileSize, setSelectedFileSize] = useState<string>("2.4 MB");
+  const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string>("");
   const [isCopied, setIsCopied] = useState(false);
   const [declaredHonorCode, setDeclaredHonorCode] = useState(true);
 
@@ -208,11 +209,17 @@ export function AssignmentViews() {
       // 1. Send to backend API
       await api.assignments.submit(currentAssignment.id, {
         textContent: data.textContent,
-        fileAttachmentName: selectedFileName
+        fileAttachmentName: selectedFileName,
+        fileAttachmentUrl: selectedFileDataUrl || undefined
       });
 
       // 2. Update context state
-      await submitAssignment(currentAssignment.id, data.textContent, selectedFileName);
+      await submitAssignment(
+        currentAssignment.id,
+        data.textContent,
+        selectedFileName,
+        selectedFileDataUrl || undefined
+      );
 
       // 3. Re-fetch fresh live assignments
       await fetchAssignments();
@@ -261,6 +268,16 @@ export function AssignmentViews() {
       const file = e.target.files[0];
       setSelectedFileName(file.name);
       setSelectedFileSize(`${(file.size / (1024 * 1024)).toFixed(1)} MB`);
+
+      // Read real file content as Data URL so teacher grading desk can inspect it
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          setSelectedFileDataUrl(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+
       addToast({
         type: "info",
         title: "File Attached",

@@ -116,7 +116,7 @@ interface AppContextType {
 
   // Actions
   markLessonComplete: (lessonId: string) => void;
-  submitAssignment: (assignmentId: string, text: string, fileName?: string) => void;
+  submitAssignment: (assignmentId: string, text: string, fileName?: string, fileAttachmentUrl?: string) => Promise<void>;
   gradeSubmission: (submissionId: string, marks: number, feedback: string, release: boolean) => void;
   submitQuizAttempt: (quizId: string, answers: Record<string, any>) => number;
   createQuiz: (quiz: Partial<Quiz>) => void;
@@ -750,7 +750,12 @@ const addTenant = (tenant: Tenant) => {
   };
 
   // Student submits assignment
-  const submitAssignment = async (assignmentId: string, text: string, fileName?: string) => {
+  const submitAssignment = async (
+    assignmentId: string,
+    text: string,
+    fileName?: string,
+    fileAttachmentUrl?: string
+  ) => {
     const asg = assignments.find((a) => a.id === assignmentId);
     const existingIndex = submissions.findIndex(
       (s) => s.assignmentId === assignmentId && s.studentId === currentUser.id
@@ -766,6 +771,7 @@ const addTenant = (tenant: Tenant) => {
       status: 'submitted',
       textContent: text,
       fileAttachmentName: fileName || 'Student_Submission.pdf',
+      fileAttachmentUrl: fileAttachmentUrl || undefined,
       maxMarks: asg?.maxMarks || 100
     };
 
@@ -782,17 +788,11 @@ const addTenant = (tenant: Tenant) => {
     });
 
     try {
-      if (api.students?.submitAssignment) {
-        await api.students.submitAssignment(assignmentId, {
-          textContent: text,
-          fileAttachmentName: fileName || 'Student_Submission.pdf',
-        });
-      } else {
-        await api.assignments.submit(assignmentId, {
-          textContent: text,
-          fileAttachmentName: fileName || 'Student_Submission.pdf',
-        });
-      }
+      await api.assignments.submit(assignmentId, {
+        textContent: text,
+        fileAttachmentName: fileName || 'Student_Submission.pdf',
+        fileAttachmentUrl: fileAttachmentUrl || undefined,
+      });
     } catch (err) {
       console.warn('Backend submit assignment skipped:', err);
     }
