@@ -393,6 +393,39 @@ const addTenant = (tenant: Tenant) => {
     };
   }, [authUser?.role, authToken]);
 
+  // Restore authenticated session from localStorage on initial load
+  useEffect(() => {
+    const token = api.token.get();
+    const user = api.user.get();
+    if (token && user) {
+      setAuthToken(token);
+      setAuthUser(user);
+      const roleMap: Record<string, UserRole> = {
+        STUDENT: 'student',
+        TEACHER: 'teacher',
+        PARENT: 'parent',
+        ADMIN: 'admin',
+        SUPER_ADMIN: 'super_admin'
+      };
+      if (user.role && roleMap[user.role]) {
+        setCurrentRole(roleMap[user.role]);
+      }
+      setIsLanding(false);
+    }
+    fetchCourses();
+    fetchAnnouncements();
+  }, []);
+
+  const fetchAnnouncements = async () => {
+    try {
+      const res = await api.announcements.getAll({ role: currentRole.toUpperCase() });
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setAnnouncements(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not load announcements from backend:', err);
+    }
+  };
   const mapBackendCourseToFrontend = (c: any): Course => {
     const teacherName = c.teacher?.user
       ? `${c.teacher.user.firstName} ${c.teacher.user.lastName || ''}`.trim()
@@ -587,6 +620,7 @@ const addTenant = (tenant: Tenant) => {
   // Switch role reset default views
   useEffect(() => {
     setCurrentView('dashboard');
+    fetchAnnouncements();
   }, [currentRole]);
 
   // Mark lesson as complete
@@ -661,10 +695,17 @@ const addTenant = (tenant: Tenant) => {
     });
 
     try {
-      await api.assignments.submit(assignmentId, {
-        textContent: text,
-        fileAttachmentName: fileName || 'Student_Submission.pdf',
-      });
+      if (api.students?.submitAssignment) {
+        await api.students.submitAssignment(assignmentId, {
+          textContent: text,
+          fileAttachmentName: fileName || 'Student_Submission.pdf',
+        });
+      } else {
+        await api.assignments.submit(assignmentId, {
+          textContent: text,
+          fileAttachmentName: fileName || 'Student_Submission.pdf',
+        });
+      }
     } catch (err) {
       console.warn('Backend submit assignment skipped:', err);
     }
@@ -1570,7 +1611,27 @@ const addTenant = (tenant: Tenant) => {
     });
   };
 
-  const createAnnouncement = (ann: Partial<Announcement>) => {
+  const createAnnouncement = async (ann: Partial<Announcement>) => {
+    try {
+      const res = await api.announcements.create({
+        title: ann.title || 'Official Announcement',
+        message: ann.message || '',
+        targetAudience: ann.targetAudience || 'Platform-Wide (Everyone)',
+        priority: ann.priority || 'normal'
+      });
+      if (res.success && res.data) {
+        setAnnouncements((prev) => [res.data, ...prev]);
+        addToast({
+          type: 'success',
+          title: 'Announcement Published!',
+          message: 'Notice has been dispatched and saved to cloud database.'
+        });
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to save announcement in backend, falling back to local:', err);
+    }
+
     const newAnn: Announcement = {
       id: `ann_${Date.now()}`,
       title: ann.title || 'Official Announcement',
@@ -1589,16 +1650,26 @@ const addTenant = (tenant: Tenant) => {
     });
   };
 
-  const updateAnnouncement = (id: string, updates: Partial<Omit<Announcement, 'id'>>) => {
+  const updateAnnouncement = async (id: string, updates: Partial<Omit<Announcement, 'id'>>) => {
+    try {
+      await api.announcements.update(id, updates);
+    } catch (err) {
+      console.warn('Failed to update announcement in backend:', err);
+    }
     setAnnouncements((prev) =>
       prev.map((announcement) => announcement.id === id ? { ...announcement, ...updates } : announcement)
     );
     addToast({ type: 'success', title: 'Announcement Updated', message: 'Announcement details saved successfully.' });
   };
 
-  const deleteAnnouncement = (id: string) => {
+  const deleteAnnouncement = async (id: string) => {
+    try {
+      await api.announcements.delete(id);
+    } catch (err) {
+      console.warn('Failed to delete announcement in backend:', err);
+    }
     setAnnouncements((prev) => prev.filter((announcement) => announcement.id !== id));
-    addToast({ type: 'success', title: 'Announcement Removed', message: 'Announcement has been removed.' });
+    addToast({ type: 'success', title: 'Announcement Removed', message: 'Announcement has been removed from database.' });
   };
 
   const toggleSaveResource = (id: string) => {

@@ -270,17 +270,23 @@ model SportsRegistration {
 }
 
 model Announcement {
-  id         String   @id @default(uuid())
-  tenantId   String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  title      String
-  content    String
-  targetRole Role?
-  isPinned   Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String      @id @default(uuid())
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title         String
+  content       String
+  targetRole    Role?
+  priority      String?     @default("normal")
+  authorName    String?     @default("Principal's Office")
+  authorRole    String?     @default("ADMIN")
+  targetAudience String?    @default("Platform-Wide (Everyone)")
+  category      String?     @default("GENERAL")
+  isPinned      Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   @@index([tenantId, targetRole])
+  @@index([tenantId, isPinned])
 }
 
 model Package {
@@ -326,12 +332,19 @@ model PackageSubscription {
   status     SubscriptionStatus @default(ACTIVE)
   startDate  DateTime           @default(now())
   endDate    DateTime
-  paidAmount Float              @default(0.0)
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  paidAmount    Float              @default(0.0)
+  paymentMethod String?            @default("CARD")
+  receiptNo     String?
+  bankRefNo     String?
+  slipUrl       String?
+  slipFileName  String?
+  paymentNotes  String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
   @@index([packageId, status])
   @@index([studentId, status])
+  @@index([receiptNo])
 }
 
 model LiveClassSession {

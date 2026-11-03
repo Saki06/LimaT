@@ -298,7 +298,14 @@ export function LiveScheduleView() {
   useEffect(() => {
     const fetchLiveClasses = async () => {
       try {
-        const res = await api.liveClasses.getAll();
+        let res: any = null;
+        if (!isTeacher && api.students?.getMyLiveClasses) {
+          res = await api.students.getMyLiveClasses();
+        }
+        if (!res || !res.success || !Array.isArray(res.data) || res.data.length === 0) {
+          res = await api.liveClasses.getAll();
+        }
+
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
           const mapped: LiveSlot[] = res.data.map((item: any) => {
             const startD = new Date(item.startTime);
@@ -318,7 +325,7 @@ export function LiveScheduleView() {
             return {
               id: item.id,
               title: item.title,
-              subject: item.course?.title || item.package?.title || "Combined Mathematics",
+              subject: item.course?.title || item.package?.title || item.subject || "Combined Mathematics",
               grade: "Grade 12 & 13",
               day: dayName,
               startTime: timeStr,
@@ -328,7 +335,7 @@ export function LiveScheduleView() {
               meetingId: item.meetingId,
               passcode: item.passcode,
               type: item.topic || "Live Interactive Lecture",
-              enrolledCount: item._count?.attendances || 142,
+              enrolledCount: item.enrolledCount || item._count?.attendances || 142,
               status: stat,
               recordingUrl: item.recordingUrl,
               courseId: item.courseId,
@@ -585,7 +592,11 @@ export function LiveScheduleView() {
   const handleStudentJoin = async (slot: LiveSlot) => {
     try {
       if (!slot.id.startsWith("slot-")) {
-        await api.liveClasses.join(slot.id);
+        if (api.students?.joinLiveClass) {
+          await api.students.joinLiveClass(slot.id);
+        } else {
+          await api.liveClasses.join(slot.id);
+        }
       }
     } catch (e) {
       console.warn("Attendance log failed:", e);

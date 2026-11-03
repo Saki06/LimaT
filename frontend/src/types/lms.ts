@@ -65,6 +65,11 @@ export interface TimetableEntry {
   startTime: string;
   endTime: string;
   room: string;
+  subjectCode?: string;
+  periodType?: string;
+  platform?: string;
+  meetingUrl?: string;
+  isLiveNow?: boolean;
 }
 
 export interface Subject {
@@ -549,9 +554,12 @@ export interface ConnectPurchase {
   date: string;
   validUntil: string;
   status: 'active' | 'expired';
-  paymentMethod: 'Card (Visa/Mastercard)' | 'Bank Deposit (Commercial Bank)' | 'FriMi / PayHere';
+  paymentMethod: string;
   receiptNo: string;
   meetUrl: string;
+  bankRefNo?: string;
+  slipUrl?: string;
+  slipFileName?: string;
 }
 
 export interface TutorPackage {

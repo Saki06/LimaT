@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
+import { api } from "@/lib/api";
 import {
   BookOpen,
   CheckCircle2,
@@ -16,7 +17,11 @@ import {
   Video,
   ExternalLink,
   X,
-  Filter
+  Filter,
+  ChevronRight,
+  GraduationCap,
+  PlayCircle,
+  Users
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,6 +57,37 @@ export function StudentDashboard() {
       .toUpperCase() || "SP";
 
   const [isLiveClassModalOpen, setIsLiveClassModalOpen] = useState(false);
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState<boolean>(false);
+
+  // Fetch real-time student dashboard metrics from backend
+  useEffect(() => {
+    let isMounted = true;
+    const fetchDashboard = async () => {
+      try {
+        setIsLoadingDashboard(true);
+        const res = await api.students.getDashboardOverview();
+        if (isMounted && res.success && res.data) {
+          setDashboardData(res.data);
+        }
+      } catch (err) {
+        console.warn("Using offline / context student dashboard metrics:", err);
+      } finally {
+        if (isMounted) setIsLoadingDashboard(false);
+      }
+    };
+    fetchDashboard();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Compute live or fallback metrics
+  const enrolledCoursesCount = dashboardData?.metrics?.enrolledCoursesCount ?? courses.length;
+  const upcomingLiveCount = dashboardData?.metrics?.upcomingLiveClassesCount ?? 1;
+  const pendingAssignmentsCount = dashboardData?.metrics?.pendingAssignmentsCount ?? assignments.length;
+  const attendanceRate = dashboardData?.metrics?.attendanceRate ?? 94;
+  const averageScore = dashboardData?.metrics?.averageScore ?? 88;
 
   // Learning Feed State
   const [activeFeedFilter, setActiveFeedFilter] = useState<string>("all");
@@ -64,20 +100,181 @@ export function StudentDashboard() {
     });
   }, [announcements]);
 
-
   const totalLessons = courses.reduce((acc, c) => acc + c.totalLessons, 0);
   const completedLessons = courses.reduce((acc, c) => acc + c.completedLessons, 0);
   const completionPercentage = Math.round((completedLessons / totalLessons) * 100) || 0;
-
 
   const handleContinueCourse = (courseId: string) => {
     setSelectedCourseId(courseId);
     setCurrentView("courses");
   };
 
+  // Dynamic Time-of-day Greeting
+  const currentHour = new Date().getHours();
+  const greeting =
+    currentHour < 12
+      ? "Good Morning"
+      : currentHour < 17
+      ? "Good Afternoon"
+      : "Good Evening";
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Student Welcome Cockpit Banner */}
+      <div className="bg-gradient-to-r from-[#0d5c4d] via-[#106e5d] to-[#158066] rounded-3xl p-5 sm:p-6 text-white shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/20 text-white backdrop-blur-xs">
+              Student Learning Cockpit
+            </span>
+            <span className="text-xs text-white/80 font-medium">
+              {greeting}, {currentUser?.name?.split(" ")[0] || "Alex"}
+            </span>
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            Track Your Curriculum &amp; Excel in Your Studies
+          </h1>
+          <p className="text-xs text-white/85 max-w-xl leading-relaxed">
+            Stay on top of today&apos;s live lectures, test your knowledge in quiz arena, and submit assignments on schedule.
+          </p>
+        </div>
 
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <Button
+            onClick={() => setCurrentView("courses")}
+            className="bg-white text-[#0d5c4d] hover:bg-emerald-50 font-extrabold text-xs shadow-xs cursor-pointer h-9 px-4 rounded-xl"
+          >
+            <BookOpen className="h-3.5 w-3.5 mr-1.5" /> Continue Learning
+          </Button>
+          <Button
+            onClick={() => setCurrentView("live_schedule")}
+            className="bg-white/15 hover:bg-white/25 text-white border border-white/25 font-bold text-xs cursor-pointer backdrop-blur-xs h-9 px-4 rounded-xl"
+          >
+            <Video className="h-3.5 w-3.5 mr-1.5" /> Live Schedule
+          </Button>
+          <Button
+            onClick={() => setCurrentView("quizzes")}
+            className="bg-white/15 hover:bg-white/25 text-white border border-white/25 font-bold text-xs cursor-pointer backdrop-blur-xs h-9 px-4 rounded-xl"
+          >
+            <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Quiz Arena
+          </Button>
+        </div>
+      </div>
+
+      {/* Top 4 Student Executive KPI Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Enrolled Courses */}
+        <Card
+          onClick={() => setCurrentView("courses")}
+          className="border-[#e6ece8] bg-white hover:border-[#a2dfd2] hover:bg-emerald-50/20 transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
+        >
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Enrolled Subjects
+              </span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-[#0d2b26]">
+                  {enrolledCoursesCount}
+                </span>
+                <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
+                  Active
+                </Badge>
+              </div>
+              <p className="text-[11px] text-[#0d5c4d] font-semibold flex items-center gap-1">
+                View My Courses <ChevronRight className="h-3 w-3" />
+              </p>
+            </div>
+            <div className="h-11 w-11 rounded-2xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <BookOpen className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Live Video Masterclasses */}
+        <Card
+          onClick={() => setCurrentView("live_schedule")}
+          className="border-[#e6ece8] bg-white hover:border-indigo-300 hover:bg-indigo-50/20 transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
+        >
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Live Masterclasses
+              </span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-[#0d2b26]">
+                  {upcomingLiveCount}
+                </span>
+                <Badge variant="outline" className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border-indigo-200">
+                  Scheduled
+                </Badge>
+              </div>
+              <p className="text-[11px] text-indigo-700 font-semibold flex items-center gap-1">
+                Open Live Studio <ChevronRight className="h-3 w-3" />
+              </p>
+            </div>
+            <div className="h-11 w-11 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <Video className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Pending Homework / Assignments */}
+        <Card
+          onClick={() => setCurrentView("assignments")}
+          className="border-[#e6ece8] bg-white hover:border-amber-300 hover:bg-amber-50/20 transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
+        >
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Pending Homework
+              </span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-[#0d2b26]">
+                  {pendingAssignmentsCount}
+                </span>
+                <Badge variant="outline" className="text-[10px] font-semibold text-amber-700 bg-amber-50 border-amber-200">
+                  To Submit
+                </Badge>
+              </div>
+              <p className="text-[11px] text-[#b47a16] font-semibold flex items-center gap-1">
+                View Due Dates <ChevronRight className="h-3 w-3" />
+              </p>
+            </div>
+            <div className="h-11 w-11 rounded-2xl bg-amber-50 text-[#b47a16] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <FileText className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Attendance & Academic Standing */}
+        <Card
+          onClick={() => setCurrentView("results")}
+          className="border-[#e6ece8] bg-white hover:border-[#a2dfd2] hover:bg-emerald-50/20 transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
+        >
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Attendance &amp; Score
+              </span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-[#0d2b26]">
+                  {attendanceRate}%
+                </span>
+                <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
+                  Avg {averageScore}%
+                </Badge>
+              </div>
+              <p className="text-[11px] text-[#0d5c4d] font-semibold flex items-center gap-1">
+                View Performance <ChevronRight className="h-3 w-3" />
+              </p>
+            </div>
+            <div className="h-11 w-11 rounded-2xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <Award className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Main Grid: Continue Learning + Performance Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

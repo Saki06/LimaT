@@ -904,6 +904,314 @@ export const api = {
       const res = await fetch(`${API_BASE_URL}/teachers/public/${slugOrId}`);
       return res.json();
     },
+
+    async getMarketplace(params?: {
+      subject?: string;
+      medium?: string;
+      district?: string;
+      search?: string;
+    }) {
+      const query = new URLSearchParams();
+      if (params?.subject) query.append('subject', params.subject);
+      if (params?.medium) query.append('medium', params.medium);
+      if (params?.district) query.append('district', params.district);
+      if (params?.search) query.append('search', params.search);
+
+      const res = await fetch(`${API_BASE_URL}/teachers/marketplace?${query.toString()}`);
+      return res.json();
+    },
+  },
+
+  // Student Workspace APIs (Profile, Dashboard Cockpit, Learning Analytics)
+  students: {
+    async getMyProfile() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/me`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async updateMyProfile(data: {
+      firstName?: string;
+      lastName?: string;
+      avatarUrl?: string;
+      gradeLevel?: string;
+      section?: string;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/me`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async getDashboardOverview() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/dashboard`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getMyCourses() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-courses`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async enrollCourse(courseId: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/courses/${courseId}/enroll`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getMyPackages() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-packages`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async subscribePackage(packageId: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/packages/${packageId}/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async checkoutPackage(packageId: string, data?: {
+      paymentMethod?: string;
+      bankRefNo?: string;
+      slipUrl?: string;
+      slipFileName?: string;
+      paymentNotes?: string;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/packages/${packageId}/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data || {}),
+      });
+      return res.json();
+    },
+
+    async getMyPurchases() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-purchases`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getMyAssignments() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-assignments`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async submitAssignment(assignmentId: string, data: { textContent?: string; fileAttachmentUrl?: string; fileAttachmentName?: string }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/assignments/${assignmentId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async getMyResults() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-results`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getMyLiveClasses() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-live-classes`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async joinLiveClass(sessionId: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/live-classes/${sessionId}/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getMyTimetable() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/students/my-timetable`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getMyLibraryResources(params?: {
+      resourceType?: string;
+      subject?: string;
+      year?: string | number;
+      medium?: string;
+      search?: string;
+    }) {
+      const token = api.token.get();
+      const query = new URLSearchParams();
+      if (params?.resourceType) query.append('resourceType', params.resourceType);
+      if (params?.subject) query.append('subject', params.subject);
+      if (params?.year) query.append('year', params.year.toString());
+      if (params?.medium) query.append('medium', params.medium);
+      if (params?.search) query.append('search', params.search);
+
+      const res = await fetch(`${API_BASE_URL}/students/my-resources?${query.toString()}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+  },
+
+  // Announcements & Notice Board API
+  announcements: {
+    async getAll(params?: { search?: string; priority?: string; audience?: string; role?: string }) {
+      const query = new URLSearchParams();
+      if (params?.search) query.append('search', params.search);
+      if (params?.priority) query.append('priority', params.priority);
+      if (params?.audience) query.append('audience', params.audience);
+      if (params?.role) query.append('role', params.role);
+
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements?${query.toString()}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getById(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements/${id}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async create(data: {
+      title: string;
+      message: string;
+      targetAudience?: string;
+      priority?: 'normal' | 'high' | 'urgent';
+      isPinned?: boolean;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async update(id: string, data: Partial<{
+      title: string;
+      message: string;
+      targetAudience: string;
+      priority: 'normal' | 'high' | 'urgent';
+      isPinned: boolean;
+    }>) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async delete(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements/${id}`, {
+        method: 'DELETE',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async togglePin(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/announcements/${id}/pin`, {
+        method: 'PATCH',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
   },
 
     // Super Admin Profile APIs
