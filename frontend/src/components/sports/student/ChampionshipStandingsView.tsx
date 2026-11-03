@@ -1499,14 +1499,14 @@ export function ChampionshipStandingsView({
                               {sch.schoolName.charAt(0)}
                             </span>
                             <div>
-                              <p className="font-bold text-[#0d2b26] flex items-center gap-1.5">
+                              <div className="font-bold text-[#0d2b26] flex items-center gap-1.5">
                                 <span>{sch.schoolName}</span>
                                 {sch.rank === 1 && (
                                   <Badge className="bg-amber-100 text-amber-900 border-amber-200 text-[9px] px-1.5 py-0">
                                     🏆 Champions
                                   </Badge>
                                 )}
-                              </p>
+                              </div>
                               {sch.recentRecord && (
                                 <p className="text-[10px] text-emerald-700 font-medium truncate max-w-xs">
                                   {sch.recentRecord}
