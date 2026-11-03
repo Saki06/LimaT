@@ -155,6 +155,7 @@ export interface StudentSubmission {
   status: 'not_submitted' | 'submitted' | 'marked' | 'result_released';
   textContent?: string;
   fileAttachmentName?: string;
+  fileAttachmentUrl?: string;
   marksObtained?: number;
   maxMarks: number;
   teacherFeedback?: string;
@@ -597,6 +598,7 @@ export interface TeacherSubscriber {
   paymentMethod: string;
   slipReference?: string;
   slipFileName?: string;
+  slipUrl?: string;
   attendanceRate: number;
   schoolId?: string;
 }

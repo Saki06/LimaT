@@ -8,6 +8,7 @@ import {
   submitAssignment,
   gradeSubmission,
   getAssignmentSubmissions,
+  getTeacherSubmissions,
 } from '../controllers/assignment.controller';
 import { authenticateToken, requireRoles } from '../middlewares/auth.middleware';
 
@@ -19,7 +20,10 @@ router.use(authenticateToken);
 // 1. List assignments (Available for Teachers and Students)
 router.get('/', getAssignments);
 
-// 2. Get specific assignment by ID
+// 2. Get all submissions for teacher review desk (Teacher / Admin)
+router.get('/teacher/submissions', requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'), getTeacherSubmissions);
+
+// 3. Get specific assignment by ID
 router.get('/:id', getAssignmentById);
 
 // 3. Create a new assignment (Teacher / Admin)

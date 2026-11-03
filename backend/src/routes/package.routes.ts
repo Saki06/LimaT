@@ -8,6 +8,8 @@ import {
   deletePackage,
   subscribeToPackage,
   getPackageSubscribers,
+  getAllTeacherSubscribers,
+  verifyBankSlip,
 } from '../controllers/package.controller';
 import { authenticateToken, requireRoles } from '../middlewares/auth.middleware';
 
@@ -22,6 +24,22 @@ router.get(
   authenticateToken,
   requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'),
   getMyPackages
+);
+
+// 2b. Tutor's Subscribers across all packages
+router.get(
+  '/teacher/subscribers',
+  authenticateToken,
+  requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'),
+  getAllTeacherSubscribers
+);
+
+// 2c. Verify / Approve or Reject Bank Deposit Slip
+router.patch(
+  '/subscriptions/:subscriptionId/verify',
+  authenticateToken,
+  requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'),
+  verifyBankSlip
 );
 
 // 3. Single Package Details

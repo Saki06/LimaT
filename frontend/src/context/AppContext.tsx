@@ -122,6 +122,7 @@ interface AppContextType {
   createQuiz: (quiz: Partial<Quiz>) => void;
   updateQuiz: (id: string, updates: Partial<Quiz>) => void;
   deleteQuiz: (id: string) => void;
+  fetchQuizzes: () => Promise<void>;
   registerEvent: (eventId: string) => void;
   createTimetableEntry: (entry: Omit<TimetableEntry, 'id'>) => void;
   updateTimetableEntry: (id: string, updates: Omit<TimetableEntry, 'id'>) => void;
@@ -137,6 +138,9 @@ interface AppContextType {
   deleteAssignment: (id: string) => void;
   createCourse: (data: { title: string; code: string; description?: string }) => Promise<{ success: boolean; message?: string }>;
   fetchCourses: () => Promise<void>;
+  fetchAssignments: () => Promise<void>;
+  fetchSubmissions: () => Promise<void>;
+  syncCourseSyllabus: (courseId: string, updatedCourses?: Course[]) => Promise<void>;
   createUnit: (courseId: string, unitTitle: string) => string;
   updateUnit: (courseId: string, unitId: string, updates: { title?: string; order?: number }) => void;
   createTopic: (courseId: string, unitId: string, topicTitle: string, description?: string) => string;
@@ -169,6 +173,7 @@ interface AppContextType {
   deleteLibraryResource: (id: string) => void;
   recordResourceView: (id: string) => void;
   recordResourceDownload: (id: string) => void;
+  fetchLibraryResources: () => Promise<void>;
 
   // Teacher Profile & Studio State
   teacherProfile: TeacherProfileData | null;
@@ -414,7 +419,74 @@ const addTenant = (tenant: Tenant) => {
     }
     fetchCourses();
     fetchAnnouncements();
+    fetchAssignments();
+    fetchSubmissions();
   }, []);
+
+  const fetchAssignments = async () => {
+    try {
+      const res = await api.assignments.getAll();
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        const loaded: Assignment[] = res.data.map((a: any) => ({
+          id: a.id,
+          courseId: a.courseId || a.course?.id || '',
+          subjectName: a.subjectName || a.course?.title || 'Combined Mathematics',
+          title: a.title,
+          instructions: a.instructions || '',
+          topicName: a.topicName || 'General Topic',
+          maxMarks: Number(a.maxMarks) || 100,
+          dueDate: a.dueDate
+            ? new Date(a.dueDate).toISOString().replace('T', ' ').substring(0, 16)
+            : '2026-11-30 23:59',
+          status: a.status?.toLowerCase() === 'draft' ? 'draft' : 'published',
+          attachmentName: a.attachmentName || undefined,
+          submissionsCount: a.submissionsCount || a._count?.submissions || 0,
+          pendingReviewCount: a.pendingReviewCount || 0,
+        }));
+        setAssignments((prev) => {
+          const loadedIds = new Set(loaded.map((item) => item.id));
+          return [...loaded, ...prev.filter((p) => !loadedIds.has(p.id))];
+        });
+      }
+    } catch (err) {
+      console.warn('Backend assignments API not reachable yet:', err);
+    }
+  };
+
+  const fetchSubmissions = async () => {
+    try {
+      const res = await api.assignments.getTeacherSubmissions();
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        const loadedSubs: StudentSubmission[] = res.data.map((s: any) => ({
+          id: s.id,
+          assignmentId: s.assignmentId,
+          assignmentTitle: s.assignmentTitle || 'Assignment',
+          studentId: s.studentId,
+          studentName: s.studentName || 'Student',
+          studentAvatar: s.studentAvatar || undefined,
+          submittedAt: s.submittedAt
+            ? new Date(s.submittedAt).toISOString().replace('T', ' ').substring(0, 16)
+            : new Date().toISOString().substring(0, 16),
+          status: s.status as 'not_submitted' | 'submitted' | 'marked' | 'result_released',
+          textContent: s.textContent || undefined,
+          fileAttachmentName: s.fileAttachmentName || undefined,
+          fileAttachmentUrl: s.fileAttachmentUrl || undefined,
+          marksObtained: s.marksObtained !== undefined && s.marksObtained !== null ? Number(s.marksObtained) : undefined,
+          maxMarks: s.maxMarks || 100,
+          teacherFeedback: s.teacherFeedback || undefined,
+          markedAt: s.markedAt
+            ? new Date(s.markedAt).toISOString().replace('T', ' ').substring(0, 16)
+            : undefined,
+        }));
+        setSubmissions((prev) => {
+          const loadedIds = new Set(loadedSubs.map((item) => item.id));
+          return [...loadedSubs, ...prev.filter((p) => !loadedIds.has(p.id))];
+        });
+      }
+    } catch (err) {
+      console.warn('Backend teacher submissions API not reachable yet:', err);
+    }
+  };
 
   const fetchAnnouncements = async () => {
     try {
@@ -426,6 +498,7 @@ const addTenant = (tenant: Tenant) => {
       console.warn('Could not load announcements from backend:', err);
     }
   };
+
   const mapBackendCourseToFrontend = (c: any): Course => {
     const teacherName = c.teacher?.user
       ? `${c.teacher.user.firstName} ${c.teacher.user.lastName || ''}`.trim()
@@ -484,27 +557,41 @@ const addTenant = (tenant: Tenant) => {
     }
   };
 
-  // Restore authenticated session from localStorage on initial load
-  useEffect(() => {
-    const token = api.token.get();
-    const user = api.user.get();
-    if (token && user) {
-      setAuthToken(token);
-      setAuthUser(user);
-      const roleMap: Record<string, UserRole> = {
-        STUDENT: 'student',
-        TEACHER: 'teacher',
-        PARENT: 'parent',
-        ADMIN: 'admin',
-        SUPER_ADMIN: 'super_admin'
-      };
-      if (user.role && roleMap[user.role]) {
-        setCurrentRole(roleMap[user.role]);
+  const fetchLibraryResources = async () => {
+    try {
+      const res = await api.resources.getAll();
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setLibraryResources((prev) => {
+          const loadedIds = new Set(res.data.map((r: any) => r.id));
+          return [...res.data, ...prev.filter((p) => !loadedIds.has(p.id))];
+        });
       }
-      setIsLanding(false);
+    } catch (err) {
+      console.warn('Backend library resources API not reachable yet:', err);
     }
+  };
+
+  const fetchQuizzes = async () => {
+    try {
+      const res = await api.quizzes.getAll();
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setQuizzes((prev) => {
+          const loadedIds = new Set(res.data.map((q: any) => q.id));
+          return [...res.data, ...prev.filter((p) => !loadedIds.has(p.id))];
+        });
+      }
+    } catch (err) {
+      console.warn('Backend quizzes API not reachable yet:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchAssignments();
+    fetchSubmissions();
     fetchCourses();
-  }, []);
+    fetchLibraryResources();
+    fetchQuizzes();
+  }, [currentRole, activeTenantId]);
 
   useEffect(() => {
     void fetchSportsEvents(setEvents, authUser?.id);
@@ -839,6 +926,12 @@ const addTenant = (tenant: Tenant) => {
       message: `You scored ${score} / ${quiz.totalMarks} marks.`
     });
 
+    api.quizzes
+      .submitAttempt(quizId, { answers, timeSpentSeconds: 420 })
+      .catch((err) => {
+        console.warn('Backend quiz attempt submission skipped:', err?.message);
+      });
+
     return score;
   };
 
@@ -885,6 +978,29 @@ const addTenant = (tenant: Tenant) => {
       title: 'Quiz Published Successfully! 🎯',
       message: `"${newQuiz.title}" is now available (${newQuiz.totalQuestions} questions, ${newQuiz.totalMarks} marks).`
     });
+
+    api.quizzes
+      .create({
+        title: newQuiz.title,
+        instructions: newQuiz.instructions,
+        courseId: newQuiz.courseId,
+        subjectName: newQuiz.subjectName,
+        durationMinutes: newQuiz.durationMinutes,
+        dueDate: newQuiz.dueDate,
+        status: newQuiz.status,
+        totalMarks: newQuiz.totalMarks,
+        questions: newQuiz.questions,
+      })
+      .then((res) => {
+        if (res.success && res.data?.id) {
+          setQuizzes((prev) =>
+            prev.map((q) => (q.id === tempId ? { ...q, id: res.data.id } : q))
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend quiz creation skipped:', err?.message);
+      });
   };
 
   // Tutor updates existing Quiz
@@ -911,6 +1027,12 @@ const addTenant = (tenant: Tenant) => {
       title: 'Quiz Updated! 📝',
       message: 'Questions and evaluation parameters saved successfully.'
     });
+
+    api.quizzes
+      .update(id, updates)
+      .catch((err) => {
+        console.warn('Backend quiz update skipped:', err?.message);
+      });
   };
 
   // Tutor deletes Quiz
@@ -921,6 +1043,12 @@ const addTenant = (tenant: Tenant) => {
       title: 'Quiz Removed',
       message: 'The quiz has been removed from the curriculum.'
     });
+
+    api.quizzes
+      .delete(id)
+      .catch((err) => {
+        console.warn('Backend quiz delete skipped:', err?.message);
+      });
   };
 
   // Event RSVP
@@ -1268,12 +1396,32 @@ const addTenant = (tenant: Tenant) => {
     addToast({ type: 'success', title: 'Event Created Successfully!' });
   };
 
-  const syncCourseSyllabus = async (courseId: string, updatedCourses: Course[]) => {
+  const syncCourseSyllabus = async (courseId: string, updatedCourses?: Course[]) => {
     try {
+      const courseList = updatedCourses || courses;
+      const target = courseList.find((c) => c.id === courseId);
+      if (!target) return;
+
       if (!courseId.startsWith("crs_")) {
-        const target = updatedCourses.find((c) => c.id === courseId);
-        if (target) {
-          await api.courses.update(courseId, { syllabus: { units: target.units } });
+        await api.courses.update(courseId, { syllabus: { units: target.units } });
+      } else {
+        const existing = courseList.find(
+          (c) => !c.id.startsWith("crs_") && (c.title === target.title || c.code === target.code)
+        );
+        if (existing) {
+          await api.courses.update(existing.id, { syllabus: { units: target.units } });
+        } else {
+          const res = await api.courses.create({
+            title: target.title,
+            code: target.code || `CRS-${Date.now().toString().slice(-4)}`,
+            description: `A/L Curriculum Batch for ${target.title}`
+          });
+          if (res.success && res.data) {
+            await api.courses.update(res.data.id, { syllabus: { units: target.units } });
+            setCourses((prev) =>
+              prev.map((c) => (c.id === courseId ? { ...c, id: res.data.id } : c))
+            );
+          }
         }
       }
     } catch (e) {
@@ -1320,8 +1468,8 @@ const addTenant = (tenant: Tenant) => {
   };
 
   const updateUnit = (courseId: string, unitId: string, updates: { title?: string; order?: number }) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1334,8 +1482,10 @@ const addTenant = (tenant: Tenant) => {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'success',
       title: 'Unit Updated!',
@@ -1345,8 +1495,8 @@ const addTenant = (tenant: Tenant) => {
 
   const createTopic = (courseId: string, unitId: string, topicTitle: string, description?: string): string => {
     const newTopicId = `top_${Date.now()}`;
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1366,8 +1516,10 @@ const addTenant = (tenant: Tenant) => {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'success',
       title: 'Topic Added to Unit!',
@@ -1377,8 +1529,8 @@ const addTenant = (tenant: Tenant) => {
   };
 
   const updateTopic = (courseId: string, unitId: string, topicId: string, updates: { title?: string; description?: string }) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1397,8 +1549,10 @@ const addTenant = (tenant: Tenant) => {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'success',
       title: 'Topic Updated!',
@@ -1407,8 +1561,8 @@ const addTenant = (tenant: Tenant) => {
   };
 
   const deleteUnit = (courseId: string, unitId: string) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         const targetUnit = c.units.find((u) => u.id === unitId);
         let removedLessons = 0;
@@ -1420,8 +1574,10 @@ const addTenant = (tenant: Tenant) => {
           totalLessons: Math.max(0, c.totalLessons - removedLessons),
           units: c.units.filter((u) => u.id !== unitId)
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'info',
       title: 'Unit Removed',
@@ -1430,8 +1586,8 @@ const addTenant = (tenant: Tenant) => {
   };
 
   const deleteTopic = (courseId: string, unitId: string, topicId: string) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1445,8 +1601,10 @@ const addTenant = (tenant: Tenant) => {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'info',
       title: 'Topic Removed',
@@ -1455,8 +1613,8 @@ const addTenant = (tenant: Tenant) => {
   };
 
   const createLesson = (courseId: string, unitId: string, topicId: string, lesson: Partial<Lesson>) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1489,8 +1647,10 @@ const addTenant = (tenant: Tenant) => {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'success',
       title: 'Lesson Added to Syllabus!',
@@ -1507,8 +1667,8 @@ const addTenant = (tenant: Tenant) => {
     newUnitId?: string,
     newTopicId?: string
   ) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
 
         const destUnitId = newUnitId || unitId;
@@ -1572,8 +1732,10 @@ const addTenant = (tenant: Tenant) => {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'success',
       title: 'Lesson Updated!',
@@ -1582,8 +1744,8 @@ const addTenant = (tenant: Tenant) => {
   };
 
   const deleteLesson = (courseId: string, unitId: string, topicId: string, lessonId: string) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1602,8 +1764,10 @@ const addTenant = (tenant: Tenant) => {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'info',
       title: 'Lesson Removed',
@@ -1972,6 +2136,7 @@ const addTenant = (tenant: Tenant) => {
         createQuiz,
         updateQuiz,
         deleteQuiz,
+        fetchQuizzes,
         registerEvent,
         createTimetableEntry,
         updateTimetableEntry,
@@ -1987,6 +2152,9 @@ const addTenant = (tenant: Tenant) => {
         deleteAssignment,
         createCourse,
         fetchCourses,
+        fetchAssignments,
+        fetchSubmissions,
+        syncCourseSyllabus,
         createUnit,
         updateUnit,
         createTopic,
@@ -2011,6 +2179,7 @@ const addTenant = (tenant: Tenant) => {
         deleteLibraryResource,
         recordResourceView,
         recordResourceDownload,
+        fetchLibraryResources,
         teacherProfile,
         updateTeacherProfile,
         refreshTeacherProfile,

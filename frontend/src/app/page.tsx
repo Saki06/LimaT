@@ -110,7 +110,7 @@ export default function HomePage() {
         case "profile":
           return <ProfileView />;
         case "connect":
-          return <ConnectView />;
+          return <TeacherConnectView />;
         case "submissions":
           return <TeacherViews initialTab="grading" />;
         case "assignments":

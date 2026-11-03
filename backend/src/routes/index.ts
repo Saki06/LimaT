@@ -11,6 +11,7 @@ import teacherRoutes from './teacher.routes';
 import superAdminProfileRoutes from './superAdminProfile.routes';
 import studentRoutes from './student.routes';
 import announcementRoutes from './announcement.routes';
+import quizRoutes from './quiz.routes';
 
 const router = Router();
 
@@ -37,5 +38,6 @@ router.use('/teachers', teacherRoutes);
 router.use('/super-admin', superAdminProfileRoutes);
 router.use('/students', studentRoutes);
 router.use('/announcements', announcementRoutes);
+router.use('/quizzes', quizRoutes);
 
 export default router;

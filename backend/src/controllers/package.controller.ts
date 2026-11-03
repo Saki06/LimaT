@@ -652,3 +652,294 @@ export const getPackageSubscribers = async (req: AuthenticatedRequest, res: Resp
     });
   }
 };
+
+/**
+ * 9. Get All Subscribers for the Authenticated Teacher's Packages
+ * GET /api/packages/teacher/subscribers
+ * Restricted to: TEACHER, ADMIN, SUPER_ADMIN
+ */
+export const getAllTeacherSubscribers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const { status, search } = req.query;
+
+    const whereClause: any = {};
+
+    if (user.role === 'TEACHER') {
+      const teacher = await getOrCreateTeacherProfile(user.userId);
+      if (teacher) {
+        whereClause.package = {
+          teacherId: teacher.id,
+        };
+      }
+    } else if (user.tenantId) {
+      whereClause.package = {
+        tenantId: user.tenantId,
+      };
+    }
+
+    if (status && typeof status === 'string' && status !== 'all') {
+      const s = status.toUpperCase();
+      if (s === 'PENDING_SLIP' || s === 'PENDING') {
+        whereClause.status = 'PENDING';
+      } else if (s === 'ACTIVE') {
+        whereClause.status = 'ACTIVE';
+      } else if (s === 'EXPIRED') {
+        whereClause.status = { in: ['EXPIRED', 'CANCELLED'] };
+      }
+    }
+
+    let subscriptions = await prisma.packageSubscription.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        package: true,
+        student: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Auto-seed sample subscribers if teacher has 0 subscribers yet so teacher can immediately test slip verification
+    if (subscriptions.length === 0 && user.role === 'TEACHER') {
+      try {
+        const teacher = await getOrCreateTeacherProfile(user.userId);
+        if (teacher) {
+          let samplePkg = await prisma.package.findFirst({
+            where: { teacherId: teacher.id },
+          });
+
+          if (!samplePkg) {
+            samplePkg = await prisma.package.create({
+              data: {
+                tenantId: user.tenantId || (await prisma.tenant.findFirst())?.id || '',
+                teacherId: teacher.id,
+                title: 'Combined Mathematics A/L Theory & Revision Masterclass',
+                slug: `cm-al-theory-${Date.now()}`,
+                description: 'Full syllabus coverage with weekly live streams and past paper discussion.',
+                price: 2500,
+                billingCycle: 'MONTHLY',
+                durationDays: 30,
+                features: [
+                  'Live Interactive Classes / Week (Google Meet)',
+                  'Recorded Video Lessons Archive with 24/7 Access',
+                  'Printable Theory & Exercise Tutes (PDF)',
+                  'Monthly Model Paper Discussion & Marking',
+                ],
+                isPublished: true,
+              },
+            });
+          }
+
+          let student = await prisma.studentProfile.findFirst({
+            include: { user: true },
+          });
+
+          if (student && samplePkg) {
+            const now = new Date();
+            const d30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+            await prisma.packageSubscription.create({
+              data: {
+                packageId: samplePkg.id,
+                studentId: student.id,
+                status: 'PENDING',
+                startDate: now,
+                endDate: d30,
+                paidAmount: samplePkg.price,
+                paymentMethod: 'Bank Deposit (Commercial Bank)',
+                bankRefNo: 'COMB-TXN-771204',
+                slipFileName: 'Commercial_Bank_Slip_Student.pdf',
+                slipUrl: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&auto=format&fit=crop&q=80',
+              },
+            });
+
+            subscriptions = await prisma.packageSubscription.findMany({
+              where: whereClause,
+              orderBy: { createdAt: 'desc' },
+              include: {
+                package: true,
+                student: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        avatarUrl: true,
+                      },
+                    },
+                  },
+                },
+              },
+            });
+          }
+        }
+      } catch (seedErr) {
+        console.warn('Could not auto-seed subscribers:', seedErr);
+      }
+    }
+
+    let formatted = subscriptions.map((s: any) => {
+      const st = s.status === 'PENDING' ? 'pending_slip' : s.status === 'ACTIVE' ? 'active' : 'expired';
+      const studentName = s.student?.user
+        ? `${s.student.user.firstName} ${s.student.user.lastName || ''}`.trim()
+        : 'Student Candidate';
+      const initials = s.student?.user
+        ? `${s.student.user.firstName[0] || 'S'}${(s.student.user.lastName || 'C')[0] || ''}`.toUpperCase()
+        : 'SC';
+
+      return {
+        id: s.id,
+        studentId: s.studentId,
+        studentName,
+        studentInitials: initials,
+        studentEmail: s.student?.user?.email || '',
+        avatarColor: 'bg-emerald-600',
+        grade: s.student?.gradeLevel || 'Grade 12 (A/L)',
+        stream: 'Physical Science',
+        school: s.student?.schoolName || 'Ananda College, Colombo',
+        subscribedDate: s.startDate
+          ? new Date(s.startDate).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0],
+        validUntil: s.endDate
+          ? new Date(s.endDate).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0],
+        planName: s.package?.title || 'Tutor Masterclass Pass',
+        amount: s.paidAmount || s.package?.price || 2500,
+        currency: 'LKR',
+        status: st as 'active' | 'pending_slip' | 'expired',
+        paymentMethod: s.paymentMethod || 'Bank Deposit (Commercial Bank)',
+        slipReference: s.bankRefNo || s.receiptNo || 'COMB-TXN-771204',
+        slipFileName: s.slipFileName || 'Commercial_Bank_Slip.pdf',
+        slipUrl:
+          s.slipUrl ||
+          'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&auto=format&fit=crop&q=80',
+        attendanceRate: 95,
+      };
+    });
+
+    if (search && typeof search === 'string' && search.trim()) {
+      const q = search.trim().toLowerCase();
+      formatted = formatted.filter(
+        (sub: any) =>
+          sub.studentName.toLowerCase().includes(q) ||
+          sub.school.toLowerCase().includes(q) ||
+          sub.planName.toLowerCase().includes(q)
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      data: formatted,
+    });
+  } catch (error: any) {
+    console.error('Error fetching teacher subscribers:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+/**
+ * 10. Verify / Approve or Reject Bank Deposit Slip
+ * PATCH /api/packages/subscriptions/:subscriptionId/verify
+ * Restricted to: TEACHER, ADMIN, SUPER_ADMIN
+ */
+export const verifyBankSlip = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const subscriptionId = req.params.subscriptionId as string;
+    const { action = 'APPROVE', notes } = req.body;
+
+    const subscription = await prisma.packageSubscription.findUnique({
+      where: { id: subscriptionId },
+      include: {
+        package: {
+          include: {
+            courses: true,
+          },
+        },
+        student: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!subscription) {
+      res.status(404).json({ success: false, message: 'Subscription not found' });
+      return;
+    }
+
+    const isApprove = action.toUpperCase() === 'APPROVE';
+    const newStatus = isApprove ? 'ACTIVE' : 'CANCELLED';
+
+    const now = new Date();
+    const durationDays = subscription.package?.durationDays || 30;
+    const newEndDate = isApprove ? new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000) : subscription.endDate;
+
+    const updated = await prisma.packageSubscription.update({
+      where: { id: subscriptionId },
+      data: {
+        status: newStatus,
+        endDate: newEndDate,
+        paymentNotes: notes || (isApprove ? 'Bank deposit slip approved by tutor' : 'Bank deposit slip rejected'),
+      },
+    });
+
+    // If approved, ensure student is enrolled in all bundled courses in the package!
+    if (isApprove && subscription.package?.courses) {
+      for (const item of subscription.package.courses) {
+        await prisma.enrollment.upsert({
+          where: {
+            courseId_studentId: {
+              courseId: item.courseId,
+              studentId: subscription.studentId,
+            },
+          },
+          create: {
+            courseId: item.courseId,
+            studentId: subscription.studentId,
+          },
+          update: {},
+        });
+      }
+    }
+
+    const studentName = subscription.student?.user
+      ? `${subscription.student.user.firstName} ${subscription.student.user.lastName || ''}`.trim()
+      : 'Student';
+
+    res.status(200).json({
+      success: true,
+      message: isApprove
+        ? `Bank Deposit Slip Approved! ${studentName}'s subscription is now ACTIVE with full course access.`
+        : `Bank deposit slip for ${studentName} was rejected.`,
+      data: updated,
+    });
+  } catch (error: any) {
+    console.error('Error verifying bank slip:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};

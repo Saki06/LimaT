@@ -854,3 +854,132 @@ export const getAssignmentSubmissions = async (req: AuthenticatedRequest, res: R
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
+
+/**
+ * 9. Get All Submissions for Teacher Grading Desk
+ * GET /api/assignments/teacher/submissions
+ * Restricted to: TEACHER, ADMIN, SUPER_ADMIN
+ */
+export const getTeacherSubmissions = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const { status, assignmentId, search } = req.query;
+
+    const whereClause: any = {};
+
+    // Filter by tenant if user has tenantId
+    if (user.tenantId) {
+      whereClause.assignment = {
+        tenantId: user.tenantId,
+      };
+    }
+
+    // If teacher, filter by teacherId unless admin/super_admin
+    if (user.role === 'TEACHER') {
+      const teacher = await prisma.teacherProfile.findUnique({
+        where: { userId: user.userId },
+      });
+      if (teacher) {
+        whereClause.assignment = {
+          ...(whereClause.assignment || {}),
+          teacherId: teacher.id,
+        };
+      }
+    }
+
+    if (assignmentId && typeof assignmentId === 'string' && assignmentId !== 'all') {
+      whereClause.assignmentId = assignmentId;
+    }
+
+    if (status && typeof status === 'string' && status !== 'all') {
+      const upperStatus = status.toUpperCase();
+      if (upperStatus === 'PENDING') {
+        whereClause.status = { in: ['SUBMITTED', 'LATE'] };
+      } else if (upperStatus === 'GRADED' || upperStatus === 'MARKED') {
+        whereClause.status = { in: ['MARKED', 'RESULT_RELEASED'] };
+      } else {
+        whereClause.status = upperStatus;
+      }
+    }
+
+    const submissions = await (prisma.assignmentSubmission as any).findMany({
+      where: whereClause,
+      include: {
+        assignment: {
+          select: {
+            id: true,
+            title: true,
+            subjectName: true,
+            maxMarks: true,
+            dueDate: true,
+          },
+        },
+        student: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+
+    let formatted = submissions.map((s: any) => {
+      const st = s.status ? s.status.toLowerCase() : 'submitted';
+      return {
+        id: s.id,
+        assignmentId: s.assignmentId,
+        assignmentTitle: s.assignment?.title || 'Assignment',
+        subjectName: s.assignment?.subjectName || 'Combined Mathematics',
+        studentId: s.studentId,
+        studentName: s.student?.user
+          ? `${s.student.user.firstName} ${s.student.user.lastName || ''}`.trim()
+          : 'Student Candidate',
+        studentEmail: s.student?.user?.email || '',
+        studentAvatar: s.student?.user?.avatarUrl || undefined,
+        submittedAt: s.submittedAt ? new Date(s.submittedAt).toISOString() : new Date().toISOString(),
+        status: (st === 'marked' ? 'marked' : st === 'result_released' ? 'result_released' : 'submitted') as
+          | 'not_submitted'
+          | 'submitted'
+          | 'marked'
+          | 'result_released',
+        textContent: s.textContent || undefined,
+        fileAttachmentName: s.fileAttachmentName || undefined,
+        fileAttachmentUrl: s.fileAttachmentUrl || undefined,
+        marksObtained: s.marksObtained !== null && s.marksObtained !== undefined ? Number(s.marksObtained) : undefined,
+        maxMarks: s.assignment?.maxMarks || 100,
+        teacherFeedback: s.teacherFeedback || undefined,
+        markedAt: s.markedAt ? new Date(s.markedAt).toISOString() : undefined,
+      };
+    });
+
+    if (search && typeof search === 'string' && search.trim()) {
+      const q = search.trim().toLowerCase();
+      formatted = formatted.filter(
+        (item: any) =>
+          item.studentName.toLowerCase().includes(q) ||
+          item.assignmentTitle.toLowerCase().includes(q) ||
+          item.studentEmail.toLowerCase().includes(q)
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      data: formatted,
+    });
+  } catch (error: any) {
+    console.error('Error fetching teacher submissions:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};

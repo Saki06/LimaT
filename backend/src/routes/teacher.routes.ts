@@ -4,6 +4,7 @@ import {
   updateMyTeacherProfile,
   getPublicTutorProfile,
   getTutorsMarketplace,
+  getMyTeacherDashboard,
 } from '../controllers/teacher.controller';
 import { authenticateToken } from '../middlewares/auth.middleware';
 
@@ -16,6 +17,7 @@ router.get('/marketplace', getTutorsMarketplace);
 router.get('/public/:slugOrId', getPublicTutorProfile);
 
 // Protected routes (for the authenticated teacher)
+router.get('/me/dashboard', authenticateToken, getMyTeacherDashboard);
 router.get('/me', authenticateToken, getMyTeacherProfile);
 router.put('/me', authenticateToken, updateMyTeacherProfile);
 

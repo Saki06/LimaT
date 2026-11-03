@@ -544,6 +544,34 @@ export const api = {
       });
       return res.json();
     },
+
+    async getTeacherSubscribers(params?: { status?: string; search?: string }) {
+      const token = api.token.get();
+      const query = new URLSearchParams();
+      if (params?.status) query.append('status', params.status);
+      if (params?.search) query.append('search', params.search);
+
+      const res = await fetch(`${API_BASE_URL}/packages/teacher/subscribers?${query.toString()}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async verifySlip(subscriptionId: string, action: 'APPROVE' | 'REJECT', notes?: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/packages/subscriptions/${subscriptionId}/verify`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ action, notes }),
+      });
+      return res.json();
+    },
   },
 
   // Live Video Classes API
@@ -781,6 +809,21 @@ export const api = {
       });
       return res.json();
     },
+
+    async getTeacherSubmissions(params?: { status?: string; assignmentId?: string; search?: string }) {
+      const token = api.token.get();
+      const query = new URLSearchParams();
+      if (params?.status) query.append('status', params.status);
+      if (params?.assignmentId) query.append('assignmentId', params.assignmentId);
+      if (params?.search) query.append('search', params.search);
+
+      const res = await fetch(`${API_BASE_URL}/assignments/teacher/submissions?${query.toString()}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
   },
 
   // Library Resources (Past Papers, Tutes, Books with Access Control)
@@ -875,8 +918,96 @@ export const api = {
     },
   },
 
+  // Online Quizzes & MCQs API
+  quizzes: {
+    async getAll(params?: { courseId?: string; search?: string }) {
+      const token = api.token.get();
+      const query = new URLSearchParams();
+      if (params?.courseId) query.append('courseId', params.courseId);
+      if (params?.search) query.append('search', params.search);
+
+      const res = await fetch(`${API_BASE_URL}/quizzes?${query.toString()}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getById(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/quizzes/${id}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async create(data: any) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/quizzes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async update(id: string, data: any) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/quizzes/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async delete(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/quizzes/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async submitAttempt(id: string, data: { answers: Record<string, any>; timeSpentSeconds?: number }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/quizzes/${id}/attempt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+  },
+
   // Teacher Studio Profile & Payout APIs
   teachers: {
+    async getDashboard() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/teachers/me/dashboard`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
     async getMyProfile() {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/teachers/me`, {
