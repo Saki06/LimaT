@@ -8,9 +8,9 @@ import liveClassRoutes from './liveClass.routes';
 import assignmentRoutes from './assignment.routes';
 import resourceRoutes from './resource.routes';
 import teacherRoutes from './teacher.routes';
+import superAdminProfileRoutes from './superAdminProfile.routes';
 import studentRoutes from './student.routes';
 import announcementRoutes from './announcement.routes';
-import superAdminProfileRoutes from './superAdminProfile.routes';
 
 const router = Router();
 
@@ -34,8 +34,8 @@ router.use('/live-classes', liveClassRoutes);
 router.use('/assignments', assignmentRoutes);
 router.use('/resources', resourceRoutes);
 router.use('/teachers', teacherRoutes);
+router.use('/super-admin', superAdminProfileRoutes);
 router.use('/students', studentRoutes);
 router.use('/announcements', announcementRoutes);
-router.use('/super-admin', superAdminProfileRoutes);
 
 export default router;
