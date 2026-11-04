@@ -494,6 +494,10 @@ model SuperAdminProfile {
   province      String?
   postalCode    String?
   bio           String?
+  dateOfBirth   DateTime?
+  gender        String?
+  languages     String?
+  rootAuthorityId String? @unique
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

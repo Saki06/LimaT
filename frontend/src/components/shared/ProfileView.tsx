@@ -220,14 +220,14 @@ export function ProfileView() {
         fullName: "LimaT Platform Owner & Chief Director",
         preferredName: "Super Admin",
         studentId: "ROOT-SAAS-001",
-        indexNumber: "SAAS-ROOT/DIR-01",
+        indexNumber: "",
         email: currentUser.email || "director@limat.lk",
         phone: "+94 77 123 4567",
         altPhone: "+94 11 200 4455",
-        dob: "1982-01-01",
-        gender: "Male",
-        bloodGroup: "O+",
-        medium: "English, Sinhala & Tamil",
+        dob: "",
+        gender: "",
+        bloodGroup: "",
+        medium: "",
         address: "LimaT Headquarters, Colombo Technology Park",
         city: "Colombo 02",
         district: "Colombo",
@@ -573,22 +573,39 @@ export function ProfileView() {
 
         if (!response.success || cancelled) return;
 
-        const savedProfile = response.data?.superAdminProfile;
+       const savedProfile = response.data?.superAdminProfile;
 
-        if (!savedProfile) return;
+if (!response.data) return;
+
+if (!savedProfile) {
+  setProfileData((previous) => ({
+    ...previous,
+    email: response.data.email ?? previous.email,
+    studentId: response.data.id ?? previous.studentId,
+  }));
+  return;
+}
 
         setProfileData((previous) => ({
           ...previous,
+          email: response.data.email ?? previous.email,
+          studentId: response.data.id ?? previous.studentId,
           fullName: savedProfile.fullName ?? previous.fullName,
           name: savedProfile.preferredName ?? previous.name,
           phone: savedProfile.phone ?? previous.phone,
           altPhone: savedProfile.altPhone ?? previous.altPhone,
-          address: savedProfile.address ?? previous.address,
+          address: savedProfile.address ?? "",
           city: savedProfile.city ?? previous.city,
           district: savedProfile.district ?? previous.district,
           province: savedProfile.province ?? previous.province,
           postalCode: savedProfile.postalCode ?? previous.postalCode,
-          bio: savedProfile.bio ?? previous.bio,
+          bio: savedProfile.bio ?? "",
+          dob: savedProfile.dateOfBirth
+            ? savedProfile.dateOfBirth.slice(0, 10)
+            : "",
+          gender: savedProfile.gender ?? "",
+          medium: savedProfile.languages ?? "",
+          indexNumber: savedProfile.rootAuthorityId ?? "",
         }));
       } catch (error) {
         if (cancelled) return;
@@ -920,8 +937,12 @@ export function ProfileView() {
           city: profileData.city,
           district: profileData.district,
           province: profileData.province,
-          postalCode: profileData.postalCode,
+                    postalCode: profileData.postalCode,
           bio: profileData.bio,
+          dateOfBirth: profileData.dob || null,
+          gender: profileData.gender || null,
+          languages: profileData.medium || null,
+          rootAuthorityId: profileData.indexNumber || null,
         });
 
         if (!response.success) {
@@ -1500,12 +1521,24 @@ export function ProfileView() {
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Email Address (Institutional)</label>
                 {isEditing ? (
-                  <input
-                    type="email"
-                    value={profileData.email}
-                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
-                  />
+                 <input
+  type="email"
+  value={profileData.email}
+  readOnly={currentRole === "super_admin"}
+  onChange={(e) => {
+    if (currentRole !== "super_admin") {
+      setProfileData({
+        ...profileData,
+        email: e.target.value,
+      });
+    }
+  }}
+  className={`w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 ${
+    currentRole === "super_admin"
+      ? "bg-slate-100 cursor-not-allowed"
+      : ""
+  }`}
+/>
                 ) : (
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
                     <span>{profileData.email}</span>
@@ -1559,10 +1592,10 @@ export function ProfileView() {
                       onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
                       className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
                     >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
+  <option value="">Select Gender</option>
+  <option value="Male">Male</option>
+  <option value="Female">Female</option>
+</select>
                   ) : (
                     <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
                       {profileData.gender}
@@ -1574,7 +1607,9 @@ export function ProfileView() {
               {/* Medium & Blood Group */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Medium of Study</label>
+                  <label className="text-xs font-bold text-slate-700">
+  {currentRole === "super_admin" ? "Languages" : "Medium of Study"}
+</label>
                   {isEditing ? (
                     <input
                       type="text"
@@ -1589,8 +1624,9 @@ export function ProfileView() {
                   )}
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Blood Group</label>
+                {currentRole !== "super_admin" && (
+  <div className="space-y-1.5">
+    <label className="text-xs font-bold text-slate-700">Blood Group</label>
                   {isEditing ? (
                     <input
                       type="text"
@@ -1604,6 +1640,7 @@ export function ProfileView() {
                     </p>
                   )}
                 </div>
+              )}
               </div>
 
               {/* Academic Grade, Stream & Target Year (Only for Students) */}
@@ -1736,7 +1773,15 @@ export function ProfileView() {
                   />
                 ) : (
                   <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.address}, {profileData.city}, {profileData.district}, {profileData.province}
+                    {[
+  profileData.address,
+  profileData.city,
+  profileData.district,
+  profileData.province,
+]
+  .map((value) => value?.trim())
+  .filter(Boolean)
+  .join(", ")}
                   </p>
                 )}
               </div>
