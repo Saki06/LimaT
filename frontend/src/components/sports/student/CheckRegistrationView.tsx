@@ -8,7 +8,6 @@ import {
   AlertCircle,
   FileText,
   Printer,
-  QrCode,
   Trophy,
   Building2,
   Phone,
@@ -30,12 +29,10 @@ export function CheckRegistrationView({
   registrations,
   onOpenRegister
 }: CheckRegistrationViewProps) {
-  const [searchRegId, setSearchRegId] = useState("EZG26-ATH-000101");
-  const [searchMobile, setSearchMobile] = useState("0771234567");
-  const [searchedRecord, setSearchedRecord] = useState<StoredAthleteRegistration | null>(
-    registrations[0] || null
-  );
-  const [hasSearched, setHasSearched] = useState(true);
+  const [searchRegId, setSearchRegId] = useState("");
+  const [searchMobile, setSearchMobile] = useState("");
+  const [searchedRecord, setSearchedRecord] = useState<StoredAthleteRegistration | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,11 +40,9 @@ export function CheckRegistrationView({
     const cleanId = searchRegId.trim().toUpperCase();
     const cleanPhone = searchMobile.trim().replace(/\s+/g, "");
 
-    const found = registrations.find(
-      (r) =>
-        r.registrationNumber.toUpperCase() === cleanId ||
-        r.mobile.replace(/\s+/g, "") === cleanPhone ||
-        r.athleteName.toLowerCase().includes(cleanId.toLowerCase())
+    const found = registrations.find((registration) =>
+      (cleanId && registration.registrationNumber.toUpperCase() === cleanId) ||
+      (cleanPhone && registration.mobile.replace(/\s+/g, "") === cleanPhone)
     );
 
     setSearchedRecord(found || null);
@@ -64,7 +59,7 @@ export function CheckRegistrationView({
               <span>Check My Championship Registration Status</span>
             </h3>
             <p className="text-xs text-slate-500">
-              Enter your Registration ID (e.g. EZG26-ATH-000101) or registered mobile number to verify your participant status.
+              Enter your registration ID or registered mobile number to verify your participant status.
             </p>
           </div>
 
@@ -77,7 +72,7 @@ export function CheckRegistrationView({
                 type="text"
                 value={searchRegId}
                 onChange={(e) => setSearchRegId(e.target.value)}
-                placeholder="e.g. EZG26-ATH-000101"
+                placeholder="Registration ID"
                 className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
               />
             </div>
@@ -90,7 +85,7 @@ export function CheckRegistrationView({
                 type="text"
                 value={searchMobile}
                 onChange={(e) => setSearchMobile(e.target.value)}
-                placeholder="e.g. 077 123 4567"
+                placeholder="Registered mobile number"
                 className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
               />
             </div>
@@ -105,34 +100,6 @@ export function CheckRegistrationView({
             </div>
           </form>
 
-          {/* Quick presets buttons for demo convenience */}
-          <div className="flex items-center gap-2 text-[11px] text-slate-500 pt-1 flex-wrap">
-            <span className="font-bold">Quick Demo:</span>
-            <button
-              type="button"
-              onClick={() => {
-                setSearchRegId("EZG26-ATH-000101");
-                setSearchMobile("0771234567");
-                setSearchedRecord(registrations[0] || null);
-              }}
-              className="text-[#0d5c4d] font-bold hover:underline"
-            >
-              EZG26-ATH-000101 (Sathurjan)
-            </button>
-            <span>•</span>
-            <button
-              type="button"
-              onClick={() => {
-                setSearchRegId("EZG26-ATH-000103");
-                setSearchMobile("0763456781");
-                const r3 = registrations.find((r) => r.id === "EZG26-ATH-000103");
-                setSearchedRecord(r3 || null);
-              }}
-              className="text-[#0d5c4d] font-bold hover:underline"
-            >
-              EZG26-ATH-000103 (Niroshika)
-            </button>
-          </div>
         </CardContent>
       </Card>
 
@@ -303,15 +270,13 @@ export function CheckRegistrationView({
                   </div>
                 )}
 
-                {/* Gate Entry Pass Verification Mockup */}
-                <div className="p-4 rounded-xl border border-dashed border-[#0d5c4d]/40 bg-[#ecf8f5]/40 flex items-center justify-between gap-4">
+                <div className="p-4 rounded-xl border border-[#e6ece8] bg-slate-50">
                   <div className="space-y-1">
-                    <p className="font-bold text-[#0d2b26] text-xs">Digital Verification at Arena</p>
+                    <p className="font-bold text-[#0d2b26] text-xs">Registration reference</p>
                     <p className="text-[11px] text-slate-600 leading-relaxed">
-                      Present this screen or printed entry receipt at the stadium gate marshals for biometric/ID tag issuance.
+                      Use registration number {searchedRecord.registrationNumber} when contacting the sports office.
                     </p>
                   </div>
-                  <QrCode className="h-14 w-14 text-[#0d5c4d] shrink-0" />
                 </div>
               </div>
             </div>

@@ -37,11 +37,10 @@ import { AdminSportsRegistrationsDesk } from "../admin/AdminSportsRegistrationsD
 import { ChampionshipStandingsView } from "./ChampionshipStandingsView";
 import { MatchCenterFixturesView } from "./MatchCenterFixturesView";
 import {
-  INITIAL_CHAMPIONSHIP_SPORTS,
-  INITIAL_ATHLETE_REGISTRATIONS,
   ChampionshipSportItem,
   StoredAthleteRegistration
 } from "@/components/sports/sportsRegistrationData";
+import { api, SportsRegistration } from "@/lib/api";
 
 type SportsTab =
   | "tournaments"
@@ -59,13 +58,22 @@ export function SportsView({
   const {
     sports,
     teams,
+    championshipSports,
     fixtures,
+    sportsRegistrations,
     standings,
     tournaments = [],
     createTournament,
     updateTournament,
     deleteTournament,
     createFixture,
+    fetchSportsEvents,
+    fetchMySportsRegistrations,
+    fetchSportsOperations,
+    submitChampionshipRegistration,
+    updateChampionshipRegistrationStatus,
+    createChampionshipSport,
+    createChampionshipEvent,
     currentRole,
     currentUser,
     recordMatchResult,
@@ -86,57 +94,111 @@ export function SportsView({
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Eezhagam / Championship Sports Web Registration Platform States
-  const [athleteRegistrations, setAthleteRegistrations] = useState<StoredAthleteRegistration[]>(
-    INITIAL_ATHLETE_REGISTRATIONS
-  );
-  const [championshipSports, setChampionshipSports] = useState<ChampionshipSportItem[]>(
-    INITIAL_CHAMPIONSHIP_SPORTS
-  );
+  const [athleteRegistrations, setAthleteRegistrations] = useState<StoredAthleteRegistration[]>([]);
 
-  const handleNewRegistration = (newRecord: StoredAthleteRegistration) => {
-    setAthleteRegistrations((prev) => [newRecord, ...prev]);
-    addToast({
-      type: "success",
-      title: "Championship Registration Confirmed!",
-      message: `Entry Pass ${newRecord.registrationNumber} issued for ${newRecord.athleteName}.`
+  React.useEffect(() => {
+    void Promise.all([fetchSportsEvents(), fetchSportsOperations()]).catch((error) =>
+      addToast({
+        type: "error",
+        title: "Unable to Refresh Sports Data",
+        message: error instanceof Error ? error.message : "An unexpected error occurred.",
+      })
+    );
+  }, [fetchSportsEvents, fetchSportsOperations, addToast]);
+
+  React.useEffect(() => {
+    if (activeTab === "check_registration") {
+      setAthleteRegistrations(mapRegistrationRecords(sportsRegistrations));
+    }
+  }, [activeTab, sportsRegistrations]);
+
+  const mapRegistrationRecords = (records: SportsRegistration[]): StoredAthleteRegistration[] => {
+    const mapped = new Map<string, StoredAthleteRegistration>();
+    records.forEach((registration) => {
+      if (!registration.registrationNumber || !registration.athleteDetails ||
+        typeof registration.athleteDetails !== "object" || Array.isArray(registration.athleteDetails)) return;
+      const details = registration.athleteDetails as Record<string, unknown>;
+      if (
+        typeof details.athleteName !== "string" ||
+        typeof details.firstName !== "string" ||
+        typeof details.lastName !== "string" ||
+        !Array.isArray(details.selectedEvents) ||
+        typeof details.registrationNumber !== "string"
+      ) return;
+      const status = records.some((item) =>
+        item.registrationNumber === registration.registrationNumber && item.status === "REJECTED"
+      ) ? "Rejected" : records.some((item) =>
+        item.registrationNumber === registration.registrationNumber && item.status === "CONFIRMED"
+      ) ? "Approved" : "Pending";
+      const selectedEvents = details.selectedEvents.filter((item): item is StoredAthleteRegistration["selectedEvents"][number] =>
+        Boolean(item && typeof item === "object" &&
+          "id" in item && "sportName" in item && "eventName" in item &&
+          "ageCategory" in item && "gender" in item && "fee" in item)
+      );
+      mapped.set(registration.registrationNumber, {
+        ...(details as unknown as StoredAthleteRegistration),
+        id: registration.registrationNumber,
+        registrationNumber: registration.registrationNumber,
+        selectedEvents,
+        status,
+        paymentStatus: registration.paymentStatus as StoredAthleteRegistration["paymentStatus"],
+        totalAmount: registration.totalAmount,
+      });
     });
+    return Array.from(mapped.values());
   };
 
-  const handleUpdateRegStatus = (
+  const handleNewRegistration = async (newRecord: StoredAthleteRegistration) => {
+    const result = await submitChampionshipRegistration({
+      eventIds: newRecord.selectedEvents.map((event) => event.id),
+      registrationNumber: newRecord.registrationNumber,
+      athleteDetails: newRecord as unknown as Record<string, unknown>,
+    });
+    if (result.success) setAthleteRegistrations((prev) => [newRecord, ...prev]);
+    return result;
+  };
+
+  const handleUpdateRegStatus = async (
     id: string,
     newStatus: "Confirmed" | "Pending" | "Approved" | "Rejected"
   ) => {
-    setAthleteRegistrations((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
-    );
-    addToast({
-      type: "info",
-      title: "Participant Status Updated",
-      message: `Registration ${id} set to ${newStatus}.`
-    });
+    await updateChampionshipRegistrationStatus(id, newStatus);
+    setAthleteRegistrations((prev) => prev.map((registration) =>
+      registration.registrationNumber === id ? { ...registration, status: newStatus } : registration
+    ));
   };
 
-  const handleAddChampionshipSport = (newSport: ChampionshipSportItem) => {
-    setChampionshipSports((prev) => [...prev, newSport]);
-    addToast({
-      type: "success",
-      title: "New Sport Added",
-      message: `${newSport.name} published to championship registry.`
-    });
-  };
+  React.useEffect(() => {
+    if (activeTab !== "admin_registrations") return;
+    api.sports.getRegistrations()
+      .then((records) => setAthleteRegistrations(mapRegistrationRecords(records)))
+      .catch((error) => addToast({
+        type: "error",
+        title: "Unable to Load Sports Registrations",
+        message: error instanceof Error ? error.message : "An unexpected error occurred.",
+      }));
+  }, [activeTab, addToast]);
 
-  const handleAddChampionshipEvent = (
-    sportId: string,
-    newEvent: any
+  React.useEffect(() => {
+    if (activeTab !== "check_registration") return;
+    void fetchMySportsRegistrations().catch((error) => addToast({
+      type: "error",
+      title: "Unable to Load Your Registrations",
+      message: error instanceof Error ? error.message : "An unexpected error occurred.",
+    }));
+  }, [activeTab, addToast, fetchMySportsRegistrations]);
+
+  const handleAddChampionshipSport = async (
+    newSport: Omit<ChampionshipSportItem, "id" | "events" | "registrationStatus">
   ) => {
-    setChampionshipSports((prev) =>
-      prev.map((s) => (s.id === sportId ? { ...s, events: [...s.events, newEvent] } : s))
-    );
-    addToast({
-      type: "success",
-      title: "New Event Published",
-      message: `${newEvent.name} added to sports schedule.`
-    });
+    await createChampionshipSport(newSport);
+  };
+
+  const handleAddChampionshipEvent = async (
+    sportId: string,
+    newEvent: Omit<ChampionshipSportItem["events"][number], "id">
+  ) => {
+    await createChampionshipEvent(sportId, newEvent);
   };
 
   // Modals state
@@ -147,36 +209,37 @@ export function SportsView({
   // Tournament Form State
   const [tournamentForm, setTournamentForm] = useState({
     name: "",
-    sportName: "Cricket",
-    category: "Under-19 Division 1",
+    sportName: "",
+    category: "",
     format: "group_stage_knockout" as TournamentFormat,
     startDate: "",
     endDate: "",
     venue: "",
-    organizer: "Sri Lanka Inter-Academy Sports Board",
+    organizer: "",
     trophyTitle: "",
-    participatingTeamsInput: "Lions Cricket Academy, Trinity Sports Club, Royal Titans Academy, Apex Warriors",
+    participatingTeamsInput: "",
     status: "upcoming" as TournamentStatus,
-    currentRound: "Round 1 / Group Stage",
+    currentRound: "",
     description: "",
-    rules: "Standard federation rules, 50 overs white-ball format or standard match duration."
+    rules: ""
   });
 
   // Schedule Fixture Form State
   const [fixtureForm, setFixtureForm] = useState({
+    tournamentId: "",
     competitionName: "",
-    sportName: "Cricket",
-    homeTeam: "Lions Cricket Academy",
+    sportName: "",
+    homeTeam: "",
     awayTeam: "",
     date: "",
-    time: "09:30 AM",
-    venue: "City Sports Complex"
+    time: "",
+    venue: ""
   });
 
   // Score recording modal states
-  const [homeScore, setHomeScore] = useState("215/8 (50 ov)");
-  const [awayScore, setAwayScore] = useState("198 all out");
-  const [outcome, setOutcome] = useState("Lions Academy Won by 17 runs");
+  const [homeScore, setHomeScore] = useState("");
+  const [awayScore, setAwayScore] = useState("");
+  const [outcome, setOutcome] = useState("");
 
   const isAdminOrTeacher = currentRole === "admin" || currentRole === "teacher";
 
@@ -200,7 +263,13 @@ export function SportsView({
   // Handle Create Tournament Submit
   const handleCreateTournament = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tournamentForm.name.trim()) return;
+    if (
+      !tournamentForm.name.trim() ||
+      !tournamentForm.sportName ||
+      !tournamentForm.startDate ||
+      !tournamentForm.endDate ||
+      !tournamentForm.venue.trim()
+    ) return;
 
     const teamsArray = tournamentForm.participatingTeamsInput
       .split(",")
@@ -211,20 +280,20 @@ export function SportsView({
 
     createTournament({
       name: tournamentForm.name,
-      sportId: sportObj ? sportObj.id : "sp_cricket",
+      sportId: sportObj?.id || "",
       sportName: tournamentForm.sportName,
       category: tournamentForm.category,
       format: tournamentForm.format,
-      startDate: tournamentForm.startDate || new Date().toISOString().substring(0, 10),
-      endDate: tournamentForm.endDate || "2026-11-20",
-      venue: tournamentForm.venue || "National Sports Complex",
+      startDate: tournamentForm.startDate,
+      endDate: tournamentForm.endDate,
+      venue: tournamentForm.venue,
       organizer: tournamentForm.organizer,
-      trophyTitle: tournamentForm.trophyTitle || `${tournamentForm.name} Trophy`,
-      participatingTeams: teamsArray.length > 0 ? teamsArray : ["St. Michael High School", "Trinity Central College"],
-      teamsCount: teamsArray.length || 8,
+      trophyTitle: tournamentForm.trophyTitle,
+      participatingTeams: teamsArray,
+      teamsCount: teamsArray.length,
       status: tournamentForm.status,
       currentRound: tournamentForm.currentRound,
-      description: tournamentForm.description || `Premier inter-school tournament for ${tournamentForm.sportName}.`,
+      description: tournamentForm.description,
       rules: tournamentForm.rules
     });
 
@@ -232,39 +301,58 @@ export function SportsView({
     // Reset form
     setTournamentForm({
       name: "",
-      sportName: "Cricket",
-      category: "Under-19 Division 1",
+      sportName: "",
+      category: "",
       format: "group_stage_knockout",
       startDate: "",
       endDate: "",
       venue: "",
-      organizer: "Sri Lanka Schools Sports Association",
+      organizer: "",
       trophyTitle: "",
-      participatingTeamsInput: "St. Michael High School, Trinity Central College, Royal Academy Colombo, Ananda College",
+      participatingTeamsInput: "",
       status: "upcoming",
-      currentRound: "Round 1 / Group Stage",
+      currentRound: "",
       description: "",
-      rules: "Standard federation rules, 50 overs white-ball format or standard match duration."
+      rules: ""
     });
   };
 
   // Handle Schedule Fixture Submit
   const handleScheduleFixture = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fixtureForm.homeTeam || !fixtureForm.awayTeam) return;
+    if (
+      !fixtureForm.competitionName.trim() ||
+      !fixtureForm.sportName ||
+      !fixtureForm.homeTeam.trim() ||
+      !fixtureForm.awayTeam.trim() ||
+      !fixtureForm.date ||
+      !fixtureForm.time.trim() ||
+      !fixtureForm.venue.trim()
+    ) return;
 
     createFixture({
-      competitionName: fixtureForm.competitionName || "Inter-School Tournament",
+      tournamentId: fixtureForm.tournamentId || null,
+      competitionName: fixtureForm.competitionName,
       sportName: fixtureForm.sportName,
       homeTeam: fixtureForm.homeTeam,
       awayTeam: fixtureForm.awayTeam,
-      date: fixtureForm.date || new Date().toISOString().substring(0, 10),
-      time: fixtureForm.time || "09:30 AM",
-      venue: fixtureForm.venue || "College Oval",
+      date: fixtureForm.date,
+      time: fixtureForm.time,
+      venue: fixtureForm.venue,
       status: "scheduled"
     });
 
     setIsScheduleFixtureModalOpen(false);
+    setFixtureForm({
+      tournamentId: "",
+      competitionName: "",
+      sportName: "",
+      homeTeam: "",
+      awayTeam: "",
+      date: "",
+      time: "",
+      venue: "",
+    });
   };
 
   // Handle Score Submit
@@ -273,6 +361,9 @@ export function SportsView({
     if (!selectedFixtureForScore) return;
     recordMatchResult(selectedFixtureForScore, homeScore, awayScore, outcome);
     setSelectedFixtureForScore(null);
+    setHomeScore("");
+    setAwayScore("");
+    setOutcome("");
   };
 
   return (
@@ -688,6 +779,7 @@ export function SportsView({
                           onClick={() => {
                             setFixtureForm({
                               ...fixtureForm,
+                              tournamentId: tr.id,
                               competitionName: tr.name,
                               sportName: tr.sportName,
                               venue: tr.venue
@@ -730,13 +822,11 @@ export function SportsView({
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 4: LEAGUE STANDINGS (MULTI-SPORT & OVERALL CHAMPIONSHIP MEDAL TALLY) */}
+      {/* TAB 4: LEAGUE STANDINGS CALCULATED FROM SAVED FIXTURE RESULTS */}
       {/* ========================================================================= */}
       {activeTab === "standings" && (
         <ChampionshipStandingsView
           defaultStandings={standings}
-          tournaments={tournaments}
-          fixtures={fixtures}
         />
       )}
 
@@ -745,6 +835,7 @@ export function SportsView({
       {/* ========================================================================= */}
       {activeTab === "registration" && (
         <SportsRegistrationWizard
+          championshipSports={championshipSports}
           onRegistrationComplete={handleNewRegistration}
           onCancel={() => setActiveTab("tournaments")}
           currentUser={currentUser}
@@ -805,16 +896,15 @@ export function SportsView({
                   Sport Discipline *
                 </label>
                 <select
+                  required
                   value={tournamentForm.sportName}
                   onChange={(e) => setTournamentForm({ ...tournamentForm, sportName: e.target.value })}
                   className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 >
+                  <option value="">Select a sport</option>
                   {sports.map((sp) => (
                     <option key={sp.id} value={sp.name}>{sp.name}</option>
                   ))}
-                  <option value="Basketball">Basketball</option>
-                  <option value="Football (Soccer)">Football (Soccer)</option>
-                  <option value="Badminton">Badminton</option>
                 </select>
               </div>
 
@@ -857,6 +947,7 @@ export function SportsView({
                 </label>
                 <input
                   type="date"
+                  required
                   value={tournamentForm.startDate}
                   onChange={(e) => setTournamentForm({ ...tournamentForm, startDate: e.target.value })}
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
@@ -869,6 +960,7 @@ export function SportsView({
                 </label>
                 <input
                   type="date"
+                  required
                   value={tournamentForm.endDate}
                   onChange={(e) => setTournamentForm({ ...tournamentForm, endDate: e.target.value })}
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
@@ -883,6 +975,7 @@ export function SportsView({
                 </label>
                 <input
                   type="text"
+                  required
                   placeholder="e.g. Colombo Colts Grounds & College Oval"
                   value={tournamentForm.venue}
                   onChange={(e) => setTournamentForm({ ...tournamentForm, venue: e.target.value })}
@@ -914,7 +1007,7 @@ export function SportsView({
                 onChange={(e) =>
                   setTournamentForm({ ...tournamentForm, participatingTeamsInput: e.target.value })
                 }
-                placeholder="St. Michael High School, Trinity Central College, Royal Academy Colombo, Ananda College"
+                placeholder="Enter school or team names, separated by commas"
                 className="w-full p-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-xs focus:outline-none focus:border-[#0d5c4d]"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
@@ -1000,6 +1093,32 @@ export function SportsView({
           <form onSubmit={handleScheduleFixture} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Tournament (Optional)
+              </label>
+              <select
+                value={fixtureForm.tournamentId}
+                onChange={(event) => {
+                  const tournament = tournaments.find((item) => item.id === event.target.value);
+                  setFixtureForm({
+                    ...fixtureForm,
+                    tournamentId: tournament?.id || "",
+                    ...(tournament ? {
+                      competitionName: tournament.name,
+                      sportName: tournament.sportName,
+                      venue: tournament.venue,
+                    } : {}),
+                  });
+                }}
+                className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm"
+              >
+                <option value="">Independent fixture / friendly</option>
+                {tournaments.map((tournament) => (
+                  <option key={tournament.id} value={tournament.id}>{tournament.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                 Tournament / Competition Name
               </label>
               <input
@@ -1047,10 +1166,12 @@ export function SportsView({
                   Sport
                 </label>
                 <select
+                  required
                   value={fixtureForm.sportName}
                   onChange={(e) => setFixtureForm({ ...fixtureForm, sportName: e.target.value })}
                   className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none"
                 >
+                  <option value="">Select a sport</option>
                   {sports.map((sp) => (
                     <option key={sp.id} value={sp.name}>{sp.name}</option>
                   ))}
@@ -1063,6 +1184,7 @@ export function SportsView({
                 </label>
                 <input
                   type="date"
+                  required
                   value={fixtureForm.date}
                   onChange={(e) => setFixtureForm({ ...fixtureForm, date: e.target.value })}
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none"
@@ -1075,7 +1197,8 @@ export function SportsView({
                 </label>
                 <input
                   type="text"
-                  placeholder="09:30 AM"
+                  required
+                  placeholder="Enter start time"
                   value={fixtureForm.time}
                   onChange={(e) => setFixtureForm({ ...fixtureForm, time: e.target.value })}
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none"
@@ -1089,7 +1212,8 @@ export function SportsView({
               </label>
               <input
                 type="text"
-                placeholder="College Main Oval Grounds"
+                required
+                placeholder="Enter venue"
                 value={fixtureForm.venue}
                 onChange={(e) => setFixtureForm({ ...fixtureForm, venue: e.target.value })}
                 className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"

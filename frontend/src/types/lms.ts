@@ -260,6 +260,7 @@ export interface Tournament {
 export interface Fixture {
   id: string;
   teamId: string;
+  tournamentId?: string | null;
   sportName: string;
   homeTeam: string;
   awayTeam: string;
