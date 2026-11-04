@@ -573,12 +573,23 @@ export function ProfileView() {
 
         if (!response.success || cancelled) return;
 
-        const savedProfile = response.data?.superAdminProfile;
+       const savedProfile = response.data?.superAdminProfile;
 
-        if (!savedProfile) return;
+if (!response.data) return;
+
+if (!savedProfile) {
+  setProfileData((previous) => ({
+    ...previous,
+    email: response.data.email ?? previous.email,
+    studentId: response.data.id ?? previous.studentId,
+  }));
+  return;
+}
 
         setProfileData((previous) => ({
           ...previous,
+          email: response.data.email ?? previous.email,
+          studentId: response.data.id ?? previous.studentId,
           fullName: savedProfile.fullName ?? previous.fullName,
           name: savedProfile.preferredName ?? previous.name,
           phone: savedProfile.phone ?? previous.phone,
@@ -1500,12 +1511,24 @@ export function ProfileView() {
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700">Email Address (Institutional)</label>
                 {isEditing ? (
-                  <input
-                    type="email"
-                    value={profileData.email}
-                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
-                  />
+                 <input
+  type="email"
+  value={profileData.email}
+  readOnly={currentRole === "super_admin"}
+  onChange={(e) => {
+    if (currentRole !== "super_admin") {
+      setProfileData({
+        ...profileData,
+        email: e.target.value,
+      });
+    }
+  }}
+  className={`w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 ${
+    currentRole === "super_admin"
+      ? "bg-slate-100 cursor-not-allowed"
+      : ""
+  }`}
+/>
                 ) : (
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
                     <span>{profileData.email}</span>
