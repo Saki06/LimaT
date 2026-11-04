@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
+import { api } from "@/lib/api";
 import {
   BookOpen,
   Users,
@@ -46,7 +47,8 @@ import {
   HelpCircle,
   RotateCcw,
   Lock,
-  Globe
+  Globe,
+  RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -75,6 +77,8 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     courses,
     assignments,
     submissions,
+    fetchAssignments,
+    fetchSubmissions,
     gradeSubmission,
     createAssignment,
     updateAssignment,
@@ -84,6 +88,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     createQuiz,
     updateQuiz,
     deleteQuiz,
+    fetchQuizzes,
     setSelectedQuizId,
     announcements,
     createAnnouncement,
@@ -100,7 +105,8 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     updateLibraryResource,
     deleteLibraryResource,
     recordResourceView,
-    recordResourceDownload
+    recordResourceDownload,
+    fetchLibraryResources
   } = useApp();
 
   // Filter courses strictly for this individual Tutor's workspace
@@ -139,6 +145,8 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [resourceViewerTab, setResourceViewerTab] = useState<"document" | "marking" | "toc">("document");
   const [resourceViewerPage, setResourceViewerPage] = useState<number>(1);
   const [resourceViewerZoom, setResourceViewerZoom] = useState<number>(100);
+  const [isRefreshingResources, setIsRefreshingResources] = useState(false);
+  const [isRefreshingQuizzes, setIsRefreshingQuizzes] = useState(false);
 
   // Sync tab if currentView changes externally from sidebar
   useEffect(() => {
@@ -171,6 +179,30 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [isCreateAsgModalOpen, setIsCreateAsgModalOpen] = useState(false);
   const [isCreateLessonModalOpen, setIsCreateLessonModalOpen] = useState(false);
   const [isCreateAnnouncementModalOpen, setIsCreateAnnouncementModalOpen] = useState(false);
+
+  // Live Teacher Dashboard State
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+
+  const loadTeacherDashboard = async () => {
+    try {
+      setIsDashboardLoading(true);
+      const res = await api.teachers.getDashboard();
+      if (res && res.success && res.data) {
+        setDashboardData(res.data);
+      }
+    } catch (err) {
+      console.warn("Could not load teacher dashboard from backend:", err);
+    } finally {
+      setIsDashboardLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "home") {
+      loadTeacherDashboard();
+    }
+  }, [activeTab]);
 
   // Live Class Stream Modal State
   const [liveClassSession, setLiveClassSession] = useState<{
@@ -702,12 +734,18 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     { name: "Tharushi Fernando", index: "AL-2026-4405", class: "12-Physical Science", submitted: 2, avg: "68%", status: "Credit" }
   ];
 
-  // Executive Overview KPIs
-  const totalEnrolledStudents = 136; // Sum of active cohort students across Grade 12 & 13 Batches
-  const activeBatchesCount = teacherCourses.length;
-  const pendingReviewsCount = submissions.filter((s) => s.status === "submitted").length;
-  const liveSessionsTodayCount = todaySchedule.length;
-  const liveNowSession = todaySchedule.find((s) => s.status === "in_progress");
+  // Executive Overview KPIs (Powered by live cloud database)
+  const totalEnrolledStudents = dashboardData?.kpis?.totalEnrolledStudents ?? 136;
+  const activeBatchesCount = dashboardData?.kpis?.activeBatchesCount ?? teacherCourses.length;
+  const pendingReviewsCount = dashboardData?.kpis?.pendingReviewsCount ?? submissions.filter((s) => s.status === "submitted").length;
+
+  const currentSchedule: ScheduleItem[] =
+    dashboardData?.todaySchedule && dashboardData.todaySchedule.length > 0
+      ? dashboardData.todaySchedule
+      : todaySchedule;
+
+  const liveSessionsTodayCount = dashboardData?.kpis?.liveSessionsTodayCount ?? currentSchedule.length;
+  const liveNowSession = currentSchedule.find((s) => s.status === "in_progress");
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -776,6 +814,15 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              <Button
+                onClick={() => loadTeacherDashboard()}
+                disabled={isDashboardLoading}
+                className="bg-white/15 hover:bg-white/25 text-white border border-white/20 font-bold text-xs cursor-pointer backdrop-blur-xs flex items-center gap-1.5"
+                title="Refresh Studio Dashboard from Cloud Database"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isDashboardLoading ? "animate-spin" : ""}`} />
+                {isDashboardLoading ? "Refreshing..." : "Refresh"}
+              </Button>
               <Button
                 onClick={() => setIsCreateAsgModalOpen(true)}
                 className="bg-white text-[#0d5c4d] hover:bg-emerald-50 font-bold text-xs shadow-xs cursor-pointer"
@@ -894,8 +941,8 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
               onClick={() => {
                 if (liveNowSession) {
                   setLiveClassSession(liveNowSession);
-                } else if (todaySchedule[0]) {
-                  setLiveClassSession(todaySchedule[0]);
+                } else if (currentSchedule[0]) {
+                  setLiveClassSession(currentSchedule[0]);
                 }
               }}
               className="border-[#e6ece8] bg-white hover:border-rose-300 hover:bg-rose-50/20 transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
@@ -951,11 +998,11 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                     </div>
                   </div>
                   <Badge variant="outline" className="text-xs border-[#c4e9e0] text-[#0d5c4d] bg-[#ecf8f5]">
-                    4 Sessions Today
+                    {liveSessionsTodayCount} Sessions Today
                   </Badge>
                 </CardHeader>
                 <CardContent className="p-5 space-y-3">
-                  {todaySchedule.map((item, idx) => (
+                  {currentSchedule.map((item, idx) => (
                     <div
                       key={idx}
                       className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
@@ -1527,15 +1574,31 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 </p>
               </div>
 
-              {draftCount > 0 && (
+              <div className="flex items-center gap-2">
                 <Button
-                  onClick={handleBatchRelease}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 rounded-xl shadow-xs flex items-center gap-2 cursor-pointer transition-all animate-in fade-in"
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    await fetchSubmissions?.();
+                    await fetchAssignments?.();
+                  }}
+                  className="h-9 px-3 rounded-xl border-slate-200 text-xs font-bold text-slate-700 hover:text-[#0d5c4d] hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Refresh Submissions from Cloud Database"
                 >
-                  <CheckCheck className="h-4 w-4" />
-                  Release All Graded Drafts ({draftCount})
+                  <RefreshCw className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                  Refresh
                 </Button>
-              )}
+
+                {draftCount > 0 && (
+                  <Button
+                    onClick={handleBatchRelease}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-9 px-4 rounded-xl shadow-xs flex items-center gap-2 cursor-pointer transition-all animate-in fade-in"
+                  >
+                    <CheckCheck className="h-4 w-4" />
+                    Release All Graded Drafts ({draftCount})
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Quick KPI Metric Cards */}
@@ -2045,25 +2108,55 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 <Plus className="h-3.5 w-3.5" /> Create Assignment
               </Button>
             ) : courseworkSubTab === "quizzes" ? (
-              <Button
-                onClick={() => {
-                  setQuizToEdit(null);
-                  setIsQuizModalOpen(true);
-                }}
-                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5 text-xs shadow-xs cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" /> Create MCQ Quiz
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    setIsRefreshingQuizzes(true);
+                    await fetchQuizzes();
+                    setIsRefreshingQuizzes(false);
+                  }}
+                  disabled={isRefreshingQuizzes}
+                  className="border-[#0d5c4d]/30 text-[#0d5c4d] hover:bg-[#0d5c4d]/10 font-bold gap-1.5 text-xs shadow-2xs h-8 cursor-pointer"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isRefreshingQuizzes ? "animate-spin" : ""}`} />
+                  {isRefreshingQuizzes ? "Refreshing..." : "Refresh"}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setQuizToEdit(null);
+                    setIsQuizModalOpen(true);
+                  }}
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5 text-xs shadow-xs cursor-pointer h-8"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Create MCQ Quiz
+                </Button>
+              </div>
             ) : (
-              <Button
-                onClick={() => {
-                  setResourceToEdit(null);
-                  setIsResourceModalOpen(true);
-                }}
-                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5 text-xs shadow-xs cursor-pointer"
-              >
-                <UploadCloud className="h-3.5 w-3.5" /> Upload Material
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    setIsRefreshingResources(true);
+                    await fetchLibraryResources();
+                    setIsRefreshingResources(false);
+                  }}
+                  disabled={isRefreshingResources}
+                  className="border-[#0d5c4d]/30 text-[#0d5c4d] hover:bg-[#0d5c4d]/10 font-bold gap-1.5 text-xs shadow-2xs h-8 cursor-pointer"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isRefreshingResources ? "animate-spin" : ""}`} />
+                  {isRefreshingResources ? "Refreshing..." : "Refresh"}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setResourceToEdit(null);
+                    setIsResourceModalOpen(true);
+                  }}
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5 text-xs shadow-xs cursor-pointer h-8"
+                >
+                  <UploadCloud className="h-3.5 w-3.5" /> Upload Material
+                </Button>
+              </div>
             )}
           </div>
 
@@ -4144,7 +4237,11 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
               <Button
                 size="sm"
                 onClick={() => {
-                  window.alert("Downloading candidate answer sheet PDF...");
+                  if (activeSubmission?.fileAttachmentUrl) {
+                    window.open(activeSubmission.fileAttachmentUrl, "_blank");
+                  } else {
+                    window.alert("Downloading candidate answer sheet PDF...");
+                  }
                 }}
                 className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold ml-2 cursor-pointer"
               >

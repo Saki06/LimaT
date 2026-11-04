@@ -24,7 +24,8 @@ import {
   X,
   Link2,
   Paperclip,
-  Edit3
+  Edit3,
+  Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,8 @@ export function SyllabusBuilderView() {
     createLesson,
     updateLesson,
     deleteLesson,
+    syncCourseSyllabus,
+    addToast,
     currentUser,
     currentRole
   } = useApp();
@@ -83,6 +86,29 @@ export function SyllabusBuilderView() {
       ...prev,
       [unitId]: !prev[unitId]
     }));
+  };
+
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncSyllabus = async () => {
+    if (!activeCourse) return;
+    setIsSyncing(true);
+    try {
+      await syncCourseSyllabus(activeCourse.id);
+      addToast({
+        type: "success",
+        title: "Syllabus Saved to Cloud",
+        message: `${activeCourse.title} units & lessons are synchronized with server database.`
+      });
+    } catch (e) {
+      addToast({
+        type: "error",
+        title: "Cloud Sync Failed",
+        message: "Unable to sync syllabus to server."
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // Modals state
@@ -419,6 +445,20 @@ export function SyllabusBuilderView() {
               ))}
             </select>
           </div>
+
+          <Button
+            onClick={handleSyncSyllabus}
+            disabled={isSyncing}
+            variant="outline"
+            className="border-[#0d5c4d]/30 text-[#0d5c4d] hover:bg-[#0d5c4d]/10 font-bold gap-1.5 text-xs shadow-2xs cursor-pointer"
+          >
+            {isSyncing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <UploadCloud className="h-3.5 w-3.5" />
+            )}
+            {isSyncing ? "Saving..." : "Save to Cloud"}
+          </Button>
 
           <Button
             onClick={() => handleOpenAddLesson()}

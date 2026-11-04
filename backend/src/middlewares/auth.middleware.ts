@@ -77,11 +77,19 @@ if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
     // Block access for users belonging to suspended or inactive tenants
 if (user.tenantId) {
   const tenant = await prisma.tenant.findUnique({
-    where: { id: user.tenantId },
-    select: { status: true },
-  });
+  where: { id: user.tenantId },
+  select: {
+    status: true,
+    deletedAt: true,
+  },
+});
 
-  if (!tenant || tenant.status === 'SUSPENDED' || tenant.status === 'INACTIVE') {
+  if (
+  !tenant ||
+  tenant.deletedAt !== null ||
+  tenant.status === 'SUSPENDED' ||
+  tenant.status === 'INACTIVE'
+) {
     res.status(403).json({
       success: false,
       message: 'Your organization is currently inactive or suspended.',
@@ -172,14 +180,18 @@ if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
 if (user.tenantId) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: user.tenantId },
-    select: { status: true },
+    select: {
+  status: true,
+  deletedAt: true,
+},
   });
 
   if (
-    !tenant ||
-    tenant.status === 'SUSPENDED' ||
-    tenant.status === 'INACTIVE'
-  ) {
+  !tenant ||
+  tenant.deletedAt !== null ||
+  tenant.status === 'SUSPENDED' ||
+  tenant.status === 'INACTIVE'
+) {
     res.status(403).json({
       success: false,
       message: 'Your organization is currently inactive or suspended.',

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
+import { api } from "@/lib/api";
 import {
   BookOpen,
   CheckCircle2,
@@ -17,11 +18,17 @@ import {
   ArrowLeft,
   FileUp,
   Download,
-  ExternalLink
+  ExternalLink,
+  Plus,
+  Package,
+  Calendar,
+  Sparkles,
+  Users
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
 import { Lesson } from "@/types/lms";
 
 export function CourseViews() {
@@ -33,6 +40,8 @@ export function CourseViews() {
     setSelectedLessonId,
     markLessonComplete,
     currentUser,
+    addToast,
+    setCurrentView,
     t
   } = useApp();
 
@@ -41,21 +50,105 @@ export function CourseViews() {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(1);
   const [expandedUnitId, setExpandedUnitId] = useState<string>("unt_m1");
 
+  // Phase 2: Live Backend Courses & Package Subscriptions State
+  const [backendCourses, setBackendCourses] = useState<any[]>([]);
+  const [studentPackages, setStudentPackages] = useState<any[]>([]);
+  const [activeViewTab, setActiveViewTab] = useState<"courses" | "packages">("courses");
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState<boolean>(false);
+  const [allCatalogCourses, setAllCatalogCourses] = useState<any[]>([]);
+  const [isEnrollingId, setIsEnrollingId] = useState<string | null>(null);
+
+  // Fetch student courses & subscribed packages from backend
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCoursesAndPackages = async () => {
+      try {
+        const [coursesRes, packagesRes] = await Promise.all([
+          api.students.getMyCourses(),
+          api.students.getMyPackages(),
+        ]);
+        if (isMounted) {
+          if (coursesRes.success && Array.isArray(coursesRes.data)) {
+            setBackendCourses(coursesRes.data);
+          }
+          if (packagesRes.success && Array.isArray(packagesRes.data)) {
+            setStudentPackages(packagesRes.data);
+          }
+        }
+      } catch (err) {
+        console.warn("Using local courses fallback:", err);
+      }
+    };
+    fetchCoursesAndPackages();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Fetch catalog when opening enrollment modal
+  const handleOpenEnrollModal = async () => {
+    setIsEnrollModalOpen(true);
+    try {
+      const res = await api.courses.getAll();
+      if (res.success && Array.isArray(res.data)) {
+        setAllCatalogCourses(res.data);
+      }
+    } catch (err) {
+      console.warn("Could not load catalog courses:", err);
+    }
+  };
+
+  const handleEnrollCourse = async (courseId: string) => {
+    try {
+      setIsEnrollingId(courseId);
+      const res = await api.students.enrollCourse(courseId);
+      if (res.success) {
+        addToast({
+          type: "success",
+          title: "Course Enrollment",
+          message: res.message || "Enrolled successfully in course!",
+        });
+        // Refresh courses
+        const refreshed = await api.students.getMyCourses();
+        if (refreshed.success && Array.isArray(refreshed.data)) {
+          setBackendCourses(refreshed.data);
+        }
+        setIsEnrollModalOpen(false);
+      } else {
+        addToast({
+          type: "error",
+          title: "Enrollment Failed",
+          message: res.message || "Failed to enroll in course",
+        });
+      }
+    } catch (err: any) {
+      addToast({
+        type: "error",
+        title: "Enrollment Error",
+        message: err.message || "Error enrolling in course",
+      });
+    } finally {
+      setIsEnrollingId(null);
+    }
+  };
+
   const currentCourse = courses.find((c) => c.id === selectedCourseId) || courses[0];
 
   // Flatten all lessons in order to calculate next and prev navigation
   const allCourseLessons: { lesson: Lesson; unitTitle: string; topicTitle: string }[] = [];
-  currentCourse.units.forEach((unit) => {
-    unit.topics.forEach((topic) => {
-      topic.lessons.forEach((lesson) => {
-        allCourseLessons.push({
-          lesson,
-          unitTitle: unit.title,
-          topicTitle: topic.title
+  if (currentCourse && currentCourse.units) {
+    currentCourse.units.forEach((unit) => {
+      unit.topics.forEach((topic) => {
+        topic.lessons.forEach((lesson) => {
+          allCourseLessons.push({
+            lesson,
+            unitTitle: unit.title,
+            topicTitle: topic.title
+          });
         });
       });
     });
-  });
+  }
 
   const activeIndex = allCourseLessons.findIndex((item) => item.lesson.id === selectedLessonId);
   const currentItem = activeIndex >= 0 ? allCourseLessons[activeIndex] : allCourseLessons[0];
@@ -116,23 +209,62 @@ export function CourseViews() {
               <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold mb-1">
                 <span>G.C.E. Advanced Level</span>
                 <span>•</span>
-                <span>Physical Science Stream</span>
+                <span>Physical Science &amp; Technology Stream</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-[#0d2b26] tracking-tight">
                 My Learning &amp; Course Syllabus
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Select any enrolled subject below to explore its structured syllabus units, topics, and interactive lessons.
+                Explore structured syllabus units, topics, and interactive lessons for all your enrolled courses.
               </p>
             </div>
 
-            <span className="px-3.5 py-1.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-xs font-bold self-start sm:self-auto shadow-2xs">
-              {courses.length} Active Subjects
-            </span>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Button
+                onClick={handleOpenEnrollModal}
+                className="bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-extrabold text-xs shadow-xs cursor-pointer rounded-xl h-9 px-4"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" /> Enroll in Course
+              </Button>
+              <Button
+                onClick={() => setCurrentView("connect")}
+                variant="outline"
+                className="border-slate-300 text-slate-700 hover:bg-slate-50 font-bold text-xs shadow-2xs cursor-pointer rounded-xl h-9 px-4"
+              >
+                <Package className="h-3.5 w-3.5 mr-1 text-[#b47a16]" /> Find Tutors
+              </Button>
+            </div>
           </div>
 
-          {/* Subjects Grid (Clean 3-column grid for 6 subjects) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {/* Sub-Tabs: Courses vs Packages */}
+          <div className="flex items-center gap-2 border-b border-[#e2eae5] pb-2">
+            <button
+              onClick={() => setActiveViewTab("courses")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                activeViewTab === "courses"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "text-slate-600 hover:bg-[#ecf8f5]"
+              }`}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              <span>Enrolled Courses ({courses.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveViewTab("packages")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                activeViewTab === "packages"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "text-slate-600 hover:bg-[#ecf8f5]"
+              }`}
+            >
+              <Package className="h-3.5 w-3.5" />
+              <span>Tuition Packages ({studentPackages.length})</span>
+            </button>
+          </div>
+
+          {/* Content Switching based on activeViewTab */}
+          {activeViewTab === "courses" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {courses.map((course) => {
               const pct = Math.round((course.completedLessons / course.totalLessons) * 100);
               const totalUnits = course.units.length;
@@ -218,7 +350,92 @@ export function CourseViews() {
                 </div>
               );
             })}
-          </div>
+            </div>
+          ) : (
+            /* Subscribed Tuition Packages View */
+            <div className="space-y-4">
+              {studentPackages.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {studentPackages.map((sub: any) => {
+                    const pkg = sub.package;
+                    const teacher = pkg?.teacher?.user;
+                    const teacherName = teacher ? `${teacher.firstName} ${teacher.lastName}` : "Specialist Tutor";
+                    const isExpiringSoon = sub.endDate && new Date(sub.endDate).getTime() - Date.now() < 7 * 86400000;
+
+                    return (
+                      <div
+                        key={sub.id}
+                        className="rounded-3xl border border-[#e2eae5] bg-white hover:border-[#b47a16]/40 transition-all p-6 space-y-4 shadow-xs hover:shadow-md flex flex-col justify-between"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-[#b47a16] font-mono font-bold text-xs border border-amber-200">
+                              LKR {pkg?.price?.toLocaleString() || "0"} / {pkg?.billingCycle?.toLowerCase() || "monthly"}
+                            </span>
+                            <Badge
+                              variant={sub.status === "ACTIVE" ? "default" : "destructive"}
+                              className="text-[10px] font-bold"
+                            >
+                              {sub.status}
+                            </Badge>
+                          </div>
+
+                          <div>
+                            <h3 className="text-lg font-black text-[#0d2b26]">{pkg?.title}</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              Tutor: <span className="font-semibold text-slate-800">{teacherName}</span>
+                            </p>
+                          </div>
+
+                          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                            {pkg?.description || "Tuition package with interactive live classes, revision notes, and exam discussions."}
+                          </p>
+
+                          <div className="p-3 rounded-2xl bg-[#f8faf9] border border-slate-100 space-y-1 text-xs">
+                            <div className="flex items-center justify-between text-slate-500">
+                              <span>Subscription Started:</span>
+                              <span className="font-semibold text-slate-700">
+                                {new Date(sub.startDate).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-slate-500">
+                              <span>Valid Until:</span>
+                              <span className={`font-semibold ${isExpiringSoon ? "text-rose-600 font-bold" : "text-emerald-700"}`}>
+                                {new Date(sub.endDate).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <Button
+                          onClick={() => setCurrentView("live_schedule")}
+                          className="w-full bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold rounded-xl h-10 shadow-xs cursor-pointer"
+                        >
+                          <PlayCircle className="h-4 w-4 mr-1.5" /> Go to Live Sessions
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-12 text-center rounded-3xl border border-dashed border-[#d6ede6] bg-[#fbfdfc] space-y-3">
+                  <div className="h-12 w-12 rounded-2xl bg-amber-50 text-[#b47a16] flex items-center justify-center mx-auto">
+                    <Package className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-base font-extrabold text-[#0d2b26]">No Active Tuition Packages</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    You have not subscribed to any teacher tuition packages yet. Explore leading specialist educators to join live interactive masterclasses.
+                  </p>
+                  <Button
+                    onClick={() => setCurrentView("connect")}
+                    className="bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
+                  >
+                    <Users className="h-4 w-4 mr-1.5" /> Find &amp; Subscribe to Tutors
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Academic Stream Overview Footer */}
           <div className="p-5 rounded-2xl bg-[#f6fbf9] border border-[#c4e9e0] flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-slate-600">
@@ -648,6 +865,72 @@ export function CourseViews() {
           </div>
         </div>
       )}
+
+      {/* Self-Enroll in Course Modal */}
+      <Modal
+        isOpen={isEnrollModalOpen}
+        onClose={() => setIsEnrollModalOpen(false)}
+        title="Enroll in Available Courses"
+      >
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          <p className="text-xs text-slate-500">
+            Browse through courses offered across your institution and self-enroll to access curriculum lessons, syllabus units, and handouts.
+          </p>
+
+          <div className="space-y-3">
+            {allCatalogCourses.length > 0 ? (
+              allCatalogCourses.map((catalogCourse) => {
+                const isAlreadyEnrolled = courses.some(
+                  (c) => c.id === catalogCourse.id || c.code === catalogCourse.code
+                );
+
+                return (
+                  <div
+                    key={catalogCourse.id}
+                    className="p-4 rounded-2xl border border-[#e2eae5] bg-[#fbfdfc] hover:bg-white flex items-center justify-between gap-4 transition-all"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-[#ecf8f5] text-[#0d5c4d] font-mono font-bold text-[11px] border border-[#c4e9e0]">
+                          {catalogCourse.code}
+                        </span>
+                        <h4 className="text-sm font-black text-[#0d2b26]">{catalogCourse.title}</h4>
+                      </div>
+                      <p className="text-xs text-slate-500 line-clamp-1">
+                        Instructor:{" "}
+                        {catalogCourse.teacher?.user
+                          ? `${catalogCourse.teacher.user.firstName} ${catalogCourse.teacher.user.lastName}`
+                          : "Faculty Member"}
+                      </p>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      disabled={isAlreadyEnrolled || isEnrollingId === catalogCourse.id}
+                      onClick={() => handleEnrollCourse(catalogCourse.id)}
+                      className={`text-xs font-bold rounded-xl h-8.5 px-3.5 shrink-0 ${
+                        isAlreadyEnrolled
+                          ? "bg-slate-100 text-slate-400 border border-slate-200"
+                          : "bg-[#0d5c4d] hover:bg-[#0a473b] text-white"
+                      }`}
+                    >
+                      {isEnrollingId === catalogCourse.id
+                        ? "Enrolling..."
+                        : isAlreadyEnrolled
+                        ? "Enrolled ✓"
+                        : "Enroll Now"}
+                    </Button>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="p-8 text-center text-xs text-slate-400">
+                Loading available course catalog...
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

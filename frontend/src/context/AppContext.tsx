@@ -148,12 +148,13 @@ interface AppContextType {
 
   // Actions
   markLessonComplete: (lessonId: string) => void;
-  submitAssignment: (assignmentId: string, text: string, fileName?: string) => void;
+  submitAssignment: (assignmentId: string, text: string, fileName?: string, fileAttachmentUrl?: string) => Promise<void>;
   gradeSubmission: (submissionId: string, marks: number, feedback: string, release: boolean) => void;
   submitQuizAttempt: (quizId: string, answers: Record<string, any>) => number;
   createQuiz: (quiz: Partial<Quiz>) => void;
   updateQuiz: (id: string, updates: Partial<Quiz>) => void;
   deleteQuiz: (id: string) => void;
+  fetchQuizzes: () => Promise<void>;
   registerEvent: (eventId: string) => void;
   createTimetableEntry: (entry: Omit<TimetableEntry, 'id'>) => void;
   updateTimetableEntry: (id: string, updates: Omit<TimetableEntry, 'id'>) => void;
@@ -169,6 +170,9 @@ interface AppContextType {
   deleteAssignment: (id: string) => void;
   createCourse: (data: { title: string; code: string; description?: string }) => Promise<{ success: boolean; message?: string }>;
   fetchCourses: () => Promise<void>;
+  fetchAssignments: () => Promise<void>;
+  fetchSubmissions: () => Promise<void>;
+  syncCourseSyllabus: (courseId: string, updatedCourses?: Course[]) => Promise<void>;
   createUnit: (courseId: string, unitTitle: string) => string;
   updateUnit: (courseId: string, unitId: string, updates: { title?: string; order?: number }) => void;
   createTopic: (courseId: string, unitId: string, topicTitle: string, description?: string) => string;
@@ -201,6 +205,7 @@ interface AppContextType {
   deleteLibraryResource: (id: string) => void;
   recordResourceView: (id: string) => void;
   recordResourceDownload: (id: string) => void;
+  fetchLibraryResources: () => Promise<void>;
 
   // Teacher Profile & Studio State
   teacherProfile: TeacherProfileData | null;
@@ -339,9 +344,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const addTenant = (tenant: Tenant) => {
-    setTenants((prev) => [tenant, ...prev]);
-  };
+
+const addTenant = (tenant: Tenant) => {
+  setTenants((prev) => {
+    const existingTenant = prev.find((t) => t.id === tenant.id);
+
+    if (existingTenant) {
+      return prev.map((t) =>
+        t.id === tenant.id ? tenant : t
+      );
+    }
+
+    return [tenant, ...prev];
+  });
+};
+
 
   const updateTenant = (updated: Tenant) => {
     setTenants((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
@@ -410,6 +427,107 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [authUser?.role, authToken]);
 
+  // Restore authenticated session from localStorage on initial load
+  useEffect(() => {
+    const token = api.token.get();
+    const user = api.user.get();
+    if (token && user) {
+      setAuthToken(token);
+      setAuthUser(user);
+      const roleMap: Record<string, UserRole> = {
+        STUDENT: 'student',
+        TEACHER: 'teacher',
+        PARENT: 'parent',
+        ADMIN: 'admin',
+        SUPER_ADMIN: 'super_admin'
+      };
+      if (user.role && roleMap[user.role]) {
+        setCurrentRole(roleMap[user.role]);
+      }
+      setIsLanding(false);
+    }
+    fetchCourses();
+    fetchAnnouncements();
+    fetchAssignments();
+    fetchSubmissions();
+  }, []);
+
+  const fetchAssignments = async () => {
+    try {
+      const res = await api.assignments.getAll();
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        const loaded: Assignment[] = res.data.map((a: any) => ({
+          id: a.id,
+          courseId: a.courseId || a.course?.id || '',
+          subjectName: a.subjectName || a.course?.title || 'Combined Mathematics',
+          title: a.title,
+          instructions: a.instructions || '',
+          topicName: a.topicName || 'General Topic',
+          maxMarks: Number(a.maxMarks) || 100,
+          dueDate: a.dueDate
+            ? new Date(a.dueDate).toISOString().replace('T', ' ').substring(0, 16)
+            : '2026-11-30 23:59',
+          status: a.status?.toLowerCase() === 'draft' ? 'draft' : 'published',
+          attachmentName: a.attachmentName || undefined,
+          submissionsCount: a.submissionsCount || a._count?.submissions || 0,
+          pendingReviewCount: a.pendingReviewCount || 0,
+        }));
+        setAssignments((prev) => {
+          const loadedIds = new Set(loaded.map((item) => item.id));
+          return [...loaded, ...prev.filter((p) => !loadedIds.has(p.id))];
+        });
+      }
+    } catch (err) {
+      console.warn('Backend assignments API not reachable yet:', err);
+    }
+  };
+
+  const fetchSubmissions = async () => {
+    try {
+      const res = await api.assignments.getTeacherSubmissions();
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        const loadedSubs: StudentSubmission[] = res.data.map((s: any) => ({
+          id: s.id,
+          assignmentId: s.assignmentId,
+          assignmentTitle: s.assignmentTitle || 'Assignment',
+          studentId: s.studentId,
+          studentName: s.studentName || 'Student',
+          studentAvatar: s.studentAvatar || undefined,
+          submittedAt: s.submittedAt
+            ? new Date(s.submittedAt).toISOString().replace('T', ' ').substring(0, 16)
+            : new Date().toISOString().substring(0, 16),
+          status: s.status as 'not_submitted' | 'submitted' | 'marked' | 'result_released',
+          textContent: s.textContent || undefined,
+          fileAttachmentName: s.fileAttachmentName || undefined,
+          fileAttachmentUrl: s.fileAttachmentUrl || undefined,
+          marksObtained: s.marksObtained !== undefined && s.marksObtained !== null ? Number(s.marksObtained) : undefined,
+          maxMarks: s.maxMarks || 100,
+          teacherFeedback: s.teacherFeedback || undefined,
+          markedAt: s.markedAt
+            ? new Date(s.markedAt).toISOString().replace('T', ' ').substring(0, 16)
+            : undefined,
+        }));
+        setSubmissions((prev) => {
+          const loadedIds = new Set(loadedSubs.map((item) => item.id));
+          return [...loadedSubs, ...prev.filter((p) => !loadedIds.has(p.id))];
+        });
+      }
+    } catch (err) {
+      console.warn('Backend teacher submissions API not reachable yet:', err);
+    }
+  };
+
+  const fetchAnnouncements = async () => {
+    try {
+      const res = await api.announcements.getAll({ role: currentRole.toUpperCase() });
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setAnnouncements(res.data);
+      }
+    } catch (err) {
+      console.warn('Could not load announcements from backend:', err);
+    }
+  };
+
   const mapBackendCourseToFrontend = (c: any): Course => {
     const teacherName = c.teacher?.user
       ? `${c.teacher.user.firstName} ${c.teacher.user.lastName || ''}`.trim()
@@ -468,27 +586,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Restore authenticated session from localStorage on initial load
-  useEffect(() => {
-    const token = api.token.get();
-    const user = api.user.get();
-    if (token && user) {
-      setAuthToken(token);
-      setAuthUser(user);
-      const roleMap: Record<string, UserRole> = {
-        STUDENT: 'student',
-        TEACHER: 'teacher',
-        PARENT: 'parent',
-        ADMIN: 'admin',
-        SUPER_ADMIN: 'super_admin'
-      };
-      if (user.role && roleMap[user.role]) {
-        setCurrentRole(roleMap[user.role]);
+  const fetchLibraryResources = async () => {
+    try {
+      const res = await api.resources.getAll();
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setLibraryResources((prev) => {
+          const loadedIds = new Set(res.data.map((r: any) => r.id));
+          return [...res.data, ...prev.filter((p) => !loadedIds.has(p.id))];
+        });
       }
-      setIsLanding(false);
+    } catch (err) {
+      console.warn('Backend library resources API not reachable yet:', err);
     }
+  };
+
+  const fetchQuizzes = async () => {
+    try {
+      const res = await api.quizzes.getAll();
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setQuizzes((prev) => {
+          const loadedIds = new Set(res.data.map((q: any) => q.id));
+          return [...res.data, ...prev.filter((p) => !loadedIds.has(p.id))];
+        });
+      }
+    } catch (err) {
+      console.warn('Backend quizzes API not reachable yet:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchAssignments();
+    fetchSubmissions();
     fetchCourses();
-  }, []);
+    fetchLibraryResources();
+    fetchQuizzes();
+  }, [currentRole, activeTenantId]);
 
   useEffect(() => {
     if (!authToken) return;
@@ -903,6 +1035,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Switch role reset default views
   useEffect(() => {
     setCurrentView('dashboard');
+    fetchAnnouncements();
   }, [currentRole]);
 
   // Mark lesson as complete
@@ -945,7 +1078,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Student submits assignment
-  const submitAssignment = async (assignmentId: string, text: string, fileName?: string) => {
+  const submitAssignment = async (
+    assignmentId: string,
+    text: string,
+    fileName?: string,
+    fileAttachmentUrl?: string
+  ) => {
     const asg = assignments.find((a) => a.id === assignmentId);
     const existingIndex = submissions.findIndex(
       (s) => s.assignmentId === assignmentId && s.studentId === currentUser.id
@@ -961,6 +1099,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       status: 'submitted',
       textContent: text,
       fileAttachmentName: fileName || 'Student_Submission.pdf',
+      fileAttachmentUrl: fileAttachmentUrl || undefined,
       maxMarks: asg?.maxMarks || 100
     };
 
@@ -980,6 +1119,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await api.assignments.submit(assignmentId, {
         textContent: text,
         fileAttachmentName: fileName || 'Student_Submission.pdf',
+        fileAttachmentUrl: fileAttachmentUrl || undefined,
       });
     } catch (err) {
       console.warn('Backend submit assignment skipped:', err);
@@ -1114,6 +1254,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       message: `You scored ${score} / ${quiz.totalMarks} marks.`
     });
 
+    api.quizzes
+      .submitAttempt(quizId, { answers, timeSpentSeconds: 420 })
+      .catch((err) => {
+        console.warn('Backend quiz attempt submission skipped:', err?.message);
+      });
+
     return score;
   };
 
@@ -1160,6 +1306,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       title: 'Quiz Published Successfully! 🎯',
       message: `"${newQuiz.title}" is now available (${newQuiz.totalQuestions} questions, ${newQuiz.totalMarks} marks).`
     });
+
+    api.quizzes
+      .create({
+        title: newQuiz.title,
+        instructions: newQuiz.instructions,
+        courseId: newQuiz.courseId,
+        subjectName: newQuiz.subjectName,
+        durationMinutes: newQuiz.durationMinutes,
+        dueDate: newQuiz.dueDate,
+        status: newQuiz.status,
+        totalMarks: newQuiz.totalMarks,
+        questions: newQuiz.questions,
+      })
+      .then((res) => {
+        if (res.success && res.data?.id) {
+          setQuizzes((prev) =>
+            prev.map((q) => (q.id === tempId ? { ...q, id: res.data.id } : q))
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend quiz creation skipped:', err?.message);
+      });
   };
 
   // Tutor updates existing Quiz
@@ -1186,6 +1355,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       title: 'Quiz Updated! 📝',
       message: 'Questions and evaluation parameters saved successfully.'
     });
+
+    api.quizzes
+      .update(id, updates)
+      .catch((err) => {
+        console.warn('Backend quiz update skipped:', err?.message);
+      });
   };
 
   // Tutor deletes Quiz
@@ -1196,6 +1371,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       title: 'Quiz Removed',
       message: 'The quiz has been removed from the curriculum.'
     });
+
+    api.quizzes
+      .delete(id)
+      .catch((err) => {
+        console.warn('Backend quiz delete skipped:', err?.message);
+      });
   };
 
   // Event RSVP
@@ -1531,12 +1712,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addToast({ type: 'success', title: 'Event Created Successfully!' });
   };
 
-  const syncCourseSyllabus = async (courseId: string, updatedCourses: Course[]) => {
+  const syncCourseSyllabus = async (courseId: string, updatedCourses?: Course[]) => {
     try {
+      const courseList = updatedCourses || courses;
+      const target = courseList.find((c) => c.id === courseId);
+      if (!target) return;
+
       if (!courseId.startsWith("crs_")) {
-        const target = updatedCourses.find((c) => c.id === courseId);
-        if (target) {
-          await api.courses.update(courseId, { syllabus: { units: target.units } });
+        await api.courses.update(courseId, { syllabus: { units: target.units } });
+      } else {
+        const existing = courseList.find(
+          (c) => !c.id.startsWith("crs_") && (c.title === target.title || c.code === target.code)
+        );
+        if (existing) {
+          await api.courses.update(existing.id, { syllabus: { units: target.units } });
+        } else {
+          const res = await api.courses.create({
+            title: target.title,
+            code: target.code || `CRS-${Date.now().toString().slice(-4)}`,
+            description: `A/L Curriculum Batch for ${target.title}`
+          });
+          if (res.success && res.data) {
+            await api.courses.update(res.data.id, { syllabus: { units: target.units } });
+            setCourses((prev) =>
+              prev.map((c) => (c.id === courseId ? { ...c, id: res.data.id } : c))
+            );
+          }
         }
       }
     } catch (e) {
@@ -1583,8 +1784,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateUnit = (courseId: string, unitId: string, updates: { title?: string; order?: number }) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1597,8 +1798,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'success',
       title: 'Unit Updated!',
@@ -1608,8 +1811,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const createTopic = (courseId: string, unitId: string, topicTitle: string, description?: string): string => {
     const newTopicId = `top_${Date.now()}`;
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1629,8 +1832,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'success',
       title: 'Topic Added to Unit!',
@@ -1640,8 +1845,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateTopic = (courseId: string, unitId: string, topicId: string, updates: { title?: string; description?: string }) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1660,8 +1865,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'success',
       title: 'Topic Updated!',
@@ -1670,8 +1877,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteUnit = (courseId: string, unitId: string) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         const targetUnit = c.units.find((u) => u.id === unitId);
         let removedLessons = 0;
@@ -1683,8 +1890,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           totalLessons: Math.max(0, c.totalLessons - removedLessons),
           units: c.units.filter((u) => u.id !== unitId)
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'info',
       title: 'Unit Removed',
@@ -1693,8 +1902,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteTopic = (courseId: string, unitId: string, topicId: string) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1708,8 +1917,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'info',
       title: 'Topic Removed',
@@ -1718,8 +1929,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createLesson = (courseId: string, unitId: string, topicId: string, lesson: Partial<Lesson>) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1752,8 +1963,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'success',
       title: 'Lesson Added to Syllabus!',
@@ -1770,8 +1983,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     newUnitId?: string,
     newTopicId?: string
   ) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
 
         const destUnitId = newUnitId || unitId;
@@ -1835,8 +2048,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'success',
       title: 'Lesson Updated!',
@@ -1845,8 +2060,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteLesson = (courseId: string, unitId: string, topicId: string, lessonId: string) => {
-    setCourses((prev) =>
-      prev.map((c) => {
+    setCourses((prev) => {
+      const updated = prev.map((c) => {
         if (c.id !== courseId) return c;
         return {
           ...c,
@@ -1865,8 +2080,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             };
           })
         };
-      })
-    );
+      });
+      syncCourseSyllabus(courseId, updated);
+      return updated;
+    });
     addToast({
       type: 'info',
       title: 'Lesson Removed',
@@ -1874,7 +2091,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const createAnnouncement = (ann: Partial<Announcement>) => {
+  const createAnnouncement = async (ann: Partial<Announcement>) => {
+    try {
+      const res = await api.announcements.create({
+        title: ann.title || 'Official Announcement',
+        message: ann.message || '',
+        targetAudience: ann.targetAudience || 'Platform-Wide (Everyone)',
+        priority: ann.priority || 'normal'
+      });
+      if (res.success && res.data) {
+        setAnnouncements((prev) => [res.data, ...prev]);
+        addToast({
+          type: 'success',
+          title: 'Announcement Published!',
+          message: 'Notice has been dispatched and saved to cloud database.'
+        });
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to save announcement in backend, falling back to local:', err);
+    }
+
     const newAnn: Announcement = {
       id: `ann_${Date.now()}`,
       title: ann.title || 'Official Announcement',
@@ -1893,16 +2130,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const updateAnnouncement = (id: string, updates: Partial<Omit<Announcement, 'id'>>) => {
+  const updateAnnouncement = async (id: string, updates: Partial<Omit<Announcement, 'id'>>) => {
+    try {
+      await api.announcements.update(id, updates);
+    } catch (err) {
+      console.warn('Failed to update announcement in backend:', err);
+    }
     setAnnouncements((prev) =>
       prev.map((announcement) => announcement.id === id ? { ...announcement, ...updates } : announcement)
     );
     addToast({ type: 'success', title: 'Announcement Updated', message: 'Announcement details saved successfully.' });
   };
 
-  const deleteAnnouncement = (id: string) => {
+  const deleteAnnouncement = async (id: string) => {
+    try {
+      await api.announcements.delete(id);
+    } catch (err) {
+      console.warn('Failed to delete announcement in backend:', err);
+    }
     setAnnouncements((prev) => prev.filter((announcement) => announcement.id !== id));
-    addToast({ type: 'success', title: 'Announcement Removed', message: 'Announcement has been removed.' });
+    addToast({ type: 'success', title: 'Announcement Removed', message: 'Announcement has been removed from database.' });
   };
 
   const toggleSaveResource = (id: string) => {
@@ -1941,7 +2188,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       description: resource.description || 'Comprehensive learning resource uploaded for student study and curriculum preparation.',
       topic: resource.topic || (isBook ? undefined : 'General Module'),
       category: resource.category || (isPastPaper ? 'Past Papers & Model Exams' : 'Advanced Level'),
-      coverImage: resource.coverImage || (isBook 
+      coverImage: resource.coverImage || (isBook
         ? 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80'
         : isPastPaper
         ? 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=600&auto=format&fit=crop&q=80'
@@ -2216,6 +2463,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createQuiz,
         updateQuiz,
         deleteQuiz,
+        fetchQuizzes,
         registerEvent,
         createTimetableEntry,
         updateTimetableEntry,
@@ -2231,6 +2479,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteAssignment,
         createCourse,
         fetchCourses,
+        fetchAssignments,
+        fetchSubmissions,
+        syncCourseSyllabus,
         createUnit,
         updateUnit,
         createTopic,
@@ -2255,6 +2506,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteLibraryResource,
         recordResourceView,
         recordResourceDownload,
+        fetchLibraryResources,
         teacherProfile,
         updateTeacherProfile,
         refreshTeacherProfile,

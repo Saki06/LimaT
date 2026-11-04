@@ -65,6 +65,11 @@ export interface TimetableEntry {
   startTime: string;
   endTime: string;
   room: string;
+  subjectCode?: string;
+  periodType?: string;
+  platform?: string;
+  meetingUrl?: string;
+  isLiveNow?: boolean;
 }
 
 export interface Subject {
@@ -150,6 +155,7 @@ export interface StudentSubmission {
   status: 'not_submitted' | 'submitted' | 'marked' | 'result_released';
   textContent?: string;
   fileAttachmentName?: string;
+  fileAttachmentUrl?: string;
   marksObtained?: number;
   maxMarks: number;
   teacherFeedback?: string;
@@ -550,9 +556,12 @@ export interface ConnectPurchase {
   date: string;
   validUntil: string;
   status: 'active' | 'expired';
-  paymentMethod: 'Card (Visa/Mastercard)' | 'Bank Deposit (Commercial Bank)' | 'FriMi / PayHere';
+  paymentMethod: string;
   receiptNo: string;
   meetUrl: string;
+  bankRefNo?: string;
+  slipUrl?: string;
+  slipFileName?: string;
 }
 
 export interface TutorPackage {
@@ -590,6 +599,7 @@ export interface TeacherSubscriber {
   paymentMethod: string;
   slipReference?: string;
   slipFileName?: string;
+  slipUrl?: string;
   attendanceRate: number;
   schoolId?: string;
 }

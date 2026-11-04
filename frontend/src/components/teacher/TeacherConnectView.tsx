@@ -37,7 +37,8 @@ import {
   DollarSign,
   ToggleLeft,
   ToggleRight,
-  Lock
+  Lock,
+  RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -274,6 +275,28 @@ export function TeacherConnectView() {
 
   // Subscribers state
   const [subscribers, setSubscribers] = useState<TeacherSubscriber[]>(initialTeacherSubscribers);
+  const [isSubscribersLoading, setIsSubscribersLoading] = useState(false);
+
+  const loadSubscribers = async () => {
+    try {
+      setIsSubscribersLoading(true);
+      const res = await api.packages.getTeacherSubscribers();
+      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setSubscribers((prev) => {
+          const ids = new Set(res.data.map((s: any) => s.id));
+          return [...res.data, ...prev.filter((p) => !ids.has(p.id))];
+        });
+      }
+    } catch (e) {
+      console.warn("Could not load backend teacher subscribers:", e);
+    } finally {
+      setIsSubscribersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSubscribers();
+  }, []);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -499,13 +522,51 @@ export function TeacherConnectView() {
   };
 
   // Approve bank slip
-  const handleApproveSlip = (subId: string) => {
-    setSubscribers((prev) =>
-      prev.map((s) => (s.id === subId ? { ...s, status: "active", validUntil: "2026-11-05" } : s))
-    );
+  const handleApproveSlip = async (subId: string) => {
     const sub = subscribers.find((s) => s.id === subId);
+    setSubscribers((prev) =>
+      prev.map((s) =>
+        s.id === subId
+          ? {
+              ...s,
+              status: "active",
+              validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+            }
+          : s
+      )
+    );
     setSelectedSlipSub(null);
     showToast(`Bank Deposit Slip Approved! ${sub?.studentName || "Student"} subscription is now ACTIVE.`);
+
+    try {
+      const res = await api.packages.verifySlip(subId, "APPROVE");
+      if (res && res.message) {
+        showToast(res.message);
+      }
+      await loadSubscribers();
+    } catch (err) {
+      console.warn("Backend slip approve skipped:", err);
+    }
+  };
+
+  // Reject bank slip
+  const handleRejectSlip = async (subId: string) => {
+    const sub = subscribers.find((s) => s.id === subId);
+    setSubscribers((prev) =>
+      prev.map((s) => (s.id === subId ? { ...s, status: "expired" } : s))
+    );
+    setSelectedSlipSub(null);
+    showToast(`Bank Deposit Slip Declined for ${sub?.studentName || "Student"}.`);
+
+    try {
+      const res = await api.packages.verifySlip(subId, "REJECT");
+      if (res && res.message) {
+        showToast(res.message);
+      }
+      await loadSubscribers();
+    } catch (err) {
+      console.warn("Backend slip reject skipped:", err);
+    }
   };
 
   // Filtered subscribers
@@ -943,6 +1004,17 @@ export function TeacherConnectView() {
                 <option value="pending_slip">Pending Bank Slip Approval</option>
                 <option value="expired">Expired / Renewal Due</option>
               </select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadSubscribers()}
+                disabled={isSubscribersLoading}
+                className="h-8 px-2.5 rounded-xl border-slate-200 text-xs font-bold text-slate-700 hover:text-[#0d5c4d] hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Refresh subscribers from cloud database"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isSubscribersLoading ? "animate-spin" : ""}`} />
+                {isSubscribersLoading ? "Refreshing..." : "Refresh"}
+              </Button>
             </div>
           </div>
 
@@ -1135,8 +1207,8 @@ export function TeacherConnectView() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => showToast(`Deposit slip rejected for ${sub.studentName}. Notification sent to student.`)}
-                      className="border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold cursor-pointer"
+                      onClick={() => handleRejectSlip(sub.id)}
+                      className="border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-bold cursor-pointer"
                     >
                       Decline
                     </Button>
@@ -1189,29 +1261,61 @@ export function TeacherConnectView() {
               </div>
             </div>
 
-            {/* Simulated Deposit Slip Mockup */}
-            <div className="p-6 rounded-2xl border-2 border-dashed border-[#c4e9e0] bg-[#ecf8f5]/50 text-center space-y-2">
-              <Receipt className="h-10 w-10 text-[#0d5c4d] mx-auto" />
-              <p className="text-xs font-bold text-slate-800">Bank of Ceylon Official Deposit Receipt</p>
-              <p className="text-[11px] text-slate-500 font-mono">
-                Branch: Colombo Super Grade &bull; Terminal ID: 88102 &bull; Stamp: VERIFIED
-              </p>
+            {/* Deposit Slip Preview */}
+            <div className="p-4 rounded-2xl border-2 border-dashed border-[#c4e9e0] bg-[#ecf8f5]/50 text-center space-y-2">
+              {selectedSlipSub.slipUrl ? (
+                <div className="space-y-2">
+                  <img
+                    src={selectedSlipSub.slipUrl}
+                    alt="Bank Deposit Slip"
+                    className="max-h-48 mx-auto rounded-xl border border-slate-200 object-contain shadow-2xs bg-white"
+                  />
+                  <div className="flex items-center justify-center gap-2">
+                    <a
+                      href={selectedSlipSub.slipUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-[#0d5c4d] hover:underline flex items-center gap-1"
+                    >
+                      <ExternalLink className="h-3 w-3" /> Open Full Image
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Receipt className="h-10 w-10 text-[#0d5c4d] mx-auto" />
+                  <p className="text-xs font-bold text-slate-800">Bank Official Deposit Receipt</p>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    Reference: {selectedSlipSub.slipReference || "TXN-VERIFIED"} &bull; Stamp: VERIFIED
+                  </p>
+                </>
+              )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex items-center justify-between gap-2 pt-2">
               <Button
                 variant="outline"
-                onClick={() => setSelectedSlipSub(null)}
-                className="text-xs font-bold"
+                size="sm"
+                onClick={() => handleRejectSlip(selectedSlipSub.id)}
+                className="text-xs font-bold border-rose-200 text-rose-700 hover:bg-rose-50 cursor-pointer"
               >
-                Cancel
+                Decline Slip
               </Button>
-              <Button
-                onClick={() => handleApproveSlip(selectedSlipSub.id)}
-                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold shadow-xs cursor-pointer"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve &amp; Activate
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedSlipSub(null)}
+                  className="text-xs font-bold"
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => handleApproveSlip(selectedSlipSub.id)}
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold shadow-xs cursor-pointer"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve &amp; Activate
+                </Button>
+              </div>
             </div>
           </div>
         )}

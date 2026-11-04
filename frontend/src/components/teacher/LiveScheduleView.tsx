@@ -43,7 +43,8 @@ import {
   Paperclip,
   ChevronRight,
   ThumbsUp,
-  MessageCircle
+  MessageCircle,
+  RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -294,53 +295,65 @@ export function LiveScheduleView() {
     setNewCommentText("");
   };
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchLiveClasses = async () => {
+    try {
+      let res: any = null;
+      if (!isTeacher && api.students?.getMyLiveClasses) {
+        res = await api.students.getMyLiveClasses();
+      }
+      if (!res || !res.success || !Array.isArray(res.data) || res.data.length === 0) {
+        res = await api.liveClasses.getAll();
+      }
+
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        const mapped: LiveSlot[] = res.data.map((item: any) => {
+          const startD = new Date(item.startTime);
+          const daysOfWeek: LiveSlot["day"][] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+          const dayName = daysOfWeek[startD.getDay()] || "Tuesday";
+          const timeStr = startD.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+          let plat: LiveSlot["platform"] = "In-App Live Studio (Jitsi)";
+          if (item.platform === "GOOGLE_MEET") plat = "Google Meet";
+          else if (item.platform === "ZOOM") plat = "Zoom";
+          else if (item.platform === "CUSTOM") plat = "Custom";
+
+          let stat: LiveSlot["status"] = "scheduled";
+          if (item.status === "LIVE") stat = "live_now";
+          else if (item.status === "COMPLETED") stat = "completed";
+
+          return {
+            id: item.id,
+            title: item.title,
+            subject: item.course?.title || item.package?.title || item.subject || "Combined Mathematics",
+            grade: "Grade 12 & 13",
+            day: dayName,
+            startTime: timeStr,
+            endTime: "2 Hours",
+            platform: plat,
+            meetingUrl: item.meetingUrl || `https://meet.jit.si/${item.meetingId || "limat-live"}`,
+            meetingId: item.meetingId,
+            passcode: item.passcode,
+            type: item.topic || "Live Interactive Lecture",
+            enrolledCount: item.enrolledCount || item._count?.attendances || 142,
+            status: stat,
+            recordingUrl: item.recordingUrl,
+            courseId: item.courseId,
+            packageId: item.packageId
+          };
+        });
+        const serverIds = new Set(mapped.map((m) => m.id));
+        setSlots([...mapped, ...INITIAL_SLOTS.filter((s) => !serverIds.has(s.id))]);
+      }
+    } catch (err) {
+      console.warn("Using local live class slots (Backend sync optional):", err);
+    }
+  };
+
   // 1. Fetch live classes from backend on mount
   useEffect(() => {
-    const fetchLiveClasses = async () => {
-      try {
-        const res = await api.liveClasses.getAll();
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          const mapped: LiveSlot[] = res.data.map((item: any) => {
-            const startD = new Date(item.startTime);
-            const daysOfWeek: LiveSlot["day"][] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-            const dayName = daysOfWeek[startD.getDay()] || "Tuesday";
-            const timeStr = startD.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-            let plat: LiveSlot["platform"] = "In-App Live Studio (Jitsi)";
-            if (item.platform === "GOOGLE_MEET") plat = "Google Meet";
-            else if (item.platform === "ZOOM") plat = "Zoom";
-            else if (item.platform === "CUSTOM") plat = "Custom";
-
-            let stat: LiveSlot["status"] = "scheduled";
-            if (item.status === "LIVE") stat = "live_now";
-            else if (item.status === "COMPLETED") stat = "completed";
-
-            return {
-              id: item.id,
-              title: item.title,
-              subject: item.course?.title || item.package?.title || "Combined Mathematics",
-              grade: "Grade 12 & 13",
-              day: dayName,
-              startTime: timeStr,
-              endTime: "2 Hours",
-              platform: plat,
-              meetingUrl: item.meetingUrl || `https://meet.jit.si/${item.meetingId || "limat-live"}`,
-              meetingId: item.meetingId,
-              passcode: item.passcode,
-              type: item.topic || "Live Interactive Lecture",
-              enrolledCount: item._count?.attendances || 142,
-              status: stat,
-              recordingUrl: item.recordingUrl,
-              courseId: item.courseId,
-              packageId: item.packageId
-            };
-          });
-          setSlots(mapped);
-        }
-      } catch (err) {
-        console.warn("Using local live class slots (Backend sync optional):", err);
-      }
-    };
+    fetchLiveClasses();
 
     const fetchPackages = async () => {
       try {
@@ -585,7 +598,11 @@ export function LiveScheduleView() {
   const handleStudentJoin = async (slot: LiveSlot) => {
     try {
       if (!slot.id.startsWith("slot-")) {
-        await api.liveClasses.join(slot.id);
+        if (api.students?.joinLiveClass) {
+          await api.students.joinLiveClass(slot.id);
+        } else {
+          await api.liveClasses.join(slot.id);
+        }
       }
     } catch (e) {
       console.warn("Attendance log failed:", e);
@@ -744,18 +761,31 @@ export function LiveScheduleView() {
               </p>
             </div>
 
-            {/* Quick Action Buttons for Teacher */}
-            {isTeacher && (
-              <div className="flex items-center gap-3 shrink-0">
+            {/* Quick Action Buttons */}
+            <div className="flex items-center gap-3 shrink-0">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  setIsRefreshing(true);
+                  await fetchLiveClasses();
+                  setIsRefreshing(false);
+                }}
+                disabled={isRefreshing}
+                className="border-[#0d5c4d]/30 text-[#0d5c4d] hover:bg-[#0d5c4d]/10 font-bold text-xs sm:text-sm px-4 py-5 rounded-2xl flex items-center gap-2 cursor-pointer h-12"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                <span>{isRefreshing ? "Refreshing..." : "Refresh"}</span>
+              </Button>
+              {isTeacher && (
                 <Button
                   onClick={handleOpenAdd}
-                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-sm shadow-md px-5 py-5 rounded-2xl flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02]"
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-sm shadow-md px-5 py-5 rounded-2xl flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] h-12"
                 >
                   <Plus className="h-5 w-5" />
                   <span>+ Schedule Live Class</span>
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
