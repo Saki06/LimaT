@@ -2,6 +2,7 @@
 import { Response } from 'express';
 import { prisma } from '../config/prisma';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
+import { Prisma } from '@prisma/client';
 
 export const getSuperAdminProfile = async (
   req: AuthenticatedRequest,
@@ -61,9 +62,12 @@ export const updateSuperAdminProfile = async (
       'province',
       'postalCode',
       'bio',
+      'gender',
+      'languages',
+      'rootAuthorityId',
     ] as const;
 
-    const data: Record<string, string | null> = {};
+        const data: Record<string, string | Date | null> = {};
 
     for (const field of allowedFields) {
       if (req.body?.[field] !== undefined) {
@@ -91,6 +95,45 @@ export const updateSuperAdminProfile = async (
       }
     }
 
+        // Validate date of birth separately because Prisma expects DateTime
+    let dateOfBirth: Date | null | undefined;
+
+    if (req.body?.dateOfBirth !== undefined) {
+      const value = req.body.dateOfBirth;
+
+      if (value === null || value === '') {
+        dateOfBirth = null;
+      } else if (typeof value === 'string') {
+        const validFormat = /^\d{4}-\d{2}-\d{2}$/.test(value);
+        const parsedDate = new Date(`${value}T00:00:00.000Z`);
+
+        if (
+          !validFormat ||
+          Number.isNaN(parsedDate.getTime()) ||
+          parsedDate.toISOString().slice(0, 10) !== value ||
+          parsedDate.getTime() > Date.now()
+        ) {
+          res.status(400).json({
+            success: false,
+            message: 'Invalid dateOfBirth. Use YYYY-MM-DD format.',
+          });
+          return;
+        }
+
+        dateOfBirth = parsedDate;
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid value for dateOfBirth',
+        });
+        return;
+      }
+    }
+
+    if (dateOfBirth !== undefined) {
+            data.dateOfBirth = dateOfBirth;
+    }
+
     if (Object.keys(data).length === 0) {
       res.status(400).json({
         success: false,
@@ -114,7 +157,19 @@ export const updateSuperAdminProfile = async (
       data: profile,
     });
   } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      res.status(409).json({
+        success: false,
+        message: 'Root Authority ID is already in use',
+      });
+      return;
+    }
+
     console.error('Update Super Admin Profile Error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to update profile',

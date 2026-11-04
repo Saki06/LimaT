@@ -867,6 +867,10 @@ export const api = {
       province?: string | null;
       postalCode?: string | null;
       bio?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  languages?: string | null;
+  rootAuthorityId?: string | null;
     }) {
       const token = api.token.get();
 
