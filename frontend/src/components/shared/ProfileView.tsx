@@ -93,6 +93,61 @@ export function ProfileView() {
   const [isEditing, setIsEditing] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
 
+  const [tenantStatistics, setTenantStatistics] = useState<{
+    totalTenants: number;
+    activeTenants: number;
+    suspendedTenants: number;
+    inactiveTenants: number;
+  } | null>(null);
+
+  const [tenantStatisticsLoading, setTenantStatisticsLoading] =
+    useState(false);
+
+  const [tenantStatisticsError, setTenantStatisticsError] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentRole !== "super_admin") {
+      setTenantStatistics(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchTenantStatistics = async () => {
+      setTenantStatisticsLoading(true);
+      setTenantStatisticsError(null);
+
+      try {
+        const response =
+          await api.superAdminProfile.getTenantStatistics();
+
+        if (!cancelled) {
+          setTenantStatistics(response.data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setTenantStatistics(null);
+          setTenantStatisticsError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load tenant statistics"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setTenantStatisticsLoading(false);
+        }
+      }
+    };
+
+    void fetchTenantStatistics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
+
   const handleContinueCourse = (courseId: string) => {
     setSelectedCourseId(courseId);
     setCurrentView("courses");
@@ -1228,7 +1283,24 @@ if (!savedProfile) {
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Client Tenants</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d5c4d]">4 Active Clients</span>
+
+
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-lg font-black text-[#0d5c4d]">
+                  {tenantStatisticsLoading
+                    ? "Loading..."
+                    : tenantStatisticsError
+                      ? "Unavailable"
+                      : tenantStatistics
+                        ? `${tenantStatistics.activeTenants.toLocaleString()} Active Clients`
+                        : "Unavailable"}
+                </span>
+                <span className="text-[10px] text-emerald-600 font-bold">
+                  Schools, Tutors &amp; Academies
+                </span>
+              </div>
+
+
                 <span className="text-[10px] text-emerald-600 font-bold">Schools, Tutors &amp; Academies</span>
               </div>
             </div>

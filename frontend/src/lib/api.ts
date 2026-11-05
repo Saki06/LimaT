@@ -837,6 +837,40 @@ export const api = {
 
     // Super Admin Profile APIs
   superAdminProfile: {
+
+    async getTenantStatistics(): Promise<{
+      success: boolean;
+      data: {
+        totalTenants: number;
+        activeTenants: number;
+        suspendedTenants: number;
+        inactiveTenants: number;
+      };
+    }> {
+      const token = api.token.get();
+
+      const res = await fetch(
+        `${API_BASE_URL}/super-admin/statistics/tenants`,
+        {
+          method: 'GET',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: 'no-store',
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          result.message || 'Failed to fetch tenant statistics'
+        );
+      }
+
+      return result;
+    },
+
     async get() {
       const token = api.token.get();
 
