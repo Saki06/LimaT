@@ -1680,6 +1680,113 @@ export const api = {
     },
   },
 
+  // School Admin Workspace APIs
+  admin: {
+    async getOverview() {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/admin/overview`, { headers });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch admin overview');
+      return data.data;
+    },
+    async getStaff() {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/admin/staff`, { headers });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch staff');
+      return data.data;
+    },
+    async createStaff(input: any) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/admin/staff`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(input),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create staff');
+      return data.data;
+    },
+    async updateStaff(id: string, input: any) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/admin/staff/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(input),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update staff');
+      return data.data;
+    },
+    async updateStaffStatus(id: string, status: string) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/admin/staff/${encodeURIComponent(id)}/status`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update staff status');
+      return data.data;
+    },
+    async getStudents(search?: string) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const url = new URL(`${API_BASE_URL}/admin/students`);
+      if (search) url.searchParams.set('search', search);
+      const res = await fetch(url.toString(), { headers });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch students');
+      return data.data;
+    },
+    async updateStudentStatus(id: string, status: string) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/admin/students/${encodeURIComponent(id)}/status`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update student status');
+      return data.data;
+    },
+    async getSettings() {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/admin/settings`, { headers });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch settings');
+      return data.data;
+    },
+    async updateSettings(settingsData: any) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/admin/settings`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(settingsData),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to save settings');
+      return data.data;
+    },
+  },
+
   // Token and Local Storage Helpers
   token: {
     get(): string | null {

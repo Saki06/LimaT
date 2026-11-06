@@ -44,7 +44,8 @@ import {
   DollarSign,
   Check,
   Sparkles,
-  Filter
+  Filter,
+  RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -84,7 +85,18 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   const subscriptions = useSubscriptions();
   const hubFlags = useHubFlags();
   const hubSettings = useHubSettings();
-  const { setHubStatus, actOnHubFlag, removeSubscription, updateHubSettings } = useAdmin();
+  const {
+    setHubStatus,
+    actOnHubFlag,
+    removeSubscription,
+    updateHubSettings,
+    overviewData,
+    directory,
+    refreshAdminData,
+    isLoading: isAdminLoading,
+    schoolSettings,
+    saveSchoolSettings,
+  } = useAdmin();
   const createStaff = useCreateStaff();
   const updateStaff = useUpdateStaff();
   const setStaffStatus = useSetStaffStatus();
@@ -326,6 +338,29 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       subscriptionStatus: "Tutor (197 Students)"
     }
   ]);
+
+  // Synchronize live student & staff directory from PostgreSQL database
+  React.useEffect(() => {
+    if (directory && directory.length > 0) {
+      setPlatformUsers((prev) => {
+        const directoryMapped = directory.map((d) => ({
+          id: d.id,
+          name: d.name,
+          email: d.email,
+          role: (d.role === "student" ? "student" : d.role === "teacher" ? "teacher" : "admin") as "student" | "teacher" | "admin",
+          school: overviewData?.school.name || "Apex Academy Global",
+          grade: d.grade ? `${d.grade} (${d.className || 'General'})` : "Enrolled Student",
+          status: d.status === "active" ? "Active" : "Inactive",
+          lastLogin: "Active Today",
+          enrolledTutors: [],
+          subscriptionStatus: d.role === "student" ? "Enrolled Student" : "Staff Member",
+        }));
+        const existingIds = new Set(directoryMapped.map((m) => m.id));
+        const nonDuplicatePrev = prev.filter((p) => !existingIds.has(p.id));
+        return [...directoryMapped, ...nonDuplicatePrev];
+      });
+    }
+  }, [directory, overviewData?.school.name]);
 
   // Tutors Management State
   const [soloTutors, setSoloTutors] = useState<ConnectTeacher[]>(initialConnectTeachers);
@@ -671,7 +706,18 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             Configure schools, academic curricula, grade streams, faculty allocations, and system permissions.
           </p>
         </div>
-
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => refreshAdminData()}
+            disabled={isAdminLoading}
+            className="border-[#0d5c4d]/30 text-[#0d5c4d] hover:bg-[#0d5c4d]/5 font-semibold text-xs"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isAdminLoading ? 'animate-spin' : ''}`} />
+            Sync Cloud Data
+          </Button>
+        </div>
       </div>}
 
       {/* TAB: Dashboard Overview */}
@@ -786,7 +832,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-slate-500 font-semibold">Active Classes</p>
-                  <p className="text-2xl font-black text-[#0d5c4d] mt-1">{classes.length}</p>
+                  <p className="text-2xl font-black text-[#0d5c4d] mt-1">{overviewData?.kpis.totalClasses ?? classes.length}</p>
                   <p className="text-[10px] text-slate-400 font-bold mt-0.5">Across {grades.length} grade levels</p>
                 </div>
                 <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
@@ -799,7 +845,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-slate-500 font-semibold">Total Students</p>
-                  <p className="text-2xl font-black text-[#b47a16] mt-1">{totalStudents}</p>
+                  <p className="text-2xl font-black text-[#b47a16] mt-1">{overviewData?.kpis.totalStudents ?? totalStudents}</p>
                   <p className="text-[10px] text-[#b47a16] font-bold mt-0.5">Enrolled across all streams</p>
                 </div>
                 <div className="h-11 w-11 rounded-xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center">
@@ -811,9 +857,9 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             <Card className="border-[#e6ece8] bg-white shadow-2xs">
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500 font-semibold">Tutors</p>
-                  <p className="text-2xl font-black text-[#0d5c4d] mt-1">{soloTutors.length}</p>
-                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">{soloTutors.filter((t) => t.verified).length} verified instructors</p>
+                  <p className="text-xs text-slate-500 font-semibold">Tutors & Faculty</p>
+                  <p className="text-2xl font-black text-[#0d5c4d] mt-1">{overviewData?.kpis.totalTeachers ?? soloTutors.length}</p>
+                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">Active teaching faculty in database</p>
                 </div>
                 <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
                   <UserCheck className="h-5 w-5" />
