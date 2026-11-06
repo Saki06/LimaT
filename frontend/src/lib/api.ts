@@ -1335,6 +1335,73 @@ export const api = {
     },
   },
 
+  // Parent & Guardian Portal API
+  parents: {
+    async getMyChildren() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/parents/children`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async getDashboard(childId?: string) {
+      const token = api.token.get();
+      const query = childId ? `?childId=${encodeURIComponent(childId)}` : '';
+      const res = await fetch(`${API_BASE_URL}/parents/dashboard${query}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async submitLeaveRequest(data: {
+      childId: string;
+      startDate: string;
+      endDate?: string;
+      reason: string;
+      note: string;
+      tutorName?: string;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/parents/leave-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
+    async submitDepositSlip(data: {
+      childId: string;
+      packageId?: string;
+      slipRefNumber: string;
+      bankName?: string;
+      branchName?: string;
+      depositedDate?: string;
+      amountLkr?: number;
+      slipImageUrl?: string;
+      tutorName?: string;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/parents/deposit-slip`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+  },
+
   // Announcements & Notice Board API
   announcements: {
     async getAll(params?: { search?: string; priority?: string; audience?: string; role?: string }) {

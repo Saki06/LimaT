@@ -55,10 +55,12 @@ import {
   FileUp,
   ArrowRight,
   Table,
-  LayoutGrid
+  LayoutGrid,
+  RefreshCw
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
+import { api } from "@/lib/api";
 
 type ParentTab = "overview" | "tuition_classes" | "fees" | "progress" | "circulars";
 
@@ -68,6 +70,35 @@ export function ParentDashboardView() {
   // Child selection state (Child 1: Sathurjan K. - A/L 2026, Child 2: Ananya K. - Grade 8)
   const [selectedChildId, setSelectedChildId] = useState<string>("child_01");
   const [childrenList, setChildrenList] = useState<ParentChildProfile[]>(mockChildrenProfiles);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const fetchParentData = async (showToast = false) => {
+    try {
+      setIsLoading(true);
+      const res = await api.parents.getMyChildren();
+      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+        setChildrenList(res.data);
+        if (!res.data.some((c: any) => c.id === selectedChildId)) {
+          setSelectedChildId(res.data[0].id);
+        }
+        if (showToast) {
+          addToast({
+            type: "success",
+            title: "Parent Portal Refreshed",
+            message: "Updated live attendance, marks, and tuition pass status."
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("Could not load backend parent children:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchParentData(false);
+  }, []);
 
   const activeChild = childrenList.find((c) => c.id === selectedChildId) || childrenList[0];
 
@@ -175,7 +206,7 @@ export function ParentDashboardView() {
   }, [activeChild]);
 
   // Handle Bank Slip Submission
-  const handleDepositSubmit = (e: React.FormEvent) => {
+  const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!depositRefNumber.trim()) {
       addToast({
@@ -214,10 +245,25 @@ export function ParentDashboardView() {
       title: "Bank Deposit Slip Uploaded!",
       message: `Deposit slip of LKR ${depositAmount.toLocaleString()} submitted to ${depositTutor}. Temporary class access unlocked!`
     });
+
+    try {
+      await api.parents.submitDepositSlip({
+        childId: activeChild.id,
+        slipRefNumber: depositRefNumber.trim().toUpperCase(),
+        bankName: depositBank,
+        branchName: depositBranch,
+        depositedDate: depositDate,
+        amountLkr: Number(depositAmount),
+        slipImageUrl: "/images/mock_slips/sample_slip.jpg",
+        tutorName: depositTutor,
+      });
+    } catch (err) {
+      console.warn("Backend deposit slip submission skipped:", err);
+    }
   };
 
   // Handle Leave Note Submission
-  const handleLeaveSubmit = (e: React.FormEvent) => {
+  const handleLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!leaveNote.trim()) {
       addToast({
@@ -251,6 +297,19 @@ export function ParentDashboardView() {
       title: "Notice Dispatched to Tutor",
       message: `Absence request for ${leaveDate} submitted to ${leaveTutor}. Class recording validity will be extended.`
     });
+
+    try {
+      await api.parents.submitLeaveRequest({
+        childId: activeChild.id,
+        startDate: leaveDate,
+        endDate: leaveDate,
+        reason: leaveReason,
+        note: leaveNote.trim(),
+        tutorName: leaveTutor,
+      });
+    } catch (err) {
+      console.warn("Backend leave request submission skipped:", err);
+    }
   };
 
   return (
@@ -313,6 +372,17 @@ export function ParentDashboardView() {
                 );
               })}
             </div>
+
+            {/* Live Refresh Button */}
+            <button
+              type="button"
+              onClick={() => fetchParentData(true)}
+              disabled={isLoading}
+              className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all cursor-pointer flex items-center justify-center shrink-0 self-center"
+              title="Refresh Children Records"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            </button>
           </div>
         </div>
       </div>
