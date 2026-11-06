@@ -714,3 +714,104 @@ export const updateSchoolSettings = async (
     res.status(500).json({ success: false, message: 'Failed to save school settings.' });
   }
 };
+
+/**
+ * 10. POST /api/admin/students
+ * Register a new student in tenant directory
+ */
+export const createStudent = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = await resolveTenantId(req);
+    const { name, email, grade, section, studentIdNo } = req.body;
+
+    if (!name || !email) {
+      res.status(400).json({ success: false, message: 'Name and email are required.' });
+      return;
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const existingUser = await prisma.user.findUnique({
+      where: { email: cleanEmail },
+    });
+
+    if (existingUser) {
+      res.status(400).json({ success: false, message: 'A user with this email already exists.' });
+      return;
+    }
+
+    const [firstName, ...restName] = String(name).trim().split(' ');
+    const lastName = restName.join(' ') || 'Student';
+    const defaultPasswordHash = await bcrypt.hash('Student@123', 10);
+    const idNo = studentIdNo || `STU-${Math.floor(10000 + Math.random() * 90000)}`;
+
+    const user = await prisma.user.create({
+      data: {
+        tenantId,
+        email: cleanEmail,
+        passwordHash: defaultPasswordHash,
+        firstName,
+        lastName,
+        role: 'STUDENT',
+        isActive: true,
+      },
+    });
+
+    const profile = await prisma.studentProfile.create({
+      data: {
+        userId: user.id,
+        studentIdNo: idNo,
+        gradeLevel: grade || 'Grade 12',
+        section: section || 'Physical Science',
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Student registered successfully in directory.',
+      data: {
+        id: user.id,
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        role: 'student',
+        studentId: profile.studentIdNo,
+        grade: profile.gradeLevel,
+        section: profile.section,
+        status: 'active',
+      },
+    });
+  } catch (error: any) {
+    console.error('Error creating student in admin:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to create student.' });
+  }
+};
+
+/**
+ * 11. DELETE /api/admin/users/:id
+ * Remove a user from directory
+ */
+export const deleteUser = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User not found.' });
+      return;
+    }
+
+    await prisma.user.delete({ where: { id } });
+
+    res.status(200).json({
+      success: true,
+      message: 'User removed from directory successfully.',
+    });
+  } catch (error: any) {
+    console.error('Error deleting user in admin:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to delete user.' });
+  }
+};

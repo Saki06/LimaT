@@ -51,6 +51,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
+import { api } from "@/lib/api";
 
 interface AdminViewsProps {
   initialTab?: "overview" | "schools" | "classes" | "subjects" | "users" | "settings" | "staff" | "connect";
@@ -366,6 +367,38 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   const [soloTutors, setSoloTutors] = useState<ConnectTeacher[]>(initialConnectTeachers);
   const [tutorPackages, setTutorPackages] = useState<TutorPackage[]>(initialTutorPackages);
   const [staffSubTab, setStaffSubTab] = useState<"solo_tutors" | "coaches">("solo_tutors");
+
+  // Synchronize live teacher staff with solo tutors desk
+  React.useEffect(() => {
+    if (staff && staff.length > 0) {
+      setSoloTutors((prev) => {
+        const staffTeachers: ConnectTeacher[] = staff
+          .filter((s) => s.role === "teacher")
+          .map((s) => ({
+            id: s.id,
+            name: s.name,
+            initials: s.name.split(" ").map((w) => w[0]).join("").toUpperCase().substring(0, 2),
+            avatarColor: "bg-[#0d5c4d]",
+            verified: true,
+            title: s.qualification || "Senior Master Teacher & Subject Specialist",
+            subject: s.subjects?.[0] || "General Curriculum",
+            studentsCount: s.workload || 45,
+            lessonsCount: 16,
+            liveClassesCount: 4,
+            monthlyFee: 3500,
+            currency: "LKR",
+            rating: 5.0,
+            tags: s.subjects || ["Theory", "Revision"],
+            meetUrl: "https://meet.google.com/live-stream",
+            bio: `${s.name} is a certified educator handling ${s.medium || "English"} medium instruction.`,
+            qualifications: s.qualification || "B.Sc. / B.Ed."
+          }));
+        const existingIds = new Set(staffTeachers.map((st) => st.id));
+        const nonDuplicatePrev = prev.filter((p) => !existingIds.has(p.id));
+        return [...staffTeachers, ...nonDuplicatePrev];
+      });
+    }
+  }, [staff]);
   const [tutorSearch, setTutorSearch] = useState("");
   const [tutorSubjectFilter, setTutorSubjectFilter] = useState("all");
   const [tutorStatusFilter, setTutorStatusFilter] = useState<"all" | "active" | "suspended">("all");
@@ -464,6 +497,26 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     setIsAddTutorModalOpen(false);
     setNewTutorForm(initialNewTutorForm);
     addToast({ type: "success", title: "Tutor Registered!", message: `${newTutor.name} is now enrolled in the LMS.` });
+
+    // Persist to backend database via createStaff
+    const tutorEmail = `${newTutorForm.name.trim().toLowerCase().replace(/[^a-z0-9]/g, '.')}@limat-academy.lk`;
+    createStaff({
+      name: newTutorForm.name.trim(),
+      email: tutorEmail,
+      role: "teacher",
+      staffId: `TCH-${Math.floor(1000 + Math.random() * 9000)}`,
+      phone: "+94 77 123 4567",
+      gender: "male",
+      dateOfBirth: "1988-05-15",
+      joiningDate: new Date().toISOString().split("T")[0],
+      qualification: newTutorForm.qualifications,
+      subjects: [newTutorForm.subject],
+      classes: ["Grade 12", "Grade 13"],
+      sports: [],
+      teams: [],
+      medium: "english",
+      status: "active",
+    });
   };
 
   const handleConfirmDeleteTutor = () => {
@@ -525,6 +578,19 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       enrolledTutor: "Ms. Kavitha Rajan (Combined Maths)"
     });
     addToast({ type: "success", title: "Student Registered", message: `${newStud.name} added to student directory!` });
+
+    // Persist to backend database
+    api.admin.createStudent({
+      name: newStud.name,
+      email: newStud.email,
+      grade: newStud.grade,
+    }).then((created: any) => {
+      if (created?.id) {
+        setPlatformUsers((prev) => prev.map((u) => u.id === newStud.id ? { ...u, id: created.id } : u));
+      }
+    }).catch((err: any) => {
+      console.warn("Backend student creation skipped:", err);
+    });
   };
 
   // User 3-dot menu and action states
@@ -570,9 +636,14 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
 
   const handleConfirmDeleteUser = () => {
     if (!deletingUser) return;
-    setPlatformUsers((prev) => prev.filter((u) => u.id !== deletingUser.id));
+    const userToDelete = deletingUser;
+    setPlatformUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
     setDeletingUser(null);
     addToast({ type: "info", title: "User Account Removed Successfully" });
+
+    api.admin.deleteUser(userToDelete.id).catch((err: any) => {
+      console.warn("Backend user deletion skipped:", err);
+    });
   };
 
   const filteredUsers = platformUsers.filter((u) => {

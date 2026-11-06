@@ -6,7 +6,9 @@ import {
   updateStaff,
   updateStaffStatus,
   getStudents,
+  createStudent,
   updateStudentStatus,
+  deleteUser,
   getSchoolSettings,
   updateSchoolSettings,
 } from '../controllers/admin.controller';
@@ -28,7 +30,9 @@ router.patch('/staff/:id/status', updateStaffStatus);
 
 // 3. Student & Directory Management
 router.get('/students', getStudents);
+router.post('/students', createStudent);
 router.patch('/students/:id/status', updateStudentStatus);
+router.delete('/users/:id', deleteUser);
 
 // 4. School Settings & Tenant Branding
 router.get('/settings', getSchoolSettings);

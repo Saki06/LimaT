@@ -1817,6 +1817,31 @@ export const api = {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch students');
       return data.data;
     },
+    async createStudent(input: { name: string; email: string; grade?: string; section?: string; studentIdNo?: string }) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/admin/students`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(input),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create student');
+      return data.data;
+    },
+    async deleteUser(id: string) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/admin/users/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete user');
+      return data;
+    },
     async updateStudentStatus(id: string, status: string) {
       const token = api.token.get();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
