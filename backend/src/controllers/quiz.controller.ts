@@ -295,12 +295,26 @@ export const createQuiz = async (req: AuthenticatedRequest, res: Response): Prom
     }
 
     const teacher = await getOrCreateTeacherProfile(user.userId);
+    if (!teacher) {
+      res.status(404).json({ success: false, message: 'Teacher profile not found' });
+      return;
+    }
 
     let finalCourseId: string | null = null;
     let resolvedSubject = subjectName;
 
     if (courseId) {
-      const course = await prisma.course.findUnique({ where: { id: courseId } });
+      let course = await prisma.course.findUnique({ where: { id: courseId } });
+      if (!course) {
+        course = await prisma.course.findFirst({
+          where: {
+            OR: [
+              { code: { equals: courseId, mode: 'insensitive' } },
+              { title: { contains: resolvedSubject || 'Math', mode: 'insensitive' } },
+            ],
+          },
+        });
+      }
       if (course) {
         finalCourseId = course.id;
         if (!resolvedSubject) resolvedSubject = course.title;
