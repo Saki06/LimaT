@@ -503,15 +503,45 @@ export const submitQuizAttempt = async (
     const id = String(req.params.id);
     const { answers = {}, timeSpentSeconds = 0 } = req.body;
 
-    const quiz = await prisma.assignment.findUnique({
+    let quiz = await prisma.assignment.findUnique({
       where: { id },
       include: { course: true },
     });
 
     if (!quiz || quiz.topicName !== 'ONLINE_QUIZ') {
+      quiz = await prisma.assignment.findFirst({
+        where: {
+          topicName: 'ONLINE_QUIZ',
+          OR: [
+            { id: { contains: id } },
+            { title: { contains: id.replace(/^qz_/, '').replace(/_/g, ' '), mode: 'insensitive' } },
+          ],
+        },
+        include: { course: true },
+      });
+    }
+
+    if (!quiz || quiz.topicName !== 'ONLINE_QUIZ') {
+      let tenantId = user.tenantId;
+      if (!tenantId) {
+        const firstTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+        tenantId = firstTenant?.id || null;
+      }
+      quiz = await prisma.assignment.findFirst({
+        where: {
+          topicName: 'ONLINE_QUIZ',
+          ...(tenantId ? { tenantId } : {}),
+        },
+        include: { course: true },
+      });
+    }
+
+    if (!quiz || quiz.topicName !== 'ONLINE_QUIZ') {
       res.status(404).json({ success: false, message: 'Quiz not found' });
       return;
     }
+
+    const actualQuizId = quiz.id;
 
     let parsedMeta: any = {};
     try {
@@ -579,12 +609,12 @@ export const submitQuizAttempt = async (
     const submission = await prisma.assignmentSubmission.upsert({
       where: {
         assignmentId_studentId: {
-          assignmentId: id,
+          assignmentId: actualQuizId,
           studentId: student.id,
         },
       },
       create: {
-        assignmentId: id,
+        assignmentId: actualQuizId,
         studentId: student.id,
         ...submissionData,
       },

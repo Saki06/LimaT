@@ -21,7 +21,8 @@ import {
   ChevronRight,
   GraduationCap,
   PlayCircle,
-  Users
+  Users,
+  RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,25 +62,29 @@ export function StudentDashboard() {
   const [isLoadingDashboard, setIsLoadingDashboard] = useState<boolean>(false);
 
   // Fetch real-time student dashboard metrics from backend
-  useEffect(() => {
-    let isMounted = true;
-    const fetchDashboard = async () => {
-      try {
-        setIsLoadingDashboard(true);
-        const res = await api.students.getDashboardOverview();
-        if (isMounted && res.success && res.data) {
-          setDashboardData(res.data);
+  const fetchDashboard = async (showToast = false) => {
+    try {
+      setIsLoadingDashboard(true);
+      const res = await api.students.getDashboardOverview();
+      if (res && res.success && res.data) {
+        setDashboardData(res.data);
+        if (showToast) {
+          addToast({
+            type: "success",
+            title: "Dashboard Refreshed",
+            message: "Live metrics and course schedules are updated."
+          });
         }
-      } catch (err) {
-        console.warn("Using offline / context student dashboard metrics:", err);
-      } finally {
-        if (isMounted) setIsLoadingDashboard(false);
       }
-    };
-    fetchDashboard();
-    return () => {
-      isMounted = false;
-    };
+    } catch (err) {
+      console.warn("Using offline / context student dashboard metrics:", err);
+    } finally {
+      setIsLoadingDashboard(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboard(false);
   }, []);
 
   // Compute live or fallback metrics
@@ -157,6 +162,14 @@ export function StudentDashboard() {
             className="bg-white/15 hover:bg-white/25 text-white border border-white/25 font-bold text-xs cursor-pointer backdrop-blur-xs h-9 px-4 rounded-xl"
           >
             <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Quiz Arena
+          </Button>
+          <Button
+            onClick={() => fetchDashboard(true)}
+            disabled={isLoadingDashboard}
+            className="bg-white/15 hover:bg-white/25 text-white border border-white/25 font-bold text-xs cursor-pointer backdrop-blur-xs h-9 px-3 rounded-xl"
+            title="Refresh Dashboard"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoadingDashboard ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </div>
