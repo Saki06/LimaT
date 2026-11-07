@@ -76,7 +76,7 @@ export function LandingView({
   onEnterApp: () => void;
   initialPortal?: PortalType;
 }) {
-  const { setCurrentRole, addToast, schools, t, landingPortal, setLandingPortal, loginUser } = useApp();
+  const { setCurrentRole, addToast, schools, t, landingPortal, setLandingPortal, loginUser, registerUser } = useApp();
 
   // Auto-rotate the student banner image every 3.5 seconds
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -287,7 +287,7 @@ export function LandingView({
     onEnterApp();
   };
 
-  const handleSignupSubmit = (e: React.FormEvent) => {
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (signupPassword && signupConfirmPassword && signupPassword !== signupConfirmPassword) {
       addToast({
@@ -316,6 +316,39 @@ export function LandingView({
         });
         return;
       }
+
+      const nameParts = signupName.trim().split(" ");
+      const firstName = nameParts[0] || "Guardian";
+      const lastName = nameParts.slice(1).join(" ") || parentTitle;
+      const cleanPhone = parentPhone.trim().replace(/[^0-9]/g, "");
+      const email = signupEmail.trim() || `guardian_${cleanPhone || Date.now()}@parent.local`;
+      const pwd = signupPassword.trim() || "password123";
+
+      try {
+        const res = await registerUser({
+          role: "parent",
+          firstName,
+          lastName,
+          email,
+          password: pwd,
+          phoneNumber: parentPhone.trim(),
+          childStudentId: childPhoneOrId.trim()
+        });
+        if (res.success) {
+          setAuthMode("closed");
+          onEnterApp();
+          return;
+        } else if (res.message) {
+          addToast({
+            type: "warning",
+            title: "Registration Note",
+            message: res.message
+          });
+        }
+      } catch {
+        // Fallback gracefully
+      }
+
       setCurrentRole("parent");
       setAuthMode("closed");
       addToast({
@@ -325,6 +358,41 @@ export function LandingView({
       });
       onEnterApp();
       return;
+    }
+
+    // Student / Tutor Registration
+    const nameParts = (signupName.trim() || (selectedRole === "teacher" ? "Master Tutor" : "New Student")).split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(" ");
+    const email = signupEmail.trim();
+    const pwd = signupPassword.trim() || "password123";
+
+    if (email && (selectedRole === "student" || selectedRole === "teacher")) {
+      try {
+        const res = await registerUser({
+          role: selectedRole,
+          firstName,
+          lastName,
+          email,
+          password: pwd,
+          phoneNumber: signupPhone.trim(),
+          gradeLevel: "Grade 10",
+          specialization: selectedRole === "teacher" ? "Science & Mathematics" : undefined
+        });
+        if (res.success) {
+          setAuthMode("closed");
+          onEnterApp();
+          return;
+        } else if (res.message) {
+          addToast({
+            type: "warning",
+            title: "Registration Note",
+            message: res.message
+          });
+        }
+      } catch {
+        // Fallback gracefully
+      }
     }
 
     setCurrentRole(selectedRole);

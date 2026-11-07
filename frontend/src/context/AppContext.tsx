@@ -88,6 +88,18 @@ interface AppContextType {
   authUser: any | null;
   authToken: string | null;
   loginUser: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  registerUser: (input: {
+    role: 'student' | 'teacher' | 'parent';
+    firstName: string;
+    lastName?: string;
+    email: string;
+    password: string;
+    phoneNumber?: string;
+    gradeLevel?: string;
+    studentIdNo?: string;
+    specialization?: string;
+    childStudentId?: string;
+  }) => Promise<{ success: boolean; message?: string }>;
   logoutUser: () => void;
 
   // Data Collections
@@ -691,6 +703,78 @@ const addTenant = (tenant: Tenant) => {
       return { success: false, message: res.message || 'Invalid credentials' };
     } catch (err: any) {
       return { success: false, message: err.message || 'Failed to connect to backend server' };
+    }
+  };
+
+  const registerUser = async (input: {
+    role: 'student' | 'teacher' | 'parent';
+    firstName: string;
+    lastName?: string;
+    email: string;
+    password: string;
+    phoneNumber?: string;
+    gradeLevel?: string;
+    studentIdNo?: string;
+    specialization?: string;
+    childStudentId?: string;
+  }): Promise<{ success: boolean; message?: string }> => {
+    try {
+      let res: any;
+      if (input.role === 'student') {
+        res = await api.auth.registerStudent({
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
+          password: input.password,
+          gradeLevel: input.gradeLevel,
+          studentIdNo: input.studentIdNo,
+        });
+      } else if (input.role === 'teacher') {
+        res = await api.auth.registerTutor({
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
+          password: input.password,
+          specialization: input.specialization,
+        });
+      } else if (input.role === 'parent') {
+        res = await api.auth.registerParent({
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
+          password: input.password,
+          phoneNumber: input.phoneNumber,
+          childStudentId: input.childStudentId,
+        });
+      }
+
+      if (res && res.success && res.token && res.user) {
+        api.token.set(res.token);
+        api.user.set(res.user);
+        setEvents((prev) => prev.filter((event) => event.organizer !== sportsEventOrganizer));
+        setAuthToken(res.token);
+        setAuthUser(res.user);
+        const roleMap: Record<string, UserRole> = {
+          STUDENT: 'student',
+          TEACHER: 'teacher',
+          PARENT: 'parent',
+          ADMIN: 'admin',
+          SUPER_ADMIN: 'super_admin'
+        };
+        if (res.user.role && roleMap[res.user.role]) {
+          setCurrentRole(roleMap[res.user.role]);
+        }
+        setIsLanding(false);
+        addToast({
+          type: 'success',
+          title: 'Account Created',
+          message: `Welcome, ${res.user.firstName || 'User'}! Your profile has been initialized.`
+        });
+        return { success: true };
+      }
+      return { success: false, message: res?.message || 'Registration failed' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Registration network error' };
     }
   };
 
@@ -2523,6 +2607,7 @@ const addTenant = (tenant: Tenant) => {
         authUser,
         authToken,
         loginUser,
+        registerUser,
         logoutUser
       }}
     >
