@@ -388,18 +388,13 @@ const addTenant = (tenant: Tenant) => {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState<any | null>(null);
 
-  // Load real tenants for authenticated Super Admin
-  // Load real tenants for authenticated Super Admin
+  // Load real tenants for Super Admin
   useEffect(() => {
-    if (authUser?.role !== 'SUPER_ADMIN' || !authToken) {
+    if (currentRole !== 'super_admin' && authUser?.role !== 'SUPER_ADMIN') {
       return;
     }
 
     let cancelled = false;
-
-    // Do not show mock tenants while loading real Super Admin data
-    setTenants([]);
-    setActiveTenantId('');
 
     const loadTenants = async () => {
       try {
@@ -407,16 +402,18 @@ const addTenant = (tenant: Tenant) => {
 
         if (cancelled) return;
 
-        const realTenants: Tenant[] = result.data.map(mapBackendTenant);
-
-        setTenants(realTenants);
-        setActiveTenantId(realTenants[0]?.id ?? '');
+        if (result?.data && Array.isArray(result.data)) {
+          const realTenants: Tenant[] = result.data.map(mapBackendTenant);
+          if (realTenants.length > 0) {
+            setTenants(realTenants);
+            if (!realTenants.some((t) => t.id === activeTenantId)) {
+              setActiveTenantId(realTenants[0]?.id ?? '');
+            }
+          }
+        }
       } catch (error) {
         if (cancelled) return;
-
-        console.error('Failed to load tenants:', error);
-        setTenants([]);
-        setActiveTenantId('');
+        console.warn('Could not load live tenants from backend:', error);
       }
     };
 
@@ -425,7 +422,7 @@ const addTenant = (tenant: Tenant) => {
     return () => {
       cancelled = true;
     };
-  }, [authUser?.role, authToken]);
+  }, [currentRole, authUser?.role, authToken]);
 
   // Restore authenticated session from localStorage on initial load
   useEffect(() => {

@@ -177,17 +177,12 @@ export const api = {
   tenants: {
     async getAll() {
       const token = api.token.get();
-
-      if (!token) {
-        throw new Error('Authentication required');
-      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const response = await fetch(`${API_BASE_URL}/tenants`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
       });
 
       const result = await response.json();
@@ -198,30 +193,26 @@ export const api = {
 
       return result;
     },
-       async create(data: {
-  name: string;
-  subdomain: string;
-  plan: string;
-  adminEmail: string;
-  adminName: string;
-  contactPhone: string;
-  monthlyFeeLkr: number;
-  address: string;
-  type: string;
-  enabledFeatures: Record<string, boolean>;
-}) {
-      const token = api.token.get();
 
-      if (!token) {
-        throw new Error('Authentication required');
-      }
+    async create(data: {
+      name: string;
+      subdomain: string;
+      plan: string;
+      adminEmail: string;
+      adminName: string;
+      contactPhone: string;
+      monthlyFeeLkr: number;
+      address: string;
+      type: string;
+      enabledFeatures: Record<string, boolean>;
+    }) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const response = await fetch(`${API_BASE_URL}/tenants`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify(data),
       });
 
@@ -234,24 +225,19 @@ export const api = {
       return result;
     },
 
-      async updateFeatures(
+    async updateFeatures(
       tenantId: string,
       enabledFeatures: Record<string, boolean>
     ) {
       const token = api.token.get();
-
-      if (!token) {
-        throw new Error("Authentication required");
-      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const response = await fetch(
         `${API_BASE_URL}/tenants/${tenantId}/features`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers,
           body: JSON.stringify({ enabledFeatures }),
         }
       );
@@ -266,62 +252,54 @@ export const api = {
 
       return result;
     },
-      async update(
-  tenantId: string,
-  data: {
-    name?: string;
-    plan?: string;
-    adminEmail?: string;
-    adminName?: string;
-    contactPhone?: string;
-    monthlyFeeLkr?: number;
-    address?: string;
-    type?: string;
-    status?: "ACTIVE" | "INACTIVE" | "SUSPENDED" | "TRIAL";
-    tagline?: string;
-  }
-) {
-  const token = api.token.get();
 
-  if (!token) {
-    throw new Error("Authentication required");
-  }
+    async update(
+      tenantId: string,
+      data: {
+        name?: string;
+        plan?: string;
+        adminEmail?: string;
+        adminName?: string;
+        contactPhone?: string;
+        monthlyFeeLkr?: number;
+        address?: string;
+        type?: string;
+        status?: "ACTIVE" | "INACTIVE" | "SUSPENDED" | "TRIAL";
+        tagline?: string;
+      }
+    ) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const response = await fetch(
-    `${API_BASE_URL}/tenants/${tenantId}`,
-    {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(data),
-    }
-  );
+      const response = await fetch(
+        `${API_BASE_URL}/tenants/${tenantId}`,
+        {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(data),
+        }
+      );
 
-  const result = await response.json();
+      const result = await response.json();
 
-  if (!response.ok || !result.success) {
-    throw new Error(
-      result.message || "Failed to update tenant"
-    );
-  }
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to update tenant"
+        );
+      }
 
-  return result;
+      return result;
     },
 
     async getArchived() {
       const token = api.token.get();
-
-      if (!token) {
-        throw new Error("Authentication required");
-      }
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const response = await fetch(`${API_BASE_URL}/tenants/archived`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
       });
 
       const result = await response.json();
@@ -335,18 +313,14 @@ export const api = {
 
     async archive(tenantId: string) {
       const token = api.token.get();
-
-      if (!token) {
-        throw new Error("Authentication required");
-      }
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const response = await fetch(
         `${API_BASE_URL}/tenants/${encodeURIComponent(tenantId)}/archive`,
         {
           method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers,
         }
       );
 
@@ -361,18 +335,14 @@ export const api = {
 
     async restore(tenantId: string) {
       const token = api.token.get();
-
-      if (!token) {
-        throw new Error("Authentication required");
-      }
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const response = await fetch(
         `${API_BASE_URL}/tenants/${encodeURIComponent(tenantId)}/restore`,
         {
           method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers,
         }
       );
 
@@ -384,7 +354,6 @@ export const api = {
 
       return result;
     },
-
   },
 
   // Auth API
