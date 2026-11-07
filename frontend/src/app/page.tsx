@@ -215,7 +215,7 @@ export default function HomePage() {
           return <AdminViews initialTab="staff" />;
         case "curriculum":
         case "subjects":
-          return <AdminViews initialTab="overview" />;
+          return <AdminViews initialTab="subjects" />;
         case "users":
           return <AdminViews initialTab="users" />;
         case "library":

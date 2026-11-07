@@ -214,10 +214,14 @@ interface AppContextType {
   updateAnnouncement: (id: string, updates: Partial<Omit<Announcement, 'id'>>) => void;
   deleteAnnouncement: (id: string) => void;
   createSchool: (school: Partial<School>) => void;
-  createClass: (schoolClass: Partial<SchoolClass>) => void;
-  createSubject: (subject: Partial<Subject>) => void;
-  updateSubject: (id: string, updates: Partial<Subject>) => void;
-  deleteSubject: (id: string) => void;
+  createClass: (schoolClass: Partial<SchoolClass>) => Promise<void>;
+  updateClass: (id: string, updates: Partial<SchoolClass>) => Promise<void>;
+  deleteClass: (id: string) => Promise<void>;
+  createSubject: (subject: Partial<Subject>) => Promise<void>;
+  updateSubject: (id: string, updates: Partial<Subject>) => Promise<void>;
+  deleteSubject: (id: string) => Promise<void>;
+  fetchClasses: () => Promise<void>;
+  fetchSubjects: () => Promise<void>;
   createEvent: (event: Partial<SchoolEvent>) => Promise<void>;
   toggleSaveResource: (resourceId: string) => void;
   createLibraryResource: (resource: Partial<LibraryResource>) => void;
@@ -732,6 +736,28 @@ const addTenant = (tenant: Tenant) => {
     }
   };
 
+  const fetchClasses = async () => {
+    try {
+      const data = await api.admin.getClasses();
+      if (Array.isArray(data) && data.length > 0) {
+        setClasses(data);
+      }
+    } catch (err) {
+      console.warn('Could not load classes from backend, using defaults:', err);
+    }
+  };
+
+  const fetchSubjects = async () => {
+    try {
+      const data = await api.admin.getSubjects();
+      if (Array.isArray(data) && data.length > 0) {
+        setSubjects(data);
+      }
+    } catch (err) {
+      console.warn('Could not load subjects from backend, using defaults:', err);
+    }
+  };
+
   useEffect(() => {
     fetchAssignments();
     fetchSubmissions();
@@ -739,12 +765,16 @@ const addTenant = (tenant: Tenant) => {
     fetchLibraryResources();
     fetchQuizzes();
     fetchTimetable();
+    fetchClasses();
+    fetchSubjects();
   }, [currentRole, activeTenantId]);
 
   useEffect(() => {
     if (!authToken) return;
     void syncSportsCalendarEvents(setEvents);
     void fetchTimetable();
+    void fetchClasses();
+    void fetchSubjects();
   }, [authToken]);
 
   const createCourse = async (data: {
@@ -2074,43 +2104,101 @@ const addTenant = (tenant: Tenant) => {
     addToast({ type: 'success', title: 'School Registered Successfully!' });
   };
 
-  const createClass = (cls: Partial<SchoolClass>) => {
-    const newCls: SchoolClass = {
-      id: `cls_${Date.now()}`,
-      name: cls.name || 'New Class',
-      gradeId: cls.gradeId || 'grd_12',
-      gradeName: cls.gradeName || 'Grade 12',
-      classTeacherId: 'usr_teacher_01',
-      classTeacherName: 'Mr. Samantha Perera',
-      studentCount: 35
-    };
-    setClasses((prev) => [...prev, newCls]);
-    addToast({ type: 'success', title: 'Class Created Successfully!' });
+  const createClass = async (cls: Partial<SchoolClass>) => {
+    try {
+      const newCls = await api.admin.createClass(cls);
+      if (newCls) {
+        setClasses((prev) => [newCls, ...prev.filter((c) => c.id !== newCls.id)]);
+      }
+      addToast({ type: 'success', title: 'Class Created Successfully!', message: `"${cls.name || 'New Class'}" saved to cloud database.` });
+    } catch (error: any) {
+      console.error('Error creating class:', error);
+      const fallbackCls: SchoolClass = {
+        id: `cls_${Date.now()}`,
+        name: cls.name || 'New Class',
+        gradeId: cls.gradeId || 'grd_12',
+        gradeName: cls.gradeName || 'Grade 12',
+        classTeacherId: cls.classTeacherId || 'usr_teacher_01',
+        classTeacherName: cls.classTeacherName || 'Mr. Samantha Perera',
+        studentCount: cls.studentCount || 35
+      };
+      setClasses((prev) => [fallbackCls, ...prev]);
+      addToast({ type: 'success', title: 'Class Created (Offline)', message: fallbackCls.name });
+    }
   };
 
-  const createSubject = (sub: Partial<Subject>) => {
-    const newSub: Subject = {
-      id: `sub_${Date.now()}`,
-      name: sub.name || 'New Subject',
-      code: sub.code || 'SUB-01',
-      gradeId: sub.gradeId || 'grd_12',
-      gradeName: sub.gradeName || 'Grade 12',
-      color: 'from-blue-600 to-indigo-700'
-    };
-    setSubjects((prev) => [...prev, newSub]);
-    addToast({ type: 'success', title: 'Subject Added to Curriculum!' });
+  const updateClass = async (id: string, updates: Partial<SchoolClass>) => {
+    try {
+      const updated = await api.admin.updateClass(id, updates);
+      setClasses((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
+      addToast({ type: 'success', title: 'Class Updated Successfully!' });
+    } catch (error: any) {
+      console.error('Error updating class:', error);
+      setClasses((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+      addToast({ type: 'success', title: 'Class Updated (Local)' });
+    }
   };
 
-  const updateSubject = (id: string, updates: Partial<Subject>) => {
-    setSubjects((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
-    );
-    addToast({ type: 'success', title: 'Subject Details Updated Successfully!' });
+  const deleteClass = async (id: string) => {
+    try {
+      await api.admin.deleteClass(id);
+      setClasses((prev) => prev.filter((c) => c.id !== id));
+      addToast({ type: 'info', title: 'Class Removed Successfully' });
+    } catch (error: any) {
+      console.error('Error deleting class:', error);
+      setClasses((prev) => prev.filter((c) => c.id !== id));
+      addToast({ type: 'info', title: 'Class Removed (Local)' });
+    }
   };
 
-  const deleteSubject = (id: string) => {
-    setSubjects((prev) => prev.filter((s) => s.id !== id));
-    addToast({ type: 'info', title: 'Subject Removed from Curriculum' });
+  const createSubject = async (sub: Partial<Subject>) => {
+    try {
+      const newSub = await api.admin.createSubject(sub);
+      if (newSub) {
+        setSubjects((prev) => [newSub, ...prev.filter((s) => s.id !== newSub.id)]);
+      }
+      addToast({ type: 'success', title: 'Subject Added to Curriculum!', message: `"${sub.name}" saved to cloud database.` });
+    } catch (error: any) {
+      console.error('Error creating subject:', error);
+      const fallbackSub: Subject = {
+        id: `sub_${Date.now()}`,
+        name: sub.name || 'New Subject',
+        code: sub.code || 'SUB-01',
+        gradeId: sub.gradeId || 'grd_12',
+        gradeName: sub.gradeName || 'Grade 12',
+        color: sub.color || 'from-blue-600 to-indigo-700'
+      };
+      setSubjects((prev) => [fallbackSub, ...prev]);
+      addToast({ type: 'success', title: 'Subject Added (Offline)' });
+    }
+  };
+
+  const updateSubject = async (id: string, updates: Partial<Subject>) => {
+    try {
+      const updated = await api.admin.updateSubject(id, updates);
+      setSubjects((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, ...updated } : s))
+      );
+      addToast({ type: 'success', title: 'Subject Details Updated Successfully!' });
+    } catch (error: any) {
+      console.error('Error updating subject:', error);
+      setSubjects((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
+      );
+      addToast({ type: 'success', title: 'Subject Details Updated (Local)' });
+    }
+  };
+
+  const deleteSubject = async (id: string) => {
+    try {
+      await api.admin.deleteSubject(id);
+      setSubjects((prev) => prev.filter((s) => s.id !== id));
+      addToast({ type: 'info', title: 'Subject Removed from Curriculum' });
+    } catch (error: any) {
+      console.error('Error deleting subject:', error);
+      setSubjects((prev) => prev.filter((s) => s.id !== id));
+      addToast({ type: 'info', title: 'Subject Removed (Local)' });
+    }
   };
 
   const createEvent = async (evt: Partial<SchoolEvent>) => {
@@ -2956,9 +3044,13 @@ const addTenant = (tenant: Tenant) => {
         deleteAnnouncement,
         createSchool,
         createClass,
+        updateClass,
+        deleteClass,
         createSubject,
         updateSubject,
         deleteSubject,
+        fetchClasses,
+        fetchSubjects,
         createEvent,
         toggleSaveResource,
         createLibraryResource,

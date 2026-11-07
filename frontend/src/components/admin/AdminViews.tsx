@@ -74,6 +74,8 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     currentView,
     createSchool,
     createClass,
+    updateClass,
+    deleteClass,
     createSubject,
     updateSubject,
     deleteSubject,
@@ -125,6 +127,45 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   const [className, setClassName] = useState("");
   const [gradeId, setGradeId] = useState("grd_12");
   const [classTeacher, setClassTeacher] = useState("Mr. Samantha Perera");
+
+  // Class edit / delete states
+  const [isEditClassModalOpen, setIsEditClassModalOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState<import("@/types/lms").SchoolClass | null>(null);
+  const [editClassName, setEditClassName] = useState("");
+  const [editClassGradeId, setEditClassGradeId] = useState("grd_12");
+  const [editClassTeacher, setEditClassTeacher] = useState("");
+  const [editClassStudentCount, setEditClassStudentCount] = useState(35);
+  const [deletingClass, setDeletingClass] = useState<import("@/types/lms").SchoolClass | null>(null);
+
+  const handleOpenEditClass = (cls: import("@/types/lms").SchoolClass) => {
+    setEditingClass(cls);
+    setEditClassName(cls.name);
+    setEditClassGradeId(cls.gradeId || "grd_12");
+    setEditClassTeacher(cls.classTeacherName || "");
+    setEditClassStudentCount(cls.studentCount || 35);
+    setIsEditClassModalOpen(true);
+  };
+
+  const handleSaveEditClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClass) return;
+    const g = grades.find((gr) => gr.id === editClassGradeId);
+    await updateClass(editingClass.id, {
+      name: editClassName,
+      gradeId: editClassGradeId,
+      gradeName: g?.name || "Grade 12 (A/L)",
+      classTeacherName: editClassTeacher,
+      studentCount: Number(editClassStudentCount) || 35
+    });
+    setIsEditClassModalOpen(false);
+    setEditingClass(null);
+  };
+
+  const handleConfirmDeleteClass = async () => {
+    if (!deletingClass) return;
+    await deleteClass(deletingClass.id);
+    setDeletingClass(null);
+  };
 
   // Subject modal state
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
@@ -1196,9 +1237,103 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                         <Badge variant="success" className="text-[10px]">Active</Badge>
                       </td>
                       <td className="p-4 text-right">
-                        <Button variant="outline" size="sm" className="h-7 text-xs font-bold">
-                          <Edit className="h-3 w-3 mr-1" /> Edit
-                        </Button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditClass(cls)}
+                            className="h-7 text-xs font-bold"
+                          >
+                            <Edit className="h-3 w-3 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeletingClass(cls)}
+                            className="h-7 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* TAB: Curriculum & Academic Subjects */}
+      {activeAdminTab === "subjects" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-extrabold text-[#0d2b26] flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-[#0d5c4d]" />
+                Curriculum & Academic Subjects
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Manage academic subjects, syllabus codes, grade streams, and course allocations with real database persistence.
+              </p>
+            </div>
+            <Button
+              onClick={() => setIsSubjectModalOpen(true)}
+              className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-2 text-xs shadow-xs"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Subject
+            </Button>
+          </div>
+
+          {/* Subjects Table */}
+          <Card className="border-[#e6ece8] bg-white shadow-2xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#e6ece8] bg-[#f8faf9] text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                    <th className="p-4">Subject Name</th>
+                    <th className="p-4">Subject Code</th>
+                    <th className="p-4">Grade Stream</th>
+                    <th className="p-4">Theme / Color</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#e6ece8] text-slate-700">
+                  {subjects.map((sub) => (
+                    <tr key={sub.id} className="hover:bg-[#fbfcfb] transition-colors">
+                      <td className="p-4 font-bold text-[#0d2b26]">{sub.name}</td>
+                      <td className="p-4">
+                        <Badge variant="outline" className="text-[10px] font-mono text-[#0d5c4d] bg-[#ecf8f5] border-[#c4e9e0]">
+                          {sub.code}
+                        </Badge>
+                      </td>
+                      <td className="p-4 font-semibold text-slate-600">{sub.gradeName || "Grade 12 (A/L)"}</td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`h-4 w-4 rounded-full bg-linear-to-r ${sub.color || "from-blue-600 to-indigo-700"} inline-block shadow-xs`} />
+                          <span className="text-[11px] font-mono text-slate-400">Active</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditSubject(sub)}
+                            className="h-7 text-xs font-bold"
+                          >
+                            <Edit className="h-3 w-3 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeletingSubject(sub)}
+                            className="h-7 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -2643,6 +2778,275 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal: Edit Class */}
+      <Modal
+        isOpen={isEditClassModalOpen}
+        onClose={() => {
+          setIsEditClassModalOpen(false);
+          setEditingClass(null);
+        }}
+        title="Edit Class Stream"
+        description="Update class details and stream allocations."
+      >
+        <form onSubmit={handleSaveEditClass} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Class Name
+            </label>
+            <input
+              type="text"
+              required
+              value={editClassName}
+              onChange={(e) => setEditClassName(e.target.value)}
+              placeholder="e.g. 12-Commerce"
+              className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Grade Level
+              </label>
+              <select
+                value={editClassGradeId}
+                onChange={(e) => setEditClassGradeId(e.target.value)}
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              >
+                {grades.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Class Teacher
+              </label>
+              <input
+                type="text"
+                value={editClassTeacher}
+                onChange={(e) => setEditClassTeacher(e.target.value)}
+                placeholder="Teacher name"
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Enrolled Students Count
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={editClassStudentCount}
+              onChange={(e) => setEditClassStudentCount(Number(e.target.value))}
+              className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsEditClassModalOpen(false);
+                setEditingClass(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold">
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Delete Class Confirmation */}
+      <Modal
+        isOpen={Boolean(deletingClass)}
+        onClose={() => setDeletingClass(null)}
+        title="Delete Class Stream"
+        description="Are you sure you want to delete this class? This action cannot be undone."
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700">
+            You are about to remove <span className="font-bold text-[#0d2b26]">{deletingClass?.name}</span>.
+          </p>
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button variant="outline" onClick={() => setDeletingClass(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDeleteClass}>
+              Delete Class
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Create Subject */}
+      <Modal
+        isOpen={isSubjectModalOpen}
+        onClose={() => setIsSubjectModalOpen(false)}
+        title="Add Academic Subject"
+        description="Add a new subject to the school curriculum."
+      >
+        <form onSubmit={handleCreateSubjectSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Subject Name
+            </label>
+            <input
+              type="text"
+              required
+              value={subjectName}
+              onChange={(e) => setSubjectName(e.target.value)}
+              placeholder="e.g. Combined Mathematics"
+              className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Subject Code
+              </label>
+              <input
+                type="text"
+                required
+                value={subjectCode}
+                onChange={(e) => setSubjectCode(e.target.value)}
+                placeholder="e.g. CMATH-12"
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Grade Stream
+              </label>
+              <select
+                value={subjectGradeId}
+                onChange={(e) => setSubjectGradeId(e.target.value)}
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              >
+                {grades.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button type="button" variant="outline" onClick={() => setIsSubjectModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold">
+              Save Subject
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Edit Subject */}
+      <Modal
+        isOpen={isEditSubjectModalOpen}
+        onClose={() => {
+          setIsEditSubjectModalOpen(false);
+          setEditingSubject(null);
+        }}
+        title="Edit Subject"
+        description="Update curriculum subject details."
+      >
+        <form onSubmit={handleSaveEditSubject} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Subject Name
+            </label>
+            <input
+              type="text"
+              required
+              value={editSubjectName}
+              onChange={(e) => setEditSubjectName(e.target.value)}
+              className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Subject Code
+              </label>
+              <input
+                type="text"
+                required
+                value={editSubjectCode}
+                onChange={(e) => setEditSubjectCode(e.target.value)}
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Grade Stream
+              </label>
+              <select
+                value={editSubjectGradeId}
+                onChange={(e) => setEditSubjectGradeId(e.target.value)}
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              >
+                {grades.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsEditSubjectModalOpen(false);
+                setEditingSubject(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold">
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Delete Subject Confirmation */}
+      <Modal
+        isOpen={Boolean(deletingSubject)}
+        onClose={() => setDeletingSubject(null)}
+        title="Delete Subject"
+        description="Are you sure you want to remove this subject from the curriculum?"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700">
+            You are about to remove <span className="font-bold text-[#0d2b26]">{deletingSubject?.name}</span> ({deletingSubject?.code}).
+          </p>
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button variant="outline" onClick={() => setDeletingSubject(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDeleteSubject}>
+              Delete Subject
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       <Modal isOpen={isStaffModalOpen} onClose={() => setIsStaffModalOpen(false)} title={`${editingStaff ? "Edit" : "Add"} ${staffRoleFilter === "coach" ? "Coach" : "Teacher"}`} description="Keep staff records accurate for your school." maxWidth="max-w-3xl">

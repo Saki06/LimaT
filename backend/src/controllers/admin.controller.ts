@@ -815,3 +815,471 @@ export const deleteUser = async (
     res.status(500).json({ success: false, message: error.message || 'Failed to delete user.' });
   }
 };
+
+/**
+ * Default Seed Classes & Subjects for initial database population
+ */
+const DEFAULT_CLASSES = [
+  {
+    id: 'cls_12_sci',
+    name: '12-Physical Science',
+    gradeId: 'grd_12',
+    gradeName: 'Grade 12 (A/L)',
+    classTeacherId: 'usr_teacher_01',
+    classTeacherName: 'Mr. Samantha Perera',
+    studentCount: 38,
+  },
+  {
+    id: 'cls_12_bio',
+    name: '12-Biological Science',
+    gradeId: 'grd_12',
+    gradeName: 'Grade 12 (A/L)',
+    classTeacherId: 'usr_teacher_02',
+    classTeacherName: 'Dr. Niluka Jayawardena',
+    studentCount: 42,
+  },
+  {
+    id: 'cls_13_sci',
+    name: '13-Physical Science',
+    gradeId: 'grd_13',
+    gradeName: 'Grade 13 (A/L)',
+    classTeacherId: 'usr_teacher_03',
+    classTeacherName: 'Mrs. Anoma Alwis',
+    studentCount: 35,
+  },
+  {
+    id: 'cls_11_ol',
+    name: '11-G.C.E. O/L Special',
+    gradeId: 'grd_11',
+    gradeName: 'Grade 11 (O/L)',
+    classTeacherId: 'usr_teacher_04',
+    classTeacherName: 'Mr. Rohan Gunaratne',
+    studentCount: 45,
+  },
+];
+
+const DEFAULT_SUBJECTS = [
+  {
+    id: 'sub_math',
+    name: 'Combined Mathematics',
+    code: 'CMATH-12',
+    gradeId: 'grd_12',
+    gradeName: 'Grade 12 (A/L)',
+    color: 'from-blue-600 to-indigo-700',
+  },
+  {
+    id: 'sub_phy',
+    name: 'Physics',
+    code: 'PHY-12',
+    gradeId: 'grd_12',
+    gradeName: 'Grade 12 (A/L)',
+    color: 'from-cyan-600 to-blue-700',
+  },
+  {
+    id: 'sub_chem',
+    name: 'Chemistry',
+    code: 'CHEM-12',
+    gradeId: 'grd_12',
+    gradeName: 'Grade 12 (A/L)',
+    color: 'from-emerald-600 to-teal-700',
+  },
+  {
+    id: 'sub_bio',
+    name: 'Biology',
+    code: 'BIO-12',
+    gradeId: 'grd_12',
+    gradeName: 'Grade 12 (A/L)',
+    color: 'from-green-600 to-emerald-700',
+  },
+  {
+    id: 'sub_ict',
+    name: 'Information & Communication Technology',
+    code: 'ICT-12',
+    gradeId: 'grd_12',
+    gradeName: 'Grade 12 (A/L)',
+    color: 'from-purple-600 to-violet-700',
+  },
+];
+
+/**
+ * 12. GET /api/admin/classes
+ * Fetch all academic classes for the active tenant
+ */
+export const getClasses = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = await resolveTenantId(req);
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      res.status(404).json({ success: false, message: 'School tenant not found.' });
+      return;
+    }
+    const settings = (tenant.settings as Record<string, any>) || {};
+    let classes = Array.isArray(settings.classes) ? settings.classes : [];
+    if (classes.length === 0) {
+      classes = DEFAULT_CLASSES;
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: {
+          settings: {
+            ...settings,
+            classes: DEFAULT_CLASSES,
+          },
+        },
+      });
+    }
+    res.status(200).json({ success: true, data: classes });
+  } catch (error: any) {
+    console.error('Error in getClasses:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch classes.' });
+  }
+};
+
+/**
+ * 13. POST /api/admin/classes
+ * Create a new academic class stream
+ */
+export const createClass = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = await resolveTenantId(req);
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      res.status(404).json({ success: false, message: 'School tenant not found.' });
+      return;
+    }
+    const { name, gradeId, gradeName, classTeacherId, classTeacherName, studentCount } = req.body;
+    if (!name) {
+      res.status(400).json({ success: false, message: 'Class name is required.' });
+      return;
+    }
+    const settings = (tenant.settings as Record<string, any>) || {};
+    const existingClasses: any[] = Array.isArray(settings.classes) && settings.classes.length > 0
+      ? settings.classes
+      : [...DEFAULT_CLASSES];
+
+    const newClass = {
+      id: `cls_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: String(name).trim(),
+      gradeId: gradeId || 'grd_12',
+      gradeName: gradeName || 'Grade 12 (A/L)',
+      classTeacherId: classTeacherId || 'usr_teacher_01',
+      classTeacherName: classTeacherName || 'Mr. Samantha Perera',
+      studentCount: typeof studentCount === 'number' ? studentCount : 35,
+    };
+
+    const updatedClasses = [newClass, ...existingClasses];
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...settings,
+          classes: updatedClasses,
+        },
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Class created successfully.',
+      data: newClass,
+    });
+  } catch (error: any) {
+    console.error('Error in createClass:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to create class.' });
+  }
+};
+
+/**
+ * 14. PUT /api/admin/classes/:id
+ * Update an existing academic class stream
+ */
+export const updateClass = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = await resolveTenantId(req);
+    const classId = String(req.params.id);
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      res.status(404).json({ success: false, message: 'School tenant not found.' });
+      return;
+    }
+    const settings = (tenant.settings as Record<string, any>) || {};
+    const existingClasses: any[] = Array.isArray(settings.classes) && settings.classes.length > 0
+      ? settings.classes
+      : [...DEFAULT_CLASSES];
+
+    const index = existingClasses.findIndex((c) => c.id === classId);
+    if (index === -1) {
+      res.status(404).json({ success: false, message: 'Class not found.' });
+      return;
+    }
+
+    const updatedItem = {
+      ...existingClasses[index],
+      ...req.body,
+      id: classId,
+    };
+    existingClasses[index] = updatedItem;
+
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...settings,
+          classes: existingClasses,
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Class updated successfully.',
+      data: updatedItem,
+    });
+  } catch (error: any) {
+    console.error('Error in updateClass:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to update class.' });
+  }
+};
+
+/**
+ * 15. DELETE /api/admin/classes/:id
+ * Remove a class stream
+ */
+export const deleteClass = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = await resolveTenantId(req);
+    const classId = String(req.params.id);
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      res.status(404).json({ success: false, message: 'School tenant not found.' });
+      return;
+    }
+    const settings = (tenant.settings as Record<string, any>) || {};
+    const existingClasses: any[] = Array.isArray(settings.classes) && settings.classes.length > 0
+      ? settings.classes
+      : [...DEFAULT_CLASSES];
+
+    const filtered = existingClasses.filter((c) => c.id !== classId);
+
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...settings,
+          classes: filtered,
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Class removed successfully.',
+      data: { id: classId },
+    });
+  } catch (error: any) {
+    console.error('Error in deleteClass:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to delete class.' });
+  }
+};
+
+/**
+ * 16. GET /api/admin/subjects
+ * Fetch all curriculum subjects
+ */
+export const getSubjects = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = await resolveTenantId(req);
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      res.status(404).json({ success: false, message: 'School tenant not found.' });
+      return;
+    }
+    const settings = (tenant.settings as Record<string, any>) || {};
+    let subjects = Array.isArray(settings.subjects) ? settings.subjects : [];
+    if (subjects.length === 0) {
+      subjects = DEFAULT_SUBJECTS;
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: {
+          settings: {
+            ...settings,
+            subjects: DEFAULT_SUBJECTS,
+          },
+        },
+      });
+    }
+    res.status(200).json({ success: true, data: subjects });
+  } catch (error: any) {
+    console.error('Error in getSubjects:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch subjects.' });
+  }
+};
+
+/**
+ * 17. POST /api/admin/subjects
+ * Add a subject to curriculum
+ */
+export const createSubject = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = await resolveTenantId(req);
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      res.status(404).json({ success: false, message: 'School tenant not found.' });
+      return;
+    }
+    const { name, code, gradeId, gradeName, color } = req.body;
+    if (!name) {
+      res.status(400).json({ success: false, message: 'Subject name is required.' });
+      return;
+    }
+    const settings = (tenant.settings as Record<string, any>) || {};
+    const existingSubjects: any[] = Array.isArray(settings.subjects) && settings.subjects.length > 0
+      ? settings.subjects
+      : [...DEFAULT_SUBJECTS];
+
+    const newSub = {
+      id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: String(name).trim(),
+      code: String(code || `SUB-${existingSubjects.length + 1}`).trim().toUpperCase(),
+      gradeId: gradeId || 'grd_12',
+      gradeName: gradeName || 'Grade 12 (A/L)',
+      color: color || 'from-blue-600 to-indigo-700',
+    };
+
+    const updated = [newSub, ...existingSubjects];
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...settings,
+          subjects: updated,
+        },
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Subject added to curriculum successfully.',
+      data: newSub,
+    });
+  } catch (error: any) {
+    console.error('Error in createSubject:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to create subject.' });
+  }
+};
+
+/**
+ * 18. PUT /api/admin/subjects/:id
+ * Update subject details
+ */
+export const updateSubject = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = await resolveTenantId(req);
+    const subjectId = String(req.params.id);
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      res.status(404).json({ success: false, message: 'School tenant not found.' });
+      return;
+    }
+    const settings = (tenant.settings as Record<string, any>) || {};
+    const existingSubjects: any[] = Array.isArray(settings.subjects) && settings.subjects.length > 0
+      ? settings.subjects
+      : [...DEFAULT_SUBJECTS];
+
+    const index = existingSubjects.findIndex((s) => s.id === subjectId);
+    if (index === -1) {
+      res.status(404).json({ success: false, message: 'Subject not found.' });
+      return;
+    }
+
+    const updatedItem = {
+      ...existingSubjects[index],
+      ...req.body,
+      id: subjectId,
+    };
+    existingSubjects[index] = updatedItem;
+
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...settings,
+          subjects: existingSubjects,
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Subject details updated successfully.',
+      data: updatedItem,
+    });
+  } catch (error: any) {
+    console.error('Error in updateSubject:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to update subject.' });
+  }
+};
+
+/**
+ * 19. DELETE /api/admin/subjects/:id
+ * Remove subject from curriculum
+ */
+export const deleteSubject = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = await resolveTenantId(req);
+    const subjectId = String(req.params.id);
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      res.status(404).json({ success: false, message: 'School tenant not found.' });
+      return;
+    }
+    const settings = (tenant.settings as Record<string, any>) || {};
+    const existingSubjects: any[] = Array.isArray(settings.subjects) && settings.subjects.length > 0
+      ? settings.subjects
+      : [...DEFAULT_SUBJECTS];
+
+    const filtered = existingSubjects.filter((s) => s.id !== subjectId);
+
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...settings,
+          subjects: filtered,
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Subject removed from curriculum successfully.',
+      data: { id: subjectId },
+    });
+  } catch (error: any) {
+    console.error('Error in deleteSubject:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to delete subject.' });
+  }
+};

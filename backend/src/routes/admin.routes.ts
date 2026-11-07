@@ -11,6 +11,14 @@ import {
   deleteUser,
   getSchoolSettings,
   updateSchoolSettings,
+  getClasses,
+  createClass,
+  updateClass,
+  deleteClass,
+  getSubjects,
+  createSubject,
+  updateSubject,
+  deleteSubject,
 } from '../controllers/admin.controller';
 import { optionalAuthenticateToken } from '../middlewares/auth.middleware';
 
@@ -37,5 +45,17 @@ router.delete('/users/:id', deleteUser);
 // 4. School Settings & Tenant Branding
 router.get('/settings', getSchoolSettings);
 router.put('/settings', updateSchoolSettings);
+
+// 5. Classes & Academic Streams Management
+router.get('/classes', getClasses);
+router.post('/classes', createClass);
+router.put('/classes/:id', updateClass);
+router.delete('/classes/:id', deleteClass);
+
+// 6. Curriculum & Subjects Management
+router.get('/subjects', getSubjects);
+router.post('/subjects', createSubject);
+router.put('/subjects/:id', updateSubject);
+router.delete('/subjects/:id', deleteSubject);
 
 export default router;
