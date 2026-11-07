@@ -86,7 +86,8 @@ export function ProfileView() {
     courses,
     setSelectedCourseId,
     teacherProfile,
-    updateTeacherProfile
+    updateTeacherProfile,
+    updateAuthUser
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<ProfileTab>("personal");
@@ -627,6 +628,78 @@ if (!savedProfile) {
     };
   }, [currentRole, currentUser.id, addToast]);
 
+  // Load Student Profile from database if student
+  useEffect(() => {
+    if (currentRole !== "student") return;
+
+    let cancelled = false;
+    const loadStudentProfile = async () => {
+      try {
+        const response = await api.students.getMyProfile();
+        if (!response.success || cancelled || !response.data) return;
+
+        const data = response.data;
+        const studentUser = data.user;
+        const fullName = [studentUser?.firstName, studentUser?.lastName].filter(Boolean).join(" ");
+
+        setProfileData((previous) => ({
+          ...previous,
+          email: studentUser?.email ?? previous.email,
+          studentId: data.studentIdNo ?? previous.studentId,
+          fullName: fullName || previous.fullName,
+          name: studentUser?.firstName || previous.name,
+          grade: data.gradeLevel ?? previous.grade,
+          gradeLevel: data.gradeLevel ?? previous.gradeLevel,
+          classRoom: data.section ?? previous.classRoom,
+          guardianName: data.guardian?.user ? `${data.guardian.user.firstName || ''} ${data.guardian.user.lastName || ''}`.trim() : previous.guardianName,
+          guardianPhone: data.guardian?.phoneNumber ?? previous.guardianPhone,
+          guardianEmail: data.guardian?.user?.email ?? previous.guardianEmail,
+        }));
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load Student profile:", error);
+      }
+    };
+
+    loadStudentProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, currentUser.id]);
+
+  // Load Parent Profile from database if parent
+  useEffect(() => {
+    if (currentRole !== "parent") return;
+
+    let cancelled = false;
+    const loadParentProfile = async () => {
+      try {
+        const response = await api.parents.getMyProfile();
+        if (!response.success || cancelled || !response.data) return;
+
+        const data = response.data;
+        const parentUser = data.user;
+        const fullName = [parentUser?.firstName, parentUser?.lastName].filter(Boolean).join(" ");
+
+        setProfileData((previous) => ({
+          ...previous,
+          email: parentUser?.email ?? previous.email,
+          fullName: fullName || previous.fullName,
+          name: parentUser?.firstName || previous.name,
+          phone: data.phoneNumber ?? previous.phone,
+        }));
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load Parent profile:", error);
+      }
+    };
+
+    loadParentProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, currentUser.id]);
+
   const [avatarPreset, setAvatarPreset] = useState<string>("default");
   const [selectedScheduleDay, setSelectedScheduleDay] = useState<
     "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"
@@ -1007,14 +1080,96 @@ if (!savedProfile) {
       if (success) {
         setIsEditing(false);
       }
-    } else {
-      setIsEditing(false);
-      addToast({
-        type: "success",
-        title: "Profile Saved",
-        message: "Your profile information has been successfully updated!"
-      });
+      return;
     }
+
+    if (currentRole === "student") {
+      setIsSavingProfile(true);
+      try {
+        const nameParts = (profileData.fullName || profileData.name || "").trim().split(/\s+/);
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || "";
+
+        const response = await api.students.updateMyProfile({
+          firstName,
+          lastName,
+          gradeLevel: profileData.grade || profileData.gradeLevel,
+          section: profileData.classRoom || profileData.stream,
+        });
+
+        if (!response.success) {
+          throw new Error(response.message || "Failed to update student profile");
+        }
+
+        updateAuthUser({
+          firstName,
+          lastName,
+        });
+
+        setIsEditing(false);
+        addToast({
+          type: "success",
+          title: "Profile Saved",
+          message: "Student academic profile and identity updated successfully.",
+        });
+      } catch (error: any) {
+        addToast({
+          type: "error",
+          title: "Save Failed",
+          message: error?.message || "Unable to update Student profile.",
+        });
+      } finally {
+        setIsSavingProfile(false);
+      }
+      return;
+    }
+
+    if (currentRole === "parent") {
+      setIsSavingProfile(true);
+      try {
+        const nameParts = (profileData.fullName || profileData.name || "").trim().split(/\s+/);
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || "";
+
+        const response = await api.parents.updateMyProfile({
+          firstName,
+          lastName,
+          phoneNumber: profileData.phone,
+        });
+
+        if (!response.success) {
+          throw new Error(response.message || "Failed to update parent profile");
+        }
+
+        updateAuthUser({
+          firstName,
+          lastName,
+        });
+
+        setIsEditing(false);
+        addToast({
+          type: "success",
+          title: "Profile Saved",
+          message: "Parent contact profile and identity updated successfully.",
+        });
+      } catch (error: any) {
+        addToast({
+          type: "error",
+          title: "Save Failed",
+          message: error?.message || "Unable to update Parent profile.",
+        });
+      } finally {
+        setIsSavingProfile(false);
+      }
+      return;
+    }
+
+    setIsEditing(false);
+    addToast({
+      type: "success",
+      title: "Profile Saved",
+      message: "Your profile information has been successfully updated!"
+    });
   };
 
   return (

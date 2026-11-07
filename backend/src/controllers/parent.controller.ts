@@ -743,3 +743,98 @@ export const submitDepositSlip = async (
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
+
+/**
+ * 5. Get Current Parent Profile
+ * GET /api/parents/me
+ */
+export const getMyParentProfile = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const parent = await getOrCreateParentProfile(userId);
+    res.status(200).json({
+      success: true,
+      data: {
+        id: parent.id,
+        userId: parent.userId,
+        phoneNumber: parent.phoneNumber,
+        user: parent.user,
+        studentsCount: parent.students?.length || 0,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error in getMyParentProfile:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+/**
+ * 6. Update Current Parent Profile
+ * PUT /api/parents/me
+ */
+export const updateMyParentProfile = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const { firstName, lastName, avatarUrl, phoneNumber } = req.body;
+
+    if (firstName !== undefined || lastName !== undefined || avatarUrl !== undefined) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          ...(firstName !== undefined ? { firstName } : {}),
+          ...(lastName !== undefined ? { lastName } : {}),
+          ...(avatarUrl !== undefined ? { avatarUrl } : {}),
+        },
+      });
+    }
+
+    const updatedProfile = await prisma.parentProfile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        phoneNumber: phoneNumber || null,
+      },
+      update: {
+        ...(phoneNumber !== undefined ? { phoneNumber } : {}),
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            role: true,
+            tenantId: true,
+          },
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Parent profile updated successfully',
+      data: updatedProfile,
+    });
+  } catch (error: any) {
+    console.error('Error in updateMyParentProfile:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};

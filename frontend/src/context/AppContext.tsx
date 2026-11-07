@@ -87,6 +87,7 @@ interface AppContextType {
   // Authentication State & Actions
   authUser: any | null;
   authToken: string | null;
+  updateAuthUser: (updates: Record<string, any>) => void;
   loginUser: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   registerUser: (input: {
     role: 'student' | 'teacher' | 'parent';
@@ -802,6 +803,15 @@ const addTenant = (tenant: Tenant) => {
       type: 'info',
       title: 'Signed Out',
       message: 'You have been successfully signed out.'
+    });
+  };
+
+  const updateAuthUser = (updates: Record<string, any>) => {
+    setAuthUser((prev: any) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...updates };
+      api.user.set(updated);
+      return updated;
     });
   };
 
@@ -2686,6 +2696,7 @@ const addTenant = (tenant: Tenant) => {
         removeToast,
         authUser,
         authToken,
+        updateAuthUser,
         loginUser,
         registerUser,
         logoutUser

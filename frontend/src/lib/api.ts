@@ -1306,6 +1306,34 @@ export const api = {
 
   // Parent & Guardian Portal API
   parents: {
+    async getMyProfile() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/parents/me`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      return res.json();
+    },
+
+    async updateMyProfile(data: {
+      firstName?: string;
+      lastName?: string;
+      avatarUrl?: string;
+      phoneNumber?: string;
+    }) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/parents/me`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+
     async getMyChildren() {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/parents/children`, {
