@@ -664,6 +664,7 @@ export const api = {
       meetingId?: string;
       passcode?: string;
       recordingUrl?: string;
+      teacherId?: string;
     }) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/live-classes`, {

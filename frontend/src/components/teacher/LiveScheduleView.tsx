@@ -75,6 +75,45 @@ export interface LiveSlot {
   viewsCount?: number;
 }
 
+function parseTimeString(timeStr?: string): { hours: number; minutes: number } {
+  if (!timeStr) return { hours: 9, minutes: 0 };
+  const cleaned = timeStr.trim().toUpperCase();
+  const isPM = cleaned.includes("PM");
+  const isAM = cleaned.includes("AM");
+  const numPart = cleaned.replace(/[^0-9:]/g, "");
+  const [hStr, mStr] = numPart.split(":");
+  let h = parseInt(hStr || "9", 10);
+  const m = parseInt(mStr || "0", 10);
+  if (isPM && h < 12) h += 12;
+  if (isAM && h === 12) h = 0;
+  return { hours: h, minutes: m };
+}
+
+function calculateSlotStartDate(dayName: string, timeStr?: string): Date {
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const targetDay = days.indexOf(dayName);
+  const now = new Date();
+  const currentDay = now.getDay();
+  let daysUntil = (targetDay - currentDay + 7) % 7;
+  if (daysUntil === 0) daysUntil = 7;
+
+  const target = new Date(now);
+  target.setDate(now.getDate() + daysUntil);
+  const { hours, minutes } = parseTimeString(timeStr);
+  target.setHours(hours, minutes, 0, 0);
+  return target;
+}
+
+function parseDurationMinutes(durStr?: string): number {
+  if (!durStr) return 90;
+  let total = 0;
+  const hoursMatch = durStr.match(/(\d+)\s*h/i);
+  const minsMatch = durStr.match(/(\d+)\s*m/i);
+  if (hoursMatch) total += parseInt(hoursMatch[1], 10) * 60;
+  if (minsMatch) total += parseInt(minsMatch[1], 10);
+  return total > 0 ? total : 90;
+}
+
 const INITIAL_SLOTS: LiveSlot[] = [
   {
     id: "slot-1",
@@ -444,6 +483,9 @@ export function LiveScheduleView() {
     else if (formData.platform === "Zoom") finalPlatform = "ZOOM";
     else if (formData.platform === "Custom") finalPlatform = "CUSTOM";
 
+    const targetStartTime = calculateSlotStartDate(formData.day, formData.startTime);
+    const durationMinutes = parseDurationMinutes(formData.duration);
+
     try {
       if (editingSlotId) {
         setSlots((prev) =>
@@ -454,6 +496,8 @@ export function LiveScheduleView() {
           await api.liveClasses.update(editingSlotId, {
             title: formData.title,
             topic: formData.type,
+            startTime: targetStartTime.toISOString(),
+            durationMinutes,
             platform: finalPlatform,
             meetingUrl: formData.meetingUrl,
             meetingId: formData.meetingId,
@@ -477,12 +521,11 @@ export function LiveScheduleView() {
         setSlots((prev) => [newSlot, ...prev]);
 
         // Persist to backend
-        const now = new Date();
         const res = await api.liveClasses.create({
           title: formData.title,
           topic: formData.type,
-          startTime: now.toISOString(),
-          durationMinutes: 90,
+          startTime: targetStartTime.toISOString(),
+          durationMinutes,
           platform: finalPlatform,
           meetingUrl: formData.meetingUrl,
           meetingId: formData.meetingId,

@@ -87,7 +87,8 @@ export function ProfileView() {
     setSelectedCourseId,
     teacherProfile,
     updateTeacherProfile,
-    updateAuthUser
+    updateAuthUser,
+    timetable
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<ProfileTab>("personal");
@@ -704,6 +705,22 @@ if (!savedProfile) {
   const [selectedScheduleDay, setSelectedScheduleDay] = useState<
     "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"
   >("Monday");
+
+  const dayLiveSessions = useMemo(() => {
+    const fromTimetable = (timetable || []).filter((e) => e.day === selectedScheduleDay);
+    if (fromTimetable.length > 0) {
+      return fromTimetable.map((item) => ({
+        time: `${item.startTime} - ${item.endTime}`,
+        subject: item.subjectName,
+        cohort: item.className || "Active Tuition Cohort",
+        type: item.periodType === "LAB" ? "Practical Lab" : "Live Masterclass",
+        platform: item.room || "Live Studio HD",
+        meetCode: item.meetingUrl || `meet.jit.si/LimatLive_${item.id.slice(0, 8)}`,
+        isLive: Boolean(item.isLiveNow)
+      }));
+    }
+    return null;
+  }, [timetable, selectedScheduleDay]);
 
   const handleCopyId = () => {
     navigator.clipboard?.writeText(profileData.studentId);
@@ -2481,6 +2498,14 @@ if (!savedProfile) {
               <div className="flex items-center gap-2.5">
                 <button
                   type="button"
+                  onClick={() => setCurrentView("live_schedule")}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] text-white hover:bg-[#083e34] font-bold text-xs shadow-2xs transition-colors cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Manage Live Classes</span>
+                </button>
+                <button
+                  type="button"
                   onClick={handleDownloadTeacherTimetable}
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#d6dfd9] text-[#0d5c4d] hover:bg-[#ecf8f5] font-bold text-xs shadow-2xs transition-colors cursor-pointer"
                 >
@@ -2521,8 +2546,9 @@ if (!savedProfile) {
 
             {/* Live Session Cards */}
             <div className="space-y-3">
-              {[
-                ...(selectedScheduleDay === "Monday"
+              {(dayLiveSessions && dayLiveSessions.length > 0
+                ? dayLiveSessions
+                : (selectedScheduleDay === "Monday"
                   ? [
                       {
                         time: "06:30 PM - 08:30 PM",
@@ -2631,8 +2657,8 @@ if (!savedProfile) {
                         meetCode: "meet.google.com/mc-boost-live",
                         isLive: true
                       }
-                    ])
-              ].map((slot, idx) => (
+                    ]
+              )).map((slot, idx) => (
                 <div
                   key={idx}
                   className="p-5 rounded-2xl border border-[#e6ece8] bg-white hover:border-[#b2e5d9] shadow-2xs hover:shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"

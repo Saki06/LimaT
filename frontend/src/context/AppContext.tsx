@@ -108,6 +108,7 @@ interface AppContextType {
   grades: GradeLevel[];
   classes: SchoolClass[];
   timetable: TimetableEntry[];
+  fetchTimetable: () => Promise<void>;
   subjects: Subject[];
   courses: Course[];
   assignments: Assignment[];
@@ -169,9 +170,9 @@ interface AppContextType {
   deleteQuiz: (id: string) => void;
   fetchQuizzes: () => Promise<void>;
   registerEvent: (eventId: string) => Promise<void>;
-  createTimetableEntry: (entry: Omit<TimetableEntry, 'id'>) => void;
-  updateTimetableEntry: (id: string, updates: Omit<TimetableEntry, 'id'>) => void;
-  deleteTimetableEntry: (id: string) => void;
+  createTimetableEntry: (entry: Omit<TimetableEntry, 'id'>) => Promise<void>;
+  updateTimetableEntry: (id: string, updates: Omit<TimetableEntry, 'id'>) => Promise<void>;
+  deleteTimetableEntry: (id: string) => Promise<void>;
   updateEvent: (id: string, updates: Partial<Omit<SchoolEvent, 'id'>>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   recordMatchResult: (fixtureId: string, homeScore: string, awayScore: string, outcome: string) => Promise<void>;
@@ -295,6 +296,76 @@ const syncSportsCalendarEvents = async (
   } catch (err) {
     console.warn('Events backend not available yet:', err);
   }
+};
+
+function minutesFromTimeString(time: string) {
+  if (!time) return 0;
+  const [hours, minutes] = time.split(':').map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
+function getNextDateForDay(dayName: string, timeStr?: string): Date {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const targetDay = days.indexOf(dayName);
+  const now = new Date();
+  const currentDay = now.getDay();
+  let daysUntil = (targetDay - currentDay + 7) % 7;
+  if (daysUntil === 0) daysUntil = 7;
+
+  const targetDate = new Date(now);
+  targetDate.setDate(now.getDate() + daysUntil);
+
+  if (timeStr) {
+    const parts = timeStr.trim().split(':');
+    if (parts.length >= 2) {
+      targetDate.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+    }
+  }
+  return targetDate;
+}
+
+const mapLiveClassToTimetableEntry = (session: any): TimetableEntry => {
+  const d = new Date(session.startTime);
+  const daysName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+  const day = daysName[d.getDay()] || 'Monday';
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  const startTime = `${hours}:${minutes}`;
+
+  let endTime = '10:30';
+  if (session.endTime) {
+    const ed = new Date(session.endTime);
+    endTime = `${ed.getHours().toString().padStart(2, '0')}:${ed.getMinutes().toString().padStart(2, '0')}`;
+  } else {
+    const duration = session.durationMinutes || 60;
+    const endMinutes = d.getHours() * 60 + d.getMinutes() + duration;
+    const endH = Math.floor(endMinutes / 60) % 24;
+    const endM = endMinutes % 60;
+    endTime = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+  }
+
+  const teacherName = session.teacher?.user
+    ? `${session.teacher.user.firstName} ${session.teacher.user.lastName || ''}`.trim()
+    : 'Lead Specialist Educator';
+
+  return {
+    id: session.id,
+    day,
+    classId: session.courseId || session.packageId || 'cls_cohort',
+    className: session.course?.title || session.package?.title || 'Grade 12 / 13 A/L Batch',
+    subjectId: session.courseId || session.id,
+    subjectName: session.course?.title || session.title,
+    subjectCode: session.course?.code || 'LIVE-101',
+    teacherId: session.teacherId,
+    teacherName,
+    startTime,
+    endTime,
+    room: session.platform === 'JITSI' ? 'Jitsi Virtual Studio HD' : (session.platform || 'Virtual Studio Room'),
+    periodType: 'MASTERCLASS',
+    platform: session.platform || 'JITSI',
+    meetingUrl: session.meetingUrl || `https://meet.jit.si/LimatLive_${session.id.slice(0, 8)}`,
+    isLiveNow: session.status === 'LIVE',
+  };
 };
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -640,17 +711,40 @@ const addTenant = (tenant: Tenant) => {
     }
   };
 
+  const fetchTimetable = async () => {
+    try {
+      const token = api.token.get();
+      if (!token) return;
+
+      const res = await api.liveClasses.getAll();
+      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+        const mapped = res.data.map(mapLiveClassToTimetableEntry);
+        setTimetable(mapped);
+        return;
+      }
+
+      const studentRes = await api.students.getMyTimetable();
+      if (studentRes?.success && Array.isArray(studentRes.data) && studentRes.data.length > 0) {
+        setTimetable(studentRes.data);
+      }
+    } catch (err) {
+      console.warn('Could not load timetable from backend:', err);
+    }
+  };
+
   useEffect(() => {
     fetchAssignments();
     fetchSubmissions();
     fetchCourses();
     fetchLibraryResources();
     fetchQuizzes();
+    fetchTimetable();
   }, [currentRole, activeTenantId]);
 
   useEffect(() => {
     if (!authToken) return;
     void syncSportsCalendarEvents(setEvents);
+    void fetchTimetable();
   }, [authToken]);
 
   const createCourse = async (data: {
@@ -1553,19 +1647,79 @@ const addTenant = (tenant: Tenant) => {
     });
   };
 
-  const createTimetableEntry = (entry: Omit<TimetableEntry, 'id'>) => {
-    setTimetable((previous) => [...previous, { ...entry, id: `tt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` }]);
-    addToast({ type: 'success', title: 'Timetable period added', message: 'The scheduled period has been saved.' });
+  const createTimetableEntry = async (entry: Omit<TimetableEntry, 'id'>) => {
+    try {
+      const targetDate = getNextDateForDay(entry.day, entry.startTime);
+      const startMinutes = minutesFromTimeString(entry.startTime);
+      const endMinutes = minutesFromTimeString(entry.endTime);
+      const durationMinutes = Math.max(30, endMinutes - startMinutes);
+
+      if (authToken) {
+        await api.liveClasses.create({
+          title: `${entry.subjectName} (${entry.className})`,
+          topic: entry.subjectName,
+          startTime: targetDate.toISOString(),
+          durationMinutes,
+          courseId: entry.classId?.startsWith('cls_') ? undefined : entry.classId,
+          teacherId: entry.teacherId || undefined,
+          platform: 'JITSI',
+          meetingUrl: `https://meet.jit.si/LimatLive_${Math.random().toString(36).slice(2, 9)}`,
+        });
+        await fetchTimetable();
+        addToast({ type: 'success', title: 'Timetable period added', message: 'The scheduled period has been saved to the database.' });
+        return;
+      }
+
+      setTimetable((previous) => [...previous, { ...entry, id: `tt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` }]);
+      addToast({ type: 'success', title: 'Timetable period added', message: 'The scheduled period has been saved.' });
+    } catch (err: any) {
+      console.error('Failed to create timetable entry:', err);
+      addToast({ type: 'error', title: 'Save Failed', message: err.message || 'Unable to save timetable period' });
+    }
   };
 
-  const updateTimetableEntry = (id: string, updates: Omit<TimetableEntry, 'id'>) => {
-    setTimetable((previous) => previous.map((entry) => entry.id === id ? { ...updates, id } : entry));
-    addToast({ type: 'success', title: 'Timetable period updated', message: 'The schedule changes have been saved.' });
+  const updateTimetableEntry = async (id: string, updates: Omit<TimetableEntry, 'id'>) => {
+    try {
+      if (authToken && !id.startsWith('tt_')) {
+        const targetDate = getNextDateForDay(updates.day, updates.startTime);
+        const startMinutes = minutesFromTimeString(updates.startTime);
+        const endMinutes = minutesFromTimeString(updates.endTime);
+        const durationMinutes = Math.max(30, endMinutes - startMinutes);
+
+        await api.liveClasses.update(id, {
+          title: `${updates.subjectName} (${updates.className})`,
+          topic: updates.subjectName,
+          startTime: targetDate.toISOString(),
+          durationMinutes,
+        });
+        await fetchTimetable();
+        addToast({ type: 'success', title: 'Timetable period updated', message: 'The schedule changes have been saved to the database.' });
+        return;
+      }
+
+      setTimetable((previous) => previous.map((entry) => entry.id === id ? { ...updates, id } : entry));
+      addToast({ type: 'success', title: 'Timetable period updated', message: 'The schedule changes have been saved.' });
+    } catch (err: any) {
+      console.error('Failed to update timetable entry:', err);
+      addToast({ type: 'error', title: 'Update Failed', message: err.message || 'Unable to update timetable period' });
+    }
   };
 
-  const deleteTimetableEntry = (id: string) => {
-    setTimetable((previous) => previous.filter((entry) => entry.id !== id));
-    addToast({ type: 'success', title: 'Timetable period removed', message: 'The scheduled period has been deleted.' });
+  const deleteTimetableEntry = async (id: string) => {
+    try {
+      if (authToken && !id.startsWith('tt_')) {
+        await api.liveClasses.delete(id);
+        await fetchTimetable();
+        addToast({ type: 'success', title: 'Timetable period removed', message: 'The scheduled period has been deleted from the database.' });
+        return;
+      }
+
+      setTimetable((previous) => previous.filter((entry) => entry.id !== id));
+      addToast({ type: 'success', title: 'Timetable period removed', message: 'The scheduled period has been deleted.' });
+    } catch (err: any) {
+      console.error('Failed to delete timetable entry:', err);
+      addToast({ type: 'error', title: 'Delete Failed', message: err.message || 'Unable to delete timetable period' });
+    }
   };
 
   const updateEvent = async (id: string, updates: Partial<Omit<SchoolEvent, 'id'>>) => {
@@ -2722,6 +2876,7 @@ const addTenant = (tenant: Tenant) => {
         grades,
         classes,
         timetable,
+        fetchTimetable,
         subjects,
         courses,
         assignments,
