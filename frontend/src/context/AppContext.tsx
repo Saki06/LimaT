@@ -168,11 +168,12 @@ interface AppContextType {
   updateQuiz: (id: string, updates: Partial<Quiz>) => void;
   deleteQuiz: (id: string) => void;
   fetchQuizzes: () => Promise<void>;
-  registerEvent: (eventId: string) => void;
+  registerEvent: (eventId: string) => Promise<void>;
   createTimetableEntry: (entry: Omit<TimetableEntry, 'id'>) => void;
   updateTimetableEntry: (id: string, updates: Omit<TimetableEntry, 'id'>) => void;
   deleteTimetableEntry: (id: string) => void;
-  updateEvent: (id: string, updates: Partial<Omit<SchoolEvent, 'id'>>) => void;
+  updateEvent: (id: string, updates: Partial<Omit<SchoolEvent, 'id'>>) => Promise<void>;
+  deleteEvent: (id: string) => Promise<void>;
   recordMatchResult: (fixtureId: string, homeScore: string, awayScore: string, outcome: string) => Promise<void>;
   createTournament: (tournament: Partial<Tournament>) => Promise<void>;
   updateTournament: (id: string, updates: Partial<Tournament>) => Promise<void>;
@@ -216,7 +217,7 @@ interface AppContextType {
   createSubject: (subject: Partial<Subject>) => void;
   updateSubject: (id: string, updates: Partial<Subject>) => void;
   deleteSubject: (id: string) => void;
-  createEvent: (event: Partial<SchoolEvent>) => void;
+  createEvent: (event: Partial<SchoolEvent>) => Promise<void>;
   toggleSaveResource: (resourceId: string) => void;
   createLibraryResource: (resource: Partial<LibraryResource>) => void;
   updateLibraryResource: (id: string, updates: Partial<LibraryResource>) => void;
@@ -252,6 +253,35 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const sportsEventOrganizer = 'School Sports Office';
 
+const mapBackendEventToSchoolEvent = (event: SportsEvent): SchoolEvent => {
+  const dateObj = new Date(event.startDate);
+  const isValidDate = !isNaN(dateObj.getTime());
+  const dateStr = isValidDate ? dateObj.toISOString().slice(0, 10) : '2026-11-15';
+  const timeStr = isValidDate
+    ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : '09:00 AM - 02:00 PM';
+
+  const validAudiences = ['all', 'students', 'teachers', 'grade_11', 'grade_12'] as const;
+  const audience = validAudiences.includes(event.ageCategory as any)
+    ? (event.ageCategory as SchoolEvent['audience'])
+    : 'all';
+
+  return {
+    id: event.id,
+    title: event.title,
+    description: event.description || event.sportType || 'Campus event and community activity.',
+    date: dateStr,
+    time: timeStr,
+    venue: event.venue,
+    organizer: event.sportType || 'Event Committee',
+    capacity: event.maxParticipants || 500,
+    registeredCount: event.registrationCount,
+    audience,
+    status: event.status === 'COMPLETED' ? 'completed' : 'published',
+    isRegisteredByCurrentUser: event.isRegistered,
+  };
+};
+
 const syncSportsCalendarEvents = async (
   setEvents: React.Dispatch<React.SetStateAction<SchoolEvent[]>>
 ) => {
@@ -260,29 +290,10 @@ const syncSportsCalendarEvents = async (
     if (!token) return;
     const sportsEvents = await api.sports.getEvents();
     if (api.token.get() !== token) return;
-    const mappedEvents: SchoolEvent[] = sportsEvents.map((event) => ({
-      id: event.id,
-      title: event.title,
-      description: event.description || event.sportType || 'Sports event',
-      date: new Date(event.startDate).toISOString().slice(0, 10),
-      time: new Date(event.startDate).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      venue: event.venue,
-      organizer: sportsEventOrganizer,
-      capacity: 200,
-      registeredCount: event.registrationCount,
-      audience: 'students',
-      status: event.status === 'COMPLETED' ? 'completed' : 'published',
-      isRegisteredByCurrentUser: event.isRegistered,
-    }));
-    setEvents((prev) => {
-      const nonSportsEvents = prev.filter((event) => event.organizer !== sportsEventOrganizer);
-      return [...mappedEvents, ...nonSportsEvents];
-    });
+    const mappedEvents: SchoolEvent[] = sportsEvents.map(mapBackendEventToSchoolEvent);
+    setEvents(mappedEvents);
   } catch (err) {
-    console.warn('Sports events backend not available yet:', err);
+    console.warn('Events backend not available yet:', err);
   }
 };
 
@@ -1475,14 +1486,50 @@ const addTenant = (tenant: Tenant) => {
       });
   };
 
-  // Event RSVP
+  // Event RSVP & RSVP Cancellation
   const registerEvent = async (eventId: string) => {
-    if (authToken) {
-      const result = await registerForSport({ eventId });
-      if (result.success) await syncSportsCalendarEvents(setEvents);
-      return;
+    const target = events.find((e) => e.id === eventId);
+    const isCurrentlyRegistered = target?.isRegisteredByCurrentUser;
+
+    if (authToken && !eventId.startsWith('evt_')) {
+      try {
+        if (isCurrentlyRegistered) {
+          await api.sports.cancelRegistration(eventId);
+          addToast({
+            type: 'info',
+            title: 'RSVP Cancelled',
+            message: 'Your registration for this event has been cancelled.'
+          });
+        } else {
+          const result = await registerForSport({ eventId });
+          if (!result.success) {
+            addToast({
+              type: 'error',
+              title: 'Registration Failed',
+              message: result.message || 'Could not register for event'
+            });
+            return;
+          }
+          addToast({
+            type: 'success',
+            title: 'RSVP Confirmed!',
+            message: 'You have successfully registered for this event.'
+          });
+        }
+        await syncSportsCalendarEvents(setEvents);
+        return;
+      } catch (err: any) {
+        console.error('Failed to toggle event registration:', err);
+        addToast({
+          type: 'error',
+          title: 'Action Failed',
+          message: err.message || 'Could not process event registration'
+        });
+        return;
+      }
     }
 
+    // Local / Offline fallback
     setEvents((prev) =>
       prev.map((evt) => {
         if (evt.id === eventId) {
@@ -1490,7 +1537,7 @@ const addTenant = (tenant: Tenant) => {
           return {
             ...evt,
             isRegisteredByCurrentUser: isReg,
-            registeredCount: isReg ? evt.registeredCount + 1 : evt.registeredCount - 1
+            registeredCount: isReg ? evt.registeredCount + 1 : Math.max(0, evt.registeredCount - 1)
           };
         }
         return evt;
@@ -1498,9 +1545,11 @@ const addTenant = (tenant: Tenant) => {
     );
 
     addToast({
-      type: 'success',
-      title: 'Event Registration Updated',
-      message: 'Your participation status has been updated in school records.'
+      type: isCurrentlyRegistered ? 'info' : 'success',
+      title: isCurrentlyRegistered ? 'RSVP Cancelled' : 'RSVP Confirmed!',
+      message: isCurrentlyRegistered
+        ? 'Your registration for this event has been cancelled.'
+        : 'You have successfully registered for this event.'
     });
   };
 
@@ -1519,11 +1568,61 @@ const addTenant = (tenant: Tenant) => {
     addToast({ type: 'success', title: 'Timetable period removed', message: 'The scheduled period has been deleted.' });
   };
 
-  const updateEvent = (id: string, updates: Partial<Omit<SchoolEvent, 'id'>>) => {
-    setEvents((prev) =>
-      prev.map((event) => event.id === id ? { ...event, ...updates } : event)
-    );
-    addToast({ type: 'success', title: 'Event Updated', message: 'Event details saved successfully.' });
+  const updateEvent = async (id: string, updates: Partial<Omit<SchoolEvent, 'id'>>) => {
+    try {
+      if (authToken && !id.startsWith('evt_')) {
+        let startDateStr: string | undefined = undefined;
+        if (updates.date) {
+          const dateVal = updates.date;
+          const timeVal = updates.time || '09:00 AM';
+          try {
+            const parsed = new Date(`${dateVal} ${timeVal}`);
+            startDateStr = !isNaN(parsed.getTime()) ? parsed.toISOString() : new Date(`${dateVal}T10:00:00Z`).toISOString();
+          } catch {
+            startDateStr = new Date(`${dateVal}T10:00:00Z`).toISOString();
+          }
+        }
+
+        await api.sports.updateEvent(id, {
+          ...(updates.title !== undefined ? { title: updates.title } : {}),
+          ...(updates.description !== undefined ? { description: updates.description } : {}),
+          ...(updates.venue !== undefined ? { venue: updates.venue } : {}),
+          ...(updates.organizer !== undefined ? { sportType: updates.organizer } : {}),
+          ...(updates.audience !== undefined ? { ageCategory: updates.audience } : {}),
+          ...(updates.capacity !== undefined ? { maxParticipants: updates.capacity } : {}),
+          ...(startDateStr ? { startDate: startDateStr } : {}),
+        });
+
+        await syncSportsCalendarEvents(setEvents);
+        addToast({ type: 'success', title: 'Event Updated', message: 'Event details saved to database.' });
+        return;
+      }
+
+      setEvents((prev) =>
+        prev.map((event) => event.id === id ? { ...event, ...updates } : event)
+      );
+      addToast({ type: 'success', title: 'Event Updated', message: 'Event details saved successfully.' });
+    } catch (err: any) {
+      console.error('Failed to update event:', err);
+      addToast({ type: 'error', title: 'Update Failed', message: err.message || 'Unable to update event' });
+    }
+  };
+
+  const deleteEvent = async (id: string) => {
+    try {
+      if (authToken && !id.startsWith('evt_')) {
+        await api.sports.deleteEvent(id);
+        await syncSportsCalendarEvents(setEvents);
+        addToast({ type: 'success', title: 'Event Deleted', message: 'Event removed from campus calendar.' });
+        return;
+      }
+
+      setEvents((prev) => prev.filter((event) => event.id !== id));
+      addToast({ type: 'info', title: 'Event Deleted', message: 'Event removed successfully.' });
+    } catch (err: any) {
+      console.error('Failed to delete event:', err);
+      addToast({ type: 'error', title: 'Delete Failed', message: err.message || 'Unable to delete event' });
+    }
   };
 
   // Sports Match Result
@@ -1860,22 +1959,56 @@ const addTenant = (tenant: Tenant) => {
     addToast({ type: 'info', title: 'Subject Removed from Curriculum' });
   };
 
-  const createEvent = (evt: Partial<SchoolEvent>) => {
-    const newEvt: SchoolEvent = {
-      id: `evt_${Date.now()}`,
-      title: evt.title || 'New School Event',
-      description: evt.description || 'Event description and activities.',
-      date: evt.date || '2026-11-10',
-      time: evt.time || '09:00 AM - 02:00 PM',
-      venue: evt.venue || 'College Auditorium',
-      organizer: evt.organizer || 'Event Committee',
-      capacity: evt.capacity || 500,
-      registeredCount: 0,
-      audience: evt.audience || 'all',
-      status: 'published'
-    };
-    setEvents((prev) => [newEvt, ...prev]);
-    addToast({ type: 'success', title: 'Event Created Successfully!' });
+  const createEvent = async (evt: Partial<SchoolEvent>) => {
+    try {
+      const dateVal = evt.date || new Date().toISOString().slice(0, 10);
+      const timeVal = evt.time || '09:00 AM';
+      let startDateStr = new Date(`${dateVal}T10:00:00Z`).toISOString();
+      try {
+        const parsed = new Date(`${dateVal} ${timeVal}`);
+        if (!isNaN(parsed.getTime())) {
+          startDateStr = parsed.toISOString();
+        }
+      } catch {
+        // fallback
+      }
+
+      if (authToken) {
+        await api.sports.createEvent({
+          title: evt.title || 'New School Event',
+          description: evt.description || '',
+          venue: evt.venue || 'College Auditorium',
+          sportType: evt.organizer || 'Event Committee',
+          ageCategory: evt.audience || 'all',
+          maxParticipants: evt.capacity || 500,
+          startDate: startDateStr,
+          fee: 0,
+          isTeamSport: false,
+        });
+        await syncSportsCalendarEvents(setEvents);
+        addToast({ type: 'success', title: 'Event Created Successfully!' });
+        return;
+      }
+
+      const newEvt: SchoolEvent = {
+        id: `evt_${Date.now()}`,
+        title: evt.title || 'New School Event',
+        description: evt.description || 'Event description and activities.',
+        date: evt.date || '2026-11-10',
+        time: evt.time || '09:00 AM - 02:00 PM',
+        venue: evt.venue || 'College Auditorium',
+        organizer: evt.organizer || 'Event Committee',
+        capacity: evt.capacity || 500,
+        registeredCount: 0,
+        audience: evt.audience || 'all',
+        status: 'published'
+      };
+      setEvents((prev) => [newEvt, ...prev]);
+      addToast({ type: 'success', title: 'Event Created Successfully!' });
+    } catch (err: any) {
+      console.error('Failed to create event:', err);
+      addToast({ type: 'error', title: 'Create Failed', message: err.message || 'Unable to create event' });
+    }
   };
 
   const syncCourseSyllabus = async (courseId: string, updatedCourses?: Course[]) => {
@@ -2635,6 +2768,7 @@ const addTenant = (tenant: Tenant) => {
         updateTimetableEntry,
         deleteTimetableEntry,
         updateEvent,
+        deleteEvent,
         recordMatchResult,
         createTournament,
         updateTournament,

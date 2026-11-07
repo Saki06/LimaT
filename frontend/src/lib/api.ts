@@ -1633,21 +1633,58 @@ export const api = {
     },
 
     async createEvent(input: {
-      disciplineId: string;
+      disciplineId?: string | null;
       title: string;
       sportType: string;
-      ageCategory: string;
-      gender: string;
-      fee: number;
-      maxParticipants: number;
+      ageCategory?: string;
+      gender?: string;
+      fee?: number;
+      maxParticipants?: number | null;
       venue: string;
       startDate: string;
+      endDate?: string | null;
       description?: string;
-      isTeamSport: boolean;
+      isTeamSport?: boolean;
     }): Promise<SportsEvent> {
       return sportsRequest<SportsEvent>('/events', {
         method: 'POST',
         body: JSON.stringify(input),
+      });
+    },
+
+    async updateEvent(
+      id: string,
+      input: Partial<{
+        disciplineId?: string | null;
+        title?: string;
+        sportType?: string;
+        ageCategory?: string | null;
+        gender?: string | null;
+        fee?: number;
+        maxParticipants?: number | null;
+        venue?: string;
+        startDate?: string;
+        endDate?: string | null;
+        description?: string | null;
+        isTeamSport?: boolean;
+        status?: SportsEventStatus;
+      }>,
+    ): Promise<SportsEvent> {
+      return sportsRequest<SportsEvent>(`/events/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async deleteEvent(id: string): Promise<void> {
+      await sportsRequest<{ success: boolean }>(`/events/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async cancelRegistration(eventId: string): Promise<void> {
+      await sportsRequest<{ success: boolean }>(`/events/${encodeURIComponent(eventId)}/register`, {
+        method: 'DELETE',
       });
     },
 

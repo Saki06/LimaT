@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import {
+  cancelSportsRegistration,
   createSportsDiscipline,
   createSportsEvent,
   createSportsFixture,
   createSportsTeam,
   createSportsTournament,
+  deleteSportsEvent,
   deleteSportsFixture,
   deleteSportsTeam,
   deleteSportsTournament,
@@ -19,6 +21,7 @@ import {
   recordSportsFixtureResult,
   registerChampionshipAthlete,
   registerForSport,
+  updateSportsEvent,
   updateSportsFixture,
   updateSportsRegistrationStatus,
   updateSportsTeam,
@@ -31,11 +34,15 @@ const router = Router();
 
 router.get('/events', authenticateToken, listSportsEvents);
 router.post('/events', authenticateToken, createSportsEvent);
+router.patch('/events/:id', authenticateToken, updateSportsEvent);
+router.delete('/events/:id', authenticateToken, deleteSportsEvent);
+router.delete('/events/:id/register', authenticateToken, cancelSportsRegistration);
 
 router.get('/my-registrations', authenticateToken, getMySportsRegistrations);
 router.get('/registrations/me', authenticateToken, getMySportsRegistrations);
 router.get('/registrations', authenticateToken, listSportsRegistrations);
 router.get('/registrations/verify', authenticateToken, verifySportsRegistration);
+router.delete('/registrations/:id', authenticateToken, cancelSportsRegistration);
 router.post('/registrations/championship', authenticateToken, registerChampionshipAthlete);
 router.patch('/registrations/:registrationNumber/status', authenticateToken, updateSportsRegistrationStatus);
 router.post('/register', authenticateToken, registerForSport);
