@@ -1127,6 +1127,8 @@ export function SportsView({
       {activeTab === "standings" && (
         <ChampionshipStandingsView
           defaultStandings={standings}
+          tournaments={tournaments}
+          fixtures={fixtures}
         />
       )}
 

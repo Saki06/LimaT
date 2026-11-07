@@ -1008,9 +1008,97 @@ export function ChampionshipStandingsView({
   const [inspectedSchool, setInspectedSchool] = useState<SchoolMedalStanding | null>(null);
   const [inspectedTeam, setInspectedTeam] = useState<TeamLeagueEntry | null>(null);
 
+  // Dynamically compute All-School Medals Tally from live standings, tournament results & default medal baseline
+  const dynamicMedalTally = useMemo(() => {
+    const schoolMap = new Map<string, SchoolMedalStanding>();
+
+    INITIAL_SCHOOL_MEDAL_TALLY.forEach((item) => {
+      schoolMap.set(item.schoolName.toLowerCase().trim(), {
+        ...item,
+        dominantSports: [...item.dominantSports],
+      });
+    });
+
+    if (defaultStandings && defaultStandings.length > 0) {
+      defaultStandings.forEach((st) => {
+        const rawSchool = ("schoolName" in st && st.schoolName)
+          ? st.schoolName
+          : ("teamName" in st && st.teamName)
+          ? st.teamName.split(" ")[0] + " College"
+          : "";
+        if (!rawSchool) return;
+
+        const schoolKey = rawSchool.toLowerCase().trim();
+        const sportName = ("sport" in st && st.sport)
+          ? String(st.sport)
+          : ("sportName" in st && st.sportName)
+          ? String(st.sportName)
+          : "Championships";
+        const rank = ("rank" in st && typeof (st as any).rank === "number") ? (st as any).rank : 99;
+
+        let entry = schoolMap.get(schoolKey);
+        if (!entry) {
+          entry = {
+            id: `sch_${schoolKey.replace(/[^a-z0-9]/g, "_")}`,
+            rank: 99,
+            schoolName: rawSchool,
+            district: "Western",
+            province: "National Stream",
+            gold: 0,
+            silver: 0,
+            bronze: 0,
+            totalMedals: 0,
+            championshipPoints: 0,
+            dominantSports: [],
+            crestColor: "bg-emerald-600 text-white",
+            recentRecord: "Active League Participant 2026",
+          };
+          schoolMap.set(schoolKey, entry);
+        }
+
+        if (rank === 1) {
+          entry.gold += 1;
+        } else if (rank === 2) {
+          entry.silver += 1;
+        } else if (rank === 3) {
+          entry.bronze += 1;
+        }
+
+        if (sportName && !entry.dominantSports.includes(sportName)) {
+          entry.dominantSports.push(sportName);
+        }
+      });
+    }
+
+    const list = Array.from(schoolMap.values()).map((s) => {
+      const total = s.gold + s.silver + s.bronze;
+      const pts = (s.gold * 5) + (s.silver * 3) + (s.bronze * 1);
+      return {
+        ...s,
+        totalMedals: total,
+        championshipPoints: pts,
+      };
+    });
+
+    list.sort((a, b) => {
+      if (b.championshipPoints !== a.championshipPoints) {
+        return b.championshipPoints - a.championshipPoints;
+      }
+      if (b.gold !== a.gold) {
+        return b.gold - a.gold;
+      }
+      return b.totalMedals - a.totalMedals;
+    });
+
+    return list.map((s, idx) => ({
+      ...s,
+      rank: idx + 1,
+    }));
+  }, [defaultStandings, tournaments, fixtures]);
+
   // Filtered Medal Tally
   const filteredMedalTally = useMemo(() => {
-    return INITIAL_SCHOOL_MEDAL_TALLY.filter((sch) => {
+    return dynamicMedalTally.filter((sch) => {
       const q = searchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -1021,7 +1109,7 @@ export function ChampionshipStandingsView({
 
       return matchSearch;
     });
-  }, [searchQuery]);
+  }, [dynamicMedalTally, searchQuery]);
 
   // Filtered Team Leagues
   const filteredTeamLeagues = useMemo(() => {
