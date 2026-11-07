@@ -81,6 +81,8 @@ export default function HomePage() {
         case "sports":
         case "sports_tournaments":
           return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_teams":
+          return <SportsView key="teams" initialTab="teams" />;
         case "sports_registration":
           return <SportsView key="registration" initialTab="registration" />;
         case "sports_check":
@@ -137,6 +139,8 @@ export default function HomePage() {
         case "sports":
         case "sports_tournaments":
           return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_teams":
+          return <SportsView key="teams" initialTab="teams" />;
         case "sports_registration":
           return <SportsView key="registration" initialTab="registration" />;
         case "sports_check":
@@ -159,6 +163,8 @@ export default function HomePage() {
         case "sports":
         case "sports_tournaments":
           return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_teams":
+          return <SportsView key="teams" initialTab="teams" />;
         case "sports_registration":
           return <SportsView key="registration" initialTab="registration" />;
         case "sports_check":
@@ -226,6 +232,8 @@ export default function HomePage() {
         case "sports":
         case "sports_tournaments":
           return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_teams":
+          return <SportsView key="teams" initialTab="teams" />;
         case "sports_registration":
           return <SportsView key="registration" initialTab="registration" />;
         case "sports_check":

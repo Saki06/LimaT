@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useApp } from "@/context/AppContext";
 import {
   Search,
   CheckCircle2,
@@ -29,12 +30,14 @@ export function CheckRegistrationView({
   registrations,
   onOpenRegister
 }: CheckRegistrationViewProps) {
+  const { verifySportsRegistration } = useApp();
   const [searchRegId, setSearchRegId] = useState("");
   const [searchMobile, setSearchMobile] = useState("");
   const [searchedRecord, setSearchedRecord] = useState<StoredAthleteRegistration | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isSearchingBackend, setIsSearchingBackend] = useState(false);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setHasSearched(true);
     const cleanId = searchRegId.trim().toUpperCase();
@@ -45,7 +48,67 @@ export function CheckRegistrationView({
       (cleanPhone && registration.mobile.replace(/\s+/g, "") === cleanPhone)
     );
 
-    setSearchedRecord(found || null);
+    if (found) {
+      setSearchedRecord(found);
+      return;
+    }
+
+    // Direct Backend Verification Lookup
+    const query = cleanId || cleanPhone;
+    if (query) {
+      setIsSearchingBackend(true);
+      try {
+        const records = await verifySportsRegistration(query);
+        if (records.length > 0) {
+          const rec = records[0];
+          const details = (rec.athleteDetails || {}) as Record<string, unknown>;
+          const status = rec.status === "CONFIRMED" ? "Approved" : rec.status === "REJECTED" ? "Rejected" : "Pending";
+          const transformed: StoredAthleteRegistration = {
+            id: rec.registrationNumber || rec.id,
+            registrationNumber: rec.registrationNumber || query,
+            athleteName: (details.athleteName as string) || (details.firstName as string) || "Athlete Participant",
+            firstName: (details.firstName as string) || "",
+            lastName: (details.lastName as string) || "",
+            dob: (details.dob as string) || "",
+            age: (details.age as number) || 0,
+            gender: (details.gender as any) || "Boys",
+            nicOrStudentId: (details.nicOrStudentId as string) || "",
+            mobile: (details.mobile as string) || cleanPhone,
+            email: (details.email as string) || "",
+            province: (details.province as string) || "",
+            district: (details.district as string) || "",
+            schoolName: (details.schoolName as string) || "Academy",
+            grade: (details.grade as string) || "",
+            sports: (details.sports as string[]) || [rec.event?.sportType || "Sports"],
+            selectedEvents: (details.selectedEvents as any) || [
+              {
+                id: rec.eventId,
+                sportName: rec.event?.sportType || "Championship",
+                eventName: rec.event?.title || "Event",
+                ageCategory: "Open",
+                gender: "All",
+                fee: rec.event?.fee || rec.totalAmount || 0,
+              }
+            ],
+            isTeamInterest: Boolean(details.isTeamInterest),
+            consentTimestamp: rec.createdAt,
+            paymentStatus: (rec.paymentStatus as any) || "PAID",
+            totalAmount: rec.totalAmount,
+            status,
+            createdAt: rec.createdAt,
+          };
+          setSearchedRecord(transformed);
+          setIsSearchingBackend(false);
+          return;
+        }
+      } catch {
+        // ignore
+      } finally {
+        setIsSearchingBackend(false);
+      }
+    }
+
+    setSearchedRecord(null);
   };
 
   return (

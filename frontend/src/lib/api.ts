@@ -1648,6 +1648,12 @@ export const api = {
       );
     },
 
+    async verifyRegistration(query: string): Promise<SportsRegistration[]> {
+      return sportsRequest<SportsRegistration[]>(
+        `/registrations/verify?query=${encodeURIComponent(query)}`
+      );
+    },
+
     async getTeams(): Promise<SportsTeamRecord[]> {
       return sportsRequest<SportsTeamRecord[]>('/teams');
     },
@@ -1656,6 +1662,22 @@ export const api = {
       return sportsRequest<SportsTeamRecord>('/teams', {
         method: 'POST',
         body: JSON.stringify(input),
+      });
+    },
+
+    async updateTeam(
+      id: string,
+      input: Partial<Omit<SportsTeamRecord, 'id'>>,
+    ): Promise<SportsTeamRecord> {
+      return sportsRequest<SportsTeamRecord>(`/teams/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async deleteTeam(id: string): Promise<void> {
+      await sportsRequest<{ message: string }>(`/teams/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
       });
     },
 
@@ -1698,6 +1720,22 @@ export const api = {
       return sportsRequest<SportsFixtureRecord>('/fixtures', {
         method: 'POST',
         body: JSON.stringify(input),
+      });
+    },
+
+    async updateFixture(
+      id: string,
+      input: Partial<Omit<SportsFixtureRecord, 'id'>>,
+    ): Promise<SportsFixtureRecord> {
+      return sportsRequest<SportsFixtureRecord>(`/fixtures/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      });
+    },
+
+    async deleteFixture(id: string): Promise<void> {
+      await sportsRequest<{ message: string }>(`/fixtures/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
       });
     },
 

@@ -526,6 +526,63 @@ export const createSportsTeam = async (
   }
 };
 
+export const updateSportsTeam = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    const tenantId = requireSportsManager(req, res);
+    if (!tenantId) return;
+    const id = typeof req.params.id === 'string' ? req.params.id : '';
+    const { sportName, name, coachName, trainingSchedule, status, players } = req.body;
+    const data: Prisma.SportsTeamUpdateInput = {};
+    if (typeof sportName === 'string' && sportName.trim()) data.sportName = sportName.trim();
+    if (typeof name === 'string' && name.trim()) data.name = name.trim();
+    if (typeof coachName === 'string') data.coachName = coachName.trim();
+    if (typeof trainingSchedule === 'string') data.trainingSchedule = trainingSchedule.trim();
+    if (typeof status === 'string') data.status = status;
+    if (Array.isArray(players)) {
+      data.players = players as Prisma.InputJsonValue;
+      data.playersCount = players.length;
+    }
+    const result = await prisma.sportsTeam.updateMany({
+      where: { id, tenantId },
+      data,
+    });
+    if (!result.count) {
+      res.status(404).json({ success: false, message: 'Sports team not found.' });
+      return;
+    }
+    const team = await prisma.sportsTeam.findUnique({ where: { id } });
+    res.status(200).json({ success: true, data: team });
+  } catch (error: any) {
+    console.error('Error updating sports team:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+export const deleteSportsTeam = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    const tenantId = requireSportsManager(req, res);
+    if (!tenantId) return;
+    const id = typeof req.params.id === 'string' ? req.params.id : '';
+    const result = await prisma.sportsTeam.deleteMany({
+      where: { id, tenantId },
+    });
+    if (!result.count) {
+      res.status(404).json({ success: false, message: 'Sports team not found.' });
+      return;
+    }
+    res.status(200).json({ success: true, message: 'Sports team deleted successfully.' });
+  } catch (error: any) {
+    console.error('Error deleting sports team:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
 export const listSportsTournaments = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -783,6 +840,65 @@ export const recordSportsFixtureResult = async (
   }
 };
 
+export const updateSportsFixture = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    const tenantId = requireSportsManager(req, res);
+    if (!tenantId) return;
+    const id = typeof req.params.id === 'string' ? req.params.id : '';
+    const body = req.body;
+    const data: Prisma.SportsFixtureUpdateInput = {};
+    if (typeof body.sportName === 'string' && body.sportName.trim()) data.sportName = body.sportName.trim();
+    if (typeof body.homeTeam === 'string' && body.homeTeam.trim()) data.homeTeam = body.homeTeam.trim();
+    if (typeof body.awayTeam === 'string' && body.awayTeam.trim()) data.awayTeam = body.awayTeam.trim();
+    if (typeof body.competitionName === 'string') data.competitionName = body.competitionName;
+    if (typeof body.venue === 'string' && body.venue.trim()) data.venue = body.venue.trim();
+    if (typeof body.time === 'string') data.time = body.time;
+    if (body.date) {
+      const parsed = parseDate(body.date);
+      if (parsed) data.date = parsed;
+    }
+    if (typeof body.status === 'string') data.status = body.status;
+    const result = await prisma.sportsFixture.updateMany({
+      where: { id, tenantId },
+      data,
+    });
+    if (!result.count) {
+      res.status(404).json({ success: false, message: 'Sports fixture not found.' });
+      return;
+    }
+    const fixture = await prisma.sportsFixture.findUnique({ where: { id } });
+    res.status(200).json({ success: true, data: fixture });
+  } catch (error: any) {
+    console.error('Error updating sports fixture:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+export const deleteSportsFixture = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    const tenantId = requireSportsManager(req, res);
+    if (!tenantId) return;
+    const id = typeof req.params.id === 'string' ? req.params.id : '';
+    const result = await prisma.sportsFixture.deleteMany({
+      where: { id, tenantId },
+    });
+    if (!result.count) {
+      res.status(404).json({ success: false, message: 'Sports fixture not found.' });
+      return;
+    }
+    res.status(200).json({ success: true, message: 'Sports fixture deleted successfully.' });
+  } catch (error: any) {
+    console.error('Error deleting sports fixture:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
 export const listSportsStandings = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -892,6 +1008,47 @@ export const listSportsStandings = async (
     res.status(200).json({ success: true, data });
   } catch (error: any) {
     console.error('Error deriving sports standings:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+export const verifySportsRegistration = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    const tenantId = getTenantId(req);
+    const query = typeof req.query.query === 'string' ? req.query.query.trim() : '';
+    if (!query) {
+      res.status(400).json({ success: false, message: 'Registration number or mobile number is required.' });
+      return;
+    }
+    const cleanQuery = query.toUpperCase();
+    const registrations = await prisma.sportsRegistration.findMany({
+      where: {
+        ...(tenantId ? { tenantId } : {}),
+        OR: [
+          { registrationNumber: cleanQuery },
+          { registrationNumber: { contains: cleanQuery, mode: 'insensitive' } },
+        ],
+      },
+      include: {
+        event: {
+          select: {
+            title: true,
+            sportType: true,
+            venue: true,
+            startDate: true,
+            fee: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+    res.status(200).json({ success: true, data: registrations });
+  } catch (error: any) {
+    console.error('Error verifying sports registration:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };

@@ -177,6 +177,11 @@ interface AppContextType {
   updateTournament: (id: string, updates: Partial<Tournament>) => Promise<void>;
   deleteTournament: (id: string) => Promise<void>;
   createFixture: (fixture: Partial<Fixture>) => Promise<void>;
+  deleteFixture: (id: string) => Promise<void>;
+  createSportsTeam: (team: Omit<SportsTeamRecord, 'id' | 'playersCount'>) => Promise<void>;
+  updateSportsTeam: (id: string, updates: Partial<Omit<SportsTeamRecord, 'id'>>) => Promise<void>;
+  deleteSportsTeam: (id: string) => Promise<void>;
+  verifySportsRegistration: (query: string) => Promise<SportsRegistration[]>;
   createAssignment: (assignment: Partial<Assignment>) => void;
   updateAssignment: (id: string, updates: Partial<Assignment>) => void;
   deleteAssignment: (id: string) => void;
@@ -1634,6 +1639,76 @@ const addTenant = (tenant: Tenant) => {
     }
   };
 
+  const deleteFixture = async (id: string) => {
+    try {
+      await api.sports.deleteFixture(id);
+      setFixtures((prev) => prev.filter((f) => f.id !== id));
+      addToast({
+        type: 'info',
+        title: 'Fixture Deleted',
+        message: 'The match fixture has been cancelled and removed.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Delete Fixture', message });
+    }
+  };
+
+  const createSportsTeam = async (team: Omit<SportsTeamRecord, 'id' | 'playersCount'>) => {
+    try {
+      await api.sports.createTeam(team);
+      await fetchSportsOperations();
+      addToast({
+        type: 'success',
+        title: 'Team Squad Created',
+        message: `${team.name} has been added to ${team.sportName}.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Create Team', message });
+    }
+  };
+
+  const updateSportsTeam = async (id: string, updates: Partial<Omit<SportsTeamRecord, 'id'>>) => {
+    try {
+      await api.sports.updateTeam(id, updates);
+      await fetchSportsOperations();
+      addToast({
+        type: 'success',
+        title: 'Team Squad Updated',
+        message: 'Team squad details were successfully saved.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Update Team', message });
+    }
+  };
+
+  const deleteSportsTeam = async (id: string) => {
+    try {
+      await api.sports.deleteTeam(id);
+      await fetchSportsOperations();
+      addToast({
+        type: 'info',
+        title: 'Team Squad Removed',
+        message: 'Team squad has been deleted.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Delete Team', message });
+    }
+  };
+
+  const verifySportsRegistration = async (query: string): Promise<SportsRegistration[]> => {
+    try {
+      return await api.sports.verifyRegistration(query);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Lookup Failed', message });
+      return [];
+    }
+  };
+
   const createAssignment = async (asg: Partial<Assignment>) => {
     const targetCourse = courses.find((c) => c.id === asg.courseId);
     const resolvedSubjectName = asg.subjectName || targetCourse?.title || 'Combined Mathematics';
@@ -2555,6 +2630,11 @@ const addTenant = (tenant: Tenant) => {
         updateTournament,
         deleteTournament,
         createFixture,
+        deleteFixture,
+        createSportsTeam,
+        updateSportsTeam,
+        deleteSportsTeam,
+        verifySportsRegistration,
         createAssignment,
         updateAssignment,
         deleteAssignment,
