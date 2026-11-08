@@ -1,4 +1,4 @@
-﻿import type { Tenant } from '@/types/tenant';
+import type { Tenant } from '@/types/tenant';
 
 interface BackendTenant {
   id: string;

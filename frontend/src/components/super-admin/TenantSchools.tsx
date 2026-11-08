@@ -17,73 +17,6 @@ interface TenantSchoolsProps {
   onConfigureFeatures: (tenantId: string) => void;
 }
 
-export const SUBJECT_FILTER_OPTIONS = [
-  { key: "all", label: "👨‍🏫 All Tutors", shortName: "All" },
-  {
-    key: "maths",
-    label: "📐 Combined Maths",
-    shortName: "Combined Maths",
-    keywords: [
-      "math",
-      "maths",
-      "mathematics",
-      "calculus",
-      "algebra",
-      "pure math",
-      "applied math",
-      "combined math",
-      "geometry",
-      "கணிதம்",
-      "இணைந்த கணிதம்",
-    ],
-  },
-  {
-    key: "phys",
-    label: "⚡ Physics",
-    shortName: "Physics",
-    keywords: [
-      "phys",
-      "physics",
-      "quantum",
-      "mechanics",
-      "physical science",
-      "பௌதிகவியல்",
-      "இயற்பியல்",
-    ],
-  },
-  {
-    key: "chem",
-    label: "🧪 Chemistry",
-    shortName: "Chemistry",
-    keywords: [
-      "chem",
-      "chemistry",
-      "organic",
-      "inorganic",
-      "chemical",
-      "இரசாயனவியல்",
-      "வேதியியல்",
-    ],
-  },
-  {
-    key: "commerce",
-    label: "📊 Commerce & Accounts",
-    shortName: "Commerce & Accounts",
-    keywords: [
-      "commerce",
-      "account",
-      "accounts",
-      "accounting",
-      "business",
-      "economics",
-      "finance",
-      "வணிகம்",
-      "கணக்கியல்",
-      "பொருளாதாரம்",
-    ],
-  },
-];
-
 export function TenantSchools({
   tenants,
   activeTenantId,
@@ -92,71 +25,42 @@ export function TenantSchools({
   onDeleteTenant,
   onConfigureFeatures
 }: TenantSchoolsProps) {
-  const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredTenants = useMemo(() => {
-    const selectedOption = SUBJECT_FILTER_OPTIONS.find((s) => s.key === subjectFilter);
-    const keywords = selectedOption?.keywords;
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return tenants;
 
     return tenants.filter((t) => {
-      let matchSubject = subjectFilter === "all";
-
-      if (!matchSubject && keywords) {
-        const targetTexts: string[] = [
-          t.name,
-          t.tagline || "",
-          t.code,
-          t.adminName || "",
-          t.address || "",
-          ...(t.subjects || []),
-          ...(t.courses || []),
-        ].map((s) => (s ? s.toLowerCase() : ""));
-
-        matchSubject = keywords.some((kw) =>
-          targetTexts.some((text) => text.includes(kw))
-        );
-      }
-
-      const query = searchQuery.trim().toLowerCase();
-      const matchQuery =
-        !query ||
+      return (
         t.name.toLowerCase().includes(query) ||
         t.code.toLowerCase().includes(query) ||
         t.adminName.toLowerCase().includes(query) ||
         (t.tagline && t.tagline.toLowerCase().includes(query)) ||
         (t.subjects && t.subjects.some((s) => s.toLowerCase().includes(query))) ||
-        (t.courses && t.courses.some((c) => c.toLowerCase().includes(query)));
-
-      return matchSubject && matchQuery;
+        (t.courses && t.courses.some((c) => c.toLowerCase().includes(query)))
+      );
     });
-  }, [tenants, subjectFilter, searchQuery]);
+  }, [tenants, searchQuery]);
 
   return (
     <div className="space-y-4">
-      {/* Subject Stream Filter & Search */}
+      {/* Search & Overview Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          {SUBJECT_FILTER_OPTIONS.map((sub) => (
-            <button
-              key={sub.key}
-              onClick={() => setSubjectFilter(sub.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                subjectFilter === sub.key
-                  ? "bg-[#0d5c4d] text-white shadow-xs"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              {sub.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-[#0d5c4d] text-white shadow-xs">
+            👨‍🏫 All Tutors
+            <span className="px-2 py-0.5 rounded-full bg-white/20 text-[11px] font-black text-white">
+              {tenants.length}
+            </span>
+          </span>
         </div>
 
         <div className="relative w-full sm:w-72">
           <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search institution, code, admin..."
+            placeholder="Search institution, code, admin, subject..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#0d5c4d] focus:bg-white transition-all"
@@ -168,30 +72,18 @@ export function TenantSchools({
       {filteredTenants.length === 0 ? (
         <div className="p-12 text-center rounded-2xl border-2 border-dashed border-slate-200 bg-white shadow-2xs space-y-3">
           <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-2xl">
-            {subjectFilter === "maths" ? "📐" : subjectFilter === "phys" ? "⚡" : subjectFilter === "chem" ? "🧪" : subjectFilter === "commerce" ? "📊" : "🔍"}
+            🔍
           </div>
           <h4 className="text-base font-black text-slate-800">
-            {subjectFilter === "all"
-              ? "No Tutors Found"
-              : `No Tutors Found for ${SUBJECT_FILTER_OPTIONS.find((s) => s.key === subjectFilter)?.shortName || "Subject"}`}
+            No Tutors Found
           </h4>
           <p className="text-xs text-slate-500 max-w-md mx-auto">
-            {subjectFilter === "all"
-              ? "No educational studios or tutors matched your search query."
-              : `There are currently no educator studios tagged with this subject stream. You can edit an existing studio's "Subject Specialization" or register a new tutor studio.`}
+            {searchQuery
+              ? `No educational studios or tutors matched "${searchQuery}". Try another name, code, or subject.`
+              : "No educational studios or tutors registered yet."}
           </p>
-          <div className="flex items-center justify-center gap-2 pt-2">
-            {subjectFilter !== "all" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSubjectFilter("all")}
-                className="text-xs font-bold border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer"
-              >
-                View All Tutors
-              </Button>
-            )}
-            {searchQuery && (
+          {searchQuery && (
+            <div className="flex items-center justify-center gap-2 pt-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -200,8 +92,8 @@ export function TenantSchools({
               >
                 Clear Search
               </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       ) : (
         /* Tenants Cards Grid */
