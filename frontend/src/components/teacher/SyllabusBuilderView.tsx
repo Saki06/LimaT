@@ -86,8 +86,8 @@ export function SyllabusBuilderView() {
   const [isCreateCourseModalOpen, setIsCreateCourseModalOpen] = useState(false);
   const [newCourseTitle, setNewCourseTitle] = useState("");
   const [newCourseCode, setNewCourseCode] = useState("");
-  const [newCourseGrade, setNewCourseGrade] = useState("Grade 12 (A/L 2027)");
-  const [newCourseSubject, setNewCourseSubject] = useState("Combined Mathematics");
+  const [newCourseGrade, setNewCourseGrade] = useState("");
+  const [newCourseSubject, setNewCourseSubject] = useState("");
   const [newCourseDescription, setNewCourseDescription] = useState("");
   const [isCreatingCourse, setIsCreatingCourse] = useState(false);
 
@@ -96,7 +96,7 @@ export function SyllabusBuilderView() {
     if (!newCourseTitle.trim()) return;
     setIsCreatingCourse(true);
     const cleanTitle = newCourseTitle.trim();
-    const cleanGrade = newCourseGrade;
+    const cleanGrade = newCourseGrade.trim() || "General Batch";
     const cleanSubject = newCourseSubject.trim() || "Masterclass";
     const code =
       newCourseCode.trim().toUpperCase() ||
@@ -112,7 +112,8 @@ export function SyllabusBuilderView() {
         setIsCreateCourseModalOpen(false);
         setNewCourseTitle("");
         setNewCourseCode("");
-        setNewCourseGrade("Grade 12 (A/L 2027)");
+        setNewCourseGrade("");
+        setNewCourseSubject("");
         setNewCourseDescription("");
       }
     } finally {
@@ -492,23 +493,11 @@ export function SyllabusBuilderView() {
             </label>
             <input
               type="text"
-              list="batch-grade-suggestions"
               value={newCourseGrade}
               onChange={(e) => setNewCourseGrade(e.target.value)}
-              placeholder="e.g. Grade 12 (A/L 2027) or 2026 Revision"
+              placeholder="e.g. Grade 12 (A/L 2027), 2026 Revision"
               className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] font-medium"
             />
-            <datalist id="batch-grade-suggestions">
-              <option value="Grade 12 (A/L 2027)" />
-              <option value="Grade 13 (A/L 2026)" />
-              <option value="2026 A/L Revision Batch" />
-              <option value="2027 A/L Theory Batch" />
-              <option value="2025 A/L Repeaters Special" />
-              <option value="Grade 11 (O/L 2026)" />
-              <option value="Grade 10" />
-              <option value="Special Masterclass" />
-            </datalist>
-            <span className="text-[10px] text-slate-400">Type any custom batch or select from suggestions</span>
           </div>
         </div>
 
@@ -584,7 +573,7 @@ export function SyllabusBuilderView() {
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-[#0d5c4d]"></span>
               <span className="text-xs font-bold uppercase tracking-wider text-[#0d5c4d]">
-                Curriculum Architecture &bull; Tutor Desk
+                Curriculum Architecture &bull; Tutor Studio
               </span>
             </div>
             <h1 className="text-2xl font-black text-[#0d2b26] mt-1">Syllabus Builder</h1>
@@ -624,32 +613,32 @@ export function SyllabusBuilderView() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e6ece8]">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 border-b border-[#e6ece8]">
         <div>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-[#0d5c4d]"></span>
             <span className="text-xs font-bold uppercase tracking-wider text-[#0d5c4d]">
-              Curriculum Architecture &bull; Faculty Tool
+              Curriculum Architecture &bull; Tutor Studio
             </span>
           </div>
           <h1 className="text-2xl font-black text-[#0d2b26] mt-1">Syllabus Builder</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Organize national curriculum units, define syllabus topics, and manage lesson delivery.
+            Organize syllabus units, define topics, and manage lesson delivery.
           </p>
         </div>
 
         {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Target Course Switcher Dropdown */}
           <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-[#c4e9e0] shadow-2xs">
-            <BookOpen className="h-4 w-4 text-[#0d5c4d]" />
+            <BookOpen className="h-4 w-4 text-[#0d5c4d] shrink-0" />
             <select
               value={activeCourseId}
               onChange={(e) => {
                 setActiveCourseId(e.target.value);
                 setSelectedCourseId(e.target.value);
               }}
-              className="bg-transparent text-xs font-bold text-[#0d2b26] focus:outline-none cursor-pointer"
+              className="bg-transparent text-xs font-bold text-[#0d2b26] focus:outline-none cursor-pointer max-w-[200px] truncate"
             >
               {visibleCourses.map((crs) => (
                 <option key={crs.id} value={crs.id}>
@@ -662,7 +651,7 @@ export function SyllabusBuilderView() {
           <Button
             size="sm"
             onClick={() => setIsCreateCourseModalOpen(true)}
-            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1 text-xs shadow-2xs h-8 px-3 rounded-xl cursor-pointer"
+            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1 text-xs shadow-2xs h-8 px-3 rounded-xl cursor-pointer shrink-0"
           >
             <Plus className="h-3.5 w-3.5" /> New Course
           </Button>
@@ -671,7 +660,8 @@ export function SyllabusBuilderView() {
             onClick={handleSyncSyllabus}
             disabled={isSyncing}
             variant="outline"
-            className="border-[#0d5c4d]/30 text-[#0d5c4d] hover:bg-[#0d5c4d]/10 font-bold gap-1.5 text-xs shadow-2xs cursor-pointer"
+            size="sm"
+            className="border-[#0d5c4d]/30 text-[#0d5c4d] hover:bg-[#0d5c4d]/10 font-bold gap-1.5 text-xs shadow-2xs h-8 px-3 rounded-xl cursor-pointer shrink-0"
           >
             {isSyncing ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -682,10 +672,11 @@ export function SyllabusBuilderView() {
           </Button>
 
           <Button
+            size="sm"
             onClick={() => handleOpenAddLesson()}
-            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5 text-xs shadow-xs cursor-pointer"
+            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1.5 text-xs shadow-xs h-8 px-3.5 rounded-xl cursor-pointer shrink-0"
           >
-            <Plus className="h-3.5 w-3.5" /> Add Lesson to Syllabus
+            <Plus className="h-3.5 w-3.5" /> Add Lesson
           </Button>
         </div>
       </div>
