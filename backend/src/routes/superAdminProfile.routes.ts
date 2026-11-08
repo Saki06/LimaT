@@ -18,6 +18,7 @@ import { uploadSuperAdminAvatar } from '../middlewares/avatarUpload.middleware';
 import {
   uploadSuperAdminAvatarController,
   getSuperAdminAvatarController,
+  removeSuperAdminAvatarController,
 } from '../controllers/superAdminAvatar.controller';
 import multer from 'multer';
 
@@ -65,6 +66,12 @@ router.post(
 router.get(
   '/avatars/:filename',
   getSuperAdminAvatarController
+);
+
+
+router.delete(
+  '/profile/avatar',
+  removeSuperAdminAvatarController
 );
 
 export default router;

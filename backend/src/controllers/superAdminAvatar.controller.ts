@@ -192,3 +192,80 @@ export const getSuperAdminAvatarController = async (
     }
   }
 };
+
+export const removeSuperAdminAvatarController = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user!.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, avatarUrl: true },
+    });
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+      return;
+    }
+
+    if (!user.avatarUrl) {
+      res.status(404).json({
+        success: false,
+        message: 'No profile picture to remove',
+      });
+      return;
+    }
+
+    const oldAvatarUrl = user.avatarUrl;
+
+    const updateResult = await prisma.user.updateMany({
+  where: {
+    id: userId,
+    avatarUrl: oldAvatarUrl,
+  },
+  data: {
+    avatarUrl: null,
+  },
+});
+
+if (updateResult.count !== 1) {
+  res.status(409).json({
+    success: false,
+    message: 'Profile picture was changed by another request. Please try again.',
+  });
+  return;
+}
+
+    const prefix = '/api/super-admin/avatars/';
+
+    if (oldAvatarUrl.startsWith(prefix)) {
+      const filename = oldAvatarUrl.slice(prefix.length);
+
+      if (
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/i.test(filename)
+      ) {
+        await deleteFile(path.join(avatarDirectory, filename));
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile picture removed successfully',
+      data: {
+        avatarUrl: null,
+      },
+    });
+  } catch (error) {
+    console.error('Remove Super Admin Avatar Error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to remove profile picture',
+    });
+  }
+};
