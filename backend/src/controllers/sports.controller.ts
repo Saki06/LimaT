@@ -136,7 +136,12 @@ export const listSportsEvents = async (
       }
     }
 
-    res.status(200).json({ success: true, data: events });
+    const sanitizedEvents = events.map((event: any) => ({
+      ...event,
+      registrations: Array.isArray(event.registrations) ? event.registrations : [],
+    }));
+
+    res.status(200).json({ success: true, data: sanitizedEvents });
   } catch (error: any) {
     console.error('Error listing sports events:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });

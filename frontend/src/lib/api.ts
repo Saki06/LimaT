@@ -1565,8 +1565,8 @@ export const api = {
         startDate: string;
         endDate: string | null;
         status: SportsEventStatus;
-        _count: { registrations: number };
-        registrations: Array<{ userId: string }>;
+        _count?: { registrations: number };
+        registrations?: Array<{ userId: string }>;
       }>>('/events');
       return result.map((event) => ({
         id: event.id,
@@ -1583,8 +1583,8 @@ export const api = {
         startDate: event.startDate,
         endDate: event.endDate,
         status: event.status,
-        registrationCount: event._count.registrations,
-        isRegistered: event.registrations.length > 0,
+        registrationCount: event._count?.registrations ?? 0,
+        isRegistered: (event.registrations?.length ?? 0) > 0,
       }));
     },
 
