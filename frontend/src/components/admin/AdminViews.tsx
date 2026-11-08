@@ -7,7 +7,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useApp } from "@/context/AppContext";
 import { useAdmin, useCreateStaff, useHubFlags, useHubSettings, useSetStaffStatus, useStaff, useSubscriptions, useTeacherHubs, useUpdateStaff } from "@/context/AdminContext";
 import { AdminRecordStatus, AdminStaffRecord, StaffInput, ConnectTeacher, TutorPackage } from "@/types/lms";
-import { initialConnectTeachers, initialTutorPackages } from "@/data/connectMockData";
 import {
   Building2,
   Users,
@@ -52,6 +51,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { api } from "@/lib/api";
+
+export interface PlatformUser {
+  id: string;
+  name: string;
+  email: string;
+  role: "student" | "teacher" | "admin";
+  school: string;
+  grade: string;
+  status: string;
+  lastLogin: string;
+  enrolledTutors: string[];
+  subscriptionStatus: string;
+}
 
 interface AdminViewsProps {
   initialTab?: "overview" | "schools" | "classes" | "subjects" | "users" | "settings" | "staff" | "connect";
@@ -281,163 +293,62 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   const [minPackagePrice, setMinPackagePrice] = useState<number>(1000);
   const [maxPackagePrice, setMaxPackagePrice] = useState<number>(50000);
 
-  // Platform user directory state & mock records
-  const [platformUsers, setPlatformUsers] = useState([
-    {
-      id: "usr_admin_01",
-      name: "Dr. K. Rajasingham",
-      email: "principal@school.lk",
-      role: "admin",
-      school: "St. Michael High School",
-      grade: "Administration Staff",
-      status: "Active",
-      lastLogin: "2026-10-01 08:15",
-      enrolledTutors: [] as string[],
-      subscriptionStatus: "Platform Admin"
-    },
-    {
-      id: "usr_student_01",
-      name: "Sathurjan K.",
-      email: "sathurjan@school.lk",
-      role: "student",
-      school: "Colombo Hindu College",
-      grade: "Grade 12 - Physical Science",
-      status: "Active",
-      lastLogin: "2026-10-01 06:50",
-      enrolledTutors: ["Ms. Kavitha Rajan (Combined Maths)", "Mr. Thuvaragan S. (Physics)"],
-      subscriptionStatus: "Active Paid (2 Tutors)"
-    },
-    {
-      id: "usr_student_02",
-      name: "Kasun Bandara",
-      email: "kasun.b@school.lk",
-      role: "student",
-      school: "St. Michael High School",
-      grade: "Grade 12 - Physical Science",
-      status: "Active",
-      lastLogin: "2026-09-30 18:05",
-      enrolledTutors: ["Ms. Kavitha Rajan (Combined Maths)"],
-      subscriptionStatus: "Active Paid (1 Tutor)"
-    },
-    {
-      id: "usr_student_03",
-      name: "Anuki Silva",
-      email: "anuki.s@school.lk",
-      role: "student",
-      school: "Royal Academy Colombo",
-      grade: "Grade 13 - Biological Science",
-      status: "Active",
-      lastLogin: "2026-10-01 07:12",
-      enrolledTutors: ["Dr. Sarath Perera (Chemistry)", "Mrs. Shanthi Mohan (Biology)"],
-      subscriptionStatus: "Active Paid (2 Tutors)"
-    },
-    {
-      id: "usr_student_04",
-      name: "Dineth Perera",
-      email: "dineth.p@school.lk",
-      role: "student",
-      school: "Trinity Central College",
-      grade: "Grade 12 - Technology & ICT",
-      status: "Active",
-      lastLogin: "2026-09-28 16:30",
-      enrolledTutors: ["Mr. Ketheesan K. (ICT & Computing)"],
-      subscriptionStatus: "Active Paid (1 Tutor)"
-    },
-    {
-      id: "usr_student_05",
-      name: "Tharushi Fernando",
-      email: "tharushi.f@school.lk",
-      role: "student",
-      school: "Hillwood Central College",
-      grade: "Grade 11 - G.C.E. O/L",
-      status: "Active",
-      lastLogin: "2026-09-30 14:10",
-      enrolledTutors: [] as string[],
-      subscriptionStatus: "Free Student"
-    },
-    {
-      id: "usr_teacher_01",
-      name: "Ms. Kavitha Rajan",
-      email: "kavitha.rajan@limat.lk",
-      role: "teacher",
-      school: "Independent Tutor Studio",
-      grade: "Faculty - Combined Mathematics",
-      status: "Active",
-      lastLogin: "2026-10-01 07:30",
-      enrolledTutors: [] as string[],
-      subscriptionStatus: "Tutor (284 Students)"
-    },
-    {
-      id: "usr_teacher_02",
-      name: "Mr. Thuvaragan S.",
-      email: "thuvaragan.s@limat.lk",
-      role: "teacher",
-      school: "Independent Tutor Studio",
-      grade: "Faculty - Physics",
-      status: "Active",
-      lastLogin: "2026-09-30 15:20",
-      enrolledTutors: [] as string[],
-      subscriptionStatus: "Tutor (197 Students)"
-    }
-  ]);
+  // Platform user directory state & records
+  const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([]);
 
   // Synchronize live student & staff directory from PostgreSQL database
   React.useEffect(() => {
     if (directory && directory.length > 0) {
-      setPlatformUsers((prev) => {
-        const directoryMapped = directory.map((d) => ({
-          id: d.id,
-          name: d.name,
-          email: d.email,
-          role: (d.role === "student" ? "student" : d.role === "teacher" ? "teacher" : "admin") as "student" | "teacher" | "admin",
-          school: overviewData?.school.name || "Apex Academy Global",
-          grade: d.grade ? `${d.grade} (${d.className || 'General'})` : "Enrolled Student",
-          status: d.status === "active" ? "Active" : "Inactive",
-          lastLogin: "Active Today",
-          enrolledTutors: [],
-          subscriptionStatus: d.role === "student" ? "Enrolled Student" : "Staff Member",
-        }));
-        const existingIds = new Set(directoryMapped.map((m) => m.id));
-        const nonDuplicatePrev = prev.filter((p) => !existingIds.has(p.id));
-        return [...directoryMapped, ...nonDuplicatePrev];
-      });
+      const directoryMapped: PlatformUser[] = directory.map((d) => ({
+        id: d.id,
+        name: d.name,
+        email: d.email,
+        role: (d.role === "student" ? "student" : d.role === "teacher" ? "teacher" : "admin") as "student" | "teacher" | "admin",
+        school: overviewData?.school.name || "Apex Academy Global",
+        grade: d.grade ? `${d.grade} (${d.className || 'General'})` : "Enrolled Student",
+        status: d.status === "active" ? "Active" : "Inactive",
+        lastLogin: "Active Today",
+        enrolledTutors: [],
+        subscriptionStatus: d.role === "student" ? "Enrolled Student" : "Staff Member",
+      }));
+      setPlatformUsers(directoryMapped);
+    } else {
+      setPlatformUsers([]);
     }
   }, [directory, overviewData?.school.name]);
 
   // Tutors Management State
-  const [soloTutors, setSoloTutors] = useState<ConnectTeacher[]>(initialConnectTeachers);
-  const [tutorPackages, setTutorPackages] = useState<TutorPackage[]>(initialTutorPackages);
+  const [soloTutors, setSoloTutors] = useState<ConnectTeacher[]>([]);
+  const [tutorPackages, setTutorPackages] = useState<TutorPackage[]>([]);
   const [staffSubTab, setStaffSubTab] = useState<"solo_tutors" | "coaches">("solo_tutors");
 
   // Synchronize live teacher staff with solo tutors desk
   React.useEffect(() => {
     if (staff && staff.length > 0) {
-      setSoloTutors((prev) => {
-        const staffTeachers: ConnectTeacher[] = staff
-          .filter((s) => s.role === "teacher")
-          .map((s) => ({
-            id: s.id,
-            name: s.name,
-            initials: s.name.split(" ").map((w) => w[0]).join("").toUpperCase().substring(0, 2),
-            avatarColor: "bg-[#0d5c4d]",
-            verified: true,
-            title: s.qualification || "Senior Master Teacher & Subject Specialist",
-            subject: s.subjects?.[0] || "General Curriculum",
-            studentsCount: s.workload || 45,
-            lessonsCount: 16,
-            liveClassesCount: 4,
-            monthlyFee: 3500,
-            currency: "LKR",
-            rating: 5.0,
-            tags: s.subjects || ["Theory", "Revision"],
-            meetUrl: "https://meet.google.com/live-stream",
-            bio: `${s.name} is a certified educator handling ${s.medium || "English"} medium instruction.`,
-            qualifications: s.qualification || "B.Sc. / B.Ed."
-          }));
-        const existingIds = new Set(staffTeachers.map((st) => st.id));
-        const nonDuplicatePrev = prev.filter((p) => !existingIds.has(p.id));
-        return [...staffTeachers, ...nonDuplicatePrev];
-      });
+      const staffTeachers: ConnectTeacher[] = staff
+        .filter((s) => s.role === "teacher")
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          initials: s.name.split(" ").map((w) => w[0]).join("").toUpperCase().substring(0, 2),
+          avatarColor: "bg-[#0d5c4d]",
+          verified: true,
+          title: s.qualification || "Senior Master Teacher & Subject Specialist",
+          subject: s.subjects?.[0] || "General Curriculum",
+          studentsCount: s.workload || 45,
+          lessonsCount: 16,
+          liveClassesCount: 4,
+          monthlyFee: 3500,
+          currency: "LKR",
+          rating: 5.0,
+          tags: s.subjects || ["Theory", "Revision"],
+          meetUrl: "https://meet.google.com/live-stream",
+          bio: `${s.name} is a certified educator handling ${s.medium || "English"} medium instruction.`,
+          qualifications: s.qualification || "B.Sc. / B.Ed."
+        }));
+      setSoloTutors(staffTeachers);
+    } else {
+      setSoloTutors([]);
     }
   }, [staff]);
   const [tutorSearch, setTutorSearch] = useState("");
@@ -461,8 +372,8 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   const [newTutorForm, setNewTutorForm] = useState(initialNewTutorForm);
 
   // Student Dossier & Manual Enroll states
-  const [selectedStudentForDossier, setSelectedStudentForDossier] = useState<typeof platformUsers[0] | null>(null);
-  const [selectedStudentForEnroll, setSelectedStudentForEnroll] = useState<typeof platformUsers[0] | null>(null);
+  const [selectedStudentForDossier, setSelectedStudentForDossier] = useState<PlatformUser | null>(null);
+  const [selectedStudentForEnroll, setSelectedStudentForEnroll] = useState<PlatformUser | null>(null);
   const [manualEnrollTutorName, setManualEnrollTutorName] = useState("Ms. Kavitha Rajan (Combined Maths)");
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
   const [newStudentForm, setNewStudentForm] = useState({
@@ -636,16 +547,16 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
 
   // User 3-dot menu and action states
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
-  const [viewingUser, setViewingUser] = useState<typeof platformUsers[0] | null>(null);
-  const [editingUser, setEditingUser] = useState<typeof platformUsers[0] | null>(null);
+  const [viewingUser, setViewingUser] = useState<PlatformUser | null>(null);
+  const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
   const [editUserName, setEditUserName] = useState("");
   const [editUserEmail, setEditUserEmail] = useState("");
   const [editUserRole, setEditUserRole] = useState<"student" | "teacher" | "admin">("student");
   const [editUserSchool, setEditUserSchool] = useState("");
   const [editUserStatus, setEditUserStatus] = useState("Active");
-  const [deletingUser, setDeletingUser] = useState<typeof platformUsers[0] | null>(null);
+  const [deletingUser, setDeletingUser] = useState<PlatformUser | null>(null);
 
-  const handleOpenEditUser = (user: typeof platformUsers[0]) => {
+  const handleOpenEditUser = (user: PlatformUser) => {
     setEditingUser(user);
     setEditUserName(user.name);
     setEditUserEmail(user.email);

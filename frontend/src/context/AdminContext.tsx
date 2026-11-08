@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { api } from '@/lib/api';
-import { initialAdminDirectory, initialAdminStaff, initialAdminSubjects } from '@/data/adminMockData';
 import {
   AdminDirectoryUser,
   AdminRecordStatus,
@@ -18,12 +17,7 @@ import {
   TeacherHub,
   TeacherHubStatus
 } from '@/types/lms';
-import {
-  initialAdminSubscriptions,
-  initialHubFlags,
-  initialHubSettings,
-  initialTeacherHubs
-} from '@/data/adminConnectMockData';
+import { initialHubSettings } from '@/data/adminConnectMockData';
 
 export interface AdminOverviewData {
   school: {
@@ -100,15 +94,15 @@ const AdminContext = createContext<AdminContextValue | undefined>(undefined);
 
 export function AdminProvider({ children }: { children: React.ReactNode }) {
   const { currentUser, addToast } = useApp();
-  const [staff, setStaff] = useState<AdminStaffRecord[]>(initialAdminStaff);
-  const [directory, setDirectory] = useState<AdminDirectoryUser[]>(initialAdminDirectory);
+  const [staff, setStaff] = useState<AdminStaffRecord[]>([]);
+  const [directory, setDirectory] = useState<AdminDirectoryUser[]>([]);
   const [overviewData, setOverviewData] = useState<AdminOverviewData | null>(null);
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettingsData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [teacherHubs, setTeacherHubs] = useState(initialTeacherHubs);
-  const [subscriptions, setSubscriptions] = useState(initialAdminSubscriptions);
-  const [hubFlags, setHubFlags] = useState(initialHubFlags);
+  const [teacherHubs, setTeacherHubs] = useState<TeacherHub[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [hubFlags, setHubFlags] = useState<HubFlag[]>([]);
   const [hubSettings, setHubSettings] = useState(initialHubSettings);
   const [auditLog, setAuditLog] = useState<HubAuditEntry[]>([]);
   const schoolId = currentUser.schoolId || 'sch_apex_01';
@@ -124,10 +118,10 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         api.admin.getSettings(),
       ]);
 
-      if (staffRes.status === 'fulfilled' && Array.isArray(staffRes.value) && staffRes.value.length > 0) {
+      if (staffRes.status === 'fulfilled' && Array.isArray(staffRes.value)) {
         setStaff(staffRes.value);
       }
-      if (studentsRes.status === 'fulfilled' && Array.isArray(studentsRes.value) && studentsRes.value.length > 0) {
+      if (studentsRes.status === 'fulfilled' && Array.isArray(studentsRes.value)) {
         setDirectory(studentsRes.value);
       }
       if (overviewRes.status === 'fulfilled' && overviewRes.value) {
@@ -150,7 +144,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AdminContextValue>(() => ({
     schoolId,
     staff,
-    subjects: initialAdminSubjects.filter((subject) => subject.schoolId === schoolId),
+    subjects: [] as AdminSubjectRecord[],
     directory,
     overviewData,
     schoolSettings,
