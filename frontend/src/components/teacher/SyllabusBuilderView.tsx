@@ -57,12 +57,13 @@ export function SyllabusBuilderView() {
   // If viewed by an individual teacher, show only their assigned batches
   const visibleCourses = useMemo(() => {
     if (currentRole === "teacher") {
-      return courses.filter(
+      const filtered = courses.filter(
         (c) =>
           (c.teacherId && currentUser?.id && c.teacherId === currentUser.id) ||
           (c.teacherName && currentUser?.name && c.teacherName.toLowerCase() === currentUser.name.toLowerCase()) ||
           (!c.teacherId && !c.teacherName)
       );
+      return filtered.length > 0 ? filtered : courses;
     }
     return courses;
   }, [courses, currentRole, currentUser]);
@@ -75,7 +76,7 @@ export function SyllabusBuilderView() {
 
   // Accordion state for expanded units
   const [expandedUnitIds, setExpandedUnitIds] = useState<Record<string, boolean>>({
-    [activeCourse?.units[0]?.id || ""]: true
+    [activeCourse?.units?.[0]?.id || ""]: true
   });
 
   const toggleUnit = (unitId: string) => {
@@ -363,8 +364,8 @@ export function SyllabusBuilderView() {
     e.preventDefault();
     if (!lessonTitle.trim() || !activeCourse) return;
 
-    const unitId = modalActiveUnit?.id || activeCourse.units[0]?.id;
-    const topicId = modalActiveTopic?.id || activeCourse.units[0]?.topics[0]?.id;
+    const unitId = modalActiveUnit?.id || activeCourse.units?.[0]?.id;
+    const topicId = modalActiveTopic?.id || activeCourse.units?.[0]?.topics?.[0]?.id;
 
     if (!unitId || !topicId) return;
 
@@ -401,9 +402,40 @@ export function SyllabusBuilderView() {
 
   // Calculate metrics
   let totalTopicsCount = 0;
-  activeCourse.units.forEach((u) => {
-    totalTopicsCount += u.topics.length;
-  });
+  if (activeCourse?.units) {
+    activeCourse.units.forEach((u) => {
+      totalTopicsCount += (u.topics || []).length;
+    });
+  }
+
+  if (!activeCourse) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e6ece8]">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[#0d5c4d]"></span>
+              <span className="text-xs font-bold uppercase tracking-wider text-[#0d5c4d]">
+                Curriculum Architecture &bull; Faculty Tool
+              </span>
+            </div>
+            <h1 className="text-2xl font-black text-[#0d2b26] mt-1">Syllabus Builder</h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Organize national curriculum units, define syllabus topics, and manage lesson delivery.
+            </p>
+          </div>
+        </div>
+
+        <Card className="p-12 text-center border-dashed border-slate-200">
+          <BookOpen className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-700">No Courses Available</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+            You do not have any active course batches yet. Create a course or contact administrator to start building your syllabus curriculum.
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -491,7 +523,7 @@ export function SyllabusBuilderView() {
             <div className="grid grid-cols-3 gap-4 border-t md:border-t-0 md:border-l border-[#c4e9e0] pt-4 md:pt-0 md:pl-6">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Units</p>
-                <p className="text-2xl font-black text-[#0d2b26] mt-0.5">{activeCourse.units.length}</p>
+                <p className="text-2xl font-black text-[#0d2b26] mt-0.5">{(activeCourse.units || []).length}</p>
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Topics</p>
@@ -499,7 +531,7 @@ export function SyllabusBuilderView() {
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Lessons</p>
-                <p className="text-2xl font-black text-[#0d5c4d] mt-0.5">{activeCourse.totalLessons}</p>
+                <p className="text-2xl font-black text-[#0d5c4d] mt-0.5">{activeCourse.totalLessons || 0}</p>
               </div>
             </div>
           </div>
@@ -512,7 +544,7 @@ export function SyllabusBuilderView() {
           <div>
             <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-2">
               <Layers className="h-4 w-4 text-[#0d5c4d]" />
-              Syllabus Structure &amp; Learning Modules ({activeCourse.units.length} Units)
+              Syllabus Structure &amp; Learning Modules ({(activeCourse.units || []).length} Units)
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Click any unit to expand its topics and uploaded coursework
@@ -528,7 +560,7 @@ export function SyllabusBuilderView() {
           </Button>
         </div>
 
-        {activeCourse.units.length === 0 ? (
+        {(activeCourse.units || []).length === 0 ? (
           <div className="p-12 text-center rounded-3xl bg-white border border-[#e6ece8] shadow-xs space-y-3">
             <Layers className="h-10 w-10 text-slate-300 mx-auto" />
             <h4 className="text-base font-bold text-slate-700">No Units in this Course Yet</h4>
@@ -543,7 +575,7 @@ export function SyllabusBuilderView() {
             </Button>
           </div>
         ) : (
-          activeCourse.units.map((unit, unitIdx) => {
+          (activeCourse.units || []).map((unit, unitIdx) => {
             const isExpanded = !!expandedUnitIds[unit.id];
             let unitLessonCount = 0;
             unit.topics.forEach((t) => (unitLessonCount += t.lessons.length));
