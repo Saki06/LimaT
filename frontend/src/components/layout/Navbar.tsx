@@ -22,7 +22,7 @@ import { Modal } from "@/components/ui/modal";
 import { Announcement } from "@/types/lms";
 
 export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () => void }) {
-  const { currentRole, currentUser, t, announcements, setCurrentView, setIsLanding, logoutUser } = useApp();
+  const { currentRole, currentUser, t, announcements, setCurrentView, setIsLanding, setLandingPortal, logoutUser } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const [selectedAnnouncementModal, setSelectedAnnouncementModal] = useState<Announcement | null>(null);
@@ -56,10 +56,14 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
           <Menu className="h-5 w-5" />
         </button>
 
-        {/* Newtoz Brand & Tozy Winged Mascot */}
+        {/* Newtoz Brand & Tozy Winged Mascot - Click to All Portals Landing */}
         <div
-          onClick={() => setCurrentView("dashboard")}
+          onClick={() => {
+            setIsLanding(true);
+            setLandingPortal("gateway");
+          }}
           className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group min-w-0"
+          title="Return to All Portals (Landing Page)"
         >
           {/* Tozy Winged Mascot Logo */}
           <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm group-hover:scale-105 transition-all shrink-0 ring-2 ring-emerald-500/20">

@@ -1226,8 +1226,12 @@ export function LandingView({
       {/* ----------------- 1. STUDENT PORTAL NAVIGATION ----------------- */}
       {portalType === "student" && (
         <nav className="h-16 sm:h-20 border-b border-emerald-100/60 bg-[#ebf8f4]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-emerald-500/20">
+          <div
+            onClick={() => setLandingPortal("gateway")}
+            className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-85 transition-opacity"
+            title="Return to All Portals"
+          >
+            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-emerald-500/20 group-hover:scale-105 transition-transform">
               <img
                 src="/images/tozy_icon.jpg"
                 alt="Tozy - Newtoz Mascot"
@@ -1264,8 +1268,12 @@ export function LandingView({
       {/* ----------------- 2. PARENT PORTAL NAVIGATION ----------------- */}
       {portalType === "parent" && (
         <nav className="h-16 sm:h-20 border-b border-sky-100/60 bg-[#f0f6fc]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-sky-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-sky-500/20">
+          <div
+            onClick={() => setLandingPortal("gateway")}
+            className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-85 transition-opacity"
+            title="Return to All Portals"
+          >
+            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-sky-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-sky-500/20 group-hover:scale-105 transition-transform">
               <img
                 src="/images/tozy_icon.jpg"
                 alt="Tozy - Newtoz Mascot"
@@ -1301,8 +1309,12 @@ export function LandingView({
       {/* ----------------- 3. TUTOR / STAFF PORTAL NAVIGATION ----------------- */}
       {portalType === "staff" && (
         <nav className="h-16 sm:h-20 border-b border-amber-200/50 bg-[#fef8eb]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-amber-400 via-emerald-300 to-cyan-300 p-0.5 shadow-sm shrink-0 ring-2 ring-amber-500/20">
+          <div
+            onClick={() => setLandingPortal("gateway")}
+            className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-85 transition-opacity"
+            title="Return to All Portals"
+          >
+            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-amber-400 via-emerald-300 to-cyan-300 p-0.5 shadow-sm shrink-0 ring-2 ring-amber-500/20 group-hover:scale-105 transition-transform">
               <img
                 src="/images/tozy_icon.jpg"
                 alt="Tozy - Newtoz Mascot"
