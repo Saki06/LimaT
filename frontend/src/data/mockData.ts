@@ -33,11 +33,11 @@ export const mockUsers: Record<string, User> = {
   },
   teacher: {
     id: 'usr_teacher_01',
-    name: 'Dr. Samantha Perera',
-    email: 'samantha.perera@limat.lk',
+    name: 'Faculty Educator',
+    email: 'educator@limat.lk',
     role: 'teacher',
     schoolId: 'sch_01',
-    schoolName: 'LimaT Independent Tuition & Masterclasses'
+    schoolName: 'Tuition & Masterclasses'
   },
   admin: {
     id: 'usr_admin_01',

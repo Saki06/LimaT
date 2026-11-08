@@ -595,7 +595,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
       message: annMessage.trim(),
       targetAudience: annAudience,
       priority: annPriority,
-      authorName: activeTenant?.adminName || currentUser.name || "Dr. Samantha Perera",
+      authorName: currentUser.name || activeTenant?.adminName || "Faculty Instructor",
       authorRole: "Tutor"
     });
     setIsCreateAnnouncementModalOpen(false);
@@ -822,7 +822,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                   Daily Cockpit
                 </span>
                 <span className="text-xs text-white/80 font-medium">
-                  Welcome back, {currentUser?.name || "Mr. Samantha Perera"}
+                  Welcome back, {currentUser?.name || "Teacher"}
                 </span>
               </div>
               <h2 className="text-lg font-black text-white mt-1">Teaching &amp; Assessment Control Center</h2>

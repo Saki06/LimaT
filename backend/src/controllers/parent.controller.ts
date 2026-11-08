@@ -231,7 +231,7 @@ export const getMyChildren = async (
       // 1. Build Enrolments
       const enrolments = (student.enrollments || []).map((enr: any, idx: number) => {
         const teacherUser = enr.course?.teacher?.user;
-        const teacherName = teacherUser ? `${teacherUser.firstName} ${teacherUser.lastName}` : 'Dr. Samantha Perera';
+        const teacherName = teacherUser ? `${teacherUser.firstName} ${teacherUser.lastName}` : 'Faculty Educator';
         const subject = enr.course?.title || 'Advanced Mathematics';
 
         // Check if there is an active package subscription for this course/teacher
@@ -276,7 +276,7 @@ export const getMyChildren = async (
       // 2. Build Invoices from PackageSubscriptions
       const invoices = (student.packageSubscriptions || []).map((sub: any, idx: number) => {
         const teacherUser = sub.package?.teacher?.user;
-        const teacherName = teacherUser ? `${teacherUser.firstName} ${teacherUser.lastName}` : 'Dr. Samantha Perera';
+        const teacherName = teacherUser ? `${teacherUser.firstName} ${teacherUser.lastName}` : 'Faculty Educator';
         const status = sub.status === 'ACTIVE' ? 'cleared' : sub.status === 'PENDING' ? 'under_review' : 'cleared';
 
         return {
@@ -311,7 +311,7 @@ export const getMyChildren = async (
           childId: student.id,
           paperCode: `MOD-REV-${idx + 1}`,
           title: sub.assignment?.title || `Standard Revision Paper ${idx + 1}`,
-          tutorName: 'Dr. Samantha Perera',
+          tutorName: 'Faculty Educator',
           subject: sub.assignment?.subjectName || 'Combined Mathematics',
           date: sub.submittedAt ? sub.submittedAt.toISOString().split('T')[0] : '2026-10-12',
           score,
@@ -330,7 +330,7 @@ export const getMyChildren = async (
         id: att.id,
         childId: student.id,
         sessionTitle: 'Weekly Masterclass Lecture',
-        tutorName: 'Dr. Samantha Perera',
+        tutorName: 'Faculty Educator',
         subject: 'Combined Mathematics',
         date: att.joinedAt ? att.joinedAt.toISOString().split('T')[0] : '2026-10-14',
         timeSlot: '6:00 PM - 8:30 PM',
@@ -364,8 +364,8 @@ export const getMyChildren = async (
         currentStage: 'G.C.E. Advanced Level',
         cumulativeCareerAverage: avgScore,
         totalYearsEnrolled: 2,
-        classTeacher: 'Dr. Samantha Perera',
-        classTeacherEmail: 'samantha.perera@tuition-academy.lk',
+        classTeacher: 'Faculty Educator',
+        classTeacherEmail: 'educator@academy.lk',
         classTeacherPhone: '+94 77 123 4567',
         attendanceRate: 94,
         presentDays: 34,
@@ -376,7 +376,7 @@ export const getMyChildren = async (
           {
             id: 'enr_math_def',
             teacherId: 'tch_math_01',
-            teacherName: 'Dr. Samantha Perera',
+            teacherName: 'Faculty Educator',
             teacherTitle: 'Senior Master Tutor & Paper Author',
             subject: 'Combined Mathematics',
             avatarColor: 'bg-emerald-600',
@@ -410,7 +410,7 @@ export const getMyChildren = async (
             invoiceNumber: 'INV-2026-089',
             childId: student.id,
             childName: studentName,
-            teacherName: 'Dr. Samantha Perera',
+            teacherName: 'Faculty Educator',
             subject: 'Combined Mathematics',
             month: 'October 2026',
             amountLkr: 3500,
@@ -429,7 +429,7 @@ export const getMyChildren = async (
             childId: student.id,
             paperCode: 'MATH-REV-04',
             title: 'Calculus & Integration Master Paper 04',
-            tutorName: 'Dr. Samantha Perera',
+            tutorName: 'Faculty Educator',
             subject: 'Combined Mathematics',
             date: '2026-10-12',
             score: 92,
@@ -447,7 +447,7 @@ export const getMyChildren = async (
             id: 'att_log_01',
             childId: student.id,
             sessionTitle: 'Weekly Theory Class — Pure Math Functions',
-            tutorName: 'Dr. Samantha Perera',
+            tutorName: 'Faculty Educator',
             subject: 'Combined Mathematics',
             date: '2026-10-14',
             timeSlot: '6:00 PM - 8:30 PM',
@@ -575,7 +575,7 @@ export const submitLeaveRequest = async (
     const leaveRecord = {
       id: `leave_${Date.now()}`,
       childId,
-      tutorName: tutorName || 'Dr. Samantha Perera',
+      tutorName: tutorName || 'Faculty Educator',
       startDate: startDate || new Date().toISOString().split('T')[0],
       endDate: endDate || startDate || new Date().toISOString().split('T')[0],
       reason: reason || 'School Exam Clashing',
@@ -716,7 +716,7 @@ export const submitDepositSlip = async (
       invoiceNumber: receiptNo,
       childId: student.id,
       childName: `${student.user.firstName} ${student.user.lastName}`,
-      teacherName: tutorName || 'Dr. Samantha Perera',
+      teacherName: tutorName || 'Faculty Educator',
       subject: pkg.title,
       month: 'October 2026',
       amountLkr: Number(amountLkr || pkg.price),

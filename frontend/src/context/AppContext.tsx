@@ -1008,7 +1008,7 @@ const addTenant = (tenant: Tenant) => {
     ? {
         ...baseUser,
         id: authUser.id,
-        name: `${authUser.firstName} ${authUser.lastName}`.trim() || authUser.email,
+        name: `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() || authUser.email || 'User',
         email: authUser.email,
         role: currentRole,
         avatar: authUser.avatarUrl || baseUser.avatar
@@ -2163,7 +2163,7 @@ const addTenant = (tenant: Tenant) => {
         gradeId: cls.gradeId || 'grd_12',
         gradeName: cls.gradeName || 'Grade 12',
         classTeacherId: cls.classTeacherId || 'usr_teacher_01',
-        classTeacherName: cls.classTeacherName || 'Mr. Samantha Perera',
+        classTeacherName: cls.classTeacherName || 'Class Teacher',
         studentCount: cls.studentCount || 35
       };
       setClasses((prev) => [fallbackCls, ...prev]);

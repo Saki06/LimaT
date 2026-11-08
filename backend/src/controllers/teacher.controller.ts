@@ -33,27 +33,25 @@ const getOrCreateTeacherProfile = async (userId: string) => {
   });
 
   if (!profile) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     const employeeNo = `TUTOR-${userId.substring(0, 8).toUpperCase()}`;
     await prisma.teacherProfile.create({
       data: {
         userId,
         employeeNo,
-        specialization: 'Combined Mathematics & Sciences',
-        title: 'Lead Specialist Educator & Department Chair',
-        bio: 'Specialist Educator with over a decade of teaching excellence preparing students for G.C.E. Advanced Level with distinction.',
-        mediums: ['English', 'Sinhala', 'Tamil'],
-        experienceYears: 12,
-        qualifications: [
-          { degree: 'B.Sc. (Hons) in Mathematics', institution: 'University of Colombo', year: '2012', grade: 'First Class' },
-          { degree: 'Postgraduate Diploma in Education (PGDE)', institution: 'University of Peradeniya', year: '2015', grade: 'Distinction' },
-        ],
-        bankName: 'Commercial Bank of Ceylon',
-        bankAccountName: 'Samantha Priyantha Perera',
-        bankAccountNumber: '8004561234',
-        bankBranch: 'Havelock Town',
-        bankBranchCode: '042',
-        rating: 4.9,
-        isVerified: true,
+        specialization: 'General',
+        title: 'Educator & Instructor',
+        bio: '',
+        mediums: ['English'],
+        experienceYears: 0,
+        qualifications: [],
+        bankName: null,
+        bankAccountName: user ? `${user.firstName} ${user.lastName || ''}`.trim() : null,
+        bankAccountNumber: null,
+        bankBranch: null,
+        bankBranchCode: null,
+        rating: 5.0,
+        isVerified: false,
       },
     });
 

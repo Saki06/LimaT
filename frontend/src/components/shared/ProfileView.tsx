@@ -119,53 +119,53 @@ export function ProfileView() {
   // Editable Profile State based on role
   const defaultProfile = useMemo(() => {
     if (currentRole === "teacher") {
-      const userFirstName = teacherProfile?.user?.firstName || currentUser.name?.split(" ")[0] || "Samantha";
-      const userLastName = teacherProfile?.user?.lastName || currentUser.name?.split(" ").slice(1).join(" ") || "Perera";
-      const userFullName = `${userFirstName} ${userLastName}`.trim();
+      const userFirstName = teacherProfile?.user?.firstName || (currentUser.name ? currentUser.name.split(" ")[0] : "");
+      const userLastName = teacherProfile?.user?.lastName || (currentUser.name && currentUser.name.includes(" ") ? currentUser.name.split(" ").slice(1).join(" ") : "");
+      const userFullName = `${userFirstName} ${userLastName}`.trim() || currentUser.name || "Educator";
 
       return {
-        name: currentUser.name || "Mr. Samantha Perera",
-        fullName: userFullName || "Samantha Priyantha Perera",
-        preferredName: userFirstName || "Samantha",
-        studentId: teacherProfile?.employeeNo || "TCH-2026-0042",
-        indexNumber: teacherProfile?.sltsRegNo || "SLTS-REG/2012/4482",
-        email: teacherProfile?.user?.email || currentUser.email || "samantha.p@school.lk",
-        phone: teacherProfile?.phone || "+94 77 456 7890",
-        altPhone: "+94 11 234 5678",
-        dob: "1984-06-18",
-        gender: "Male",
-        bloodGroup: "B+",
-        medium: (teacherProfile?.mediums && teacherProfile.mediums.length > 0) ? teacherProfile.mediums.join(", ") : "English, Sinhala & Tamil",
-        address: teacherProfile?.address || "No. 18, Havelock Road, Havelock Town",
-        city: teacherProfile?.city || "Colombo 05",
-        district: teacherProfile?.district || "Colombo",
-        province: teacherProfile?.province || "Western Province",
-        postalCode: teacherProfile?.postalCode || "00500",
-        bio: teacherProfile?.bio || "Lead Specialist Educator & Department Chair for Combined Mathematics (A/L). 14 years of teaching excellence preparing students for G.C.E. Advanced Level with distinction.",
-        schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
-        schoolCode: "LMT-COLOMBO",
+        name: userFullName,
+        fullName: userFullName,
+        preferredName: userFirstName || userFullName,
+        studentId: teacherProfile?.employeeNo || "",
+        indexNumber: teacherProfile?.sltsRegNo || "",
+        email: teacherProfile?.user?.email || currentUser.email || "",
+        phone: teacherProfile?.phone || "",
+        altPhone: "",
+        dob: "",
+        gender: "",
+        bloodGroup: "",
+        medium: (teacherProfile?.mediums && teacherProfile.mediums.length > 0) ? teacherProfile.mediums.join(", ") : "English",
+        address: teacherProfile?.address || "",
+        city: teacherProfile?.city || "",
+        district: teacherProfile?.district || "",
+        province: teacherProfile?.province || "",
+        postalCode: teacherProfile?.postalCode || "",
+        bio: teacherProfile?.bio || "",
+        schoolName: currentUser.schoolName || "",
+        schoolCode: "",
         gradeLevel: "Faculty",
-        grade: teacherProfile?.title || "A/L Faculty (Grade 12 & 13)",
-        classRoom: "Advanced Level Mathematics Faculty",
-        stream: teacherProfile?.specialization || "Combined Mathematics & Pure Sciences",
-        examYear: "2026",
-        academicYear: "Faculty Member (2012 - Present)",
-        house: "Lions Sports Academy Mentor",
-        classTeacher: "Head of Faculty (Mathematics)",
-        admittedDate: "September 2012",
-        attendanceRate: "99.1%",
-        gpa: `Faculty Rating ${teacherProfile?.rating ?? 4.9}/5.0`,
-        guardianName: "Mrs. Malini Perera",
-        guardianRelationship: "Spouse (Next of Kin)",
-        guardianPhone: "+94 77 987 6543",
-        guardianEmail: "malini.perera@gmail.com",
-        guardianOccupation: "Senior Banking Executive",
-        motherName: "M. Perera",
-        motherPhone: "+94 11 234 5678",
-        emergencyContact: "Faculty Support (+94 11 258 0042)",
-        transportMode: "Faculty Parking (Pass #FC-42)",
-        healthNotes: "Normal health clearance. First-aid certified.",
-        extracurricular: "Master-in-Charge Mathematics Olympiad, Senior Chess Club Patron"
+        grade: teacherProfile?.title || "Faculty Member",
+        classRoom: "Teacher Studio",
+        stream: teacherProfile?.specialization || "General",
+        examYear: "",
+        academicYear: "Active Faculty",
+        house: "",
+        classTeacher: "",
+        admittedDate: "",
+        attendanceRate: "100%",
+        gpa: teacherProfile?.rating ? `Faculty Rating ${teacherProfile.rating}/5.0` : "New Faculty",
+        guardianName: "",
+        guardianRelationship: "",
+        guardianPhone: "",
+        guardianEmail: "",
+        guardianOccupation: "",
+        motherName: "",
+        motherPhone: "",
+        emergencyContact: "",
+        transportMode: "",
+        healthNotes: "",
+        extracurricular: ""
       };
     }
 
@@ -198,7 +198,7 @@ export function ProfileView() {
         examYear: "2026",
         academicYear: "2024 - Present",
         house: "Lions Sports Academy Supporter",
-        classTeacher: "Dr. Samantha Perera & Eng. K. Thanushan",
+        classTeacher: "Academic Lead & Faculty Mentors",
         admittedDate: "January 2024",
         attendanceRate: "100% PTM Attendance",
         gpa: "Verified Guardian Status",
@@ -291,7 +291,7 @@ export function ProfileView() {
       examYear: "2026",
       academicYear: "Batch 2026 - 2027",
       house: "Lions Sports & Athletics Academy",
-      classTeacher: "Dr. Samantha Perera (Lead Combined Maths Specialist)",
+      classTeacher: "Academic Lead (Grade 12 Faculty)",
       admittedDate: "January 2024",
       attendanceRate: "96.4%",
       gpa: "3.84 / 4.0",
@@ -307,152 +307,36 @@ export function ProfileView() {
       healthNotes: "No known allergies. Normal athletic health clearance.",
       extracurricular: "Vice Captain Lions Cricket 1st XI, Senior Athletic Squad, Science Club"
     };
-  }, [currentRole, currentUser]);
+  }, [currentRole, currentUser, teacherProfile]);
 
   const [profileData, setProfileData] = useState(defaultProfile);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [showPublicPreview, setShowPublicPreview] = useState(false);
 
   // Bank & Payout Details (Teacher)
-  const [bankName, setBankName] = useState("Commercial Bank of Ceylon");
-  const [bankAccountName, setBankAccountName] = useState("Samantha Priyantha Perera");
-  const [bankAccountNumber, setBankAccountNumber] = useState("8004561234");
-  const [bankBranch, setBankBranch] = useState("Havelock Town");
-  const [bankBranchCode, setBankBranchCode] = useState("042");
+  const [bankName, setBankName] = useState("");
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankBranch, setBankBranch] = useState("");
+  const [bankBranchCode, setBankBranchCode] = useState("");
 
   // Public Studio & Social Ecosystem (Teacher)
-  const [publicSlug, setPublicSlug] = useState("prof-samantha-perera");
-  const [youtubeUrl, setYoutubeUrl] = useState("https://youtube.com/@SamanthaPereraMaths");
-  const [telegramUrl, setTelegramUrl] = useState("https://t.me/CombinedMaths2026LK");
-  const [whatsappNumber, setWhatsappNumber] = useState("+94774567890");
-  const [websiteUrl, setWebsiteUrl] = useState("https://samanthamaths.lk");
-  const [coverImageUrl, setCoverImageUrl] = useState("https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80");
+  const [publicSlug, setPublicSlug] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [telegramUrl, setTelegramUrl] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
 
   // Qualifications & Accreditations (Teacher)
-  const [qualificationsList, setQualificationsList] = useState<TeacherQualification[]>([
-    {
-      id: "deg-1",
-      degree: "Bachelor of Science (B.Sc. Special) in Mathematics",
-      institution: "University of Colombo, Sri Lanka",
-      honors: "First Class Honours (GPA: 3.92 / 4.0)",
-      year: "2008",
-      details: "Pure Mathematics, Real Analysis, Complex Variables, Abstract Algebra & Numerical Methods."
-    },
-    {
-      id: "deg-2",
-      degree: "Post Graduate Diploma in Education (PGDE)",
-      institution: "National Institute of Education (NIE), Maharagama",
-      honors: "Passed with Distinction",
-      year: "2014",
-      details: "Secondary & Collegiate STEM Pedagogy, Educational Psychology, Curriculum Formulation & Evaluation."
-    },
-    {
-      id: "deg-3",
-      degree: "Master of Science (M.Sc.) in Applied Mathematics",
-      institution: "University of Peradeniya",
-      honors: "Thesis Distinction",
-      year: "2018",
-      details: "Thesis: Numerical Modeling of Partial Differential Equations & Boundary Value Simulations."
-    }
-  ]);
+  const [qualificationsList, setQualificationsList] = useState<TeacherQualification[]>([]);
+  const [accreditationsList, setAccreditationsList] = useState<TeacherAccreditation[]>([]);
+  const [bankAccountsList, setBankAccountsList] = useState<TeacherBankAccount[]>([]);
+  const [socialChannelsList, setSocialChannelsList] = useState<TeacherSocialChannel[]>([]);
+  const [subjectsList, setSubjectsList] = useState<string[]>([]);
 
-  const [accreditationsList, setAccreditationsList] = useState<TeacherAccreditation[]>([
-    {
-      id: "acc-1",
-      title: "Sri Lanka Teachers' Service (SLTS) Class 1 Senior Educator",
-      issuer: "Ministry of Education, Isurupaya, Battaramulla",
-      regNo: "SLTS-REG/2012/4482",
-      status: "Active & Permanent Pensionable Service · 14 Years Seniority",
-      badge: "SLTS Class 1",
-      badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200"
-    },
-    {
-      id: "acc-2",
-      title: "G.C.E. Advanced Level Chief Examiner & Paper Setter Accreditation",
-      issuer: "Department of Examinations, Pelawatte, Battaramulla",
-      regNo: "EXAM-AL/MTH-P03",
-      status: "Supervising Examiner · Combined Mathematics Paper Evaluation Panel 03",
-      badge: "Chief Examiner",
-      badgeColor: "bg-blue-50 text-blue-800 border-blue-200"
-    },
-    {
-      id: "acc-3",
-      title: "National STEM Pedagogical Master Trainer & Digital Lead",
-      issuer: "UNESCO & National Education Commission (NEC)",
-      regNo: "STEM-LK/2021/88",
-      status: "Accredited Master Facilitator for Advanced Collegiate Mathematics Instruction",
-      badge: "Master Trainer",
-      badgeColor: "bg-purple-50 text-purple-800 border-purple-200"
-    },
-    {
-      id: "acc-4",
-      title: "Provincial Teaching Excellence & Mentorship Award (2023)",
-      issuer: "Western Provincial Department of Education",
-      regNo: "WP-EDU/AWARD/2023",
-      status: "Awarded for 98% Distinction Rate in A/L Combined Mathematics Examination",
-      badge: "Provincial Award",
-      badgeColor: "bg-amber-50 text-amber-800 border-amber-200"
-    }
-  ]);
-
-  const [bankAccountsList, setBankAccountsList] = useState<TeacherBankAccount[]>([
-    {
-      id: "bank-1",
-      bankName: "Commercial Bank of Ceylon",
-      bankAccountName: "Samantha Priyantha Perera",
-      bankAccountNumber: "8004561234",
-      bankBranch: "Havelock Town",
-      bankBranchCode: "042",
-      isPrimary: true
-    },
-    {
-      id: "bank-2",
-      bankName: "Bank of Ceylon (BOC)",
-      bankAccountName: "Samantha Priyantha Perera",
-      bankAccountNumber: "0072938491",
-      bankBranch: "Kollupitiya Super Grade",
-      bankBranchCode: "001",
-      isPrimary: false
-    }
-  ]);
-
-  const [socialChannelsList, setSocialChannelsList] = useState<TeacherSocialChannel[]>([
-    {
-      id: "soc-1",
-      platform: "youtube",
-      title: "YouTube Lecture Channel",
-      url: "https://youtube.com/@SamanthaPereraMaths"
-    },
-    {
-      id: "soc-2",
-      platform: "telegram",
-      title: "Telegram Student Discussion Group",
-      url: "https://t.me/CombinedMaths2026LK"
-    },
-    {
-      id: "soc-3",
-      platform: "whatsapp",
-      title: "Direct WhatsApp Mentorship Helpline",
-      url: "+94774567890"
-    },
-    {
-      id: "soc-4",
-      platform: "website",
-      title: "Personal Tutor Studio & Notes Portal",
-      url: "https://samanthamaths.lk"
-    }
-  ]);
-
-  const [subjectsList, setSubjectsList] = useState<string[]>([
-    "Combined Mathematics",
-    "Pure Mathematics",
-    "Applied Mathematics",
-    "Mechanics",
-    "Probability & Statistics"
-  ]);
-
-  const [selectedMediums, setSelectedMediums] = useState<string[]>(["English", "Sinhala", "Tamil"]);
-  const [experienceYears, setExperienceYears] = useState<number>(14);
+  const [selectedMediums, setSelectedMediums] = useState<string[]>(["English"]);
+  const [experienceYears, setExperienceYears] = useState<number>(0);
 
   // Modal states for full CRUD workflows
   const [degreeModalState, setDegreeModalState] = useState<{
@@ -512,41 +396,33 @@ export function ProfileView() {
   // Sync with backend teacher profile when loaded
   useEffect(() => {
     if (teacherProfile && currentRole === "teacher") {
-      if (teacherProfile.bankName) setBankName(teacherProfile.bankName);
-      if (teacherProfile.bankAccountName) setBankAccountName(teacherProfile.bankAccountName);
-      if (teacherProfile.bankAccountNumber) setBankAccountNumber(teacherProfile.bankAccountNumber);
-      if (teacherProfile.bankBranch) setBankBranch(teacherProfile.bankBranch);
-      if (teacherProfile.bankBranchCode) setBankBranchCode(teacherProfile.bankBranchCode);
-      if (teacherProfile.publicSlug) setPublicSlug(teacherProfile.publicSlug);
-      if (teacherProfile.youtubeUrl) setYoutubeUrl(teacherProfile.youtubeUrl);
-      if (teacherProfile.telegramUrl) setTelegramUrl(teacherProfile.telegramUrl);
-      if (teacherProfile.whatsappNumber) setWhatsappNumber(teacherProfile.whatsappNumber);
-      if (teacherProfile.websiteUrl) setWebsiteUrl(teacherProfile.websiteUrl);
-      if (teacherProfile.coverImageUrl) setCoverImageUrl(teacherProfile.coverImageUrl);
-      if (teacherProfile.experienceYears) setExperienceYears(teacherProfile.experienceYears);
+      setBankName(teacherProfile.bankName || "");
+      setBankAccountName(teacherProfile.bankAccountName || profileData.fullName || "");
+      setBankAccountNumber(teacherProfile.bankAccountNumber || "");
+      setBankBranch(teacherProfile.bankBranch || "");
+      setBankBranchCode(teacherProfile.bankBranchCode || "");
+      setPublicSlug(teacherProfile.publicSlug || "");
+      setYoutubeUrl(teacherProfile.youtubeUrl || "");
+      setTelegramUrl(teacherProfile.telegramUrl || "");
+      setWhatsappNumber(teacherProfile.whatsappNumber || "");
+      setWebsiteUrl(teacherProfile.websiteUrl || "");
+      setCoverImageUrl(teacherProfile.coverImageUrl || "");
+      setExperienceYears(teacherProfile.experienceYears || 0);
       if (Array.isArray(teacherProfile.mediums) && teacherProfile.mediums.length > 0) {
         setSelectedMediums(teacherProfile.mediums);
       }
-      if (Array.isArray(teacherProfile.qualifications) && teacherProfile.qualifications.length > 0) {
-        setQualificationsList(teacherProfile.qualifications);
-      }
-      if (Array.isArray(teacherProfile.accreditations) && teacherProfile.accreditations.length > 0) {
-        setAccreditationsList(teacherProfile.accreditations);
-      }
-      if (Array.isArray(teacherProfile.bankAccounts) && teacherProfile.bankAccounts.length > 0) {
-        setBankAccountsList(teacherProfile.bankAccounts);
-      }
-      if (Array.isArray(teacherProfile.socialChannels) && teacherProfile.socialChannels.length > 0) {
-        setSocialChannelsList(teacherProfile.socialChannels);
-      }
+      setQualificationsList(Array.isArray(teacherProfile.qualifications) ? teacherProfile.qualifications : []);
+      setAccreditationsList(Array.isArray(teacherProfile.accreditations) ? teacherProfile.accreditations : []);
+      setBankAccountsList(Array.isArray(teacherProfile.bankAccounts) ? teacherProfile.bankAccounts : []);
+      setSocialChannelsList(Array.isArray(teacherProfile.socialChannels) ? teacherProfile.socialChannels : []);
       if (teacherProfile.specialization) {
         const parsedSubjects = teacherProfile.specialization.split(",").map((s) => s.trim()).filter(Boolean);
-        if (parsedSubjects.length > 0) {
-          setSubjectsList(parsedSubjects);
-        }
+        setSubjectsList(parsedSubjects);
+      } else {
+        setSubjectsList([]);
       }
     }
-  }, [teacherProfile, currentRole]);
+  }, [teacherProfile, currentRole, profileData.fullName]);
 
   useEffect(() => {
     setProfileData(defaultProfile);
@@ -561,7 +437,7 @@ export function ProfileView() {
         setActiveTab("personal");
       }
     }
-  }, [defaultProfile, currentRole]);
+  }, [defaultProfile, currentRole, activeTab]);
 
     // Load Super Admin profile from PostgreSQL
   useEffect(() => {
@@ -1369,10 +1245,10 @@ if (!savedProfile) {
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enrolled Subscribers</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
                 <span className="text-lg font-black text-[#0d5c4d] font-mono">
-                  {teacherProfile?.stats?.totalSubscribers ?? 142} Students
+                  {teacherProfile?.stats?.totalSubscribers ?? 0} Students
                 </span>
                 <span className="text-[10px] text-emerald-600 font-bold">
-                  Across {teacherProfile?.stats?.totalPackages ?? 4} Batches
+                  Across {teacherProfile?.stats?.totalPackages ?? 0} Batches
                 </span>
               </div>
             </div>
@@ -1381,17 +1257,19 @@ if (!savedProfile) {
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Monthly Gross Revenue</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
                 <span className="text-lg font-black text-amber-600 font-mono">
-                  Rs. {(teacherProfile?.stats?.monthlyGrossRevenue ?? 639000).toLocaleString()}
+                  Rs. {(teacherProfile?.stats?.monthlyGrossRevenue ?? 0).toLocaleString()}
                 </span>
-                <span className="text-[10px] text-slate-500 font-semibold">90% Tutor Payout</span>
+                <span className="text-[10px] text-slate-500 font-semibold">Live Payouts</span>
               </div>
             </div>
 
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Weekly Live Hours</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d2b26]">14 Hours</span>
-                <span className="text-[10px] text-emerald-600 font-bold">Google Meet Active</span>
+                <span className="text-lg font-black text-[#0d2b26]">
+                  {teacherProfile?.stats?.totalCourses ? `${teacherProfile.stats.totalCourses * 2} Hours` : "0 Hours"}
+                </span>
+                <span className="text-[10px] text-emerald-600 font-bold">Live Stream Active</span>
               </div>
             </div>
           </div>
@@ -2973,7 +2851,7 @@ if (!savedProfile) {
                     data: {
                       id: "",
                       bankName: "Commercial Bank of Ceylon",
-                      bankAccountName: profileData.fullName || "Samantha Priyantha Perera",
+                      bankAccountName: profileData.fullName || "",
                       bankAccountNumber: "",
                       bankBranch: "",
                       bankBranchCode: "",
@@ -3195,7 +3073,7 @@ if (!savedProfile) {
                       type="text"
                       value={slugEditValue}
                       onChange={(e) => setSlugEditValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                      placeholder="prof-samantha-perera"
+                      placeholder="your-tutor-handle"
                       className="flex-1 text-xs font-mono font-bold text-[#0d5c4d] focus:outline-none"
                       autoFocus
                     />
@@ -3483,7 +3361,7 @@ if (!savedProfile) {
                   {
                     name: "Combined Mathematics",
                     code: "Batch CMATH-26",
-                    teacher: "Dr. Samantha Perera",
+                    teacher: "Senior Mathematics Educator",
                     title: "Lead Mathematics Specialist & Paper Author",
                     nextSession: "Saturday 08:30 AM – 11:30 AM (Model Paper Class)",
                     weeklySessions: [
@@ -3938,7 +3816,7 @@ if (!savedProfile) {
                   <div className="text-xs space-y-1 text-slate-600">
                     <p><span className="font-bold text-slate-800">Role:</span> All-Rounder / Vice Captain</p>
                     <p><span className="font-bold text-slate-800">Specialty:</span> Right-Hand Bat, Right-Arm Medium Fast</p>
-                    <p><span className="font-bold text-slate-800">Coach:</span> Coach Samantha Perera</p>
+                    <p><span className="font-bold text-slate-800">Coach:</span> Senior Academy Coach</p>
                     <p><span className="font-bold text-slate-800">Schedule:</span> Mon, Wed, Fri (3:30 - 5:30 PM)</p>
                   </div>
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
@@ -4155,7 +4033,7 @@ if (!savedProfile) {
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60">
-                  <span className="font-bold text-slate-700">Coach Samantha Perera (Academy Sports Director)</span>
+                  <span className="font-bold text-slate-700">Senior Academy Sports Director</span>
                   <span className="px-2 py-0.5 rounded-full bg-white border border-[#c4e9e0] text-[#0d5c4d] font-bold">
                     Official Stamp Verified ✓
                   </span>
@@ -4722,7 +4600,7 @@ if (!savedProfile) {
                     ...bankModalState,
                     data: { ...bankModalState.data, bankAccountName: e.target.value }
                   })}
-                  placeholder="e.g. Samantha Priyantha Perera"
+                  placeholder="e.g. Account Holder Name"
                   className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0d2b26] focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>

@@ -762,7 +762,7 @@ export const createClass = async (
       gradeId: gradeId || 'grd_12',
       gradeName: gradeName || 'Grade 12 (A/L)',
       classTeacherId: classTeacherId || 'usr_teacher_01',
-      classTeacherName: classTeacherName || 'Mr. Samantha Perera',
+      classTeacherName: classTeacherName || 'Class Teacher',
       studentCount: typeof studentCount === 'number' ? studentCount : 35,
     };
 
