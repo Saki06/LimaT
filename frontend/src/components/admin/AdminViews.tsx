@@ -850,7 +850,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 </div>
                 <div>
                   <p className="text-2xl font-black text-[#0d2b26]">{soloTutors.length}</p>
-                  <p className="text-xs font-bold text-[#0d5c4d] mt-0.5">Tutors Hub (தனிப்பட்ட ஆசிரியர்கள்)</p>
+                  <p className="text-xs font-bold text-[#0d5c4d] mt-0.5">Tutors Hub (Individual Tutors)</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Manage tutor verification, fee packages, Google Meet classroom links, and subscriber counts.
                   </p>
@@ -885,7 +885,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   <p className="text-2xl font-black text-[#0d2b26]">
                     {platformUsers.filter((u) => u.role === "student").length}
                   </p>
-                  <p className="text-xs font-bold text-[#b47a16] mt-0.5">Student Directory (மாணவர்கள் & சந்தா)</p>
+                  <p className="text-xs font-bold text-[#b47a16] mt-0.5">Student Directory (Students & Subscriptions)</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Oversee student tutor enrollments, activate/suspend access, and manage subscriptions.
                   </p>
@@ -918,7 +918,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 </div>
                 <div>
                   <p className="text-2xl font-black text-[#0d2b26]">Sports Hub</p>
-                  <p className="text-xs font-bold text-[#1d6fa5] mt-0.5">Tournaments & Scores (விளையாட்டு)</p>
+                  <p className="text-xs font-bold text-[#1d6fa5] mt-0.5">Tournaments & Scores (Sports Hub)</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Create inter-school tournaments, fixtures, record live match scores, and track standings.
                   </p>
@@ -1353,7 +1353,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 {staffSubTab === "solo_tutors" ? "LimaT Independent Tutor Network" : "LimaT Athletics & Sports Coaching"}
               </p>
               <h2 className="mt-1 text-2xl font-black text-[#0d2b26]">
-                {staffSubTab === "solo_tutors" ? "Tutors Management (தனிப்பட்ட ஆசிரியர்கள்)" : "Sports Coaches Management (விளையாட்டு பயிற்றுநர்கள்)"}
+                {staffSubTab === "solo_tutors" ? "Tutors Management (Individual Tutors)" : "Sports Coaches Management (Athletic Coaches)"}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
                 {staffSubTab === "solo_tutors"
@@ -3489,7 +3489,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 className="h-4 w-4 accent-[#0d5c4d] rounded cursor-pointer"
               />
               <label htmlFor="verifiedCheck" className="text-xs font-bold text-[#0d5c4d] cursor-pointer">
-                Grant Verified Badge (சரிபார்க்கப்பட்ட ஆசிரியர் பேட்ஜ்)
+                Grant Verified Badge (Official Tutor Badge)
               </label>
             </div>
           </div>
