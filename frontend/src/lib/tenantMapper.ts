@@ -7,6 +7,7 @@ interface BackendTenant {
   plan: string;
   status: string;
   settings?: Record<string, any> | null;
+  courses?: Array<{ id: string; title: string; code: string }>;
   createdAt: string;
   _count?: {
     users?: number;
@@ -19,6 +20,14 @@ export function mapBackendTenant(data: BackendTenant): Tenant {
 
   const plan = data.plan.toLowerCase();
   const status = data.status.toLowerCase();
+
+  const subjectsList: string[] = Array.isArray(settings.subjects)
+    ? settings.subjects.map((s: any) => typeof s === 'string' ? s : s?.name).filter(Boolean)
+    : [];
+
+  const coursesList: string[] = Array.isArray(data.courses)
+    ? data.courses.map((c: any) => typeof c === 'string' ? c : c?.title).filter(Boolean)
+    : [];
 
   return {
     id: data.id,
@@ -46,5 +55,7 @@ export function mapBackendTenant(data: BackendTenant): Tenant {
     primaryColor: settings.primaryColor,
     address: settings.address,
     tagline: settings.tagline,
+    subjects: subjectsList,
+    courses: coursesList,
   };
 }

@@ -17,6 +17,73 @@ interface TenantSchoolsProps {
   onConfigureFeatures: (tenantId: string) => void;
 }
 
+export const SUBJECT_FILTER_OPTIONS = [
+  { key: "all", label: "👨‍🏫 All Tutors", shortName: "All" },
+  {
+    key: "maths",
+    label: "📐 Combined Maths",
+    shortName: "Combined Maths",
+    keywords: [
+      "math",
+      "maths",
+      "mathematics",
+      "calculus",
+      "algebra",
+      "pure math",
+      "applied math",
+      "combined math",
+      "geometry",
+      "கணிதம்",
+      "இணைந்த கணிதம்",
+    ],
+  },
+  {
+    key: "phys",
+    label: "⚡ Physics",
+    shortName: "Physics",
+    keywords: [
+      "phys",
+      "physics",
+      "quantum",
+      "mechanics",
+      "physical science",
+      "பௌதிகவியல்",
+      "இயற்பியல்",
+    ],
+  },
+  {
+    key: "chem",
+    label: "🧪 Chemistry",
+    shortName: "Chemistry",
+    keywords: [
+      "chem",
+      "chemistry",
+      "organic",
+      "inorganic",
+      "chemical",
+      "இரசாயனவியல்",
+      "வேதியியல்",
+    ],
+  },
+  {
+    key: "commerce",
+    label: "📊 Commerce & Accounts",
+    shortName: "Commerce & Accounts",
+    keywords: [
+      "commerce",
+      "account",
+      "accounts",
+      "accounting",
+      "business",
+      "economics",
+      "finance",
+      "வணிகம்",
+      "கணக்கியல்",
+      "பொருளாதாரம்",
+    ],
+  },
+];
+
 export function TenantSchools({
   tenants,
   activeTenantId,
@@ -29,17 +96,38 @@ export function TenantSchools({
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredTenants = useMemo(() => {
+    const selectedOption = SUBJECT_FILTER_OPTIONS.find((s) => s.key === subjectFilter);
+    const keywords = selectedOption?.keywords;
+
     return tenants.filter((t) => {
-      const matchSubject =
-        subjectFilter === "all" ||
-        t.name.toLowerCase().includes(subjectFilter.toLowerCase()) ||
-        (t.tagline && t.tagline.toLowerCase().includes(subjectFilter.toLowerCase())) ||
-        t.code.toLowerCase().includes(subjectFilter.toLowerCase());
+      let matchSubject = subjectFilter === "all";
+
+      if (!matchSubject && keywords) {
+        const targetTexts: string[] = [
+          t.name,
+          t.tagline || "",
+          t.code,
+          t.adminName || "",
+          t.address || "",
+          ...(t.subjects || []),
+          ...(t.courses || []),
+        ].map((s) => (s ? s.toLowerCase() : ""));
+
+        matchSubject = keywords.some((kw) =>
+          targetTexts.some((text) => text.includes(kw))
+        );
+      }
+
+      const query = searchQuery.trim().toLowerCase();
       const matchQuery =
-        !searchQuery.trim() ||
-        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.adminName.toLowerCase().includes(searchQuery.toLowerCase());
+        !query ||
+        t.name.toLowerCase().includes(query) ||
+        t.code.toLowerCase().includes(query) ||
+        t.adminName.toLowerCase().includes(query) ||
+        (t.tagline && t.tagline.toLowerCase().includes(query)) ||
+        (t.subjects && t.subjects.some((s) => s.toLowerCase().includes(query))) ||
+        (t.courses && t.courses.some((c) => c.toLowerCase().includes(query)));
+
       return matchSubject && matchQuery;
     });
   }, [tenants, subjectFilter, searchQuery]);
@@ -49,13 +137,7 @@ export function TenantSchools({
       {/* Subject Stream Filter & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          {[
-            { key: "all", label: "👨‍🏫 All Tutors" },
-            { key: "maths", label: "📐 Combined Maths" },
-            { key: "phys", label: "⚡ Physics" },
-            { key: "chem", label: "🧪 Chemistry" },
-            { key: "commerce", label: "📊 Commerce & Accounts" }
-          ].map((sub) => (
+          {SUBJECT_FILTER_OPTIONS.map((sub) => (
             <button
               key={sub.key}
               onClick={() => setSubjectFilter(sub.key)}
@@ -82,8 +164,48 @@ export function TenantSchools({
         </div>
       </div>
 
-      {/* Tenants Cards Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Empty State when no tutors match */}
+      {filteredTenants.length === 0 ? (
+        <div className="p-12 text-center rounded-2xl border-2 border-dashed border-slate-200 bg-white shadow-2xs space-y-3">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-2xl">
+            {subjectFilter === "maths" ? "📐" : subjectFilter === "phys" ? "⚡" : subjectFilter === "chem" ? "🧪" : subjectFilter === "commerce" ? "📊" : "🔍"}
+          </div>
+          <h4 className="text-base font-black text-slate-800">
+            {subjectFilter === "all"
+              ? "No Tutors Found"
+              : `No Tutors Found for ${SUBJECT_FILTER_OPTIONS.find((s) => s.key === subjectFilter)?.shortName || "Subject"}`}
+          </h4>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            {subjectFilter === "all"
+              ? "No educational studios or tutors matched your search query."
+              : `There are currently no educator studios tagged with this subject stream. You can edit an existing studio's "Subject Specialization" or register a new tutor studio.`}
+          </p>
+          <div className="flex items-center justify-center gap-2 pt-2">
+            {subjectFilter !== "all" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSubjectFilter("all")}
+                className="text-xs font-bold border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                View All Tutors
+              </Button>
+            )}
+            {searchQuery && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchQuery("")}
+                className="text-xs font-bold border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                Clear Search
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Tenants Cards Grid */
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredTenants.map((tenant) => {
           const enabledModulesCount = HIERARCHICAL_MODULES.filter((m) => tenant.enabledFeatures[m.key]).length;
           const isSimulated = tenant.id === activeTenantId;
@@ -127,6 +249,21 @@ export function TenantSchools({
 
                       <h3 className="text-base font-black text-[#0d2b26] mt-1">{tenant.name}</h3>
                       {tenant.tagline && <p className="text-xs text-slate-500 italic">&ldquo;{tenant.tagline}&rdquo;</p>}
+
+                      {tenant.subjects && tenant.subjects.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {tenant.subjects.slice(0, 3).map((sub, idx) => (
+                            <span key={idx} className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                              📚 {sub}
+                            </span>
+                          ))}
+                          {tenant.subjects.length > 3 && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                              +{tenant.subjects.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
@@ -224,6 +361,7 @@ export function TenantSchools({
           );
         })}
       </div>
+      )}
     </div>
   );
 }

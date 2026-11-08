@@ -203,6 +203,7 @@ export const api = {
       contactPhone: string;
       monthlyFeeLkr: number;
       address: string;
+      tagline?: string;
       type: string;
       enabledFeatures: Record<string, boolean>;
     }) {

@@ -4,10 +4,17 @@ import { prisma } from '../config/prisma';
 export const listTenants = async (req: Request, res: Response): Promise<void> => {
   try {
     const tenants = await prisma.tenant.findMany({
-  where: {
-    deletedAt: null,
-  },
-  include: {
+      where: {
+        deletedAt: null,
+      },
+      include: {
+        courses: {
+          select: {
+            id: true,
+            title: true,
+            code: true,
+          },
+        },
         _count: {
           select: {
             users: true,
@@ -28,17 +35,18 @@ export const listTenants = async (req: Request, res: Response): Promise<void> =>
 export const createTenant = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
-  name,
-  subdomain,
-  plan,
-  adminEmail,
-  adminName,
-  contactPhone,
-  monthlyFeeLkr,
-  address,
-  type,
-  enabledFeatures,
-} = req.body ?? {};
+      name,
+      subdomain,
+      plan,
+      adminEmail,
+      adminName,
+      contactPhone,
+      monthlyFeeLkr,
+      address,
+      tagline,
+      type,
+      enabledFeatures,
+    } = req.body ?? {};
 
 if (
   monthlyFeeLkr !== undefined &&
@@ -129,6 +137,7 @@ if (
   ? 0
   : monthlyFeeLkr,
   address: address || '',
+  tagline: tagline || '',
   type: type || 'individual_teacher',
   enabledFeatures: enabledFeatures || {},
 },

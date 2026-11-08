@@ -27,6 +27,7 @@ export function CreateTenantModal({ isOpen, onClose, onAddTenant }: CreateTenant
     contactPhone: "",
     monthlyFeeLkr: 18000,
     address: "",
+    tagline: "",
     studentCount: 150,
     teacherCount: 1
   });
@@ -59,6 +60,7 @@ setIsSubmitting(true);
       createdAt: new Date().toISOString().split("T")[0],
       renewalDate: "2027-12-31",
       address: newTenantData.address || "Sri Lanka",
+      tagline: newTenantData.tagline || "",
       enabledFeatures: { ...preset.features }
     };
 
@@ -72,6 +74,7 @@ setIsSubmitting(true);
   contactPhone: newTenantData.contactPhone.trim(),
   monthlyFeeLkr: Number(newTenantData.monthlyFeeLkr),
   address: newTenantData.address.trim(),
+  tagline: newTenantData.tagline.trim(),
   type: newTenantData.type,
   enabledFeatures: { ...preset.features },
 });
@@ -132,8 +135,8 @@ setIsSubmitting(true);
             <input
               type="text"
               placeholder="e.g. Combined Mathematics"
-              value={newTenantData.address}
-              onChange={(e) => setNewTenantData({ ...newTenantData, address: e.target.value })}
+              value={newTenantData.tagline}
+              onChange={(e) => setNewTenantData({ ...newTenantData, tagline: e.target.value })}
               className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
             />
           </div>
