@@ -106,6 +106,18 @@ export function ProfileView() {
   const [tenantStatisticsError, setTenantStatisticsError] =
     useState<string | null>(null);
 
+  const [monthlyMrr, setMonthlyMrr] = useState<{
+    monthlyMrr: number;
+    currency: string;
+    activeSubscriptions: number;
+    calculatedAt: string;
+  } | null>(null);
+
+  const [monthlyMrrLoading, setMonthlyMrrLoading] = useState(false);
+
+  const [monthlyMrrError, setMonthlyMrrError] =
+    useState<string | null>(null);
+
   useEffect(() => {
     if (currentRole !== "super_admin") {
       setTenantStatistics(null);
@@ -142,6 +154,50 @@ export function ProfileView() {
     };
 
     void fetchTenantStatistics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
+
+  useEffect(() => {
+    if (currentRole !== "super_admin") {
+      setMonthlyMrr(null);
+      setMonthlyMrrError(null);
+      setMonthlyMrrLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchMonthlyMrr = async () => {
+      setMonthlyMrrLoading(true);
+      setMonthlyMrrError(null);
+      setMonthlyMrr(null);
+
+      try {
+        const response = await api.superAdminProfile.getMonthlySaasMrr();
+
+        if (!cancelled) {
+          setMonthlyMrr(response.data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setMonthlyMrr(null);
+          setMonthlyMrrError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load monthly SaaS MRR"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setMonthlyMrrLoading(false);
+        }
+      }
+    };
+
+    void fetchMonthlyMrr();
 
     return () => {
       cancelled = true;
@@ -1308,7 +1364,19 @@ if (!savedProfile) {
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Monthly SaaS MRR</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-amber-600 font-mono">LKR 448,000</span>
+
+                <span className="text-lg font-black text-amber-600 font-mono">
+                  {monthlyMrrLoading
+                    ? "Loading..."
+                    : monthlyMrrError
+                      ? "Unavailable"
+                      : monthlyMrr
+                        ? `${monthlyMrr.currency} ${monthlyMrr.monthlyMrr.toLocaleString("en-LK", {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })}`
+                        : "Unavailable"}
+                </span>
                 <span className="text-[10px] text-slate-500 font-semibold">Recurring Platform Revenue</span>
               </div>
             </div>

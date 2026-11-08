@@ -871,6 +871,39 @@ export const api = {
       return result;
     },
 
+    async getMonthlySaasMrr(): Promise<{
+      success: boolean;
+      data: {
+        monthlyMrr: number;
+        currency: string;
+        activeSubscriptions: number;
+        calculatedAt: string;
+      };
+    }> {
+      const token = api.token.get();
+
+      const res = await fetch(
+        `${API_BASE_URL}/super-admin/statistics/mrr`,
+        {
+          method: 'GET',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: 'no-store',
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(
+          result.message || 'Failed to fetch monthly SaaS MRR'
+        );
+      }
+
+      return result;
+    },
+
     async get() {
       const token = api.token.get();
 
