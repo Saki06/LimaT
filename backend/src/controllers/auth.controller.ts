@@ -62,9 +62,9 @@ const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
       return;
     }
 
-    // Validate tenant status before issuing a JWT
-if (user.tenantId) {
-  const tenant = await prisma.tenant.findUnique({
+    // Validate tenant status before issuing a JWT (except Super Admin)
+    if (user.tenantId && user.role !== 'SUPER_ADMIN') {
+      const tenant = await prisma.tenant.findUnique({
   where: { id: user.tenantId },
   select: {
     status: true,

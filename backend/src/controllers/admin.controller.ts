@@ -7,14 +7,15 @@ import { AuthenticatedRequest } from '../middlewares/auth.middleware';
  * Helper to resolve the active tenant ID from request user, header, or default
  */
 export const resolveTenantId = async (req: AuthenticatedRequest): Promise<string> => {
-  if (req.user?.tenantId) {
-    return req.user.tenantId;
-  }
   const rawHeader = req.headers['x-tenant-id'];
   const headerTenantId = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
   if (headerTenantId) {
-    const existing = await prisma.tenant.findUnique({ where: { id: headerTenantId } });
+    const existing = await prisma.tenant.findUnique({ where: { id: headerTenantId, deletedAt: null } });
     if (existing) return existing.id;
+  }
+  if (req.user?.tenantId) {
+    const userTenant = await prisma.tenant.findUnique({ where: { id: req.user.tenantId, deletedAt: null } });
+    if (userTenant) return userTenant.id;
   }
   const defaultTenant = await prisma.tenant.findFirst({
     where: { status: 'ACTIVE', deletedAt: null },

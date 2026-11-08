@@ -74,9 +74,9 @@ if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
   return;
 }
 
-    // Block access for users belonging to suspended or inactive tenants
-if (user.tenantId) {
-  const tenant = await prisma.tenant.findUnique({
+    // Block access for users belonging to suspended or inactive tenants (except Super Admin)
+    if (user.tenantId && user.role !== 'SUPER_ADMIN') {
+      const tenant = await prisma.tenant.findUnique({
   where: { id: user.tenantId },
   select: {
     status: true,
@@ -176,9 +176,9 @@ if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
   return;
 }
 
-    // Block suspended or inactive tenant users
-if (user.tenantId) {
-  const tenant = await prisma.tenant.findUnique({
+    // Block suspended or inactive tenant users (except Super Admin)
+    if (user.tenantId && user.role !== 'SUPER_ADMIN') {
+      const tenant = await prisma.tenant.findUnique({
     where: { id: user.tenantId },
     select: {
   status: true,
