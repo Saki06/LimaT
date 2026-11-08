@@ -2153,21 +2153,21 @@ export function LandingView({
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1 w-full">
                   <button
                     type="button"
-                    onClick={() => handle1ClickDemoLogin("teacher")}
+                    onClick={() => openAuth("signup", "teacher", "drawer")}
                     className="bg-[#b47a16] hover:bg-[#8d5f10] text-white font-black text-sm px-7 py-3.5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto group"
                   >
-                    <Sparkles className="h-4 sm:h-5 w-4 sm:w-5 text-[#fde047]" />
-                    <span>Launch Tutor Cockpit</span>
+                    <UserPlus className="h-4 sm:h-5 w-4 sm:w-5" />
+                    <span>Register as Tutor</span>
                     <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => openAuth("signup", "teacher", "drawer")}
+                    onClick={() => openAuth("login", "teacher", "drawer")}
                     className="bg-white/90 backdrop-blur-xs border-2 border-amber-100 hover:border-[#b47a16] text-slate-800 font-extrabold text-sm px-6 py-3.5 rounded-full shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
                   >
-                    <UserPlus className="h-4 w-4 text-[#b47a16]" />
-                    <span>Register as Tutor</span>
+                    <LogIn className="h-4 w-4 text-[#b47a16]" />
+                    <span>Tutor Sign In</span>
                   </button>
                 </div>
               </div>
