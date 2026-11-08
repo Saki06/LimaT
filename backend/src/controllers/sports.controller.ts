@@ -32,32 +32,21 @@ export const listSportsEvents = async (
 ): Promise<void> => {
   try {
     const user = req.user;
-
-    if (!user) {
-      res.status(401).json({ success: false, message: 'Authenticated user is required.' });
-      return;
-    }
-
-    if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
-      res.status(403).json({
-        success: false,
-        message: 'Your account is not assigned to an organization.',
-      });
-      return;
-    }
-
-    // A tenantless Super Admin is the only role allowed to browse across tenants.
-    const where = user.tenantId ? { tenantId: user.tenantId } : {};
+    const where = user?.tenantId ? { tenantId: user.tenantId } : {};
 
     let events = await prisma.sportsEvent.findMany({
       where,
       include: {
-        registrations: {
-          where: { userId: user.userId },
-          select: {
-            userId: true,
-          },
-        },
+        ...(user?.userId
+          ? {
+              registrations: {
+                where: { userId: user.userId },
+                select: {
+                  userId: true,
+                },
+              },
+            }
+          : {}),
         _count: {
           select: { registrations: true },
         },
@@ -66,7 +55,7 @@ export const listSportsEvents = async (
     });
 
     if (events.length === 0) {
-      let candidateTenantId = user.tenantId;
+      let candidateTenantId = user?.tenantId ?? null;
       if (!candidateTenantId) {
         const activeTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
         candidateTenantId = activeTenant?.id ?? null;
@@ -128,12 +117,16 @@ export const listSportsEvents = async (
         events = await prisma.sportsEvent.findMany({
           where,
           include: {
-            registrations: {
-              where: { userId: user.userId },
-              select: {
-                userId: true,
-              },
-            },
+            ...(user?.userId
+              ? {
+                  registrations: {
+                    where: { userId: user.userId },
+                    select: {
+                      userId: true,
+                    },
+                  },
+                }
+              : {}),
             _count: {
               select: { registrations: true },
             },
@@ -267,10 +260,6 @@ export const listSportsDisciplines = async (
 ): Promise<void> => {
   try {
     const tenantId = getTenantId(req);
-    if (!req.user) {
-      res.status(401).json({ success: false, message: 'Authenticated user is required.' });
-      return;
-    }
 
     const disciplines = await prisma.sportsDiscipline.findMany({
       where: tenantId ? { tenantId } : {},
@@ -696,10 +685,6 @@ export const listSportsTeams = async (
 ): Promise<void> => {
   try {
     const tenantId = getTenantId(req);
-    if (!req.user) {
-      res.status(401).json({ success: false, message: 'Authenticated user is required.' });
-      return;
-    }
     const teams = await prisma.sportsTeam.findMany({
       where: tenantId ? { tenantId } : {},
       orderBy: { name: 'asc' },
@@ -806,10 +791,6 @@ export const listSportsTournaments = async (
 ): Promise<void> => {
   try {
     const tenantId = getTenantId(req);
-    if (!req.user) {
-      res.status(401).json({ success: false, message: 'Authenticated user is required.' });
-      return;
-    }
     const tournaments = await prisma.sportsTournament.findMany({
       where: tenantId ? { tenantId } : {},
       orderBy: { startDate: 'asc' },
@@ -948,10 +929,6 @@ export const listSportsFixtures = async (
 ): Promise<void> => {
   try {
     const tenantId = getTenantId(req);
-    if (!req.user) {
-      res.status(401).json({ success: false, message: 'Authenticated user is required.' });
-      return;
-    }
     const fixtures = await prisma.sportsFixture.findMany({
       where: tenantId ? { tenantId } : {},
       orderBy: [{ date: 'asc' }, { time: 'asc' }],
@@ -1122,10 +1099,6 @@ export const listSportsStandings = async (
 ): Promise<void> => {
   try {
     const tenantId = getTenantId(req);
-    if (!req.user) {
-      res.status(401).json({ success: false, message: 'Authenticated user is required.' });
-      return;
-    }
     const fixtures = await prisma.sportsFixture.findMany({
       where: { ...(tenantId ? { tenantId } : {}), status: 'completed' },
       orderBy: { date: 'asc' },

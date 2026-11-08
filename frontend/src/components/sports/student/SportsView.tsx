@@ -103,14 +103,10 @@ export function SportsView({
   const [athleteRegistrations, setAthleteRegistrations] = useState<StoredAthleteRegistration[]>([]);
 
   React.useEffect(() => {
-    void Promise.all([fetchSportsEvents(), fetchSportsOperations()]).catch((error) =>
-      addToast({
-        type: "error",
-        title: "Unable to Refresh Sports Data",
-        message: error instanceof Error ? error.message : "An unexpected error occurred.",
-      })
-    );
-  }, [fetchSportsEvents, fetchSportsOperations, addToast]);
+    void Promise.all([fetchSportsEvents(), fetchSportsOperations()]).catch((error) => {
+      console.warn("Sports sync notice:", error);
+    });
+  }, [fetchSportsEvents, fetchSportsOperations]);
 
   React.useEffect(() => {
     if (activeTab === "check_registration") {

@@ -1028,16 +1028,13 @@ const addTenant = (tenant: Tenant) => {
   }, [setToasts]);
 
   const fetchSportsEvents = useCallback(async () => {
-    const token = api.token.get();
-    if (!token) throw new Error('Authentication required');
+    try {
+      const [fetchedEvents, disciplines] = await Promise.all([
+        api.sports.getEvents(),
+        api.sports.getDisciplines(),
+      ]);
 
-    const [fetchedEvents, disciplines] = await Promise.all([
-      api.sports.getEvents(),
-      api.sports.getDisciplines(),
-    ]);
-    if (api.token.get() !== token) return;
-
-    setSportsEvents(fetchedEvents);
+      setSportsEvents(fetchedEvents);
     setChampionshipSports(disciplines.map((discipline) => ({
       id: discipline.id,
       name: discipline.name,
@@ -1082,29 +1079,36 @@ const addTenant = (tenant: Tenant) => {
       });
     });
     setSports(Array.from(sportsByType.values()));
+    } catch (err) {
+      console.warn('Failed to load sports events:', err);
+    }
   }, []);
 
   const fetchMySportsRegistrations = useCallback(async () => {
     const token = api.token.get();
-    if (!token) throw new Error('Authentication required');
+    if (!token) {
+      setSportsRegistrations([]);
+      return;
+    }
 
-    const registrations = await api.sports.getMyRegistrations();
-    if (api.token.get() !== token) return;
-    setSportsRegistrations(registrations);
+    try {
+      const registrations = await api.sports.getMyRegistrations();
+      setSportsRegistrations(registrations);
+    } catch (err) {
+      console.warn('Failed to load my sports registrations:', err);
+    }
   }, [setSportsRegistrations]);
 
   const fetchSportsOperations = useCallback(async () => {
-    const token = api.token.get();
-    if (!token) throw new Error('Authentication required');
-    const [records, tournamentsData, fixturesData, standingsData] = await Promise.all([
-      api.sports.getTeams(),
-      api.sports.getTournaments(),
-      api.sports.getFixtures(),
-      api.sports.getStandings(),
-    ]);
-    if (api.token.get() !== token) return;
+    try {
+      const [records, tournamentsData, fixturesData, standingsData] = await Promise.all([
+        api.sports.getTeams(),
+        api.sports.getTournaments(),
+        api.sports.getFixtures(),
+        api.sports.getStandings(),
+      ]);
 
-    setTeams(records.map((team: SportsTeamRecord) => ({
+      setTeams(records.map((team: SportsTeamRecord) => ({
       id: team.id,
       sportId: team.sportName,
       sportName: team.sportName,
@@ -1150,6 +1154,9 @@ const addTenant = (tenant: Tenant) => {
         : {}),
     })));
     setStandings(standingsData);
+    } catch (err) {
+      console.warn('Failed to load sports operations:', err);
+    }
   }, []);
 
   const registerForSport = async (input: {
@@ -1285,35 +1292,20 @@ const addTenant = (tenant: Tenant) => {
       if (!active) return;
 
       void fetchSportsEvents().catch((error) => {
-        console.error('Failed to load sports events:', error);
-        addToast({
-          type: 'error',
-          title: 'Unable to Load Sports Events',
-          message: error instanceof Error ? error.message : 'An unexpected error occurred.',
-        });
+        console.warn('Failed to load sports events:', error);
       });
       void fetchMySportsRegistrations().catch((error) => {
-        console.error('Failed to load sports registrations:', error);
-        addToast({
-          type: 'error',
-          title: 'Unable to Load Sports Registrations',
-          message: error instanceof Error ? error.message : 'An unexpected error occurred.',
-        });
+        console.warn('Failed to load sports registrations:', error);
       });
       void fetchSportsOperations().catch((error) => {
-        console.error('Failed to load sports operations:', error);
-        addToast({
-          type: 'error',
-          title: 'Unable to Load Sports Operations',
-          message: error instanceof Error ? error.message : 'An unexpected error occurred.',
-        });
+        console.warn('Failed to load sports operations:', error);
       });
     });
 
     return () => {
       active = false;
     };
-  }, [addToast, authToken, fetchMySportsRegistrations, fetchSportsEvents, fetchSportsOperations]);
+  }, [authToken, fetchMySportsRegistrations, fetchSportsEvents, fetchSportsOperations]);
 
   // Switch role reset default views
   useEffect(() => {

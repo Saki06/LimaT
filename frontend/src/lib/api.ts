@@ -155,13 +155,12 @@ export interface SportsStandingRecord {
 
 async function sportsRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const token = api.token.get();
-  if (!token) throw new Error('Authentication required');
 
   const response = await fetch(`${API_BASE_URL}/sports${path}`, {
     ...init,
     headers: {
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   });
