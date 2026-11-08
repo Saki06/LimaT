@@ -130,3 +130,39 @@ for (const subscription of subscriptions) {
     });
   }
 };
+
+
+export const getStudentStatistics = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const totalStudents = await prisma.user.count({
+      where: {
+        role: 'STUDENT',
+        tenantId: {
+          not: null,
+        },
+        tenant: {
+          is: {
+            deletedAt: null,
+          },
+        },
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalStudents,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to fetch student statistics:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Unable to fetch student statistics',
+    });
+  }
+};

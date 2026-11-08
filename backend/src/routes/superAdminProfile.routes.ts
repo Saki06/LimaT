@@ -11,6 +11,7 @@ import {
 import {
   getTenantStatistics,
   getMonthlySaasMrr,
+  getStudentStatistics,
 } from '../controllers/superAdminStatistics.controller';
 
 const router = Router();
@@ -22,5 +23,6 @@ router.get('/profile', getSuperAdminProfile);
 router.patch('/profile', updateSuperAdminProfile);
 router.get('/statistics/tenants', getTenantStatistics);
 router.get('/statistics/mrr', getMonthlySaasMrr);
+router.get('/statistics/students', getStudentStatistics);
 
 export default router;
