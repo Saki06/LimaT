@@ -1,4 +1,4 @@
-export const API_BASE_URL =
+﻿export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export interface AuthResponse {
@@ -1491,6 +1491,103 @@ export const api = {
 
     // Super Admin Profile APIs
   superAdminProfile: {
+
+    async getTenantStatistics(): Promise<{
+      success: boolean;
+      data: {
+        totalTenants: number;
+        activeTenants: number;
+        suspendedTenants: number;
+        inactiveTenants: number;
+      };
+    }> {
+      const token = api.token.get();
+
+      const res = await fetch(
+        `${API_BASE_URL}/super-admin/statistics/tenants`,
+        {
+          method: 'GET',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: 'no-store',
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          result.message || 'Failed to fetch tenant statistics'
+        );
+      }
+
+      return result;
+    },
+
+    async getMonthlySaasMrr(): Promise<{
+      success: boolean;
+      data: {
+        monthlyMrr: number;
+        currency: string;
+        activeSubscriptions: number;
+        calculatedAt: string;
+      };
+    }> {
+      const token = api.token.get();
+
+      const res = await fetch(
+        `${API_BASE_URL}/super-admin/statistics/mrr`,
+        {
+          method: 'GET',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: 'no-store',
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(
+          result.message || 'Failed to fetch monthly SaaS MRR'
+        );
+      }
+
+      return result;
+    },
+
+    async getStudentStatistics(): Promise<{
+      success: boolean;
+      data: {
+        totalStudents: number;
+      };
+    }> {
+      const token = api.token.get();
+
+      const res = await fetch(
+        `${API_BASE_URL}/super-admin/statistics/students`,
+        {
+          method: 'GET',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: 'no-store',
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(
+          result.message || 'Failed to fetch student statistics'
+        );
+      }
+
+      return result;
+    },
+
     async get() {
       const token = api.token.get();
 
@@ -1541,6 +1638,111 @@ export const api = {
 
       if (!res.ok) {
         throw new Error(result.message || 'Failed to update Super Admin profile');
+      }
+
+
+      return result;
+    },
+
+    async uploadAvatar(file: File): Promise<{
+      success: boolean;
+      message: string;
+      data: { avatarUrl: string };
+    }> {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const res = await fetch(
+        `${API_BASE_URL}/super-admin/profile/avatar`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(
+          result.message || 'Failed to upload profile picture'
+        );
+      }
+
+      return result;
+    },
+    async getAvatarBlob(avatarUrl: string): Promise<Blob> {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const prefix = '/api/super-admin/avatars/';
+
+      if (!avatarUrl.startsWith(prefix)) {
+        throw new Error('Invalid avatar URL');
+      }
+
+      const filename = avatarUrl.slice(prefix.length);
+
+      if (!/^[0-9a-f-]{36}\.(jpg|png|webp)$/i.test(filename)) {
+        throw new Error('Invalid avatar filename');
+      }
+
+      const res = await fetch(
+        `${API_BASE_URL}/super-admin/avatars/${filename}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          cache: 'no-store',
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error('Failed to load profile picture');
+      }
+
+      return res.blob();
+    },
+
+    async deleteAvatar(): Promise<{
+      success: boolean;
+      message: string;
+      data: { avatarUrl: null };
+    }> {
+      const token = api.token.get();
+
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const res = await fetch(
+        `${API_BASE_URL}/super-admin/profile/avatar`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(
+          result.message || 'Failed to delete profile picture'
+        );
       }
 
       return result;
@@ -2047,6 +2249,7 @@ export const api = {
   },
 
   // Token and Local Storage Helpers
+
   token: {
     get(): string | null {
       if (typeof window === 'undefined') return null;

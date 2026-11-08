@@ -102,6 +102,174 @@ export function ProfileView() {
     }
   }, [currentRole, refreshTeacherProfile]);
 
+  const [tenantStatistics, setTenantStatistics] = useState<{
+    totalTenants: number;
+    activeTenants: number;
+    suspendedTenants: number;
+    inactiveTenants: number;
+  } | null>(null);
+
+  const [tenantStatisticsLoading, setTenantStatisticsLoading] =
+    useState(false);
+
+  const [tenantStatisticsError, setTenantStatisticsError] =
+    useState<string | null>(null);
+
+  const [monthlyMrr, setMonthlyMrr] = useState<{
+    monthlyMrr: number;
+    currency: string;
+    activeSubscriptions: number;
+    calculatedAt: string;
+  } | null>(null);
+
+  const [monthlyMrrLoading, setMonthlyMrrLoading] = useState(false);
+
+  const [monthlyMrrError, setMonthlyMrrError] =
+    useState<string | null>(null);
+
+
+  const [studentStatistics, setStudentStatistics] = useState<{
+    totalStudents: number;
+  } | null>(null);
+
+  const [studentStatisticsLoading, setStudentStatisticsLoading] =
+    useState(false);
+
+  const [studentStatisticsError, setStudentStatisticsError] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentRole !== "super_admin") {
+      setTenantStatistics(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchTenantStatistics = async () => {
+      setTenantStatisticsLoading(true);
+      setTenantStatisticsError(null);
+
+      try {
+        const response =
+          await api.superAdminProfile.getTenantStatistics();
+
+        if (!cancelled) {
+          setTenantStatistics(response.data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setTenantStatistics(null);
+          setTenantStatisticsError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load tenant statistics"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setTenantStatisticsLoading(false);
+        }
+      }
+    };
+
+    void fetchTenantStatistics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
+
+  useEffect(() => {
+    if (currentRole !== "super_admin") {
+      setMonthlyMrr(null);
+      setMonthlyMrrError(null);
+      setMonthlyMrrLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchMonthlyMrr = async () => {
+      setMonthlyMrrLoading(true);
+      setMonthlyMrrError(null);
+      setMonthlyMrr(null);
+
+      try {
+        const response = await api.superAdminProfile.getMonthlySaasMrr();
+
+        if (!cancelled) {
+          setMonthlyMrr(response.data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setMonthlyMrr(null);
+          setMonthlyMrrError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load monthly SaaS MRR"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setMonthlyMrrLoading(false);
+        }
+      }
+    };
+
+    void fetchMonthlyMrr();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
+
+
+  useEffect(() => {
+    if (currentRole !== "super_admin") {
+      setStudentStatistics(null);
+      setStudentStatisticsError(null);
+      setStudentStatisticsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchStudentStatistics = async () => {
+      setStudentStatisticsLoading(true);
+      setStudentStatisticsError(null);
+      setStudentStatistics(null);
+
+      try {
+        const response =
+          await api.superAdminProfile.getStudentStatistics();
+
+        if (!cancelled) {
+          setStudentStatistics(response.data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setStudentStatistics(null);
+          setStudentStatisticsError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load student statistics"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setStudentStatisticsLoading(false);
+        }
+      }
+    };
+
+    void fetchStudentStatistics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
+
   const handleContinueCourse = (courseId: string) => {
     setSelectedCourseId(courseId);
     setCurrentView("courses");
@@ -458,7 +626,8 @@ export function ProfileView() {
 
         if (!response.success || cancelled) return;
 
-       const savedProfile = response.data?.superAdminProfile;
+        setSavedAvatarUrl(response.data?.avatarUrl ?? null);
+        const savedProfile = response.data?.superAdminProfile;
 
 if (!response.data) return;
 
@@ -585,6 +754,115 @@ if (!savedProfile) {
   }, [currentRole, currentUser.id]);
 
   const [avatarPreset, setAvatarPreset] = useState<string>("default");
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [savedAvatarUrl, setSavedAvatarUrl] = useState<string | null>(null);
+  const [savedAvatarImageUrl, setSavedAvatarImageUrl] = useState<string | null>(null);
+
+
+  useEffect(() => {
+    if (currentRole !== "super_admin" || !savedAvatarUrl) {
+      setSavedAvatarImageUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    const loadSavedAvatar = async () => {
+      try {
+        const blob = await api.superAdminProfile.getAvatarBlob(savedAvatarUrl);
+
+        if (cancelled) return;
+
+        objectUrl = URL.createObjectURL(blob);
+        setSavedAvatarImageUrl(objectUrl);
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error("Failed to load Super Admin avatar:", error);
+        setSavedAvatarImageUrl(null);
+      }
+    };
+
+    setSavedAvatarImageUrl(null);
+    void loadSavedAvatar();
+
+    return () => {
+      cancelled = true;
+
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [currentRole, savedAvatarUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+    };
+  }, [avatarPreviewUrl]);
+
+  const handleAvatarFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (currentRole !== "super_admin") return;
+
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      addToast({ type: "error", title: "Invalid Image", message: "Only JPG, PNG and WebP images are allowed." });
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      addToast({ type: "error", title: "Image Too Large", message: "Profile picture must be 2 MB or smaller." });
+      event.target.value = "";
+      return;
+    }
+
+    setAvatarFile(file);
+    setAvatarPreviewUrl(URL.createObjectURL(file));
+    event.target.value = "";
+  };
+
+
+  const handleDeleteAvatar = async () => {
+    if (currentRole !== "super_admin" || isSavingProfile) return;
+
+    setIsSavingProfile(true);
+
+    try {
+      await api.superAdminProfile.deleteAvatar();
+
+      setSavedAvatarUrl(null);
+      setSavedAvatarImageUrl(null);
+      setAvatarFile(null);
+      setAvatarPreviewUrl(null);
+
+      addToast({
+        type: "success",
+        title: "Avatar Removed",
+        message: "Your profile picture has been removed.",
+      });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "Delete Failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to remove profile picture.",
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   const [selectedScheduleDay, setSelectedScheduleDay] = useState<
     "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"
   >("Monday");
@@ -918,8 +1196,19 @@ if (!savedProfile) {
           rootAuthorityId: profileData.indexNumber || null,
         });
 
+
         if (!response.success) {
           throw new Error(response.message || "Profile update failed");
+        }
+
+        if (avatarFile) {
+          const avatarResponse = await api.superAdminProfile.uploadAvatar(
+            avatarFile
+          );
+
+          setSavedAvatarUrl(avatarResponse.data.avatarUrl);
+          setAvatarFile(null);
+          setAvatarPreviewUrl(null);
         }
 
         setIsEditing(false);
@@ -1154,23 +1443,86 @@ if (!savedProfile) {
         </div>
 
         <div className="relative flex flex-col md:flex-row items-start md:items-center gap-5 sm:gap-6">
-          {/* Avatar with preset selection & edit indicator */}
+          {/* Avatar with photo preview */}
           <div className="relative group shrink-0">
-            <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-gradient-to-br from-[#0d5c4d] to-[#16423b] flex items-center justify-center text-white text-3xl sm:text-4xl font-black shadow-lg shadow-[#0d5c4d]/25 border-4 border-white ring-2 ring-[#0d5c4d]/10">
-              {profileData.name.charAt(0)}
-            </div>
-            {isEditing && (
-              <button
-                type="button"
-                className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform"
-                title="Change Avatar Photo"
-              >
-                <Camera className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+            <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-gradient-to-br from-[#0d5c4d] to-[#16423b] flex items-center justify-center overflow-hidden text-white text-3xl sm:text-4xl font-black shadow-lg shadow-[#0d5c4d]/25 border-4 border-white ring-2 ring-[#0d5c4d]/10">
 
+              {currentRole === "super_admin" &&
+              (avatarPreviewUrl || savedAvatarImageUrl) ? (
+                <img
+                  src={avatarPreviewUrl || savedAvatarImageUrl || ""}
+                  alt="Super Admin profile picture"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                profileData.name.charAt(0)
+              )}
+</div>
+            {currentRole === "super_admin" && (
+              <input
+                id="super-admin-avatar-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleAvatarFileChange}
+                className="hidden"
+                aria-label="Select profile picture"
+              />
+            )}
+
+            {isEditing && (
+              currentRole === "super_admin" ? (
+                <label
+                  htmlFor="super-admin-avatar-input"
+                  className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform cursor-pointer"
+                  title="Change Avatar Photo"
+                >
+                  <Camera className="h-4 w-4" />
+                </label>
+              ) : (
+                <button
+                  type="button"
+                  className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform"
+                  title="Change Avatar Photo"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+              )
+            )}
+
+            {currentRole === "super_admin" &&
+              isEditing &&
+              savedAvatarUrl && (
+                <button
+                  type="button"
+                  onClick={handleDeleteAvatar}
+                  disabled={isSavingProfile}
+                  title="Remove profile picture"
+                  aria-label="Remove profile picture"
+                  className="absolute -bottom-1.5 -left-1.5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-50 text-red-600 shadow-md transition-transform hover:scale-105 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v5" />
+                    <path d="M14 11v5" />
+                  </svg>
+                </button>
+              )}
+          </div>
           {/* User Details */}
+
           <div className="flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 className="text-xl sm:text-2xl font-black text-[#0d2b26]">
@@ -1285,7 +1637,24 @@ if (!savedProfile) {
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Client Tenants</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d5c4d]">4 Active Clients</span>
+
+
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-lg font-black text-[#0d5c4d]">
+                  {tenantStatisticsLoading
+                    ? "Loading..."
+                    : tenantStatisticsError
+                      ? "Unavailable"
+                      : tenantStatistics
+                        ? `${tenantStatistics.activeTenants.toLocaleString()} Active Clients`
+                        : "Unavailable"}
+                </span>
+                <span className="text-[10px] text-emerald-600 font-bold">
+                  Schools, Tutors &amp; Academies
+                </span>
+              </div>
+
+
                 <span className="text-[10px] text-emerald-600 font-bold">Schools, Tutors &amp; Academies</span>
               </div>
             </div>
@@ -1293,7 +1662,19 @@ if (!savedProfile) {
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Monthly SaaS MRR</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-amber-600 font-mono">LKR 448,000</span>
+
+                <span className="text-lg font-black text-amber-600 font-mono">
+                  {monthlyMrrLoading
+                    ? "Loading..."
+                    : monthlyMrrError
+                      ? "Unavailable"
+                      : monthlyMrr
+                        ? `${monthlyMrr.currency} ${monthlyMrr.monthlyMrr.toLocaleString("en-LK", {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })}`
+                        : "Unavailable"}
+                </span>
                 <span className="text-[10px] text-slate-500 font-semibold">Recurring Platform Revenue</span>
               </div>
             </div>
@@ -1301,8 +1682,19 @@ if (!savedProfile) {
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Platform Students</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d2b26]">9,942 Students</span>
-                <span className="text-[10px] text-emerald-600 font-bold">Across All Tenant Databases</span>
+
+<span className="text-lg font-black text-[#0d2b26]">
+  {studentStatisticsLoading
+    ? "Loading..."
+    : studentStatisticsError
+      ? "Unavailable"
+      : studentStatistics
+        ? `${studentStatistics.totalStudents.toLocaleString()} Students`
+        : "Unavailable"}
+</span>
+                <span className="text-[10px] text-emerald-600 font-bold">
+  Registered Students Across Non-Archived Tenants
+</span>
               </div>
             </div>
           </div>
