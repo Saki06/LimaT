@@ -6,9 +6,6 @@ import {
   Bell,
   Search,
   Menu,
-  GraduationCap,
-  School,
-  Shield,
   Sparkles,
   ChevronDown,
   X,
@@ -26,22 +23,6 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const [selectedAnnouncementModal, setSelectedAnnouncementModal] = useState<Announcement | null>(null);
-
-  const roleBadgeColor = {
-    student: "bg-[#ecf8f5] text-[#0d5c4d] border-[#c4e9e0]",
-    teacher: "bg-[#fef7e6] text-[#b47a16] border-[#fde4af]",
-    admin: "bg-slate-100 text-slate-800 border-slate-200",
-    super_admin: "bg-amber-100 text-amber-950 border-amber-300 font-black",
-    parent: "bg-indigo-50 text-indigo-700 border-indigo-200 font-bold"
-  }[currentRole] || "bg-slate-100 text-slate-800 border-slate-200";
-
-  const roleIcon = {
-    student: <GraduationCap className="h-4 w-4" />,
-    teacher: <School className="h-4 w-4" />,
-    admin: <Shield className="h-4 w-4" />,
-    super_admin: <span className="text-xs">👑</span>,
-    parent: <span className="text-xs">👨‍👩‍👧</span>
-  }[currentRole] || <Shield className="h-4 w-4" />;
 
   const { activeTenant } = useApp();
 
@@ -96,12 +77,6 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
 
       {/* Right controls */}
       <div className="flex items-center gap-3">
-        {/* Active Role Pill */}
-        <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${roleBadgeColor}`}>
-          {roleIcon}
-          <span className="capitalize">{currentRole} Portal</span>
-        </div>
-
         {/* Notifications */}
         <div className="relative">
           <button
