@@ -118,6 +118,17 @@ export function ProfileView() {
   const [monthlyMrrError, setMonthlyMrrError] =
     useState<string | null>(null);
 
+
+  const [studentStatistics, setStudentStatistics] = useState<{
+    totalStudents: number;
+  } | null>(null);
+
+  const [studentStatisticsLoading, setStudentStatisticsLoading] =
+    useState(false);
+
+  const [studentStatisticsError, setStudentStatisticsError] =
+    useState<string | null>(null);
+
   useEffect(() => {
     if (currentRole !== "super_admin") {
       setTenantStatistics(null);
@@ -198,6 +209,52 @@ export function ProfileView() {
     };
 
     void fetchMonthlyMrr();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
+
+
+  useEffect(() => {
+    if (currentRole !== "super_admin") {
+      setStudentStatistics(null);
+      setStudentStatisticsError(null);
+      setStudentStatisticsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchStudentStatistics = async () => {
+      setStudentStatisticsLoading(true);
+      setStudentStatisticsError(null);
+      setStudentStatistics(null);
+
+      try {
+        const response =
+          await api.superAdminProfile.getStudentStatistics();
+
+        if (!cancelled) {
+          setStudentStatistics(response.data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setStudentStatistics(null);
+          setStudentStatisticsError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load student statistics"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setStudentStatisticsLoading(false);
+        }
+      }
+    };
+
+    void fetchStudentStatistics();
 
     return () => {
       cancelled = true;
@@ -1384,8 +1441,19 @@ if (!savedProfile) {
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Platform Students</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d2b26]">9,942 Students</span>
-                <span className="text-[10px] text-emerald-600 font-bold">Across All Tenant Databases</span>
+
+<span className="text-lg font-black text-[#0d2b26]">
+  {studentStatisticsLoading
+    ? "Loading..."
+    : studentStatisticsError
+      ? "Unavailable"
+      : studentStatistics
+        ? `${studentStatistics.totalStudents.toLocaleString()} Students`
+        : "Unavailable"}
+</span>
+                <span className="text-[10px] text-emerald-600 font-bold">
+  Registered Students Across Non-Archived Tenants
+</span>
               </div>
             </div>
           </div>

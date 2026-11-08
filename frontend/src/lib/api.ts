@@ -904,6 +904,36 @@ export const api = {
       return result;
     },
 
+    async getStudentStatistics(): Promise<{
+      success: boolean;
+      data: {
+        totalStudents: number;
+      };
+    }> {
+      const token = api.token.get();
+
+      const res = await fetch(
+        `${API_BASE_URL}/super-admin/statistics/students`,
+        {
+          method: 'GET',
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: 'no-store',
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        throw new Error(
+          result.message || 'Failed to fetch student statistics'
+        );
+      }
+
+      return result;
+    },
+
     async get() {
       const token = api.token.get();
 
