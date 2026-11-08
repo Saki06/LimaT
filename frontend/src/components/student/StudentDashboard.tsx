@@ -46,7 +46,7 @@ export function StudentDashboard() {
     activeTenant
   } = useApp();
 
-  const tutorName = activeTenant?.adminName || activeTenant?.name || "Dr. Samantha Perera";
+  const tutorName = activeTenant?.adminName || activeTenant?.name || "Lead Tutor";
   const tutorSubject = activeTenant?.tagline || "A/L Combined Mathematics";
   const tutorInitials =
     tutorName

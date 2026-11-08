@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import {
   Layers,
@@ -72,7 +72,52 @@ export function SyllabusBuilderView() {
     selectedCourseId || visibleCourses[0]?.id || ""
   );
 
+  useEffect(() => {
+    if (selectedCourseId && visibleCourses.some((c) => c.id === selectedCourseId)) {
+      setActiveCourseId(selectedCourseId);
+    } else if (!visibleCourses.some((c) => c.id === activeCourseId) && visibleCourses.length > 0) {
+      setActiveCourseId(visibleCourses[0].id);
+    }
+  }, [selectedCourseId, visibleCourses, activeCourseId]);
+
   const activeCourse = visibleCourses.find((c) => c.id === activeCourseId) || visibleCourses[0];
+
+  // Course creation modal state
+  const [isCreateCourseModalOpen, setIsCreateCourseModalOpen] = useState(false);
+  const [newCourseTitle, setNewCourseTitle] = useState("");
+  const [newCourseCode, setNewCourseCode] = useState("");
+  const [newCourseGrade, setNewCourseGrade] = useState("Grade 12 (A/L 2027)");
+  const [newCourseSubject, setNewCourseSubject] = useState("Combined Mathematics");
+  const [newCourseDescription, setNewCourseDescription] = useState("");
+  const [isCreatingCourse, setIsCreatingCourse] = useState(false);
+
+  const handleCreateCourseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCourseTitle.trim()) return;
+    setIsCreatingCourse(true);
+    const cleanTitle = newCourseTitle.trim();
+    const cleanGrade = newCourseGrade;
+    const cleanSubject = newCourseSubject.trim() || "Masterclass";
+    const code =
+      newCourseCode.trim().toUpperCase() ||
+      `${cleanTitle.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "CRS"}-${Math.floor(100 + Math.random() * 900)}`;
+
+    try {
+      const res = await createCourse({
+        title: cleanTitle,
+        code,
+        description: newCourseDescription.trim() || `${cleanSubject} • ${cleanGrade}`,
+      });
+      if (res.success) {
+        setIsCreateCourseModalOpen(false);
+        setNewCourseTitle("");
+        setNewCourseCode("");
+        setNewCourseDescription("");
+      }
+    } finally {
+      setIsCreatingCourse(false);
+    }
+  };
 
   // Accordion state for expanded units
   const [expandedUnitIds, setExpandedUnitIds] = useState<Record<string, boolean>>({
@@ -400,6 +445,120 @@ export function SyllabusBuilderView() {
     setIsCreateLessonModalOpen(false);
   };
 
+  const renderCreateCourseModal = () => (
+    <Modal
+      isOpen={isCreateCourseModalOpen}
+      onClose={() => setIsCreateCourseModalOpen(false)}
+      title="Create New Course / Masterclass"
+    >
+      <form onSubmit={handleCreateCourseSubmit} className="space-y-4">
+        <p className="text-xs text-slate-500">
+          Define your tuition masterclass or subject batch. You can immediately build units, topics, and upload lessons.
+        </p>
+
+        <div>
+          <label className="text-xs font-bold text-slate-700 block mb-1">
+            Course / Masterclass Title *
+          </label>
+          <input
+            type="text"
+            required
+            value={newCourseTitle}
+            onChange={(e) => setNewCourseTitle(e.target.value)}
+            placeholder="e.g. 2027 A/L Combined Mathematics Theory & Revision"
+            className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] font-medium"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">
+              Course Code (Optional)
+            </label>
+            <input
+              type="text"
+              value={newCourseCode}
+              onChange={(e) => setNewCourseCode(e.target.value)}
+              placeholder="e.g. CM-2027"
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] font-mono font-medium"
+            />
+            <span className="text-[10px] text-slate-400">Leave empty to auto-generate</span>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">
+              Target Batch / Grade
+            </label>
+            <select
+              value={newCourseGrade}
+              onChange={(e) => setNewCourseGrade(e.target.value)}
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:border-[#0d5c4d] font-medium cursor-pointer"
+            >
+              <option value="Grade 12 (A/L 2027)">Grade 12 (A/L 2027)</option>
+              <option value="Grade 13 (A/L 2026)">Grade 13 (A/L 2026)</option>
+              <option value="Grade 11 (O/L 2026)">Grade 11 (O/L 2026)</option>
+              <option value="Grade 10">Grade 10</option>
+              <option value="Special Masterclass">Special Masterclass</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-700 block mb-1">
+            Subject Specialization
+          </label>
+          <input
+            type="text"
+            value={newCourseSubject}
+            onChange={(e) => setNewCourseSubject(e.target.value)}
+            placeholder="e.g. Combined Mathematics, Pure Physics, Chemistry"
+            className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] font-medium"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-700 block mb-1">
+            Description &amp; Syllabus Overview
+          </label>
+          <textarea
+            rows={3}
+            value={newCourseDescription}
+            onChange={(e) => setNewCourseDescription(e.target.value)}
+            placeholder="Brief course objectives, syllabus scope, lecture format, and targeted examinations..."
+            className="w-full p-3 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] font-medium resize-none"
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsCreateCourseModalOpen(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isCreatingCourse || !newCourseTitle.trim()}
+            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+          >
+            {isCreatingCourse ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>Creating Course...</span>
+              </>
+            ) : (
+              <>
+                <Plus className="h-3.5 w-3.5" />
+                <span>Create Course &amp; Start Syllabus</span>
+              </>
+            )}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+
   // Calculate metrics
   let totalTopicsCount = 0;
   if (activeCourse?.units) {
@@ -416,7 +575,7 @@ export function SyllabusBuilderView() {
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-[#0d5c4d]"></span>
               <span className="text-xs font-bold uppercase tracking-wider text-[#0d5c4d]">
-                Curriculum Architecture &bull; Faculty Tool
+                Curriculum Architecture &bull; Tutor Desk
               </span>
             </div>
             <h1 className="text-2xl font-black text-[#0d2b26] mt-1">Syllabus Builder</h1>
@@ -424,15 +583,31 @@ export function SyllabusBuilderView() {
               Organize national curriculum units, define syllabus topics, and manage lesson delivery.
             </p>
           </div>
+          <Button
+            onClick={() => setIsCreateCourseModalOpen(true)}
+            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-2xs h-9 px-4 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>+ New Course</span>
+          </Button>
         </div>
 
         <Card className="p-12 text-center border-dashed border-slate-200">
           <BookOpen className="h-12 w-12 text-slate-300 mx-auto mb-3" />
           <h3 className="text-base font-bold text-slate-700">No Courses Available</h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-            You do not have any active course batches yet. Create a course or contact administrator to start building your syllabus curriculum.
+          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto mb-5">
+            You do not have any active course masterclasses yet. Create your first course to start building your syllabus and organizing lessons.
           </p>
+          <Button
+            onClick={() => setIsCreateCourseModalOpen(true)}
+            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold rounded-xl px-5 py-2.5 shadow-sm inline-flex items-center gap-2 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Create Your First Course / Masterclass</span>
+          </Button>
         </Card>
+
+        {renderCreateCourseModal()}
       </div>
     );
   }
@@ -474,6 +649,14 @@ export function SyllabusBuilderView() {
               ))}
             </select>
           </div>
+
+          <Button
+            size="sm"
+            onClick={() => setIsCreateCourseModalOpen(true)}
+            className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-1 text-xs shadow-2xs h-8 px-3 rounded-xl cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" /> New Course
+          </Button>
 
           <Button
             onClick={handleSyncSyllabus}
@@ -1895,6 +2078,8 @@ export function SyllabusBuilderView() {
           </div>
         </form>
       </Modal>
+
+      {renderCreateCourseModal()}
     </div>
   );
 }

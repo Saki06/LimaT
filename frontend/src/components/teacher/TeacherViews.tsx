@@ -1197,7 +1197,25 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 </CardHeader>
                 <CardContent className="p-5 space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {teacherCourses.map((course) => {
+                    {teacherCourses.length === 0 ? (
+                      <div className="col-span-full p-8 rounded-xl border border-dashed border-slate-200 text-center bg-slate-50/50 space-y-3">
+                        <BookOpen className="h-10 w-10 text-slate-300 mx-auto" />
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-700">No Courses Created Yet</h4>
+                          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                            As an independent tutor, you can design and publish your own courses and masterclasses.
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => setCurrentView("syllabus")}
+                          className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold rounded-xl cursor-pointer"
+                        >
+                          + Go to Syllabus Builder to Create Course
+                        </Button>
+                      </div>
+                    ) : (
+                      teacherCourses.map((course) => {
                       const totalLessons = course.totalLessons || 12;
                       const completedLessons = course.completedLessons || 6;
                       const progressPct = Math.round((completedLessons / totalLessons) * 100);
@@ -1273,7 +1291,8 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                           </div>
                         </div>
                       );
-                    })}
+                    })
+                  )}
                   </div>
                 </CardContent>
               </Card>

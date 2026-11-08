@@ -108,7 +108,7 @@ setIsSubmitting(true);
           <input
             type="text"
             required
-            placeholder="e.g. Dr. Samantha Perera / Eng. K. Thanushan"
+            placeholder="e.g. Masterclass Studio / Eng. K. Thanushan"
             value={newTenantData.name}
             onChange={(e) => setNewTenantData({ ...newTenantData, name: e.target.value })}
             className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
@@ -147,7 +147,7 @@ setIsSubmitting(true);
             <label className="block text-xs font-bold text-slate-700 mb-1">Lead Tutor / Director</label>
             <input
               type="text"
-              placeholder="e.g. Dr. Samantha Perera"
+              placeholder="e.g. Lead Instructor / Master Tutor"
               value={newTenantData.adminName}
               onChange={(e) => setNewTenantData({ ...newTenantData, adminName: e.target.value })}
               className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"

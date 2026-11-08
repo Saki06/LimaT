@@ -90,7 +90,7 @@ export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
             required
             value={signupName}
             onChange={(e) => setSignupName(e.target.value)}
-            placeholder="e.g. Dr. Samantha Perera"
+            placeholder="e.g. Dr. K. Arulnesan / Eng. Thanushan"
             className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#b47a16] transition-all font-medium"
           />
         </div>

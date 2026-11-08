@@ -712,7 +712,7 @@ const addTenant = (tenant: Tenant) => {
       subjectId: c.id,
       title: c.title,
       code: c.code,
-      teacherId: c.teacherId || 'tutor',
+      teacherId: c.teacher?.userId || c.teacher?.user?.id || c.teacherId || 'tutor',
       teacherName,
       gradeName: 'Active Batch',
       className: 'Online Cohort',

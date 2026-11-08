@@ -693,7 +693,7 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                   Teacher &amp; Author Resource Desk
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Managing learning materials uploaded by <span className="font-semibold text-[#0d5c4d]">{currentUser.name || "Mr. Samantha Perera"}</span> ({myTeacherResources.length} resources)
+                  Managing learning materials uploaded by <span className="font-semibold text-[#0d5c4d]">{currentUser.name || "Tutor"}</span> ({myTeacherResources.length} resources)
                 </p>
               </div>
 
@@ -2686,7 +2686,7 @@ function TeacherUploadModal({
     resource?.resourceType || "tute"
   );
   const [subject, setSubject] = useState(resource?.subject || availableSubjects[0] || "Combined Mathematics");
-  const [author, setAuthor] = useState(resource?.author || currentUser.name || "Dr. Sarath Perera");
+  const [author, setAuthor] = useState(resource?.author || currentUser.name || "Educator");
   const [description, setDescription] = useState(resource?.description || "");
   const [topic, setTopic] = useState(resource?.topic || "");
   const [category, setCategory] = useState(resource?.category || "Advanced Level");
