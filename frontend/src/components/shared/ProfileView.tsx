@@ -87,6 +87,7 @@ export function ProfileView() {
     setSelectedCourseId,
     teacherProfile,
     updateTeacherProfile,
+    refreshTeacherProfile,
     updateAuthUser,
     timetable
   } = useApp();
@@ -94,6 +95,12 @@ export function ProfileView() {
   const [activeTab, setActiveTab] = useState<ProfileTab>("personal");
   const [isEditing, setIsEditing] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+
+  useEffect(() => {
+    if (currentRole === "teacher") {
+      void refreshTeacherProfile();
+    }
+  }, [currentRole, refreshTeacherProfile]);
 
   const handleContinueCourse = (courseId: string) => {
     setSelectedCourseId(courseId);

@@ -10,7 +10,7 @@ interface StudentSignupFormProps {
 }
 
 export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
-  const { setCurrentRole, addToast } = useApp();
+  const { addToast, registerUser } = useApp();
 
   const [signupName, setSignupName] = useState("");
   const [signupPhone, setSignupPhone] = useState("");
@@ -43,21 +43,20 @@ export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
 
     setIsLoading(true);
     try {
-      const res = await api.auth.registerStudent({
-        firstName: signupName.trim(),
+      const nameParts = signupName.trim().split(" ");
+      const firstName = nameParts[0] || "Student";
+      const lastName = nameParts.slice(1).join(" ");
+
+      const res = await registerUser({
+        role: "student",
+        firstName,
+        lastName,
         email: signupEmail.trim(),
         password: signupPassword,
+        phoneNumber: signupPhone.trim(),
       });
 
-      if (res.success && res.token && res.user) {
-        api.token.set(res.token);
-        api.user.set(res.user);
-        setCurrentRole("student");
-        addToast({
-          type: "success",
-          title: "Student Account Created!",
-          message: `Welcome, ${signupName || "Student"}! Your Student learning portal has been initialized.`
-        });
+      if (res.success) {
         onSuccess();
       } else {
         addToast({

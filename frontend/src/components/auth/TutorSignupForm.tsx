@@ -10,7 +10,7 @@ interface TutorSignupFormProps {
 }
 
 export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
-  const { setCurrentRole, addToast } = useApp();
+  const { addToast, registerUser } = useApp();
 
   const [signupName, setSignupName] = useState("");
   const [signupPhone, setSignupPhone] = useState("");
@@ -45,22 +45,21 @@ export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
 
     setIsLoading(true);
     try {
-      const res = await api.auth.registerTutor({
-        firstName: signupName.trim(),
+      const nameParts = signupName.trim().split(" ");
+      const firstName = nameParts[0] || "Educator";
+      const lastName = nameParts.slice(1).join(" ");
+
+      const res = await registerUser({
+        role: "teacher",
+        firstName,
+        lastName,
         email: signupEmail.trim(),
         password: signupPassword,
+        phoneNumber: signupPhone.trim(),
         specialization: subjectSpecialization,
       });
 
-      if (res.success && res.token && res.user) {
-        api.token.set(res.token);
-        api.user.set(res.user);
-        setCurrentRole("teacher");
-        addToast({
-          type: "success",
-          title: "Tutor Profile Initialized!",
-          message: `Welcome, ${signupName || "Educator"}! Your Tutor Studio & Course Management Desk is ready.`
-        });
+      if (res.success) {
         onSuccess();
       } else {
         addToast({
@@ -73,7 +72,7 @@ export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
       addToast({
         type: "error",
         title: "Connection Error",
-        message: err.message || "Could not reach registration server."
+        message: err.message || "Could not complete tutor registration."
       });
     } finally {
       setIsLoading(false);

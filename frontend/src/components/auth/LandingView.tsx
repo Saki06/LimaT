@@ -193,7 +193,20 @@ export function LandingView({
     }
   };
 
-  const handle1ClickDemoLogin = (role: SupportedRole) => {
+  const handle1ClickDemoLogin = async (role: SupportedRole) => {
+    const creds = rolePresetCredentials[role];
+    if (creds) {
+      try {
+        const res = await loginUser(creds.email, "password123");
+        if (res.success) {
+          setAuthMode("closed");
+          onEnterApp();
+          return;
+        }
+      } catch {
+        // Fallback below
+      }
+    }
     setCurrentRole(role);
     setAuthMode("closed");
     addToast({
@@ -262,29 +275,22 @@ export function LandingView({
         setAuthMode("closed");
         onEnterApp();
         return;
+      } else {
+        addToast({
+          type: "error",
+          title: "Login Failed",
+          message: res.message || "Invalid credentials. Please verify your email and password."
+        });
+        return;
       }
-    } catch {
-      // ignore
+    } catch (err: any) {
+      addToast({
+        type: "error",
+        title: "Connection Error",
+        message: err?.message || "Failed to reach authentication server."
+      });
+      return;
     }
-
-    // Fallback role switch
-    setCurrentRole(selectedRole);
-    setAuthMode("closed");
-    addToast({
-      type: "success",
-      title: "Login Successful",
-      message:
-        selectedRole === "parent"
-          ? "Welcome to Parent Guardian Desk! Live attendance and fee receipts loaded."
-          : selectedRole === "teacher"
-          ? "Welcome to Teacher Portal! Course creator desk loaded."
-          : selectedRole === "super_admin"
-          ? "Welcome to Super Admin Console! Platform master controls loaded."
-          : selectedRole === "admin"
-          ? "Welcome to Admin Operations Desk!"
-          : "Welcome back to Newtoz! Shape Your Future!"
-    });
-    onEnterApp();
   };
 
   const handleSignupSubmit = async (e: React.FormEvent) => {
@@ -383,15 +389,21 @@ export function LandingView({
           setAuthMode("closed");
           onEnterApp();
           return;
-        } else if (res.message) {
+        } else {
           addToast({
-            type: "warning",
-            title: "Registration Note",
-            message: res.message
+            type: "error",
+            title: "Registration Failed",
+            message: res.message || "Could not complete registration. Please check your details and try again."
           });
+          return;
         }
-      } catch {
-        // Fallback gracefully
+      } catch (err: any) {
+        addToast({
+          type: "error",
+          title: "Registration Error",
+          message: err?.message || "Failed to reach registration server."
+        });
+        return;
       }
     }
 

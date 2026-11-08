@@ -873,7 +873,11 @@ const addTenant = (tenant: Tenant) => {
           SUPER_ADMIN: 'super_admin'
         };
         if (res.user.role && roleMap[res.user.role]) {
-          setCurrentRole(roleMap[res.user.role]);
+          const mappedRole = roleMap[res.user.role];
+          setCurrentRole(mappedRole);
+          if (mappedRole === 'teacher') {
+            void refreshTeacherProfile();
+          }
         }
         setIsLanding(false);
         addToast({
@@ -945,7 +949,11 @@ const addTenant = (tenant: Tenant) => {
           SUPER_ADMIN: 'super_admin'
         };
         if (res.user.role && roleMap[res.user.role]) {
-          setCurrentRole(roleMap[res.user.role]);
+          const mappedRole = roleMap[res.user.role];
+          setCurrentRole(mappedRole);
+          if (mappedRole === 'teacher') {
+            void refreshTeacherProfile();
+          }
         }
         setIsLanding(false);
         addToast({
@@ -1008,7 +1016,7 @@ const addTenant = (tenant: Tenant) => {
     ? {
         ...baseUser,
         id: authUser.id,
-        name: `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() || authUser.email || 'User',
+        name: `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() || authUser.name || authUser.email || 'User',
         email: authUser.email,
         role: currentRole,
         avatar: authUser.avatarUrl || baseUser.avatar
@@ -2943,6 +2951,16 @@ const addTenant = (tenant: Tenant) => {
       const res = await api.teachers.getMyProfile();
       if (res && res.success && res.data) {
         setTeacherProfile(res.data);
+        if (res.data.user) {
+          setAuthUser((prev: any) => {
+            const merged = {
+              ...(prev || {}),
+              ...res.data.user,
+            };
+            api.user.set(merged);
+            return merged;
+          });
+        }
       }
     } catch (err) {
       console.warn('Could not fetch teacher profile from API:', err);
@@ -2955,6 +2973,16 @@ const addTenant = (tenant: Tenant) => {
       const res = await api.teachers.updateMyProfile(updates);
       if (res && res.success && res.data) {
         setTeacherProfile(res.data);
+        if (res.data.user) {
+          setAuthUser((prev: any) => {
+            const merged = {
+              ...(prev || {}),
+              ...res.data.user,
+            };
+            api.user.set(merged);
+            return merged;
+          });
+        }
         addToast({
           type: 'success',
           title: 'Profile Saved',

@@ -32,12 +32,12 @@ export const mockUsers: Record<string, User> = {
     schoolName: 'LimaT Independent Tuition Masterclass'
   },
   teacher: {
-    id: 'usr_teacher_01',
-    name: 'Faculty Educator',
-    email: 'educator@limat.lk',
+    id: '6f69094d-24e0-47a1-b389-56d41ad66b09',
+    name: 'Sarah Jenkins',
+    email: 'teacher@apex.edu',
     role: 'teacher',
-    schoolId: 'sch_01',
-    schoolName: 'Tuition & Masterclasses'
+    schoolId: '360f2585-111e-4d72-81c3-71b8b82f2fa2',
+    schoolName: 'Apex Academy Global'
   },
   admin: {
     id: 'usr_admin_01',
