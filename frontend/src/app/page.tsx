@@ -35,8 +35,20 @@ import {
 } from "@/components/shared";
 
 export default function HomePage() {
-  const { currentRole, currentView, theme, isLanding, setIsLanding } = useApp();
+  const { currentRole, currentView, theme, isLanding, setIsLanding, isSessionLoaded } = useApp();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // While restoring session from localStorage/URL, show seamless loader to avoid flash
+  if (!isSessionLoaded) {
+    return (
+      <div className={`flex h-screen w-screen items-center justify-center ${theme === "dark" ? "dark bg-slate-950" : "bg-slate-50"}`}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0d5c4d] border-t-transparent" />
+          <p className="text-xs font-semibold text-slate-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // If user requests landing page
   if (isLanding) {

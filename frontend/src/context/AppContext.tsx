@@ -70,6 +70,7 @@ interface AppContextType {
   setCurrentView: (view: string) => void;
   isLanding: boolean;
   setIsLanding: (isLanding: boolean) => void;
+  isSessionLoaded: boolean;
   landingPortal: 'gateway' | 'student' | 'parent' | 'staff';
   setLandingPortal: (portal: 'gateway' | 'student' | 'parent' | 'staff') => void;
   t: ReturnType<typeof getTranslation>;
@@ -369,6 +370,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [deviceMode, setDeviceMode] = useState<DeviceViewMode>('responsive');
   const [currentView, setCurrentView] = useState<string>('dashboard');
   const [isLanding, setIsLanding] = useState<boolean>(true);
+  const [isSessionLoaded, setIsSessionLoaded] = useState<boolean>(false);
   const [landingPortal, setLandingPortal] = useState<'gateway' | 'student' | 'parent' | 'staff'>('gateway');
 
   const [schools, setSchools] = useState<School[]>([]);
@@ -518,8 +520,34 @@ const addTenant = (tenant: Tenant) => {
     };
   }, [currentRole, authUser?.role, authToken]);
 
-  // Restore authenticated session from localStorage on initial load
+  // Restore session & navigation state from URL query or localStorage on initial load
   useEffect(() => {
+    let resolvedRole: UserRole | null = null;
+    let resolvedView: string | null = null;
+    let resolvedIsLanding: boolean = true;
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlPortal = params.get('portal');
+      const urlView = params.get('view');
+
+      const savedIsLanding = localStorage.getItem('lms_is_landing');
+      const savedRole = localStorage.getItem('lms_current_role') as UserRole | null;
+      const savedView = localStorage.getItem('lms_current_view');
+
+      const validRoles: UserRole[] = ['student', 'teacher', 'parent', 'admin', 'super_admin'];
+
+      if (urlPortal && validRoles.includes(urlPortal as UserRole)) {
+        resolvedRole = urlPortal as UserRole;
+        resolvedView = urlView || 'dashboard';
+        resolvedIsLanding = false;
+      } else if (savedIsLanding === 'false' && savedRole && validRoles.includes(savedRole)) {
+        resolvedRole = savedRole;
+        resolvedView = savedView || 'dashboard';
+        resolvedIsLanding = false;
+      }
+    }
+
     const token = api.token.get();
     const user = api.user.get();
     if (token && user) {
@@ -532,16 +560,56 @@ const addTenant = (tenant: Tenant) => {
         ADMIN: 'admin',
         SUPER_ADMIN: 'super_admin'
       };
-      if (user.role && roleMap[user.role]) {
-        setCurrentRole(roleMap[user.role]);
+      if (!resolvedRole && user.role && roleMap[user.role]) {
+        resolvedRole = roleMap[user.role];
       }
-      setIsLanding(false);
+      resolvedIsLanding = false;
     }
+
+    if (resolvedRole) {
+      setCurrentRole(resolvedRole);
+    }
+    if (resolvedView) {
+      setCurrentView(resolvedView);
+    }
+    setIsLanding(resolvedIsLanding);
+    setIsSessionLoaded(true);
+
     fetchCourses();
     fetchAnnouncements();
     fetchAssignments();
     fetchSubmissions();
   }, []);
+
+  // Synchronize active portal & view to localStorage and URL search params seamlessly
+  useEffect(() => {
+    if (!isSessionLoaded || typeof window === 'undefined') return;
+
+    if (isLanding) {
+      localStorage.setItem('lms_is_landing', 'true');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('portal');
+      url.searchParams.delete('view');
+      const newSearch = url.searchParams.toString();
+      const newUrl = url.pathname + (newSearch ? `?${newSearch}` : '');
+      window.history.replaceState({}, '', newUrl);
+    } else {
+      localStorage.setItem('lms_is_landing', 'false');
+      localStorage.setItem('lms_current_role', currentRole);
+      localStorage.setItem('lms_current_view', currentView);
+
+      const url = new URL(window.location.href);
+      url.searchParams.set('portal', currentRole);
+      if (currentView && currentView !== 'dashboard') {
+        url.searchParams.set('view', currentView);
+      } else {
+        url.searchParams.delete('view');
+      }
+      const newSearch = url.searchParams.toString();
+      const newUrl = url.pathname + (newSearch ? `?${newSearch}` : '');
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [isLanding, currentRole, currentView, isSessionLoaded]);
 
   const fetchAssignments = async () => {
     try {
@@ -907,6 +975,16 @@ const addTenant = (tenant: Tenant) => {
     setFixtures([]);
     setStandings([]);
     setTournaments([]);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lms_is_landing', 'true');
+      localStorage.removeItem('lms_current_role');
+      localStorage.removeItem('lms_current_view');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('portal');
+      url.searchParams.delete('view');
+      const newSearch = url.searchParams.toString();
+      window.history.replaceState({}, '', url.pathname + (newSearch ? `?${newSearch}` : ''));
+    }
     setIsLanding(true);
     addToast({
       type: 'info',
@@ -2931,6 +3009,7 @@ const addTenant = (tenant: Tenant) => {
         setCurrentView,
         isLanding,
         setIsLanding,
+        isSessionLoaded,
         landingPortal,
         setLandingPortal,
         t,
