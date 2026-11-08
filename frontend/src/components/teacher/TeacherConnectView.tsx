@@ -4,7 +4,6 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import { useHubSettings } from "@/context/AdminContext";
 import { TeacherSubscriber, TutorPackage, ConnectStudyGroup } from "@/types/lms";
-import { initialTeacherSubscribers, initialTutorPackages, initialConnectStudyGroups } from "@/data/connectMockData";
 import { api } from "@/lib/api";
 import {
   Users,
@@ -224,7 +223,7 @@ export function TeacherConnectView() {
   });
 
   // Packages CRUD state
-  const [packages, setPackages] = useState<TutorPackage[]>(initialTutorPackages);
+  const [packages, setPackages] = useState<TutorPackage[]>([]);
   const [packageSearchQuery, setPackageSearchQuery] = useState("");
   const [packageStatusFilter, setPackageStatusFilter] = useState<"all" | "active" | "draft">("all");
 
@@ -232,15 +231,15 @@ export function TeacherConnectView() {
     const loadPackages = async () => {
       try {
         const res = await api.packages.getAll();
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res && res.success && Array.isArray(res.data)) {
           const loaded = res.data.map(mapBackendPackageToFrontend);
-          setPackages((prev) => {
-            const ids = new Set(loaded.map((l: any) => l.id));
-            return [...loaded, ...prev.filter((p) => !ids.has(p.id))];
-          });
+          setPackages(loaded);
+        } else {
+          setPackages([]);
         }
       } catch (e) {
         console.warn("Could not load backend packages:", e);
+        setPackages([]);
       }
     };
     loadPackages();
@@ -274,21 +273,21 @@ export function TeacherConnectView() {
   const [newPerkInput, setNewPerkInput] = useState("");
 
   // Subscribers state
-  const [subscribers, setSubscribers] = useState<TeacherSubscriber[]>(initialTeacherSubscribers);
+  const [subscribers, setSubscribers] = useState<TeacherSubscriber[]>([]);
   const [isSubscribersLoading, setIsSubscribersLoading] = useState(false);
 
   const loadSubscribers = async () => {
     try {
       setIsSubscribersLoading(true);
       const res = await api.packages.getTeacherSubscribers();
-      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-        setSubscribers((prev) => {
-          const ids = new Set(res.data.map((s: any) => s.id));
-          return [...res.data, ...prev.filter((p) => !ids.has(p.id))];
-        });
+      if (res && res.success && Array.isArray(res.data)) {
+        setSubscribers(res.data);
+      } else {
+        setSubscribers([]);
       }
     } catch (e) {
       console.warn("Could not load backend teacher subscribers:", e);
+      setSubscribers([]);
     } finally {
       setIsSubscribersLoading(false);
     }
@@ -334,6 +333,10 @@ export function TeacherConnectView() {
   const totalEnrolledStudents = useMemo(() => {
     return packages.reduce((acc, p) => acc + (p.status === "active" ? p.enrolledCount : 0), 0);
   }, [packages]);
+
+  const activeSubscribersCount = useMemo(() => {
+    return subscribers.filter((s) => s.status === "active").length;
+  }, [subscribers]);
 
   // Package CRUD Handlers
   const handleOpenCreatePackage = () => {
@@ -634,8 +637,8 @@ export function TeacherConnectView() {
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-500 font-semibold">Active Subscribers</p>
-              <p className="text-2xl font-black text-[#0d2b26] mt-1">142 Students</p>
-              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">+14 new this month</p>
+              <p className="text-2xl font-black text-[#0d2b26] mt-1">{activeSubscribersCount} Students</p>
+              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">{totalEnrolledStudents > 0 ? `${totalEnrolledStudents} in packages` : "Real-time records"}</p>
             </div>
             <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
               <Users className="h-5 w-5" />
@@ -647,8 +650,8 @@ export function TeacherConnectView() {
           <CardContent className="p-5 flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-500 font-semibold">Monthly Tuition Revenue</p>
-              <p className="text-2xl font-black text-[#0d5c4d] mt-1">LKR 355,000</p>
-              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">LKR 2,500 / student</p>
+              <p className="text-2xl font-black text-[#0d5c4d] mt-1">LKR {totalPackageRevenue.toLocaleString()}</p>
+              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">From active packages</p>
             </div>
             <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
               <CreditCard className="h-5 w-5" />
@@ -679,12 +682,12 @@ export function TeacherConnectView() {
         <Card className="border-[#e6ece8] bg-white shadow-2xs">
           <CardContent className="p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500 font-semibold">Live Attendance Rate</p>
-              <p className="text-2xl font-black text-[#0d2b26] mt-1">94.8%</p>
-              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">High engagement</p>
+              <p className="text-xs text-slate-500 font-semibold">Total Packages</p>
+              <p className="text-2xl font-black text-[#0d2b26] mt-1">{packages.length}</p>
+              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">{packages.filter((p) => p.status === 'active').length} active</p>
             </div>
             <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
-              <CheckCircle2 className="h-5 w-5" />
+              <Package className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>

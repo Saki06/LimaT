@@ -57,21 +57,18 @@ export function SyllabusBuilderView() {
   // If viewed by an individual teacher, show only their assigned batches
   const visibleCourses = useMemo(() => {
     if (currentRole === "teacher") {
-      const tutorCourses = courses.filter(
+      return courses.filter(
         (c) =>
-          c.teacherName === currentUser?.name ||
-          c.teacherId === currentUser?.id ||
-          c.id === "crs_math_12" ||
-          c.title.toLowerCase().includes("math") ||
-          !c.id.startsWith("crs_") // include all dynamically created backend courses
+          (c.teacherId && currentUser?.id && c.teacherId === currentUser.id) ||
+          (c.teacherName && currentUser?.name && c.teacherName.toLowerCase() === currentUser.name.toLowerCase()) ||
+          (!c.teacherId && !c.teacherName)
       );
-      return tutorCourses.length > 0 ? tutorCourses : courses;
     }
     return courses;
   }, [courses, currentRole, currentUser]);
 
   const [activeCourseId, setActiveCourseId] = useState<string>(
-    selectedCourseId || visibleCourses[0]?.id || "crs_math_12"
+    selectedCourseId || visibleCourses[0]?.id || ""
   );
 
   const activeCourse = visibleCourses.find((c) => c.id === activeCourseId) || visibleCourses[0];

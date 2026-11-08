@@ -114,90 +114,7 @@ function parseDurationMinutes(durStr?: string): number {
   return total > 0 ? total : 90;
 }
 
-const INITIAL_SLOTS: LiveSlot[] = [
-  {
-    id: "slot-1",
-    title: "Pure Mathematics: Calculus & Limits Derivations",
-    subject: "Combined Mathematics",
-    grade: "Grade 12 & 13",
-    day: "Tuesday",
-    startTime: "07:00 PM",
-    endTime: "09:00 PM",
-    platform: "In-App Live Studio (Jitsi)",
-    meetingUrl: "https://meet.jit.si/limat-math-calculus-live",
-    meetingId: "limat-math-calculus-live",
-    passcode: "MATH2026",
-    type: "Live Masterclass + Q&A",
-    enrolledCount: 142,
-    status: "live_now",
-    recordingUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    handoutUrl: "https://example.com/handouts/calculus_limits_tute.pdf",
-    handoutName: "Unit 02 Calculus Handout & Problem Set #4.pdf",
-    duration: "2h 00m",
-    viewsCount: 184
-  },
-  {
-    id: "slot-2",
-    title: "Applied Mathematics: Newton's Laws, Friction & Work-Energy",
-    subject: "Combined Mathematics",
-    grade: "Grade 12 & 13",
-    day: "Thursday",
-    startTime: "07:00 PM",
-    endTime: "09:00 PM",
-    platform: "Google Meet",
-    meetingUrl: "https://meet.google.com/sam-math-live",
-    meetingId: "sam-math-live",
-    passcode: "PHYS2026",
-    type: "Problem Solving Lab",
-    enrolledCount: 142,
-    status: "scheduled",
-    handoutUrl: "https://example.com/handouts/applied_math_mechanics.pdf",
-    handoutName: "Newton's Laws & Friction Workshop Problems.pdf",
-    duration: "2h 00m",
-    viewsCount: 0
-  },
-  {
-    id: "slot-3",
-    title: "A/L Past Paper 2025 Model Examination Breakdown",
-    subject: "Combined Mathematics",
-    grade: "Grade 13 Revision",
-    day: "Saturday",
-    startTime: "09:00 AM",
-    endTime: "11:30 AM",
-    platform: "Zoom",
-    meetingUrl: "https://zoom.us/j/9876543210",
-    meetingId: "987 654 3210",
-    passcode: "AL2026",
-    type: "Paper Marking Session",
-    enrolledCount: 142,
-    status: "scheduled",
-    handoutUrl: "https://example.com/handouts/al_model_paper_2025.pdf",
-    handoutName: "G.C.E. A/L Model Paper 2025 (Pure & Applied).pdf",
-    duration: "2h 30m",
-    viewsCount: 0
-  },
-  {
-    id: "slot-4",
-    title: "Trigonometry Deep Dive & Complex Numbers",
-    subject: "Combined Mathematics",
-    grade: "Grade 12",
-    day: "Sunday",
-    startTime: "04:00 PM",
-    endTime: "06:00 PM",
-    platform: "In-App Live Studio (Jitsi)",
-    meetingUrl: "https://meet.jit.si/limat-trig-complex-mastery",
-    meetingId: "limat-trig-complex-mastery",
-    passcode: "TRIG2026",
-    type: "Special Concept Booster",
-    enrolledCount: 98,
-    status: "completed",
-    recordingUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    handoutUrl: "https://example.com/handouts/trigonometry_complex_numbers.pdf",
-    handoutName: "Complex Numbers Argand Diagrams Summary.pdf",
-    duration: "1h 55m",
-    viewsCount: 312
-  }
-];
+const INITIAL_SLOTS: LiveSlot[] = [];
 
 const DAYS = [
   "All Days",
@@ -261,36 +178,19 @@ export function LiveScheduleView() {
   // In-App Video Replay Theater Modal State
   const [viewingReplaySlot, setViewingReplaySlot] = useState<LiveSlot | null>(null);
   const [replayActiveTab, setReplayActiveTab] = useState<"chapters" | "handout" | "qa">("chapters");
-  const [comments, setComments] = useState<{ id: string; author: string; time: string; text: string; likes: number; reply?: string }[]>([
-    { id: "c1", author: "Sathurjan K.", time: "1 day ago", text: "At 40:30, why did we multiply by the conjugate instead of standard expansion?", likes: 4, reply: "Good question! In the G.C.E. A/L exam scheme, algebraic conjugation is required for full step marks." },
-    { id: "c2", author: "Anuki Silva", time: "2 days ago", text: "The summary formula sheet in the handout is super helpful, thank you sir!", likes: 7 }
-  ]);
+  const [comments, setComments] = useState<{ id: string; author: string; time: string; text: string; likes: number; reply?: string }[]>([]);
   const [newCommentText, setNewCommentText] = useState("");
 
   // Attendance Roster Modal (for Teachers)
   const [attendanceSlot, setAttendanceSlot] = useState<LiveSlot | null>(null);
   const [attendanceSearch, setAttendanceSearch] = useState("");
 
-  const mockAttendance = [
-    { id: "att-1", studentName: "Sathurjan K.", indexNo: "AL-2026-4401", joinTime: "07:02 PM", duration: "1h 55m", status: "Present" },
-    { id: "att-2", studentName: "Kasun Bandara", indexNo: "AL-2026-4402", joinTime: "07:05 PM", duration: "1h 50m", status: "Present" },
-    { id: "att-3", studentName: "Anuki Silva", indexNo: "AL-2026-4403", joinTime: "07:01 PM", duration: "1h 58m", status: "Present" },
-    { id: "att-4", studentName: "Dineth Perera", indexNo: "AL-2026-4404", joinTime: "07:15 PM", duration: "1h 40m", status: "Late Arrival" },
-    { id: "att-5", studentName: "Tharushi Fernando", indexNo: "AL-2026-4405", joinTime: "07:04 PM", duration: "1h 52m", status: "Present" },
-    { id: "att-6", studentName: "Kavindu Wickramasinghe", indexNo: "AL-2026-4406", joinTime: "07:00 PM", duration: "2h 00m", status: "Present" },
-    { id: "att-7", studentName: "Praveen Jayawardena", indexNo: "AL-2026-4407", joinTime: "07:22 PM", duration: "1h 35m", status: "Late Arrival" }
-  ];
+  const sessionAttendance: { id: string; studentName: string; indexNo: string; joinTime: string; duration: string; status: string }[] = [];
 
-  const lectureChapters = [
-    { time: "00:00", title: "Introduction, Unit Outline & Standard Formula Review", duration: "12m" },
-    { time: "12:15", title: "Rigorous Proofs: Limit Theorems & Indeterminate Forms", duration: "28m" },
-    { time: "40:30", title: "Worked Problem Set: Trigonometric & Exponential Limits", duration: "35m" },
-    { time: "1:15:30", title: "A/L Past Paper 2024 Exam Question Discussion", duration: "25m" },
-    { time: "1:40:30", title: "Student Live Doubt Resolution & Practice Homework", duration: "19m" }
-  ];
+  const lectureChapters: { time: string; title: string; duration: string }[] = [];
 
   const getEmbedUrl = (url?: string) => {
-    if (!url) return "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1";
+    if (!url) return "";
     if (url.includes("watch?v=")) {
       const videoId = url.split("watch?v=")[1]?.split("&")[0];
       return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`;
@@ -304,7 +204,7 @@ export function LiveScheduleView() {
 
   const handleExportAttendanceCSV = (slot: LiveSlot) => {
     const csvHeader = "Index No,Student Name,Class,Join Time,Duration,Attendance Status\n";
-    const csvRows = mockAttendance.map((a) => `"${a.indexNo}","${a.studentName}","Grade 12 Physical Science","${a.joinTime}","${a.duration}","${a.status}"`).join("\n");
+    const csvRows = sessionAttendance.map((a) => `"${a.indexNo}","${a.studentName}","${slot.title.replace(/"/g, '""')}","${a.joinTime}","${a.duration}","${a.status}"`).join("\n");
     const blob = new Blob([csvHeader + csvRows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -365,8 +265,8 @@ export function LiveScheduleView() {
           return {
             id: item.id,
             title: item.title,
-            subject: item.course?.title || item.package?.title || item.subject || "Combined Mathematics",
-            grade: "Grade 12 & 13",
+            subject: item.course?.title || item.package?.title || item.subject || "General",
+            grade: item.course?.grade || "All Grades",
             day: dayName,
             startTime: timeStr,
             endTime: "2 Hours",
@@ -375,18 +275,20 @@ export function LiveScheduleView() {
             meetingId: item.meetingId,
             passcode: item.passcode,
             type: item.topic || "Live Interactive Lecture",
-            enrolledCount: item.enrolledCount || item._count?.attendances || 142,
+            enrolledCount: item.enrolledCount || item._count?.attendances || 0,
             status: stat,
             recordingUrl: item.recordingUrl,
             courseId: item.courseId,
             packageId: item.packageId
           };
         });
-        const serverIds = new Set(mapped.map((m) => m.id));
-        setSlots([...mapped, ...INITIAL_SLOTS.filter((s) => !serverIds.has(s.id))]);
+        setSlots(mapped);
+      } else {
+        setSlots([]);
       }
     } catch (err) {
-      console.warn("Using local live class slots (Backend sync optional):", err);
+      console.warn("Could not fetch live classes:", err);
+      setSlots([]);
     }
   };
 
@@ -1988,6 +1890,11 @@ export function LiveScheduleView() {
                           </span>
                         </div>
                       ))}
+                      {lectureChapters.length === 0 && (
+                        <p className="text-xs text-slate-400 py-6 text-center">
+                          No chapter timestamps available for this recording.
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2046,6 +1953,11 @@ export function LiveScheduleView() {
                           )}
                         </div>
                       ))}
+                      {comments.length === 0 && (
+                        <p className="text-xs text-slate-400 py-6 text-center">
+                          No questions or comments posted yet.
+                        </p>
+                      )}
                     </div>
 
                     <form onSubmit={handleAddComment} className="pt-3 border-t border-white/10 flex gap-2">
@@ -2137,7 +2049,7 @@ export function LiveScheduleView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {mockAttendance
+                  {sessionAttendance
                     .filter((st) =>
                       !attendanceSearch.trim() ||
                       st.studentName.toLowerCase().includes(attendanceSearch.toLowerCase()) ||
@@ -2162,6 +2074,13 @@ export function LiveScheduleView() {
                         </td>
                       </tr>
                     ))}
+                  {sessionAttendance.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-xs text-slate-400">
+                        No attendance records logged for this session.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

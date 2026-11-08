@@ -634,7 +634,7 @@ export const getMyTeacherDashboard = async (req: AuthenticatedRequest, res: Resp
         ? activeSubscribersCount
         : totalStudentsInTenant > 0
         ? totalStudentsInTenant
-        : 136;
+        : 0;
 
     // 2. Active Batches / Courses
     const coursesCount = await prisma.course.count({
@@ -642,7 +642,7 @@ export const getMyTeacherDashboard = async (req: AuthenticatedRequest, res: Resp
         OR: [{ teacherId }, ...(tenantId ? [{ tenantId }] : [])],
       },
     });
-    const activeBatchesCount = coursesCount > 0 ? coursesCount : teacher.courses?.length || 2;
+    const activeBatchesCount = coursesCount > 0 ? coursesCount : (teacher.courses?.length || 0);
 
     // 3. Pending Reviews (Assignments submissions waiting to be graded)
     const pendingReviewsCount = await (prisma.assignmentSubmission as any).count({
@@ -736,7 +736,7 @@ export const getMyTeacherDashboard = async (req: AuthenticatedRequest, res: Resp
           meetingId: s.meetingId || '',
           passcode: s.passcode || '',
           status: s.status === 'LIVE' ? 'in_progress' : s.status === 'COMPLETED' ? 'completed' : 'upcoming',
-          studentsCount: 35,
+          studentsCount: 0,
         })),
         recentSubmissions: recentSubmissions.map((s: any) => ({
           id: s.id,

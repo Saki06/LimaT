@@ -83,31 +83,14 @@ export function QuizBuilderModal({
     } else {
       // Defaults for new quiz
       setTitle("");
-      setCourseId(courses[0]?.id || "crs_math_12");
-      setSubjectName(courses[0]?.title || "Combined Mathematics");
-      setInstructions("15-minute speed evaluation. Calculators allowed. All questions are mandatory.");
+      setCourseId(courses[0]?.id || "");
+      setSubjectName(courses[0]?.title || "");
+      setInstructions("All questions are mandatory. Please read each question carefully.");
       setDurationMinutes(15);
-      setDueDate("2026-11-15 23:59");
+      setDueDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
       setStatus("published");
       setQuestions([
-        {
-          id: `q_${Date.now()}_1`,
-          questionText: "Which of the following conditions ensures that the discriminant Δ of a quadratic equation ax² + bx + c = 0 has two distinct real roots?",
-          type: "mcq",
-          options: ["b² - 4ac > 0", "b² - 4ac = 0", "b² - 4ac < 0", "b² - 2ac ≥ 0"],
-          correctAnswer: 0,
-          explanation: "A strictly positive discriminant (b² - 4ac > 0) guarantees two unequal real roots.",
-          marks: 10
-        },
-        {
-          id: `q_${Date.now()}_2`,
-          questionText: "If the product of roots of 2x² - kx + 8 = 0 is equal to 4, what is the value of k?",
-          type: "mcq",
-          options: ["k can be any real number", "k = 8", "k = 4", "k = 16"],
-          correctAnswer: 0,
-          explanation: "Product of roots = c/a = 8/2 = 4, which is identically true independent of k.",
-          marks: 10
-        }
+        { ...DEFAULT_NEW_QUESTION, id: `q_${Date.now()}_1` }
       ]);
       setActiveQuestionIdx(0);
     }
@@ -276,11 +259,11 @@ export function QuizBuilderModal({
 
     const payload: Partial<Quiz> = {
       title: title.trim(),
-      courseId: courseId || courses[0]?.id || "crs_math_12",
-      subjectName: subjectName || "Combined Mathematics",
+      courseId: courseId || courses[0]?.id || "",
+      subjectName: subjectName || courses.find((c) => c.id === courseId)?.title || "General",
       instructions: instructions.trim() || "Follow exam instructions.",
       durationMinutes: Number(durationMinutes) || 15,
-      dueDate: dueDate || "2026-11-15 23:59",
+      dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       status: status,
       totalQuestions: questions.length,
       totalMarks: totalCalculatedMarks,

@@ -111,10 +111,13 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
 
   // Filter courses strictly for this individual Tutor's workspace
   const teacherCourses: Course[] = useMemo(() => {
-    const tutorCourses = courses.filter(
-      (c) => c.teacherName === currentUser?.name || c.id === "crs_math_12" || c.title.toLowerCase().includes("math")
+    const isGlobalAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
+    if (isGlobalAdmin) return courses;
+    return courses.filter(
+      (c) =>
+        (c.teacherId && currentUser?.id && c.teacherId === currentUser.id) ||
+        (c.teacherName && currentUser?.name && c.teacherName.toLowerCase() === currentUser.name.toLowerCase())
     );
-    return tutorCourses.length > 0 ? tutorCourses : courses.slice(0, 2);
   }, [courses, currentUser]);
 
   const [activeTab, setActiveTab] = useState<"home" | "grading" | "assignments" | "analytics">(
@@ -331,7 +334,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   };
 
   // New lesson form state with full multi-format upload support
-  const [lessonCourseId, setLessonCourseId] = useState(courses[0]?.id || "crs_math_12");
+  const [lessonCourseId, setLessonCourseId] = useState(courses[0]?.id || "");
   const [lessonUnitId, setLessonUnitId] = useState("");
   const [lessonTopicId, setLessonTopicId] = useState("");
   const [lessonTitle, setLessonTitle] = useState("");
@@ -654,95 +657,110 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     passcode?: string;
   }
 
-  const todaySchedule: ScheduleItem[] = [
-    {
-      period: "Morning Batch",
-      time: "07:30 AM – 09:00 AM",
-      course: "Grade 12 Combined Mathematics",
-      courseId: "crs_math_12",
-      topic: "Unit 1: Quadratic Inequations & Interval Sign Analysis",
-      classRoom: "Virtual Studio Classroom · Stream #CM-12",
-      deliveryMode: "live_online",
-      meetingUrl: "https://meet.google.com/lms-math-12",
-      meetingId: "SOLO-MATH-12-AM",
-      passcode: "558291",
-      type: "Live Theory Lecture",
-      status: "completed",
-      studentsCount: 42
-    },
-    {
-      period: "Live Masterclass",
-      time: "09:30 AM – 11:00 AM",
-      course: "Grade 13 Applied Mathematics",
-      courseId: "crs_math_12",
-      topic: "Unit 2: Differential Calculus & Curve Sketching",
-      classRoom: "Tutor Live Studio · Room #MATH-A1",
-      deliveryMode: "live_online",
-      meetingUrl: "https://meet.google.com/lms-math-13",
-      meetingId: "SOLO-MATH-LIVE-992",
-      passcode: "774921",
-      type: "Live Interactive Masterclass",
-      status: "in_progress",
-      studentsCount: 38
-    },
-    {
-      period: "Afternoon Workshop",
-      time: "04:00 PM – 05:30 PM",
-      course: "Grade 12 Applied Mathematics Mechanics",
-      courseId: "crs_math_12",
-      topic: "Mechanics Intensive: Equilibrium Systems & Newton's Laws",
-      classRoom: "Tutor Live Studio · Room #MATH-MECH",
-      deliveryMode: "live_online",
-      meetingUrl: "https://meet.google.com/lms-math-mech",
-      meetingId: "SOLO-MATH-MECH-880",
-      passcode: "419082",
-      type: "Live Problem Workshop",
-      status: "upcoming",
-      studentsCount: 32
-    },
-    {
-      period: "Evening Clinic",
-      time: "07:30 PM – 09:00 PM",
-      course: "Grade 12 Combined Mathematics",
-      courseId: "crs_math_12",
-      topic: "Live Doubt Clearance & Past Paper Clinic",
-      classRoom: "Doubt Clearance Studio · Room #MATH-CLN",
-      deliveryMode: "live_online",
-      meetingUrl: "https://meet.google.com/lms-math-doubt",
-      meetingId: "SOLO-MATH-CLN-410",
-      passcode: "392011",
-      type: "Live Tutorial Clinic",
-      status: "upcoming",
-      studentsCount: 24
+  const todaySchedule: ScheduleItem[] = [];
+
+  // Sri Lanka G.C.E A/L Grade Distribution (Calculated from real submissions)
+  const gradeDistribution = useMemo(() => {
+    let a = 0, b = 0, c = 0, s = 0, w = 0;
+    submissions.forEach((sub) => {
+      if (sub.marksObtained != null) {
+        const score = (Number(sub.marksObtained) / (Number(sub.maxMarks) || 100)) * 100;
+        if (!isNaN(score)) {
+          if (score >= 75) a++;
+          else if (score >= 65) b++;
+          else if (score >= 55) c++;
+          else if (score >= 40) s++;
+          else w++;
+        }
+      }
+    });
+    return [
+      { grade: "A (75-100%)", count: a, fill: "#0d5c4d" },
+      { grade: "B (65-74%)", count: b, fill: "#158066" },
+      { grade: "C (55-64%)", count: c, fill: "#f3b738" },
+      { grade: "S (40-54%)", count: s, fill: "#e59f20" },
+      { grade: "W (<40%)", count: w, fill: "#e11d48" }
+    ];
+  }, [submissions]);
+
+  const studentRoster = useMemo(() => {
+    const studentMap = new Map<string, { name: string; index: string; class: string; submitted: number; totalScore: number; gradedCount: number }>();
+    submissions.forEach((sub) => {
+      const studentId = sub.studentId || sub.studentName || "student";
+      const existing = studentMap.get(studentId) || {
+        name: sub.studentName || "Student",
+        index: sub.studentId?.slice(-8).toUpperCase() || "STU-001",
+        class: sub.assignmentTitle || "Enrolled Course",
+        submitted: 0,
+        totalScore: 0,
+        gradedCount: 0,
+      };
+      existing.submitted += 1;
+      if (sub.marksObtained != null) {
+        const score = (Number(sub.marksObtained) / (Number(sub.maxMarks) || 100)) * 100;
+        if (!isNaN(score)) {
+          existing.totalScore += score;
+          existing.gradedCount += 1;
+        }
+      }
+      studentMap.set(studentId, existing);
+    });
+
+    return Array.from(studentMap.values()).map((st) => {
+      const avg = st.gradedCount > 0 ? Math.round(st.totalScore / st.gradedCount) : null;
+      let status = "Enrolled";
+      if (avg !== null) {
+        if (avg >= 75) status = "Distinction";
+        else if (avg >= 65) status = "Merit";
+        else if (avg >= 55) status = "Credit";
+        else status = "Pass";
+      }
+      return {
+        name: st.name,
+        index: st.index,
+        class: st.class,
+        submitted: st.submitted,
+        avg: avg !== null ? `${avg}%` : "Pending",
+        status,
+      };
+    });
+  }, [submissions]);
+
+  const benchmarkStats = useMemo(() => {
+    if (submissions.length === 0) {
+      return { classAvg: "N/A", onTimeRate: "N/A", needingSupport: 0 };
     }
-  ];
+    let totalScore = 0;
+    let gradedCount = 0;
+    let onTimeCount = 0;
+    let needingSupport = 0;
 
-  // Sri Lanka G.C.E A/L Grade Distribution
-  const gradeDistribution = [
-    { grade: "A (75-100%)", count: 18, fill: "#0d5c4d" },
-    { grade: "B (65-74%)", count: 12, fill: "#158066" },
-    { grade: "C (55-64%)", count: 6, fill: "#f3b738" },
-    { grade: "S (40-54%)", count: 3, fill: "#e59f20" },
-    { grade: "W (<40%)", count: 1, fill: "#e11d48" }
-  ];
+    submissions.forEach((s) => {
+      if (s.marksObtained != null) {
+        const score = (Number(s.marksObtained) / (Number(s.maxMarks) || 100)) * 100;
+        if (!isNaN(score)) {
+          totalScore += score;
+          gradedCount += 1;
+          if (score < 50) needingSupport += 1;
+        }
+      }
+      if (s.status !== "not_submitted") {
+        onTimeCount += 1;
+      }
+    });
 
-  const studentRoster = [
-    { name: "Sathurjan K.", index: "AL-2026-4401", class: "12-Physical Science", submitted: 2, avg: "94%", status: "Distinction" },
-    { name: "Kasun Bandara", index: "AL-2026-4402", class: "12-Physical Science", submitted: 1, avg: "Pending", status: "Review" },
-    { name: "Anuki Silva", index: "AL-2026-4403", class: "12-Physical Science", submitted: 2, avg: "88%", status: "Distinction" },
-    { name: "Dineth Perera", index: "AL-2026-4404", class: "12-Physical Science", submitted: 2, avg: "76%", status: "Merit" },
-    { name: "Tharushi Fernando", index: "AL-2026-4405", class: "12-Physical Science", submitted: 2, avg: "68%", status: "Credit" }
-  ];
+    const classAvg = gradedCount > 0 ? `${(totalScore / gradedCount).toFixed(1)}%` : "N/A";
+    const onTimeRate = `${((onTimeCount / submissions.length) * 100).toFixed(1)}%`;
+
+    return { classAvg, onTimeRate, needingSupport };
+  }, [submissions]);
 
   // Executive Overview KPIs (Powered by live cloud database)
-  const totalEnrolledStudents = dashboardData?.kpis?.totalEnrolledStudents ?? 136;
+  const totalEnrolledStudents = dashboardData?.kpis?.totalEnrolledStudents ?? 0;
   const activeBatchesCount = dashboardData?.kpis?.activeBatchesCount ?? teacherCourses.length;
   const pendingReviewsCount = dashboardData?.kpis?.pendingReviewsCount ?? submissions.filter((s) => s.status === "submitted").length;
 
-  const currentSchedule: ScheduleItem[] =
-    dashboardData?.todaySchedule && dashboardData.todaySchedule.length > 0
-      ? dashboardData.todaySchedule
-      : todaySchedule;
+  const currentSchedule: ScheduleItem[] = dashboardData?.todaySchedule || [];
 
   const liveSessionsTodayCount = dashboardData?.kpis?.liveSessionsTodayCount ?? currentSchedule.length;
   const liveNowSession = currentSchedule.find((s) => s.status === "in_progress");
@@ -877,8 +895,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
             {/* Card 2: Active Batches */}
             <Card 
               onClick={() => {
-                setSelectedCourseId(teacherCourses[0]?.id || "crs_math_12");
-                setCurrentView("course-detail");
+                if (teacherCourses[0]?.id) {
+                  setSelectedCourseId(teacherCourses[0].id);
+                  setCurrentView("course-detail");
+                }
               }}
               className="border-[#e6ece8] bg-white hover:border-[#a2dfd2] transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
             >
@@ -1142,6 +1162,11 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       </div>
                     </div>
                   ))}
+                  {currentSchedule.length === 0 && (
+                    <div className="py-8 text-center text-xs text-slate-400">
+                      No live sessions or lectures scheduled for today.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -2867,10 +2892,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
             <Card className="lg:col-span-7 border-[#e6ece8] bg-white shadow-2xs">
               <CardHeader className="p-6 pb-2">
                 <CardTitle className="text-sm font-black text-[#0d2b26]">
-                  A/L Marks Grade Distribution (Grade 12 Physical Science)
+                  Marks Grade Distribution
                 </CardTitle>
                 <p className="text-xs text-slate-500">
-                  Breakdown of 40 enrolled candidates across benchmark bands.
+                  Breakdown of evaluated student submissions across benchmark bands.
                 </p>
               </CardHeader>
               <CardContent className="p-6 pt-2">
@@ -2907,25 +2932,29 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 <div className="p-3.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] flex items-center justify-between">
                   <div>
                     <p className="text-xs text-[#0d5c4d] font-bold">Class Average</p>
-                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">82.4%</p>
+                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">{benchmarkStats.classAvg}</p>
                   </div>
-                  <Badge variant="success">Above Target</Badge>
+                  <Badge variant={benchmarkStats.classAvg !== "N/A" ? "success" : "outline"}>
+                    {benchmarkStats.classAvg !== "N/A" ? "Live Calculated" : "No Data"}
+                  </Badge>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center justify-between">
                   <div>
                     <p className="text-xs text-slate-600 font-bold">On-Time Submission Rate</p>
-                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">94.3%</p>
+                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">{benchmarkStats.onTimeRate}</p>
                   </div>
-                  <Badge variant="outline">On Track</Badge>
+                  <Badge variant="outline">Submissions</Badge>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-[#fef7e6] border border-[#fde4af] flex items-center justify-between">
                   <div>
                     <p className="text-xs text-[#b47a16] font-bold">Students Needing Support</p>
-                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">2 Students</p>
+                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">{benchmarkStats.needingSupport} Students</p>
                   </div>
-                  <Badge variant="warning">Follow-up</Badge>
+                  <Badge variant={benchmarkStats.needingSupport > 0 ? "warning" : "outline"}>
+                    {benchmarkStats.needingSupport > 0 ? "Follow-up" : "Normal"}
+                  </Badge>
                 </div>
               </CardContent>
             </Card>
@@ -2956,7 +2985,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       <td className="py-3 px-4 font-bold text-slate-900">{st.name}</td>
                       <td className="py-3 px-4 font-mono text-slate-500">{st.index}</td>
                       <td className="py-3 px-4 text-slate-600">{st.class}</td>
-                      <td className="py-3 px-4 text-slate-600">{st.submitted} / 2</td>
+                      <td className="py-3 px-4 text-slate-600">{st.submitted}</td>
                       <td className="py-3 px-4 font-mono font-bold text-[#0d5c4d]">{st.avg}</td>
                       <td className="py-3 px-4">
                         <Badge
@@ -2973,6 +3002,13 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       </td>
                     </tr>
                   ))}
+                  {studentRoster.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-xs text-slate-400">
+                        No student submission records available yet.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
