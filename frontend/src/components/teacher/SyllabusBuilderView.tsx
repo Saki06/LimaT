@@ -112,6 +112,7 @@ export function SyllabusBuilderView() {
         setIsCreateCourseModalOpen(false);
         setNewCourseTitle("");
         setNewCourseCode("");
+        setNewCourseGrade("Grade 12 (A/L 2027)");
         setNewCourseDescription("");
       }
     } finally {
@@ -489,17 +490,25 @@ export function SyllabusBuilderView() {
             <label className="text-xs font-bold text-slate-700 block mb-1">
               Target Batch / Grade
             </label>
-            <select
+            <input
+              type="text"
+              list="batch-grade-suggestions"
               value={newCourseGrade}
               onChange={(e) => setNewCourseGrade(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs text-slate-800 bg-white focus:outline-none focus:border-[#0d5c4d] font-medium cursor-pointer"
-            >
-              <option value="Grade 12 (A/L 2027)">Grade 12 (A/L 2027)</option>
-              <option value="Grade 13 (A/L 2026)">Grade 13 (A/L 2026)</option>
-              <option value="Grade 11 (O/L 2026)">Grade 11 (O/L 2026)</option>
-              <option value="Grade 10">Grade 10</option>
-              <option value="Special Masterclass">Special Masterclass</option>
-            </select>
+              placeholder="e.g. Grade 12 (A/L 2027) or 2026 Revision"
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] font-medium"
+            />
+            <datalist id="batch-grade-suggestions">
+              <option value="Grade 12 (A/L 2027)" />
+              <option value="Grade 13 (A/L 2026)" />
+              <option value="2026 A/L Revision Batch" />
+              <option value="2027 A/L Theory Batch" />
+              <option value="2025 A/L Repeaters Special" />
+              <option value="Grade 11 (O/L 2026)" />
+              <option value="Grade 10" />
+              <option value="Special Masterclass" />
+            </datalist>
+            <span className="text-[10px] text-slate-400">Type any custom batch or select from suggestions</span>
           </div>
         </div>
 
