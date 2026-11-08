@@ -296,12 +296,6 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
             label: "Class Notices & Alerts",
             icon: Bell,
             group: "Tutor Operations"
-          },
-          {
-            id: "timetable",
-            label: "Class Timetable",
-            icon: Calendar,
-            group: "Tutor Operations"
           }
         ]
       : []),
