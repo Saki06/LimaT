@@ -741,7 +741,8 @@ export function ProfileView() {
 
         if (!response.success || cancelled) return;
 
-       const savedProfile = response.data?.superAdminProfile;
+        setSavedAvatarUrl(response.data?.avatarUrl ?? null);
+        const savedProfile = response.data?.superAdminProfile;
 
 if (!response.data) return;
 
@@ -798,6 +799,46 @@ if (!savedProfile) {
   const [avatarPreset, setAvatarPreset] = useState<string>("default");
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [savedAvatarUrl, setSavedAvatarUrl] = useState<string | null>(null);
+  const [savedAvatarImageUrl, setSavedAvatarImageUrl] = useState<string | null>(null);
+
+
+  useEffect(() => {
+    if (currentRole !== "super_admin" || !savedAvatarUrl) {
+      setSavedAvatarImageUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    const loadSavedAvatar = async () => {
+      try {
+        const blob = await api.superAdminProfile.getAvatarBlob(savedAvatarUrl);
+
+        if (cancelled) return;
+
+        objectUrl = URL.createObjectURL(blob);
+        setSavedAvatarImageUrl(objectUrl);
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error("Failed to load Super Admin avatar:", error);
+        setSavedAvatarImageUrl(null);
+      }
+    };
+
+    setSavedAvatarImageUrl(null);
+    void loadSavedAvatar();
+
+    return () => {
+      cancelled = true;
+
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [currentRole, savedAvatarUrl]);
 
   useEffect(() => {
     return () => {
@@ -831,6 +872,40 @@ if (!savedProfile) {
     setAvatarPreviewUrl(URL.createObjectURL(file));
     event.target.value = "";
   };
+
+
+  const handleDeleteAvatar = async () => {
+    if (currentRole !== "super_admin" || isSavingProfile) return;
+
+    setIsSavingProfile(true);
+
+    try {
+      await api.superAdminProfile.deleteAvatar();
+
+      setSavedAvatarUrl(null);
+      setSavedAvatarImageUrl(null);
+      setAvatarFile(null);
+      setAvatarPreviewUrl(null);
+
+      addToast({
+        type: "success",
+        title: "Avatar Removed",
+        message: "Your profile picture has been removed.",
+      });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "Delete Failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to remove profile picture.",
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   const [selectedScheduleDay, setSelectedScheduleDay] = useState<
     "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"
   >("Monday");
@@ -1148,8 +1223,19 @@ if (!savedProfile) {
           rootAuthorityId: profileData.indexNumber || null,
         });
 
+
         if (!response.success) {
           throw new Error(response.message || "Profile update failed");
+        }
+
+        if (avatarFile) {
+          const avatarResponse = await api.superAdminProfile.uploadAvatar(
+            avatarFile
+          );
+
+          setSavedAvatarUrl(avatarResponse.data.avatarUrl);
+          setAvatarFile(null);
+          setAvatarPreviewUrl(null);
         }
 
         setIsEditing(false);
@@ -1305,17 +1391,18 @@ if (!savedProfile) {
           {/* Avatar with photo preview */}
           <div className="relative group shrink-0">
             <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-gradient-to-br from-[#0d5c4d] to-[#16423b] flex items-center justify-center overflow-hidden text-white text-3xl sm:text-4xl font-black shadow-lg shadow-[#0d5c4d]/25 border-4 border-white ring-2 ring-[#0d5c4d]/10">
-              {currentRole === "super_admin" && avatarPreviewUrl ? (
+
+              {currentRole === "super_admin" &&
+              (avatarPreviewUrl || savedAvatarImageUrl) ? (
                 <img
-                  src={avatarPreviewUrl}
-                  alt="Profile picture preview"
+                  src={avatarPreviewUrl || savedAvatarImageUrl || ""}
+                  alt="Super Admin profile picture"
                   className="h-full w-full object-cover"
                 />
               ) : (
                 profileData.name.charAt(0)
               )}
-            </div>
-
+</div>
             {currentRole === "super_admin" && (
               <input
                 id="super-admin-avatar-input"
@@ -1346,9 +1433,41 @@ if (!savedProfile) {
                 </button>
               )
             )}
-          </div>
 
+            {currentRole === "super_admin" &&
+              isEditing &&
+              savedAvatarUrl && (
+                <button
+                  type="button"
+                  onClick={handleDeleteAvatar}
+                  disabled={isSavingProfile}
+                  title="Remove profile picture"
+                  aria-label="Remove profile picture"
+                  className="absolute -bottom-1.5 -left-1.5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-50 text-red-600 shadow-md transition-transform hover:scale-105 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v5" />
+                    <path d="M14 11v5" />
+                  </svg>
+                </button>
+              )}
+          </div>
           {/* User Details */}
+
           <div className="flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 className="text-xl sm:text-2xl font-black text-[#0d2b26]">
