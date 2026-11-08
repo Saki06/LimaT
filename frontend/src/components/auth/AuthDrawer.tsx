@@ -79,15 +79,13 @@ export function AuthDrawer({
   const authContent = (
     <div className="space-y-4">
       {/* Role Badge Indicator */}
-      {!(selectedRole === "parent" && authTab === "signup") && (
+      {selectedRole !== "teacher" && !(selectedRole === "parent" && authTab === "signup") && (
         <div
           className={`p-3 rounded-2xl flex items-center justify-between border ${
             selectedRole === "student"
               ? "bg-[#ecf8f5] border-[#c4e9e0] text-[#0d5c4d]"
               : selectedRole === "parent"
               ? "bg-[#f0f5fa] border-[#cbdfe8] text-[#1e3a5f]"
-              : selectedRole === "teacher"
-              ? "bg-[#fef7e6] border-[#fde4af] text-[#b47a16]"
               : selectedRole === "admin"
               ? "bg-slate-100 border-slate-300 text-slate-800"
               : "bg-amber-100 border-amber-300 text-amber-950 font-black"
@@ -96,7 +94,6 @@ export function AuthDrawer({
           <div className="flex items-center gap-2">
             {selectedRole === "student" && <GraduationCap className="h-4 w-4" />}
             {selectedRole === "parent" && <Users className="h-4 w-4" />}
-            {selectedRole === "teacher" && <Sparkles className="h-4 w-4" />}
             {selectedRole === "admin" && <Shield className="h-4 w-4 text-slate-700" />}
             {selectedRole === "super_admin" && <span className="text-sm">👑</span>}
             <span className="text-xs font-black uppercase tracking-wider">
@@ -104,8 +101,6 @@ export function AuthDrawer({
                 ? "Student Portal"
                 : selectedRole === "parent"
                 ? "Parent & Guardian Desk"
-                : selectedRole === "teacher"
-                ? "Tutor Cockpit"
                 : selectedRole === "admin"
                 ? "Admin Operations"
                 : "Super Admin SaaS Console"}
@@ -116,8 +111,6 @@ export function AuthDrawer({
               ? "Direct Enrollment"
               : selectedRole === "parent"
               ? "Fee & Attendance"
-              : selectedRole === "teacher"
-              ? "Course Creator"
               : selectedRole === "admin"
               ? "Tuition Desk"
               : "Platform Control"}
@@ -188,7 +181,7 @@ export function AuthDrawer({
                   ? "Parent & Guardian Desk"
                   : selectedRole === "student"
                   ? "Student Portal"
-                  : "Tutor Cockpit"}
+                  : "Teacher Portal"}
               </p>
             </div>
           </div>

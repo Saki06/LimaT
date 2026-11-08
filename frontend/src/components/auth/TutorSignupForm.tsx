@@ -59,7 +59,7 @@ export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
         addToast({
           type: "success",
           title: "Tutor Profile Initialized!",
-          message: `Welcome, ${signupName || "Educator"}! Your Tutor Cockpit & Course Creator Desk is ready.`
+          message: `Welcome, ${signupName || "Educator"}! Your Tutor Studio & Course Management Desk is ready.`
         });
         onSuccess();
       } else {
@@ -218,12 +218,12 @@ export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
         {isLoading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Launching Tutor Cockpit...</span>
+            <span>Launching Teacher Portal...</span>
           </>
         ) : (
           <>
             <Sparkles className="h-4 w-4" />
-            <span>Register &amp; Launch Tutor Cockpit</span>
+            <span>Register &amp; Launch Teacher Portal</span>
           </>
         )}
       </button>

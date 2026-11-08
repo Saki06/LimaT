@@ -277,7 +277,7 @@ export function LandingView({
         selectedRole === "parent"
           ? "Welcome to Parent Guardian Desk! Live attendance and fee receipts loaded."
           : selectedRole === "teacher"
-          ? "Welcome to Tutor Cockpit! Course creator desk loaded."
+          ? "Welcome to Teacher Portal! Course creator desk loaded."
           : selectedRole === "super_admin"
           ? "Welcome to Super Admin Console! Platform master controls loaded."
           : selectedRole === "admin"
@@ -410,8 +410,8 @@ export function LandingView({
   // =========================================================================
   const renderAuthContent = () => (
     <div className="space-y-4">
-      {/* Active Role Dedicated Badge Header (Hidden on Parent Registration) */}
-      {!(selectedRole === "parent" && authTab === "signup") && (
+      {/* Active Role Dedicated Badge Header (Hidden on Parent Registration & Teacher) */}
+      {selectedRole !== "teacher" && !(selectedRole === "parent" && authTab === "signup") && (
         <div className={`p-3 rounded-2xl flex items-center justify-between border ${
           selectedRole === "student"
             ? "bg-[#ecf8f5] border-[#c4e9e0] text-[#0d5c4d]"
@@ -419,9 +419,7 @@ export function LandingView({
             ? "bg-[#f0f5fa] border-[#cbdfe8] text-[#1e3a5f]"
             : selectedRole === "admin"
             ? "bg-slate-100 border-slate-300 text-slate-800"
-            : selectedRole === "super_admin"
-            ? "bg-slate-900 border-amber-400/40 text-amber-300"
-            : "bg-[#fef7e6] border-[#fde4af] text-[#b47a16]"
+            : "bg-slate-900 border-amber-400/40 text-amber-300"
         }`}>
           <div className="flex items-center gap-2">
             {selectedRole === "student" ? (
@@ -430,10 +428,8 @@ export function LandingView({
               <Users className="h-4 w-4" />
             ) : selectedRole === "admin" ? (
               <Shield className="h-4 w-4 text-[#0d5c4d]" />
-            ) : selectedRole === "super_admin" ? (
-              <span className="text-sm">👑</span>
             ) : (
-              <Sparkles className="h-4 w-4" />
+              <span className="text-sm">👑</span>
             )}
             <span className="text-xs font-black uppercase tracking-wider">
               {selectedRole === "student"
@@ -442,9 +438,7 @@ export function LandingView({
                 ? "Parent & Guardian Portal"
                 : selectedRole === "admin"
                 ? "Admin Operations"
-                : selectedRole === "super_admin"
-                ? "Super Admin SaaS Console"
-                : "Tutor Cockpit"}
+                : "Super Admin SaaS Console"}
             </span>
           </div>
           <span className="text-[10px] font-bold opacity-75">
@@ -454,9 +448,7 @@ export function LandingView({
               ? "Fee & Attendance"
               : selectedRole === "admin"
               ? "Tuition Desk Administration"
-              : selectedRole === "super_admin"
-              ? "Master Platform Control"
-              : "Course Creator"}
+              : "Master Platform Control"}
           </span>
         </div>
       )}
@@ -721,7 +713,7 @@ export function LandingView({
                       ? "Admin Desk"
                       : selectedRole === "super_admin"
                       ? "Super Admin Console"
-                      : "Tutor Cockpit"}
+                      : "Teacher Portal"}
                   </span>
                 </button>
               </>
@@ -1110,7 +1102,7 @@ export function LandingView({
                     ? "Parent & Guardian Desk"
                     : selectedRole === "admin"
                     ? "Admin Operations Desk"
-                    : "Tutor Cockpit"}
+                    : "Teacher Portal"}
                 </span>
               </div>
 
@@ -2447,7 +2439,7 @@ export function LandingView({
                       ? "Admin Operations"
                       : selectedRole === "super_admin"
                       ? "Super Admin SaaS Console"
-                      : "Tutor Cockpit"}
+                      : "Teacher Portal"}
                   </p>
                 </div>
               </div>
