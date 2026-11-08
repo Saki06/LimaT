@@ -595,7 +595,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
       message: annMessage.trim(),
       targetAudience: annAudience,
       priority: annPriority,
-      authorName: currentUser.name || activeTenant?.adminName || "Faculty Instructor",
+      authorName: currentUser.name || activeTenant?.adminName || "Tutor",
       authorRole: "Tutor"
     });
     setIsCreateAnnouncementModalOpen(false);
@@ -638,7 +638,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
           0
         ) / gradedSubmissions.length
       ).toFixed(1)
-    : "84.5";
+    : "0.0";
 
   // Today's Teaching Schedule (Timeline)
   interface ScheduleItem {
@@ -1216,9 +1216,9 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       </div>
                     ) : (
                       teacherCourses.map((course) => {
-                      const totalLessons = course.totalLessons || 12;
-                      const completedLessons = course.completedLessons || 6;
-                      const progressPct = Math.round((completedLessons / totalLessons) * 100);
+                      const totalLessons = course.totalLessons ?? 0;
+                      const completedLessons = course.completedLessons ?? 0;
+                      const progressPct = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
                       const courseAsgs = assignments.filter((a) => a.courseId === course.id);
 
                       return (
@@ -1257,7 +1257,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                           <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 text-xs">
                             <div>
                               <span className="text-slate-400 block text-[10px] uppercase font-bold">Units / Topics</span>
-                              <span className="font-bold text-slate-700">{course.units?.length || 2} Units Active</span>
+                              <span className="font-bold text-slate-700">{course.units?.length || 0} Units Active</span>
                             </div>
                             <div>
                               <span className="text-slate-400 block text-[10px] uppercase font-bold">Assignments</span>
@@ -1377,7 +1377,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                           ) : (
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-black text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-[#c4e9e0]">
-                                {sub.marksObtained ?? 85}/{sub.maxMarks || 100}
+                                {sub.marksObtained != null ? sub.marksObtained : "-"}/{sub.maxMarks || 100}
                               </span>
                               <Button
                                 size="sm"
@@ -2814,7 +2814,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                             {/* Specs and stats pill */}
                             <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100">
                               <span className="font-mono text-slate-500 font-semibold">
-                                {res.fileType || "PDF"} &bull; {res.fileSize || "4.2 MB"} &bull; {res.pageCount || 20} Pages
+                                {res.fileType || "PDF"}{res.fileSize ? ` • ${res.fileSize}` : ""}{res.pageCount ? ` • ${res.pageCount} Pages` : ""}
                               </span>
                               <span className="flex items-center gap-2">
                                 <span className="flex items-center gap-0.5" title="Student Views">
@@ -4643,7 +4643,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
             createLibraryResource({
               ...data,
               status: publish ? "published" : "draft",
-              author: currentUser?.name || "Tutor Faculty",
+              author: currentUser?.name || "Tutor",
               teacherId: currentUser?.id
             });
           }

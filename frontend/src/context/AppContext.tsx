@@ -2711,7 +2711,7 @@ const addTenant = (tenant: Tenant) => {
       message: ann.message || '',
       publishedAt: 'Just now',
       authorName: currentUser.name,
-      authorRole: currentUser.role === 'teacher' ? 'Faculty Teacher' : 'Principal',
+      authorRole: currentUser.role === 'teacher' ? 'Tutor' : 'Principal',
       targetAudience: ann.targetAudience || 'All Students',
       priority: ann.priority || 'normal'
     };

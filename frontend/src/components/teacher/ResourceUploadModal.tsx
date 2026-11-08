@@ -188,7 +188,7 @@ export function ResourceUploadModal({
       pageCount: Number(pageCount) || 15,
       allowDownload,
       status: publish ? "published" : "draft",
-      author: currentUser?.name || "Tutor Faculty",
+      author: currentUser?.name || "Tutor",
       year: resourceType === "past_paper" ? Number(year) : undefined,
       medium: resourceType === "past_paper" ? medium : undefined,
       examType: resourceType === "past_paper" ? examType : undefined,
