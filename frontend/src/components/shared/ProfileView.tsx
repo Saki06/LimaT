@@ -796,6 +796,41 @@ if (!savedProfile) {
   }, [currentRole, currentUser.id, addToast]);
 
   const [avatarPreset, setAvatarPreset] = useState<string>("default");
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+    };
+  }, [avatarPreviewUrl]);
+
+  const handleAvatarFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (currentRole !== "super_admin") return;
+
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      addToast({ type: "error", title: "Invalid Image", message: "Only JPG, PNG and WebP images are allowed." });
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      addToast({ type: "error", title: "Image Too Large", message: "Profile picture must be 2 MB or smaller." });
+      event.target.value = "";
+      return;
+    }
+
+    setAvatarFile(file);
+    setAvatarPreviewUrl(URL.createObjectURL(file));
+    event.target.value = "";
+  };
   const [selectedScheduleDay, setSelectedScheduleDay] = useState<
     "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"
   >("Monday");
@@ -1267,19 +1302,49 @@ if (!savedProfile) {
         </div>
 
         <div className="relative flex flex-col md:flex-row items-start md:items-center gap-5 sm:gap-6">
-          {/* Avatar with preset selection & edit indicator */}
+          {/* Avatar with photo preview */}
           <div className="relative group shrink-0">
-            <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-gradient-to-br from-[#0d5c4d] to-[#16423b] flex items-center justify-center text-white text-3xl sm:text-4xl font-black shadow-lg shadow-[#0d5c4d]/25 border-4 border-white ring-2 ring-[#0d5c4d]/10">
-              {profileData.name.charAt(0)}
+            <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-gradient-to-br from-[#0d5c4d] to-[#16423b] flex items-center justify-center overflow-hidden text-white text-3xl sm:text-4xl font-black shadow-lg shadow-[#0d5c4d]/25 border-4 border-white ring-2 ring-[#0d5c4d]/10">
+              {currentRole === "super_admin" && avatarPreviewUrl ? (
+                <img
+                  src={avatarPreviewUrl}
+                  alt="Profile picture preview"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                profileData.name.charAt(0)
+              )}
             </div>
+
+            {currentRole === "super_admin" && (
+              <input
+                id="super-admin-avatar-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleAvatarFileChange}
+                className="hidden"
+                aria-label="Select profile picture"
+              />
+            )}
+
             {isEditing && (
-              <button
-                type="button"
-                className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform"
-                title="Change Avatar Photo"
-              >
-                <Camera className="h-4 w-4" />
-              </button>
+              currentRole === "super_admin" ? (
+                <label
+                  htmlFor="super-admin-avatar-input"
+                  className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform cursor-pointer"
+                  title="Change Avatar Photo"
+                >
+                  <Camera className="h-4 w-4" />
+                </label>
+              ) : (
+                <button
+                  type="button"
+                  className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform"
+                  title="Change Avatar Photo"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+              )
             )}
           </div>
 
