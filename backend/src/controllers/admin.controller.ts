@@ -58,19 +58,8 @@ export const getAdminOverview = async (
 
     // Parse classes and subjects from tenant settings
     const settings = (tenantRecord?.settings as Record<string, any>) || {};
-    const classes = settings.classes || [
-      { id: 'cls_12a', name: 'Grade 12-A', gradeName: 'Grade 12', section: 'Physical Science', studentCount: 38 },
-      { id: 'cls_12b', name: 'Grade 12-B', gradeName: 'Grade 12', section: 'Biological Science', studentCount: 35 },
-      { id: 'cls_13a', name: 'Grade 13-A', gradeName: 'Grade 13', section: 'Technology Stream', studentCount: 42 },
-      { id: 'cls_11a', name: 'Grade 11-A', gradeName: 'Grade 11', section: 'G.C.E. O/L Core', studentCount: 40 },
-    ];
-
-    const subjects = settings.subjects || [
-      { id: 'sub_math', name: 'Combined Mathematics', code: 'CM-12', grades: ['Grade 12', 'Grade 13'] },
-      { id: 'sub_phy', name: 'Physics', code: 'PHY-12', grades: ['Grade 12', 'Grade 13'] },
-      { id: 'sub_chem', name: 'Chemistry', code: 'CHM-12', grades: ['Grade 12', 'Grade 13'] },
-      { id: 'sub_ict', name: 'Information Technology', code: 'ICT-12', grades: ['Grade 12', 'Grade 13'] },
-    ];
+    const classes = Array.isArray(settings.classes) ? settings.classes : [];
+    const subjects = Array.isArray(settings.subjects) ? settings.subjects : [];
 
     // Fetch recent 5 students and recent 5 staff members
     const [recentStudents, recentStaff] = await Promise.all([
@@ -726,9 +715,13 @@ export const getClasses = async (
 ): Promise<void> => {
   try {
     const tenantId = await resolveTenantId(req);
+    if (!tenantId) {
+      res.status(200).json({ success: true, data: [] });
+      return;
+    }
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) {
-      res.status(404).json({ success: false, message: 'School tenant not found.' });
+      res.status(200).json({ success: true, data: [] });
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
@@ -900,9 +893,13 @@ export const getSubjects = async (
 ): Promise<void> => {
   try {
     const tenantId = await resolveTenantId(req);
+    if (!tenantId) {
+      res.status(200).json({ success: true, data: [] });
+      return;
+    }
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) {
-      res.status(404).json({ success: false, message: 'School tenant not found.' });
+      res.status(200).json({ success: true, data: [] });
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
