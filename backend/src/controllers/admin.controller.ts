@@ -23,104 +23,6 @@ export const resolveTenantId = async (req: AuthenticatedRequest): Promise<string
   return defaultTenant?.id || '';
 };
 
-/**
- * Helper to ensure realistic default staff exists for the school tenant
- */
-const ensureDefaultSchoolStaff = async (tenantId: string) => {
-  const staffCount = await prisma.user.count({
-    where: {
-      tenantId,
-      role: { in: ['TEACHER', 'ADMIN'] },
-    },
-  });
-
-  if (staffCount === 0) {
-    const defaultPasswordHash = await bcrypt.hash('Staff@123', 10);
-    const mockTeachers = [
-      {
-        firstName: 'Samantha',
-        lastName: 'Perera',
-        email: 'samantha.perera@limat-academy.lk',
-        role: 'TEACHER' as const,
-        phone: '+94 77 123 4567',
-        employeeNo: 'EMP-T01',
-        specialization: 'Combined Mathematics',
-        mediums: ['English', 'Tamil'],
-        qualifications: [{ degree: 'B.Sc. (Hons) Mathematics', institution: 'Univ of Colombo', year: '2014' }],
-      },
-      {
-        firstName: 'Nalinda',
-        lastName: 'Jayawardena',
-        email: 'nalinda.j@limat-academy.lk',
-        role: 'TEACHER' as const,
-        phone: '+94 71 987 6543',
-        employeeNo: 'EMP-T02',
-        specialization: 'Advanced Physics',
-        mediums: ['English', 'Sinhala'],
-        qualifications: [{ degree: 'B.Sc. (Hons) Physics', institution: 'Univ of Peradeniya', year: '2016' }],
-      },
-      {
-        firstName: 'Fathima',
-        lastName: 'Rizwan',
-        email: 'fathima.r@limat-academy.lk',
-        role: 'TEACHER' as const,
-        phone: '+94 76 555 4321',
-        employeeNo: 'EMP-T03',
-        specialization: 'Information & Communication Technology',
-        mediums: ['English', 'Tamil'],
-        qualifications: [{ degree: 'B.Sc. Computer Science', institution: 'Univ of Moratuwa', year: '2018' }],
-      },
-      {
-        firstName: 'Rohan',
-        lastName: 'De Silva',
-        email: 'rohan.desilva@limat-academy.lk',
-        role: 'ADMIN' as const,
-        phone: '+94 75 111 2233',
-        employeeNo: 'EMP-A01',
-        specialization: 'Senior Administrator & Academic Dean',
-        mediums: ['English'],
-        qualifications: [{ degree: 'M.Ed. Educational Leadership', institution: 'NIE Sri Lanka', year: '2012' }],
-      },
-    ];
-
-    for (const t of mockTeachers) {
-      const existingUser = await prisma.user.findUnique({ where: { email: t.email } });
-      if (!existingUser) {
-        const createdUser = await prisma.user.create({
-          data: {
-            tenantId,
-            email: t.email,
-            passwordHash: defaultPasswordHash,
-            firstName: t.firstName,
-            lastName: t.lastName,
-            role: t.role,
-            isActive: true,
-          },
-        });
-
-        if (t.role === 'TEACHER') {
-          await prisma.teacherProfile.create({
-            data: {
-              userId: createdUser.id,
-              employeeNo: t.employeeNo,
-              specialization: t.specialization,
-              phone: t.phone,
-              mediums: t.mediums,
-              qualifications: t.qualifications,
-              experienceYears: 8,
-              isVerified: true,
-            },
-          });
-        }
-      }
-    }
-  }
-};
-
-/**
- * 1. GET /api/admin/overview
- * High-level school dashboard metrics and KPIs
- */
 export const getAdminOverview = async (
   req: AuthenticatedRequest,
   res: Response
@@ -131,8 +33,6 @@ export const getAdminOverview = async (
       res.status(404).json({ success: false, message: 'No active school tenant found.' });
       return;
     }
-
-    await ensureDefaultSchoolStaff(tenantId);
 
     const [
       totalStudents,
@@ -250,7 +150,6 @@ export const getStaff = async (
 ): Promise<void> => {
   try {
     const tenantId = await resolveTenantId(req);
-    await ensureDefaultSchoolStaff(tenantId);
 
     const users = await prisma.user.findMany({
       where: {
@@ -817,91 +716,6 @@ export const deleteUser = async (
 };
 
 /**
- * Default Seed Classes & Subjects for initial database population
- */
-const DEFAULT_CLASSES = [
-  {
-    id: 'cls_12_sci',
-    name: '12-Physical Science',
-    gradeId: 'grd_12',
-    gradeName: 'Grade 12 (A/L)',
-    classTeacherId: 'usr_teacher_01',
-    classTeacherName: 'Mr. Samantha Perera',
-    studentCount: 38,
-  },
-  {
-    id: 'cls_12_bio',
-    name: '12-Biological Science',
-    gradeId: 'grd_12',
-    gradeName: 'Grade 12 (A/L)',
-    classTeacherId: 'usr_teacher_02',
-    classTeacherName: 'Dr. Niluka Jayawardena',
-    studentCount: 42,
-  },
-  {
-    id: 'cls_13_sci',
-    name: '13-Physical Science',
-    gradeId: 'grd_13',
-    gradeName: 'Grade 13 (A/L)',
-    classTeacherId: 'usr_teacher_03',
-    classTeacherName: 'Mrs. Anoma Alwis',
-    studentCount: 35,
-  },
-  {
-    id: 'cls_11_ol',
-    name: '11-G.C.E. O/L Special',
-    gradeId: 'grd_11',
-    gradeName: 'Grade 11 (O/L)',
-    classTeacherId: 'usr_teacher_04',
-    classTeacherName: 'Mr. Rohan Gunaratne',
-    studentCount: 45,
-  },
-];
-
-const DEFAULT_SUBJECTS = [
-  {
-    id: 'sub_math',
-    name: 'Combined Mathematics',
-    code: 'CMATH-12',
-    gradeId: 'grd_12',
-    gradeName: 'Grade 12 (A/L)',
-    color: 'from-blue-600 to-indigo-700',
-  },
-  {
-    id: 'sub_phy',
-    name: 'Physics',
-    code: 'PHY-12',
-    gradeId: 'grd_12',
-    gradeName: 'Grade 12 (A/L)',
-    color: 'from-cyan-600 to-blue-700',
-  },
-  {
-    id: 'sub_chem',
-    name: 'Chemistry',
-    code: 'CHEM-12',
-    gradeId: 'grd_12',
-    gradeName: 'Grade 12 (A/L)',
-    color: 'from-emerald-600 to-teal-700',
-  },
-  {
-    id: 'sub_bio',
-    name: 'Biology',
-    code: 'BIO-12',
-    gradeId: 'grd_12',
-    gradeName: 'Grade 12 (A/L)',
-    color: 'from-green-600 to-emerald-700',
-  },
-  {
-    id: 'sub_ict',
-    name: 'Information & Communication Technology',
-    code: 'ICT-12',
-    gradeId: 'grd_12',
-    gradeName: 'Grade 12 (A/L)',
-    color: 'from-purple-600 to-violet-700',
-  },
-];
-
-/**
  * 12. GET /api/admin/classes
  * Fetch all academic classes for the active tenant
  */
@@ -917,19 +731,7 @@ export const getClasses = async (
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
-    let classes = Array.isArray(settings.classes) ? settings.classes : [];
-    if (classes.length === 0) {
-      classes = DEFAULT_CLASSES;
-      await prisma.tenant.update({
-        where: { id: tenantId },
-        data: {
-          settings: {
-            ...settings,
-            classes: DEFAULT_CLASSES,
-          },
-        },
-      });
-    }
+    const classes = Array.isArray(settings.classes) ? settings.classes : [];
     res.status(200).json({ success: true, data: classes });
   } catch (error: any) {
     console.error('Error in getClasses:', error);
@@ -958,9 +760,7 @@ export const createClass = async (
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
-    const existingClasses: any[] = Array.isArray(settings.classes) && settings.classes.length > 0
-      ? settings.classes
-      : [...DEFAULT_CLASSES];
+    const existingClasses: any[] = Array.isArray(settings.classes) ? settings.classes : [];
 
     const newClass = {
       id: `cls_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -1011,9 +811,7 @@ export const updateClass = async (
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
-    const existingClasses: any[] = Array.isArray(settings.classes) && settings.classes.length > 0
-      ? settings.classes
-      : [...DEFAULT_CLASSES];
+    const existingClasses: any[] = Array.isArray(settings.classes) ? settings.classes : [];
 
     const index = existingClasses.findIndex((c) => c.id === classId);
     if (index === -1) {
@@ -1066,9 +864,7 @@ export const deleteClass = async (
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
-    const existingClasses: any[] = Array.isArray(settings.classes) && settings.classes.length > 0
-      ? settings.classes
-      : [...DEFAULT_CLASSES];
+    const existingClasses: any[] = Array.isArray(settings.classes) ? settings.classes : [];
 
     const filtered = existingClasses.filter((c) => c.id !== classId);
 
@@ -1109,19 +905,7 @@ export const getSubjects = async (
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
-    let subjects = Array.isArray(settings.subjects) ? settings.subjects : [];
-    if (subjects.length === 0) {
-      subjects = DEFAULT_SUBJECTS;
-      await prisma.tenant.update({
-        where: { id: tenantId },
-        data: {
-          settings: {
-            ...settings,
-            subjects: DEFAULT_SUBJECTS,
-          },
-        },
-      });
-    }
+    const subjects = Array.isArray(settings.subjects) ? settings.subjects : [];
     res.status(200).json({ success: true, data: subjects });
   } catch (error: any) {
     console.error('Error in getSubjects:', error);
@@ -1150,9 +934,7 @@ export const createSubject = async (
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
-    const existingSubjects: any[] = Array.isArray(settings.subjects) && settings.subjects.length > 0
-      ? settings.subjects
-      : [...DEFAULT_SUBJECTS];
+    const existingSubjects: any[] = Array.isArray(settings.subjects) ? settings.subjects : [];
 
     const newSub = {
       id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -1202,9 +984,7 @@ export const updateSubject = async (
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
-    const existingSubjects: any[] = Array.isArray(settings.subjects) && settings.subjects.length > 0
-      ? settings.subjects
-      : [...DEFAULT_SUBJECTS];
+    const existingSubjects: any[] = Array.isArray(settings.subjects) ? settings.subjects : [];
 
     const index = existingSubjects.findIndex((s) => s.id === subjectId);
     if (index === -1) {
@@ -1257,9 +1037,7 @@ export const deleteSubject = async (
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
-    const existingSubjects: any[] = Array.isArray(settings.subjects) && settings.subjects.length > 0
-      ? settings.subjects
-      : [...DEFAULT_SUBJECTS];
+    const existingSubjects: any[] = Array.isArray(settings.subjects) ? settings.subjects : [];
 
     const filtered = existingSubjects.filter((s) => s.id !== subjectId);
 

@@ -43,17 +43,7 @@ import { Tenant, TenantFeature, TenantType } from '@/types/tenant';
 import { INITIAL_TENANTS, TENANT_PRESETS } from '@/data/tenantMockData';
 import {
   mockUsers,
-  initialSchools,
   initialGrades,
-  initialClasses,
-  initialSubjects,
-  initialCourses,
-  initialAssignments,
-  initialSubmissions,
-  initialQuizzes,
-  initialEvents,
-  initialAnnouncements,
-  initialLibraryResources
 } from '@/data/mockData';
 import { getTranslation } from '@/lib/i18n';
 import { api } from '@/lib/api';
@@ -381,15 +371,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isLanding, setIsLanding] = useState<boolean>(true);
   const [landingPortal, setLandingPortal] = useState<'gateway' | 'student' | 'parent' | 'staff'>('gateway');
 
-  const [schools, setSchools] = useState<School[]>(initialSchools);
+  const [schools, setSchools] = useState<School[]>([]);
   const [grades, setGrades] = useState<GradeLevel[]>(initialGrades);
-  const [classes, setClasses] = useState<SchoolClass[]>(initialClasses);
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>(initialSubjects);
-  const [courses, setCourses] = useState<Course[]>(initialCourses);
-  const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
-  const [submissions, setSubmissions] = useState<StudentSubmission[]>(initialSubmissions);
-  const [quizzes, setQuizzes] = useState<Quiz[]>(initialQuizzes);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [submissions, setSubmissions] = useState<StudentSubmission[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [sports, setSports] = useState<Sport[]>([]);
   const [championshipSports, setChampionshipSports] = useState<ChampionshipSportItem[]>([]);
   const [sportsEvents, setSportsEvents] = useState<SportsEvent[]>([]);
@@ -398,15 +388,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<SportsStandingRecord[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [events, setEvents] = useState<SchoolEvent[]>(initialEvents);
-  const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements);
-  const [libraryResources, setLibraryResources] = useState<LibraryResource[]>(initialLibraryResources);
-  const [savedResourceIds, setSavedResourceIds] = useState<string[]>(['lib_bk_01', 'lib_tut_01']);
+  const [events, setEvents] = useState<SchoolEvent[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [libraryResources, setLibraryResources] = useState<LibraryResource[]>([]);
+  const [savedResourceIds, setSavedResourceIds] = useState<string[]>([]);
 
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>('crs_math_12');
-  const [selectedLessonId, setSelectedLessonId] = useState<string | null>('les_m1_1_1');
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>('asg_01');
-  const [selectedQuizId, setSelectedQuizId] = useState<string | null>('qz_01');
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
 
   // Multi-Tenant SaaS State
   const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
@@ -556,7 +546,7 @@ const addTenant = (tenant: Tenant) => {
   const fetchAssignments = async () => {
     try {
       const res = await api.assignments.getAll();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         const loaded: Assignment[] = res.data.map((a: any) => ({
           id: a.id,
           courseId: a.courseId || a.course?.id || '',
@@ -573,10 +563,7 @@ const addTenant = (tenant: Tenant) => {
           submissionsCount: a.submissionsCount || a._count?.submissions || 0,
           pendingReviewCount: a.pendingReviewCount || 0,
         }));
-        setAssignments((prev) => {
-          const loadedIds = new Set(loaded.map((item) => item.id));
-          return [...loaded, ...prev.filter((p) => !loadedIds.has(p.id))];
-        });
+        setAssignments(loaded);
       }
     } catch (err) {
       console.warn('Backend assignments API not reachable yet:', err);
@@ -586,7 +573,7 @@ const addTenant = (tenant: Tenant) => {
   const fetchSubmissions = async () => {
     try {
       const res = await api.assignments.getTeacherSubmissions();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         const loadedSubs: StudentSubmission[] = res.data.map((s: any) => ({
           id: s.id,
           assignmentId: s.assignmentId,
@@ -608,10 +595,7 @@ const addTenant = (tenant: Tenant) => {
             ? new Date(s.markedAt).toISOString().replace('T', ' ').substring(0, 16)
             : undefined,
         }));
-        setSubmissions((prev) => {
-          const loadedIds = new Set(loadedSubs.map((item) => item.id));
-          return [...loadedSubs, ...prev.filter((p) => !loadedIds.has(p.id))];
-        });
+        setSubmissions(loadedSubs);
       }
     } catch (err) {
       console.warn('Backend teacher submissions API not reachable yet:', err);
@@ -621,7 +605,7 @@ const addTenant = (tenant: Tenant) => {
   const fetchAnnouncements = async () => {
     try {
       const res = await api.announcements.getAll({ role: currentRole.toUpperCase() });
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         setAnnouncements(res.data);
       }
     } catch (err) {
@@ -674,13 +658,9 @@ const addTenant = (tenant: Tenant) => {
   const fetchCourses = async () => {
     try {
       const res = await api.courses.getAll();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         const backendCourses = res.data.map(mapBackendCourseToFrontend);
-        setCourses((prev) => {
-          const backendIds = new Set(backendCourses.map((b: Course) => b.id));
-          const nonDuplicatePrev = prev.filter((p) => !backendIds.has(p.id));
-          return [...backendCourses, ...nonDuplicatePrev];
-        });
+        setCourses(backendCourses);
       }
     } catch (err) {
       console.warn('Backend courses API not reachable yet:', err);
@@ -690,11 +670,8 @@ const addTenant = (tenant: Tenant) => {
   const fetchLibraryResources = async () => {
     try {
       const res = await api.resources.getAll();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-        setLibraryResources((prev) => {
-          const loadedIds = new Set(res.data.map((r: any) => r.id));
-          return [...res.data, ...prev.filter((p) => !loadedIds.has(p.id))];
-        });
+      if (res.success && Array.isArray(res.data)) {
+        setLibraryResources(res.data);
       }
     } catch (err) {
       console.warn('Backend library resources API not reachable yet:', err);
@@ -704,11 +681,8 @@ const addTenant = (tenant: Tenant) => {
   const fetchQuizzes = async () => {
     try {
       const res = await api.quizzes.getAll();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-        setQuizzes((prev) => {
-          const loadedIds = new Set(res.data.map((q: any) => q.id));
-          return [...res.data, ...prev.filter((p) => !loadedIds.has(p.id))];
-        });
+      if (res.success && Array.isArray(res.data)) {
+        setQuizzes(res.data);
       }
     } catch (err) {
       console.warn('Backend quizzes API not reachable yet:', err);
@@ -739,22 +713,22 @@ const addTenant = (tenant: Tenant) => {
   const fetchClasses = async () => {
     try {
       const data = await api.admin.getClasses();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setClasses(data);
       }
     } catch (err) {
-      console.warn('Could not load classes from backend, using defaults:', err);
+      console.warn('Could not load classes from backend:', err);
     }
   };
 
   const fetchSubjects = async () => {
     try {
       const data = await api.admin.getSubjects();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setSubjects(data);
       }
     } catch (err) {
-      console.warn('Could not load subjects from backend, using defaults:', err);
+      console.warn('Could not load subjects from backend:', err);
     }
   };
 
