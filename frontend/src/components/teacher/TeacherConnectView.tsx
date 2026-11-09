@@ -124,11 +124,11 @@ const PREDEFINED_SUBJECT_GROUPS = [
   {
     group: "Primary & Scholarship (Grades 1 – 5)",
     subjects: [
-      "Grade 5 Scholarship (புலமைப்பரிசில்)",
+      "Grade 5 Scholarship",
       "Primary Mathematics",
       "Primary English",
       "Primary Tamil / Sinhala",
-      "Environmental Studies (சுற்றாடல்)"
+      "Environmental Studies"
     ]
   },
   {
@@ -202,7 +202,7 @@ export function TeacherConnectView() {
     return <Card className="p-10 text-center"><p className="text-lg font-black text-[#0d2b26]">Tutor Connect Hub is currently disabled</p><p className="mt-2 text-sm text-slate-500">Please contact platform administration.</p></Card>;
   }
 
-  // Active tab inside Teacher Connect Hub - Default to Packages (கட்டணப் பேக்கேஜ்கள்)
+  // Active tab inside Teacher Connect Hub - Default to Packages
   const [activeTab, setActiveTab] = useState<TeacherConnectTab>("packages");
 
   const mapBackendPackageToFrontend = (pkg: any): TutorPackage => ({
@@ -704,7 +704,7 @@ export function TeacherConnectView() {
           }`}
         >
           <Package className="h-4 w-4" />
-          <span>Fee Packages (கட்டணப் பேக்கேஜ்கள்)</span>
+          <span>Fee Packages</span>
           <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
             activeTab === "packages" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
           }`}>
@@ -748,7 +748,7 @@ export function TeacherConnectView() {
       </div>
 
       {/* =================================================================== */}
-      {/* TAB 0: TUITION FEE PACKAGES CRUD (கட்டணப் பேக்கேஜ்கள் மேலாண்மை)     */}
+      {/* TAB 0: TUITION FEE PACKAGES CRUD                                     */}
       {/* =================================================================== */}
       {activeTab === "packages" && (
         <div className="space-y-5 animate-in fade-in duration-200">

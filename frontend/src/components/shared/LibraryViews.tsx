@@ -3190,7 +3190,7 @@ function TeacherUploadModal({
                   <Globe className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="font-extrabold text-xs">🌐 Public (அனைவருக்கும் பொதுவானது)</p>
+                  <p className="font-extrabold text-xs">🌐 Public</p>
                   <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
                     Available to all students, tutors, and visitors across the academy. Free educational access.
                   </p>
@@ -3211,7 +3211,7 @@ function TeacherUploadModal({
                   <Lock className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="font-extrabold text-xs">🔒 Subscribers Only (சந்தாதாரர்கள் மட்டும்)</p>
+                  <p className="font-extrabold text-xs">🔒 Subscribers Only</p>
                   <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
                     Accessible ONLY to you and students subscribed to your tuition package. Locked for other students.
                   </p>

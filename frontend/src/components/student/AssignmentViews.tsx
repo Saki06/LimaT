@@ -321,16 +321,16 @@ export function AssignmentViews() {
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1 text-xs font-semibold text-emerald-200 backdrop-blur-md border border-white/15">
               <FileText className="h-3.5 w-3.5 text-emerald-300" />
-              <span>Coursework & Assessments · பாடப்பணி ஒப்படைப்பு</span>
+              <span>Coursework &amp; Assessments</span>
               <span className="h-1 w-1 rounded-full bg-emerald-400" />
               <span className="text-emerald-300 font-bold">2026/2027 Term 3</span>
             </div>
 
             <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl text-white">
-              Assignment Submissions & Feedback
+              Assignment Submissions &amp; Feedback
             </h1>
             <p className="mt-1 text-sm text-emerald-100/90 leading-relaxed">
-              பாடசாலை மற்றும் பிரத்தியேக விரிவுரையாளர்களின் ஒப்படைப்புகளைப் பார்வையிட்டு, விடைகளைப் பதிவேற்றி, ஆசிரியர் வழங்கிய மதிப்பெண்கள் மற்றும் விரிவான கருத்துரைகளை அறியுங்கள்.
+              View all course assignments, submit your responses, and review teacher grading and personalized feedback.
             </p>
 
             {/* Metrics Bar */}
@@ -629,7 +629,7 @@ export function AssignmentViews() {
                               <div>
                                 <span className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-emerald-800">
                                   <Award className="h-4 w-4 text-emerald-600" />
-                                  Certified Assessment Score (மதிப்பெண்)
+                                  Certified Assessment Score
                                 </span>
                                 <p className="text-xs text-slate-500 mt-0.5">
                                   Evaluated and confirmed on {currentSubmission.markedAt ? new Date(currentSubmission.markedAt).toLocaleDateString("en-GB", { month: "short", day: "numeric", year: "numeric" }) : "Today"}
@@ -655,7 +655,7 @@ export function AssignmentViews() {
                               <div className="rounded-xl bg-white p-4 border border-emerald-200/80 shadow-2xs space-y-2">
                                 <div className="flex items-center gap-2 text-xs font-bold text-[#0d5c4d]">
                                   <MessageSquare className="h-4 w-4 text-emerald-600" />
-                                  <span>Instructor's Feedback (ஆசிரியர் கருத்துரை):</span>
+                                  <span>Instructor's Feedback:</span>
                                 </div>
                                 <blockquote className="text-xs text-slate-700 italic leading-relaxed pl-3 border-l-2 border-emerald-500">
                                   "{currentSubmission.teacherFeedback}"
