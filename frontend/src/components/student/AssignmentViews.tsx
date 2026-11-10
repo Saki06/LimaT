@@ -400,44 +400,40 @@ export function AssignmentViews() {
               <button
                 type="button"
                 onClick={() => setActiveFilter("all")}
-                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
-                  activeFilter === "all"
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${activeFilter === "all"
                     ? "bg-[#0d5c4d] text-white shadow-xs"
                     : "bg-[#f4f7f5] text-slate-600 hover:bg-[#e6ece8]"
-                }`}
+                  }`}
               >
                 All ({totalCount})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveFilter("pending")}
-                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
-                  activeFilter === "pending"
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${activeFilter === "pending"
                     ? "bg-amber-500 text-slate-950 shadow-xs font-extrabold"
                     : "bg-[#f4f7f5] text-slate-600 hover:bg-[#e6ece8]"
-                }`}
+                  }`}
               >
                 Pending ({pendingCount})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveFilter("submitted")}
-                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
-                  activeFilter === "submitted"
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${activeFilter === "submitted"
                     ? "bg-sky-600 text-white shadow-xs"
                     : "bg-[#f4f7f5] text-slate-600 hover:bg-[#e6ece8]"
-                }`}
+                  }`}
               >
                 Review ({submittedCount})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveFilter("graded")}
-                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
-                  activeFilter === "graded"
+                className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${activeFilter === "graded"
                     ? "bg-[#0d5c4d] text-white shadow-xs"
                     : "bg-[#f4f7f5] text-slate-600 hover:bg-[#e6ece8]"
-                }`}
+                  }`}
               >
                 Graded ({gradedCount})
               </button>
@@ -503,11 +499,10 @@ export function AssignmentViews() {
                   <div
                     key={asg.id}
                     onClick={() => setSelectedAssignmentId(asg.id)}
-                    className={`group relative rounded-2xl border p-4 transition-all cursor-pointer ${
-                      isSelected
+                    className={`group relative rounded-2xl border p-4 transition-all cursor-pointer ${isSelected
                         ? "bg-white border-[#0d5c4d] shadow-md ring-2 ring-[#0d5c4d]/10"
                         : "bg-white border-[#e6ece8] hover:border-[#c4e9e0] hover:shadow-sm"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-black uppercase tracking-wider text-[#0d5c4d]">

@@ -114,6 +114,22 @@ function parseDurationMinutes(durStr?: string): number {
   return total > 0 ? total : 90;
 }
 
+function extractGradeFromCourse(course?: any, fallbackText?: string): string {
+  const text = course?.title || fallbackText || "";
+  const match = text.match(/Grade\s*\d+(\s*(&|and|-)\s*\d+)?/i);
+  if (match) return match[0];
+  if (text.toLowerCase().includes("a/l") || text.toLowerCase().includes("advanced level")) {
+    return "Grade 12 & 13 (A/L)";
+  }
+  if (text.toLowerCase().includes("o/l") || text.toLowerCase().includes("ordinary level")) {
+    return "Grade 10 & 11 (O/L)";
+  }
+  if (course?.gradeName && course.gradeName !== "Active Batch") {
+    return course.gradeName;
+  }
+  return "Grade 8";
+}
+
 const INITIAL_SLOTS: LiveSlot[] = [];
 
 const DAYS = [
@@ -131,7 +147,33 @@ export function LiveScheduleView() {
   const { currentUser, currentRole, addToast, courses: contextCourses } = useApp();
   const isTeacher = currentRole === "teacher" || currentRole === "admin" || currentRole === "super_admin";
 
+  // Filter courses strictly for this teacher's account
+  const teacherCourses = useMemo(() => {
+    const isGlobalAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
+    if (isGlobalAdmin) return contextCourses || [];
+    return (contextCourses || []).filter(
+      (c) =>
+        (c.teacherId && currentUser?.id && c.teacherId === currentUser.id) ||
+        (c.teacherName && currentUser?.name && c.teacherName.toLowerCase() === currentUser.name.toLowerCase())
+    );
+  }, [contextCourses, currentUser]);
+
+  // Helper to dynamically resolve grade for a live slot
+  const getSlotGrade = (slot: LiveSlot) => {
+    if (slot.grade && slot.grade !== "Grade 12 & 13") {
+      return slot.grade;
+    }
+    const matched = teacherCourses.find((c) => c.id === slot.courseId || c.title === slot.subject) ||
+                    contextCourses?.find((c) => c.id === slot.courseId || c.title === slot.subject);
+    return extractGradeFromCourse(matched, slot.subject || slot.title);
+  };
+
   const [slots, setSlots] = useState<LiveSlot[]>(INITIAL_SLOTS);
+
+  // Derive the next scheduled live class dynamically
+  const nextScheduledSlot = useMemo(() => {
+    return slots.find((s) => s.status === "scheduled" || s.status === "live_now") || slots[0] || null;
+  }, [slots]);
   const [selectedDay, setSelectedDay] = useState<string>("All Days");
   const [selectedTab, setSelectedTab] = useState<"all" | "live" | "upcoming" | "recordings">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -148,8 +190,8 @@ export function LiveScheduleView() {
   // Form State
   const [formData, setFormData] = useState<Omit<LiveSlot, "id">>({
     title: "",
-    subject: "Combined Mathematics",
-    grade: "Grade 12 & 13",
+    subject: teacherCourses[0]?.title || "",
+    grade: extractGradeFromCourse(teacherCourses[0]),
     day: "Tuesday",
     startTime: "07:00 PM",
     endTime: "09:00 PM",
@@ -158,7 +200,7 @@ export function LiveScheduleView() {
     meetingId: "",
     passcode: "",
     type: "Live Masterclass + Q&A",
-    enrolledCount: 142,
+    enrolledCount: 0,
     status: "scheduled",
     recordingUrl: "",
     courseId: "",
@@ -300,7 +342,16 @@ export function LiveScheduleView() {
       try {
         const res = await api.packages.getAll();
         if (res.success && Array.isArray(res.data)) {
-          setAvailablePackages(res.data);
+          const isGlobalAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
+          const pkgs = isGlobalAdmin
+            ? res.data
+            : res.data.filter(
+                (p: any) =>
+                  (p.teacherId && currentUser?.id && p.teacherId === currentUser.id) ||
+                  (p.teacher?.userId && currentUser?.id && p.teacher.userId === currentUser.id) ||
+                  (p.teacherName && currentUser?.name && p.teacherName.toLowerCase() === currentUser.name.toLowerCase())
+              );
+          setAvailablePackages(pkgs.length > 0 ? pkgs : res.data);
         }
       } catch (e) {
         console.warn("Could not fetch packages:", e);
@@ -317,8 +368,8 @@ export function LiveScheduleView() {
     const randomSlug = `limat-live-${Math.random().toString(36).substring(2, 8)}`;
     setFormData({
       title: "",
-      subject: contextCourses?.[0]?.title || "Combined Mathematics",
-      grade: "Grade 12 & 13",
+      subject: teacherCourses[0]?.title || "",
+      grade: extractGradeFromCourse(teacherCourses[0]),
       day: selectedDay !== "All Days" ? (selectedDay as LiveSlot["day"]) : "Tuesday",
       startTime: "07:00 PM",
       endTime: "09:00 PM",
@@ -327,10 +378,10 @@ export function LiveScheduleView() {
       meetingId: randomSlug,
       passcode: "MATH2026",
       type: "Live Masterclass + Q&A",
-      enrolledCount: 142,
+      enrolledCount: 0,
       status: "scheduled",
       recordingUrl: "",
-      courseId: contextCourses?.[0]?.id || "",
+      courseId: teacherCourses[0]?.id || "",
       packageId: availablePackages?.[0]?.id || "",
       handoutUrl: "https://example.com/handouts/calculus_mastery.pdf",
       handoutName: "Topic Revision Handout.pdf",
@@ -724,10 +775,10 @@ export function LiveScheduleView() {
               {isTeacher && (
                 <Button
                   onClick={handleOpenAdd}
-                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-sm shadow-md px-5 py-5 rounded-2xl flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] h-12"
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-sm shadow-md px-5 py-2.5 rounded-2xl inline-flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] h-11"
                 >
-                  <Plus className="h-5 w-5" />
-                  <span>+ Schedule Live Class</span>
+                  <Plus className="h-4 w-4" />
+                  <span>Schedule Live Class</span>
                 </Button>
               )}
             </div>
@@ -767,12 +818,25 @@ export function LiveScheduleView() {
 
         <Card className="border-[#e6ece8] bg-white shadow-2xs">
           <CardContent className="p-5 flex items-center justify-between">
-            <div>
+            <div className="min-w-0 flex-1 pr-2">
               <p className="text-xs text-slate-500 font-semibold">Next Scheduled</p>
-              <p className="text-lg font-black text-slate-900 mt-1">Tuesday &bull; 7:00 PM</p>
-              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">Calculus &amp; Limits</p>
+              {nextScheduledSlot ? (
+                <>
+                  <p className="text-base sm:text-lg font-black text-slate-900 mt-1 truncate">
+                    {nextScheduledSlot.day} &bull; {nextScheduledSlot.startTime}
+                  </p>
+                  <p className="text-[10px] text-emerald-600 font-bold mt-0.5 truncate">
+                    {nextScheduledSlot.title || nextScheduledSlot.subject || "Live Session"}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-black text-slate-400 mt-1">None</p>
+                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">No upcoming sessions</p>
+                </>
+              )}
             </div>
-            <div className="h-11 w-11 rounded-xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center">
+            <div className="h-11 w-11 rounded-xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center shrink-0">
               <Clock className="h-5 w-5" />
             </div>
           </CardContent>
@@ -883,7 +947,7 @@ export function LiveScheduleView() {
           <h3 className="font-bold text-slate-800 text-base">No live classes match your filter</h3>
           <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
             {isTeacher
-              ? "Click '+ Schedule Live Class' to set up your interactive teaching session."
+              ? "Click 'Schedule Live Class' to set up your interactive teaching session."
               : "Check back later for newly scheduled live lectures."}
           </p>
         </Card>
@@ -960,7 +1024,7 @@ export function LiveScheduleView() {
                   <div className="p-4 space-y-2.5">
                     <div className="flex items-center gap-2">
                       <Badge className="bg-[#ecf8f5] text-[#0d5c4d] border-[#c4e9e0] text-[10px] font-bold">
-                        {slot.grade}
+                        {getSlotGrade(slot)}
                       </Badge>
                       <span className="text-[11px] text-slate-500 font-medium">{slot.type}</span>
                     </div>
@@ -1108,7 +1172,7 @@ export function LiveScheduleView() {
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Subject &amp; Grade</p>
                         <p className="font-bold text-slate-800 mt-0.5">{slot.subject}</p>
-                        <p className="text-[11px] text-slate-500">{slot.grade}</p>
+                        <p className="text-[11px] text-slate-500">{getSlotGrade(slot)}</p>
                       </div>
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Class Type</p>
@@ -1381,7 +1445,11 @@ export function LiveScheduleView() {
             <input
               type="text"
               required
-              placeholder="e.g. Pure Mathematics: Integration by Parts & Area Under Curves"
+              placeholder={
+                teacherCourses[0]?.title
+                  ? `e.g. ${teacherCourses[0].title} - Interactive Masterclass`
+                  : "e.g. Topic Revision & Interactive Masterclass"
+              }
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
@@ -1389,36 +1457,43 @@ export function LiveScheduleView() {
           </div>
 
           {/* Subject & Grade */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Course / Subject</label>
               <select
                 value={formData.subject}
                 onChange={(e) => {
-                  const selectedCourse = contextCourses?.find((c) => c.title === e.target.value);
+                  const selectedCourse = teacherCourses.find((c) => c.title === e.target.value);
                   setFormData({
                     ...formData,
                     subject: e.target.value,
-                    courseId: selectedCourse?.id || formData.courseId
+                    courseId: selectedCourse?.id || formData.courseId,
+                    grade: extractGradeFromCourse(selectedCourse, e.target.value)
                   });
                 }}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#0d5c4d]"
               >
-                {contextCourses && contextCourses.length > 0 ? (
-                  contextCourses.map((c) => (
+                {teacherCourses.length > 0 ? (
+                  teacherCourses.map((c) => (
                     <option key={c.id} value={c.title}>
                       {c.title} ({c.code})
                     </option>
                   ))
                 ) : (
-                  <>
-                    <option value="Combined Mathematics">Combined Mathematics</option>
-                    <option value="Physics">Physics</option>
-                    <option value="Chemistry">Chemistry</option>
-                    <option value="Information Technology">Information Technology</option>
-                  </>
+                  <option value="" disabled>No subjects/courses assigned to your account</option>
                 )}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Target Grade</label>
+              <input
+                type="text"
+                placeholder="e.g. Grade 8"
+                value={formData.grade}
+                onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#0d5c4d]"
+              />
             </div>
 
             <div>
@@ -1575,7 +1650,7 @@ export function LiveScheduleView() {
               </label>
               <input
                 type="text"
-                placeholder="e.g. Limits & Calculus Problem Set #04.pdf"
+                placeholder="e.g. Lesson Handout & Model Problem Set.pdf"
                 value={formData.handoutName || ""}
                 onChange={(e) => setFormData({ ...formData, handoutName: e.target.value })}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
@@ -1771,7 +1846,7 @@ export function LiveScheduleView() {
                     </Badge>
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    {viewingReplaySlot.subject} &bull; {viewingReplaySlot.grade} &bull; Duration: {viewingReplaySlot.duration || "2h 00m"}
+                    {viewingReplaySlot.subject} &bull; {getSlotGrade(viewingReplaySlot)} &bull; Duration: {viewingReplaySlot.duration || "2h 00m"}
                   </p>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   UserRole,
   LocaleCode,
@@ -441,19 +441,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
 
-const addTenant = (tenant: Tenant) => {
-  setTenants((prev) => {
-    const existingTenant = prev.find((t) => t.id === tenant.id);
+  const addTenant = (tenant: Tenant) => {
+    setTenants((prev) => {
+      const existingTenant = prev.find((t) => t.id === tenant.id);
 
-    if (existingTenant) {
-      return prev.map((t) =>
-        t.id === tenant.id ? tenant : t
-      );
-    }
+      if (existingTenant) {
+        return prev.map((t) =>
+          t.id === tenant.id ? tenant : t
+        );
+      }
 
-    return [tenant, ...prev];
-  });
-};
+      return [tenant, ...prev];
+    });
+  };
 
 
   const updateTenant = (updated: Tenant) => {
@@ -469,16 +469,16 @@ const addTenant = (tenant: Tenant) => {
   };
 
   const isFeatureEnabled = (feature: string): boolean => {
-  if (authUser?.role === 'SUPER_ADMIN' && !activeTenant) {
-    return false;
-  }
+    if (authUser?.role === 'SUPER_ADMIN' && !activeTenant) {
+      return false;
+    }
 
-  if (!activeTenant || !activeTenant.enabledFeatures) {
-    return true;
-  }
+    if (!activeTenant || !activeTenant.enabledFeatures) {
+      return true;
+    }
 
-  return activeTenant.enabledFeatures[feature] ?? true;
-};
+    return activeTenant.enabledFeatures[feature] ?? true;
+  };
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [authToken, setAuthToken] = useState<string | null>(null);
@@ -539,12 +539,14 @@ const addTenant = (tenant: Tenant) => {
 
       if (urlPortal && validRoles.includes(urlPortal as UserRole)) {
         resolvedRole = urlPortal as UserRole;
-        resolvedView = urlView || 'dashboard';
+        resolvedView = urlView || savedView || 'dashboard';
         resolvedIsLanding = false;
       } else if (savedIsLanding === 'false' && savedRole && validRoles.includes(savedRole)) {
         resolvedRole = savedRole;
-        resolvedView = savedView || 'dashboard';
+        resolvedView = urlView || savedView || 'dashboard';
         resolvedIsLanding = false;
+      } else if (urlView || savedView) {
+        resolvedView = urlView || savedView;
       }
     }
 
@@ -562,6 +564,10 @@ const addTenant = (tenant: Tenant) => {
       };
       if (!resolvedRole && user.role && roleMap[user.role]) {
         resolvedRole = roleMap[user.role];
+      }
+      if (!resolvedView) {
+        const savedView = typeof window !== 'undefined' ? localStorage.getItem('lms_current_view') : null;
+        resolvedView = savedView || 'dashboard';
       }
       resolvedIsLanding = false;
     }
@@ -689,23 +695,23 @@ const addTenant = (tenant: Tenant) => {
     const units: SyllabusUnit[] = Array.isArray(c.syllabus?.units)
       ? c.syllabus.units
       : [
-          {
-            id: `unt_${c.id}_default`,
-            subjectId: c.id,
-            title: 'Unit 1: Course Introduction & Overview',
-            order: 1,
-            topics: [
-              {
-                id: `top_${c.id}_default`,
-                unitId: `unt_${c.id}_default`,
-                title: 'Topic 1: Foundations',
-                description: c.description || 'Welcome to the course.',
-                order: 1,
-                lessons: []
-              }
-            ]
-          }
-        ];
+        {
+          id: `unt_${c.id}_default`,
+          subjectId: c.id,
+          title: 'Unit 1: Course Introduction & Overview',
+          order: 1,
+          topics: [
+            {
+              id: `top_${c.id}_default`,
+              unitId: `unt_${c.id}_default`,
+              title: 'Topic 1: Foundations',
+              description: c.description || 'Welcome to the course.',
+              order: 1,
+              lessons: []
+            }
+          ]
+        }
+      ];
 
     return {
       id: c.id,
@@ -1010,18 +1016,30 @@ const addTenant = (tenant: Tenant) => {
     });
   };
 
+  // Teacher Studio Profile & Payout State
+  const [teacherProfile, setTeacherProfile] = useState<TeacherProfileData | null>(null);
+
   const t = getTranslation(locale);
   const baseUser = mockUsers[currentRole];
+  const userAvatar =
+    (currentRole === 'teacher' ? (teacherProfile?.user?.avatarUrl || teacherProfile?.avatarUrl) : null) ||
+    authUser?.avatarUrl ||
+    (typeof window !== 'undefined' ? (localStorage.getItem(`lms_avatar_${authUser?.id || 'teacher'}`) || localStorage.getItem('lms_avatar_teacher')) : null) ||
+    baseUser.avatar;
+
   const currentUser: User = authUser
     ? {
-        ...baseUser,
-        id: authUser.id,
-        name: `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() || authUser.name || authUser.email || 'User',
-        email: authUser.email,
-        role: currentRole,
-        avatar: authUser.avatarUrl || baseUser.avatar
-      }
-    : baseUser;
+      ...baseUser,
+      id: authUser.id,
+      name: `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() || authUser.name || authUser.email || 'User',
+      email: authUser.email,
+      role: currentRole,
+      avatar: userAvatar
+    }
+    : {
+      ...baseUser,
+      avatar: userAvatar
+    };
 
   const addToast = useCallback((toast: Omit<ToastMessage, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -1043,50 +1061,50 @@ const addTenant = (tenant: Tenant) => {
       ]);
 
       setSportsEvents(fetchedEvents);
-    setChampionshipSports(disciplines.map((discipline) => ({
-      id: discipline.id,
-      name: discipline.name,
-      category: discipline.category,
-      iconName: discipline.iconName,
-      description: discipline.description,
-      ageGroups: Array.from(new Set(discipline.events
-        .map((event) => event.ageCategory)
-        .filter((age): age is NonNullable<typeof age> => Boolean(age)))) as ChampionshipSportItem['ageGroups'],
-      gender: 'all',
-      isTeamSport: discipline.isTeamSport,
-      registrationStatus: 'Open',
-      events: discipline.events.map((event) => ({
-        id: event.id,
-        name: event.title,
-        ageCategory: (event.ageCategory || 'Open') as ChampionshipSportItem['events'][number]['ageCategory'],
-        gender: (event.gender || 'All') as ChampionshipSportItem['events'][number]['gender'],
-        fee: event.fee,
-        maxParticipants: event.maxParticipants ?? 0,
-      })),
-    })));
-
-    const sportsByType = new Map<string, Sport>();
-    disciplines.forEach((discipline) => {
-      sportsByType.set(discipline.name.toLowerCase(), {
+      setChampionshipSports(disciplines.map((discipline) => ({
         id: discipline.id,
         name: discipline.name,
         category: discipline.category,
         iconName: discipline.iconName,
-        activeTeamsCount: 0,
+        description: discipline.description,
+        ageGroups: Array.from(new Set(discipline.events
+          .map((event) => event.ageCategory)
+          .filter((age): age is NonNullable<typeof age> => Boolean(age)))) as ChampionshipSportItem['ageGroups'],
+        gender: 'all',
+        isTeamSport: discipline.isTeamSport,
+        registrationStatus: 'Open',
+        events: discipline.events.map((event) => ({
+          id: event.id,
+          name: event.title,
+          ageCategory: (event.ageCategory || 'Open') as ChampionshipSportItem['events'][number]['ageCategory'],
+          gender: (event.gender || 'All') as ChampionshipSportItem['events'][number]['gender'],
+          fee: event.fee,
+          maxParticipants: event.maxParticipants ?? 0,
+        })),
+      })));
+
+      const sportsByType = new Map<string, Sport>();
+      disciplines.forEach((discipline) => {
+        sportsByType.set(discipline.name.toLowerCase(), {
+          id: discipline.id,
+          name: discipline.name,
+          category: discipline.category,
+          iconName: discipline.iconName,
+          activeTeamsCount: 0,
+        });
       });
-    });
-    fetchedEvents.forEach((event) => {
-      const name = event.sportType.trim();
-      if (!name || sportsByType.has(name.toLowerCase())) return;
-      sportsByType.set(name.toLowerCase(), {
-        id: `sport_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
-        name,
-        category: 'Sport',
-        iconName: 'Trophy',
-        activeTeamsCount: 0,
+      fetchedEvents.forEach((event) => {
+        const name = event.sportType.trim();
+        if (!name || sportsByType.has(name.toLowerCase())) return;
+        sportsByType.set(name.toLowerCase(), {
+          id: `sport_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+          name,
+          category: 'Sport',
+          iconName: 'Trophy',
+          activeTeamsCount: 0,
+        });
       });
-    });
-    setSports(Array.from(sportsByType.values()));
+      setSports(Array.from(sportsByType.values()));
     } catch (err) {
       console.warn('Failed to load sports events:', err);
     }
@@ -1117,51 +1135,53 @@ const addTenant = (tenant: Tenant) => {
       ]);
 
       setTeams(records.map((team: SportsTeamRecord) => ({
-      id: team.id,
-      sportId: team.sportName,
-      sportName: team.sportName,
-      name: team.name,
-      coachId: '',
-      coachName: team.coachName,
-      playersCount: team.playersCount,
-      status: team.status,
-      trainingSchedule: team.trainingSchedule,
-      players: team.players,
-    })));
-    setTournaments(tournamentsData.map((tournament: SportsTournamentRecord) => ({
-      ...tournament,
-      sportId: tournament.sportName,
-      format: tournament.format as Tournament['format'],
-      startDate: tournament.startDate.substring(0, 10),
-      endDate: tournament.endDate.substring(0, 10),
-      status: tournament.status as Tournament['status'],
-      rules: tournament.rules || undefined,
-      currentRound: tournament.currentRound || undefined,
-      champion: tournament.champion || undefined,
-      runnerUp: tournament.runnerUp || undefined,
-    })));
-    setFixtures(fixturesData.map((fixture: SportsFixtureRecord) => ({
-      id: fixture.id,
-      teamId: '',
-      tournamentId: fixture.tournamentId,
-      sportName: fixture.sportName,
-      homeTeam: fixture.homeTeam,
-      awayTeam: fixture.awayTeam,
-      date: fixture.date.substring(0, 10),
-      time: fixture.time,
-      venue: fixture.venue,
-      competitionName: fixture.competitionName,
-      status: fixture.status === 'completed' ? 'completed' : fixture.status === 'in_progress' ? 'in_progress' : 'scheduled',
-      ...(fixture.homeScore && fixture.awayScore && fixture.outcome
-        ? { result: {
-            homeScore: fixture.homeScore,
-            awayScore: fixture.awayScore,
-            outcome: fixture.outcome,
-            recordedAt: fixture.recordedAt || '',
-          } }
-        : {}),
-    })));
-    setStandings(standingsData);
+        id: team.id,
+        sportId: team.sportName,
+        sportName: team.sportName,
+        name: team.name,
+        coachId: '',
+        coachName: team.coachName,
+        playersCount: team.playersCount,
+        status: team.status,
+        trainingSchedule: team.trainingSchedule,
+        players: team.players,
+      })));
+      setTournaments(tournamentsData.map((tournament: SportsTournamentRecord) => ({
+        ...tournament,
+        sportId: tournament.sportName,
+        format: tournament.format as Tournament['format'],
+        startDate: tournament.startDate.substring(0, 10),
+        endDate: tournament.endDate.substring(0, 10),
+        status: tournament.status as Tournament['status'],
+        rules: tournament.rules || undefined,
+        currentRound: tournament.currentRound || undefined,
+        champion: tournament.champion || undefined,
+        runnerUp: tournament.runnerUp || undefined,
+      })));
+      setFixtures(fixturesData.map((fixture: SportsFixtureRecord) => ({
+        id: fixture.id,
+        teamId: '',
+        tournamentId: fixture.tournamentId,
+        sportName: fixture.sportName,
+        homeTeam: fixture.homeTeam,
+        awayTeam: fixture.awayTeam,
+        date: fixture.date.substring(0, 10),
+        time: fixture.time,
+        venue: fixture.venue,
+        competitionName: fixture.competitionName,
+        status: fixture.status === 'completed' ? 'completed' : fixture.status === 'in_progress' ? 'in_progress' : 'scheduled',
+        ...(fixture.homeScore && fixture.awayScore && fixture.outcome
+          ? {
+            result: {
+              homeScore: fixture.homeScore,
+              awayScore: fixture.awayScore,
+              outcome: fixture.outcome,
+              recordedAt: fixture.recordedAt || '',
+            }
+          }
+          : {}),
+      })));
+      setStandings(standingsData);
     } catch (err) {
       console.warn('Failed to load sports operations:', err);
     }
@@ -1315,11 +1335,25 @@ const addTenant = (tenant: Tenant) => {
     };
   }, [authToken, fetchMySportsRegistrations, fetchSportsEvents, fetchSportsOperations]);
 
-  // Switch role reset default views
+  const prevRoleRef = useRef<UserRole | null>(null);
+
+  // Switch role reset default views (only when role is actively switched by the user after session load)
   useEffect(() => {
-    setCurrentView('dashboard');
+    if (!isSessionLoaded) return;
+
+    // First time session finishes loading: anchor to the resolved role without resetting view
+    if (prevRoleRef.current === null) {
+      prevRoleRef.current = currentRole;
+      return;
+    }
+
+    // Only if user subsequently changes their role to a different role
+    if (prevRoleRef.current !== currentRole) {
+      setCurrentView('dashboard');
+      prevRoleRef.current = currentRole;
+    }
     fetchAnnouncements();
-  }, [currentRole]);
+  }, [currentRole, isSessionLoaded]);
 
   // Mark lesson as complete
   const markLessonComplete = (lessonId: string) => {
@@ -2784,11 +2818,13 @@ const addTenant = (tenant: Tenant) => {
       coverImage: resource.coverImage || (isBook
         ? 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80'
         : isPastPaper
-        ? 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=600&auto=format&fit=crop&q=80'
-        : 'https://images.unsplash.com/photo-1588072432836-e10032774350?w=600&auto=format&fit=crop&q=80'),
+          ? 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=600&auto=format&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1588072432836-e10032774350?w=600&auto=format&fit=crop&q=80'),
       fileType: resource.fileType || 'PDF',
       fileSize: resource.fileSize || '4.2 MB',
       pageCount: resource.pageCount || (isBook ? 120 : 20),
+      fileUrl: resource.fileUrl,
+      fileName: resource.fileName,
       uploadedDate: resource.uploadedDate || new Date().toISOString().split('T')[0],
       status: resource.status || 'published',
       visibility: resource.visibility || 'public',
@@ -2890,8 +2926,8 @@ const addTenant = (tenant: Tenant) => {
           updates.visibility === 'subscribers_only' || updates.visibility === 'private'
             ? 'SUBSCRIBERS_ONLY'
             : updates.visibility === 'public'
-            ? 'PUBLIC'
-            : undefined
+              ? 'PUBLIC'
+              : undefined
       })
       .catch((err) => {
         console.warn('Backend update sync skipped:', err?.message);
@@ -2918,7 +2954,7 @@ const addTenant = (tenant: Tenant) => {
     setLibraryResources((prev) =>
       prev.map((r) => (r.id === id ? { ...r, viewsCount: r.viewsCount + 1 } : r))
     );
-    api.resources.recordView(id).catch(() => {});
+    api.resources.recordView(id).catch(() => { });
   };
 
   const recordResourceDownload = (id: string) => {
@@ -2940,11 +2976,8 @@ const addTenant = (tenant: Tenant) => {
       title: 'Download Initiated',
       message: `Downloading "${target.title}" (${target.fileSize} · ${target.fileType}).`
     });
-    api.resources.recordDownload(id).catch(() => {});
+    api.resources.recordDownload(id).catch(() => { });
   };
-
-  // Teacher Studio Profile & Payout State
-  const [teacherProfile, setTeacherProfile] = useState<TeacherProfileData | null>(null);
 
   const refreshTeacherProfile = useCallback(async () => {
     try {
@@ -2969,6 +3002,12 @@ const addTenant = (tenant: Tenant) => {
 
   const updateTeacherProfile = async (updates: Partial<TeacherProfileData>): Promise<boolean> => {
     try {
+      if (updates.avatarUrl) {
+        setAuthUser((prev: any) => ({
+          ...(prev || {}),
+          avatarUrl: updates.avatarUrl,
+        }));
+      }
       setTeacherProfile((prev) => (prev ? { ...prev, ...updates } : (updates as TeacherProfileData)));
       const res = await api.teachers.updateMyProfile(updates);
       if (res && res.success && res.data) {

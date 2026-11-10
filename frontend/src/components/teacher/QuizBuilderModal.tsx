@@ -7,7 +7,6 @@ import {
   Trash2,
   CheckCircle2,
   Clock,
-  Sparkles,
   BookOpen,
   AlertCircle,
   Layers,
@@ -33,7 +32,7 @@ const DEFAULT_NEW_QUESTION: QuizQuestion = {
   id: "q_new_1",
   questionText: "",
   type: "mcq",
-  options: ["", "", "", ""],
+  options: ["", "", "", "", ""],
   correctAnswer: 0,
   explanation: "",
   marks: 10
@@ -50,7 +49,7 @@ export function QuizBuilderModal({
 
   const [title, setTitle] = useState("");
   const [courseId, setCourseId] = useState("");
-  const [subjectName, setSubjectName] = useState("Combined Mathematics");
+  const [subjectName, setSubjectName] = useState(courses[0]?.title || "");
   const [instructions, setInstructions] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(15);
   const [dueDate, setDueDate] = useState("2026-11-15 23:59");
@@ -63,6 +62,8 @@ export function QuizBuilderModal({
 
   // Populate form if editing
   useEffect(() => {
+    if (!isOpen) return;
+
     if (quizToEdit) {
       setTitle(quizToEdit.title);
       setCourseId(quizToEdit.courseId);
@@ -117,9 +118,52 @@ export function QuizBuilderModal({
     setQuestions((prev) =>
       prev.map((q, idx) => {
         if (idx !== activeQuestionIdx) return q;
-        const newOptions = [...(q.options || ["", "", "", ""])];
+        const newOptions = [...(q.options || ["", "", "", "", ""])];
         newOptions[optionIdx] = val;
         return { ...q, options: newOptions };
+      })
+    );
+  };
+
+  // Add a new option to current question (up to 6 choices, supports 5 answers for A/L)
+  const handleAddOptionToCurrentQuestion = () => {
+    setQuestions((prev) =>
+      prev.map((q, idx) => {
+        if (idx !== activeQuestionIdx) return q;
+        const currentOpts = q.options || [];
+        if (currentOpts.length >= 6) return q;
+        const nextLetter = String.fromCharCode(65 + currentOpts.length);
+        const newOptions = [...currentOpts, `Option ${nextLetter}`];
+        return { ...q, options: newOptions };
+      })
+    );
+  };
+
+  // Remove an option from current question (minimum 2 choices)
+  const handleRemoveOptionFromCurrentQuestion = (optionIdxToRemove: number) => {
+    setQuestions((prev) =>
+      prev.map((q, idx) => {
+        if (idx !== activeQuestionIdx) return q;
+        const currentOpts = q.options || [];
+        if (currentOpts.length <= 2) return q;
+        const newOptions = currentOpts.filter((_, i) => i !== optionIdxToRemove);
+
+        let newCorrectAnswer = q.correctAnswer;
+        if (q.type === "mcq") {
+          const currentCorrect = Number(q.correctAnswer);
+          if (currentCorrect === optionIdxToRemove) {
+            newCorrectAnswer = 0;
+          } else if (currentCorrect > optionIdxToRemove) {
+            newCorrectAnswer = currentCorrect - 1;
+          }
+        } else if (q.type === "multi_select") {
+          const arr = Array.isArray(q.correctAnswer) ? q.correctAnswer.map(Number) : [];
+          newCorrectAnswer = arr
+            .filter((i) => i !== optionIdxToRemove)
+            .map((i) => (i > optionIdxToRemove ? i - 1 : i));
+        }
+
+        return { ...q, options: newOptions, correctAnswer: newCorrectAnswer };
       })
     );
   };
@@ -130,7 +174,7 @@ export function QuizBuilderModal({
       id: `q_${Date.now()}_${questions.length + 1}`,
       questionText: "",
       type: "mcq",
-      options: ["Option A", "Option B", "Option C", "Option D"],
+      options: ["Option A", "Option B", "Option C", "Option D", "Option E"],
       correctAnswer: 0,
       explanation: "",
       marks: 10
@@ -165,58 +209,6 @@ export function QuizBuilderModal({
     if (activeQuestionIdx >= newQuestions.length) {
       setActiveQuestionIdx(Math.max(0, newQuestions.length - 1));
     }
-  };
-
-  // Load Math Template with all 5 question types
-  const handleLoadMathTemplate = () => {
-    setTitle("Combined Mathematics & Science: Comprehensive Diagnostic");
-    setDurationMinutes(25);
-    setQuestions([
-      {
-        id: `q_${Date.now()}_1`,
-        questionText: "What is the derivative of f(x) = sin(2x) with respect to x?",
-        type: "mcq",
-        options: ["2 cos(2x)", "cos(2x)", "-2 cos(2x)", "2 sin(x) cos(x)"],
-        correctAnswer: 0,
-        explanation: "By chain rule: d/dx[sin(2x)] = cos(2x) * 2 = 2 cos(2x).",
-        marks: 10
-      },
-      {
-        id: `q_${Date.now()}_2`,
-        questionText: "Which of the following functions are strictly increasing for all positive real numbers x > 0? (Select all that apply)",
-        type: "multi_select",
-        options: ["f(x) = eˣ", "f(x) = x³", "f(x) = 1/x", "f(x) = ln(x)"],
-        correctAnswer: [0, 1, 3],
-        explanation: "eˣ, x³, and ln(x) have strictly positive first derivatives for x > 0. Meanwhile, d/dx[1/x] = -1/x² < 0 (decreasing).",
-        marks: 10
-      },
-      {
-        id: `q_${Date.now()}_3`,
-        questionText: "A square matrix A is invertible if and only if its determinant det(A) ≠ 0.",
-        type: "true_false",
-        options: ["True", "False"],
-        correctAnswer: 0,
-        explanation: "By the Invertible Matrix Theorem, a matrix has an inverse if and only if its determinant is non-zero.",
-        marks: 10
-      },
-      {
-        id: `q_${Date.now()}_4`,
-        questionText: "What geometric curve is defined as the locus of all points in a plane equidistant from a fixed focus and a directrix line?",
-        type: "short_answer",
-        correctAnswer: "parabola",
-        explanation: "By definition, a parabola has eccentricity e = 1, meaning distance to focus equals distance to directrix.",
-        marks: 10
-      },
-      {
-        id: `q_${Date.now()}_5`,
-        questionText: "Calculate the exact value of 5! (5 factorial).",
-        type: "numerical",
-        correctAnswer: "120",
-        explanation: "5! = 5 × 4 × 3 × 2 × 1 = 120.",
-        marks: 10
-      }
-    ]);
-    setActiveQuestionIdx(0);
   };
 
   // Form submit validation
@@ -309,34 +301,6 @@ export function QuizBuilderModal({
             <span>{errorMsg}</span>
           </div>
         )}
-
-        {/* Live Metrics Header Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#f8faf9] border border-[#e6ece8]">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="success" className="text-xs font-bold gap-1 px-3 py-1">
-              <HelpCircle className="h-3.5 w-3.5" />
-              {questions.length} {questions.length === 1 ? "Question" : "Questions"}
-            </Badge>
-            <Badge variant="outline" className="text-xs font-bold font-mono px-3 py-1 bg-white">
-              🏆 {totalCalculatedMarks} Total Marks
-            </Badge>
-            <Badge variant="warning" className="text-xs font-bold gap-1 px-3 py-1">
-              <Clock className="h-3.5 w-3.5" />
-              {durationMinutes} Minutes Limit
-            </Badge>
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleLoadMathTemplate}
-            className="text-xs font-bold border-[#c4e9e0] text-[#0d5c4d] hover:bg-[#ecf8f5] cursor-pointer"
-          >
-            <Sparkles className="h-3.5 w-3.5 mr-1 text-[#0d5c4d]" />
-            Load Math MCQ Sample
-          </Button>
-        </div>
 
         {/* SECTION 1: QUIZ METADATA */}
         <div className="p-4 rounded-2xl bg-white border border-[#e6ece8] space-y-4 shadow-2xs">
@@ -480,7 +444,7 @@ export function QuizBuilderModal({
                           "options",
                           currentQ.options && currentQ.options.length >= 2
                             ? currentQ.options
-                            : ["Option A", "Option B", "Option C", "Option D"]
+                            : ["Option A", "Option B", "Option C", "Option D", "Option E"]
                         );
                         handleUpdateCurrentQuestion("correctAnswer", [0]);
                       } else if (nextType === "short_answer") {
@@ -494,7 +458,7 @@ export function QuizBuilderModal({
                           "options",
                           currentQ.options && currentQ.options.length >= 2
                             ? currentQ.options
-                            : ["Option A", "Option B", "Option C", "Option D"]
+                            : ["Option A", "Option B", "Option C", "Option D", "Option E"]
                         );
                         handleUpdateCurrentQuestion("correctAnswer", 0);
                       }
@@ -629,9 +593,41 @@ export function QuizBuilderModal({
                                 <CheckCircle2 className="h-3.5 w-3.5" /> Correct
                               </span>
                             )}
+
+                            {(currentQ.options?.length || 0) > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveOptionFromCurrentQuestion(optIdx)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                                title={`Remove Option ${String.fromCharCode(65 + optIdx)}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         );
                       })}
+
+                      {(currentQ.options?.length || 0) < 6 && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleAddOptionToCurrentQuestion}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-[#0d5c4d]/40 hover:border-[#0d5c4d] bg-[#ecf8f5]/50 hover:bg-[#ecf8f5] text-[#0d5c4d] text-xs font-bold transition-all cursor-pointer"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>
+                              + Add Option {String.fromCharCode(65 + (currentQ.options?.length || 0))}
+                              {(currentQ.options?.length || 0) === 4 ? " (5th Choice)" : ""}
+                            </span>
+                          </button>
+                          {(currentQ.options?.length || 0) === 4 && (
+                            <span className="text-[11px] text-slate-500 font-medium">
+                              (G.C.E. A/L standard 5 choices)
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -695,9 +691,36 @@ export function QuizBuilderModal({
                                 <CheckCircle2 className="h-3.5 w-3.5" /> Correct Choice
                               </span>
                             )}
+
+                            {(currentQ.options?.length || 0) > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveOptionFromCurrentQuestion(optIdx)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                                title={`Remove Option ${String.fromCharCode(65 + optIdx)}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         );
                       })}
+
+                      {(currentQ.options?.length || 0) < 6 && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleAddOptionToCurrentQuestion}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-[#0d5c4d]/40 hover:border-[#0d5c4d] bg-[#ecf8f5]/50 hover:bg-[#ecf8f5] text-[#0d5c4d] text-xs font-bold transition-all cursor-pointer"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>
+                              + Add Option {String.fromCharCode(65 + (currentQ.options?.length || 0))}
+                              {(currentQ.options?.length || 0) === 4 ? " (5th Choice)" : ""}
+                            </span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -135,6 +135,9 @@ export default function HomePage() {
           return <TeacherViews initialTab="assignments" initialSubTab="quizzes" />;
         case "courses":
         case "syllabus":
+        case "course-detail":
+        case "course_detail":
+        case "syllabus_builder":
           return <SyllabusBuilderView />;
         case "past_papers":
         case "pastPapers":
@@ -148,6 +151,8 @@ export default function HomePage() {
           return <AnnouncementsView />;
         case "connect_admin":
           return <AdminViews initialTab="connect" />;
+        case "analytics":
+          return <TeacherViews initialTab="analytics" />;
         case "sports":
         case "sports_tournaments":
           return <SportsView key="tournaments" initialTab="tournaments" />;
@@ -165,7 +170,7 @@ export default function HomePage() {
         case "sports_registrations":
           return <SportsView key="admin_reg" initialTab="admin_registrations" />;
         default:
-          return <TeacherViews initialTab="grading" />;
+          return <TeacherViews initialTab="home" />;
       }
     } else if (currentRole === "parent") {
       switch (currentView) {

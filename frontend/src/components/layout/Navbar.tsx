@@ -188,8 +188,16 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
           className="flex items-center gap-2.5 pl-3 border-l border-slate-200 group cursor-pointer text-left focus:outline-none"
           title="View & Edit Profile"
         >
-          <div className="h-9 w-9 rounded-xl bg-[#0d5c4d] group-hover:bg-[#0a473b] group-hover:scale-105 flex items-center justify-center font-bold text-xs text-white shadow-sm transition-all ring-2 ring-transparent group-hover:ring-[#0d5c4d]/20">
-            {currentUser.name.charAt(0)}
+          <div className="h-9 w-9 rounded-xl bg-[#0d5c4d] group-hover:bg-[#0a473b] group-hover:scale-105 flex items-center justify-center font-bold text-xs text-white shadow-sm transition-all ring-2 ring-transparent group-hover:ring-[#0d5c4d]/20 overflow-hidden shrink-0">
+            {currentUser.avatar ? (
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              currentUser.name ? currentUser.name.charAt(0).toUpperCase() : "U"
+            )}
           </div>
           <div className="hidden lg:block text-left">
             <p className="text-xs font-bold text-slate-900 group-hover:text-[#0d5c4d] transition-colors leading-none">

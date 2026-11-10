@@ -53,7 +53,9 @@ import {
   Phone,
   MessageSquare,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  Mail,
+  FileText
 } from "lucide-react";
 import {
   TeacherQualification,
@@ -76,6 +78,33 @@ type ProfileTab =
   | "responsibilities"
   | "payout"
   | "social";
+
+const EDUCATOR_AVATARS = [
+  {
+    title: "Educator (Professional)",
+    url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
+  },
+  {
+    title: "Senior Lecturer",
+    url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80"
+  },
+  {
+    title: "Science Faculty",
+    url: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80"
+  },
+  {
+    title: "Mathematics Mentor",
+    url: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80"
+  },
+  {
+    title: "Academic Instructor",
+    url: "https://images.unsplash.com/photo-1580894732444-8ecded7900cd?w=400&auto=format&fit=crop&q=80"
+  },
+  {
+    title: "Languages Faculty",
+    url: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80"
+  }
+];
 
 export function ProfileView() {
   const {
@@ -302,15 +331,16 @@ export function ProfileView() {
         name: userFullName,
         fullName: userFullName,
         preferredName: userFirstName || userFullName,
+        avatarUrl: teacherProfile?.user?.avatarUrl || teacherProfile?.avatarUrl || currentUser.avatar || (typeof window !== "undefined" ? localStorage.getItem(`lms_avatar_${currentUser.id || 'teacher'}`) || "" : ""),
         studentId: teacherProfile?.employeeNo || "",
         indexNumber: teacherProfile?.sltsRegNo || "",
         email: teacherProfile?.user?.email || currentUser.email || "",
         phone: teacherProfile?.phone || "",
         altPhone: "",
-        dob: "",
-        gender: "",
+        dob: teacherProfile?.dob || (typeof window !== "undefined" ? localStorage.getItem(`lms_dob_${currentUser.id || 'teacher'}`) || "" : ""),
+        gender: teacherProfile?.gender || (typeof window !== "undefined" ? localStorage.getItem(`lms_gender_${currentUser.id || 'teacher'}`) || "" : ""),
         bloodGroup: "",
-        medium: (teacherProfile?.mediums && teacherProfile.mediums.length > 0) ? teacherProfile.mediums.join(", ") : "English",
+        medium: (teacherProfile?.mediums && teacherProfile.mediums.length > 0) ? teacherProfile.mediums.join(", ") : (typeof window !== "undefined" ? localStorage.getItem(`lms_medium_${currentUser.id || 'teacher'}`) || "English" : "English"),
         address: teacherProfile?.address || "",
         city: teacherProfile?.city || "",
         district: teacherProfile?.district || "",
@@ -512,6 +542,86 @@ export function ProfileView() {
 
   const [selectedMediums, setSelectedMediums] = useState<string[]>(["English"]);
   const [experienceYears, setExperienceYears] = useState<number>(0);
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [customAvatarUrlInput, setCustomAvatarUrlInput] = useState("");
+
+  const handleTeacherAvatarFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      addToast({ type: "error", title: "Invalid Image", message: "Only JPG, PNG and WebP images are allowed." });
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      addToast({ type: "error", title: "Image Too Large", message: "Profile picture must be 5 MB or smaller." });
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const size = Math.min(img.width, img.height);
+          const targetSize = 400;
+          canvas.width = targetSize;
+          canvas.height = targetSize;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            const offsetX = (img.width - size) / 2;
+            const offsetY = (img.height - size) / 2;
+            ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, targetSize, targetSize);
+            const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+            setProfileData((prev) => ({ ...prev, avatarUrl: compressedDataUrl }));
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, compressedDataUrl);
+              localStorage.setItem("lms_avatar_teacher", compressedDataUrl);
+            }
+            addToast({
+              type: "success",
+              title: "Profile Photo Selected",
+              message: "Click 'Save Details' to apply and persist your photo."
+            });
+          }
+        } catch {
+          const rawUrl = e.target?.result as string;
+          setProfileData((prev) => ({ ...prev, avatarUrl: rawUrl }));
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, rawUrl);
+            localStorage.setItem("lms_avatar_teacher", rawUrl);
+          }
+        }
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
+  const tutorProfileCompletion = useMemo(() => {
+    if (currentRole !== "teacher") return 100;
+    const checks = [
+      Boolean(profileData.avatarUrl),
+      Boolean(profileData.fullName?.trim()),
+      Boolean(profileData.name?.trim()),
+      Boolean(profileData.email?.trim()),
+      Boolean(profileData.phone?.trim()),
+      Boolean(profileData.dob?.trim()),
+      Boolean(profileData.gender?.trim()),
+      Boolean(profileData.address?.trim()),
+      Boolean(profileData.bio?.trim()),
+      subjectsList.length > 0,
+      selectedMediums.length > 0,
+    ];
+    const completedCount = checks.filter(Boolean).length;
+    return Math.round((completedCount / checks.length) * 100);
+  }, [currentRole, profileData, subjectsList, selectedMediums]);
 
   // Modal states for full CRUD workflows
   const [degreeModalState, setDegreeModalState] = useState<{
@@ -596,13 +706,26 @@ export function ProfileView() {
       } else {
         setSubjectsList([]);
       }
+      if (teacherProfile.dob || teacherProfile.gender) {
+        setProfileData((prev) => ({
+          ...prev,
+          dob: teacherProfile.dob || prev.dob,
+          gender: teacherProfile.gender || prev.gender,
+        }));
+      }
+      if (teacherProfile.user?.avatarUrl || teacherProfile.avatarUrl) {
+        setProfileData((prev) => ({
+          ...prev,
+          avatarUrl: teacherProfile.user?.avatarUrl || teacherProfile.avatarUrl || prev.avatarUrl,
+        }));
+      }
     }
   }, [teacherProfile, currentRole, profileData.fullName]);
 
   useEffect(() => {
     setProfileData(defaultProfile);
     if (currentRole === "teacher") {
-      if (!["personal", "qualifications", "payout", "social", "teaching", "schedule"].includes(activeTab)) {
+      if (!["personal", "payout", "social", "teaching", "schedule"].includes(activeTab)) {
         setActiveTab("personal");
       }
     } else if (currentRole === "super_admin") {
@@ -869,19 +992,64 @@ if (!savedProfile) {
 
   const dayLiveSessions = useMemo(() => {
     const fromTimetable = (timetable || []).filter((e) => e.day === selectedScheduleDay);
-    if (fromTimetable.length > 0) {
-      return fromTimetable.map((item) => ({
-        time: `${item.startTime} - ${item.endTime}`,
-        subject: item.subjectName,
-        cohort: item.className || "Active Tuition Cohort",
-        type: item.periodType === "LAB" ? "Practical Lab" : "Live Masterclass",
-        platform: item.room || "Live Studio HD",
-        meetCode: item.meetingUrl || `meet.jit.si/LimatLive_${item.id.slice(0, 8)}`,
-        isLive: Boolean(item.isLiveNow)
+    return fromTimetable.map((item) => ({
+      time: `${item.startTime} - ${item.endTime}`,
+      subject: item.subjectName,
+      cohort: item.className || "Active Tuition Cohort",
+      type: item.periodType === "LAB" ? "Practical Lab" : "Live Masterclass",
+      platform: item.room || "Live Studio HD",
+      meetCode: item.meetingUrl || (item.id ? `meet.jit.si/LimatLive_${item.id.slice(0, 8)}` : ""),
+      isLive: Boolean(item.isLiveNow)
+    }));
+  }, [timetable, selectedScheduleDay]);
+
+  const tutorPackagesList = useMemo(() => {
+    if (teacherProfile?.packages && teacherProfile.packages.length > 0) {
+      return teacherProfile.packages.map((pkg: any) => ({
+        id: pkg.id,
+        title: pkg.title,
+        code: pkg.slug || `PKG-${pkg.id?.slice(0, 6)?.toUpperCase() || "BATCH"}`,
+        tier: pkg.billingCycle ? `${pkg.billingCycle} Access` : "Monthly Subscription",
+        students: pkg.subscriptions?.length || 0,
+        fee: `Rs. ${Number(pkg.price || 0).toLocaleString()} / mo`,
+        monthlyGross: `Rs. ${((pkg.subscriptions?.length || 0) * Number(pkg.price || 0)).toLocaleString()} / mo`,
+        delivery: "Google Meet Live Studio & HD Recordings",
+        schedule: "Scheduled Class Timetable",
+        progress: 100,
+        unitsDone: 0,
+        unitsTotal: 0,
+        badgeColor: "border-emerald-200 bg-emerald-50/50 text-emerald-800"
       }));
     }
-    return null;
-  }, [timetable, selectedScheduleDay]);
+    const myCourses = (courses || []).filter(
+      (c) =>
+        (c.teacherId && currentUser?.id && c.teacherId === currentUser.id) ||
+        (c.teacherName && currentUser?.name && c.teacherName.toLowerCase() === currentUser.name.toLowerCase())
+    );
+    if (myCourses.length > 0) {
+      return myCourses.map((c) => {
+        const totalLessons = c.totalLessons || c.units?.length || 0;
+        const completedLessons = c.completedLessons || 0;
+        const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+        return {
+          id: c.id,
+          title: c.title,
+          code: c.code || "COURSE",
+          tier: c.gradeName || c.className || "Tuition Cohort",
+          students: 0,
+          fee: "Active Course",
+          monthlyGross: "—",
+          delivery: "Interactive Curriculum & Notes",
+          schedule: "Weekly Live Sessions",
+          progress,
+          unitsDone: completedLessons,
+          unitsTotal: totalLessons,
+          badgeColor: "border-indigo-200 bg-indigo-50/50 text-indigo-800"
+        };
+      });
+    }
+    return [];
+  }, [teacherProfile?.packages, courses, currentUser]);
 
   const handleCopyId = () => {
     navigator.clipboard?.writeText(profileData.studentId);
@@ -1236,7 +1404,20 @@ if (!savedProfile) {
 
     if (currentRole === "teacher") {
       setIsSavingProfile(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`lms_dob_${currentUser.id || 'teacher'}`, profileData.dob || "");
+        localStorage.setItem(`lms_gender_${currentUser.id || 'teacher'}`, profileData.gender || "");
+        localStorage.setItem(`lms_medium_${currentUser.id || 'teacher'}`, profileData.medium || "");
+        if (profileData.avatarUrl) {
+          localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, profileData.avatarUrl);
+          localStorage.setItem("lms_avatar_teacher", profileData.avatarUrl);
+        } else {
+          localStorage.removeItem(`lms_avatar_${currentUser.id || 'teacher'}`);
+          localStorage.removeItem("lms_avatar_teacher");
+        }
+      }
       const success = await updateTeacherProfile({
+        avatarUrl: profileData.avatarUrl,
         title: profileData.grade,
         bio: profileData.bio,
         specialization: subjectsList.join(", "),
@@ -1247,7 +1428,7 @@ if (!savedProfile) {
         province: profileData.province,
         postalCode: profileData.postalCode,
         sltsRegNo: profileData.indexNumber,
-        mediums: selectedMediums,
+        mediums: profileData.medium ? [profileData.medium] : selectedMediums,
         experienceYears: Number(experienceYears) || 0,
         qualifications: qualificationsList,
         accreditations: accreditationsList,
@@ -1263,7 +1444,9 @@ if (!savedProfile) {
         telegramUrl,
         whatsappNumber,
         websiteUrl,
-        coverImageUrl
+        coverImageUrl,
+        dob: profileData.dob,
+        gender: profileData.gender
       });
       setIsSavingProfile(false);
       if (success) {
@@ -1274,6 +1457,11 @@ if (!savedProfile) {
 
     if (currentRole === "student") {
       setIsSavingProfile(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`lms_dob_${currentUser.id || 'student'}`, profileData.dob || "");
+        localStorage.setItem(`lms_gender_${currentUser.id || 'student'}`, profileData.gender || "");
+        localStorage.setItem(`lms_medium_${currentUser.id || 'student'}`, profileData.medium || "");
+      }
       try {
         const nameParts = (profileData.fullName || profileData.name || "").trim().split(/\s+/);
         const firstName = nameParts[0] || "";
@@ -1315,6 +1503,11 @@ if (!savedProfile) {
 
     if (currentRole === "parent") {
       setIsSavingProfile(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`lms_dob_${currentUser.id || 'parent'}`, profileData.dob || "");
+        localStorage.setItem(`lms_gender_${currentUser.id || 'parent'}`, profileData.gender || "");
+        localStorage.setItem(`lms_medium_${currentUser.id || 'parent'}`, profileData.medium || "");
+      }
       try {
         const nameParts = (profileData.fullName || profileData.name || "").trim().split(/\s+/);
         const firstName = nameParts[0] || "";
@@ -1401,15 +1594,6 @@ if (!savedProfile) {
             </button>
           )}
 
-          <button
-            onClick={() => window.print()}
-            className="px-3.5 py-2 rounded-xl bg-white border border-[#d6ede6] hover:bg-[#f6fbf9] text-xs font-bold text-slate-700 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="Print or Save Profile Record as PDF"
-          >
-            <Printer className="h-3.5 w-3.5 text-slate-500" />
-            <span className="hidden sm:inline">Print Record</span>
-          </button>
-
           {isEditing ? (
             <button
               onClick={handleSave}
@@ -1446,7 +1630,6 @@ if (!savedProfile) {
           {/* Avatar with photo preview */}
           <div className="relative group shrink-0">
             <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-gradient-to-br from-[#0d5c4d] to-[#16423b] flex items-center justify-center overflow-hidden text-white text-3xl sm:text-4xl font-black shadow-lg shadow-[#0d5c4d]/25 border-4 border-white ring-2 ring-[#0d5c4d]/10">
-
               {currentRole === "super_admin" &&
               (avatarPreviewUrl || savedAvatarImageUrl) ? (
                 <img
@@ -1454,10 +1637,17 @@ if (!savedProfile) {
                   alt="Super Admin profile picture"
                   className="h-full w-full object-cover"
                 />
+              ) : profileData.avatarUrl ? (
+                <img
+                  src={profileData.avatarUrl}
+                  alt={profileData.name}
+                  className="h-full w-full object-cover"
+                />
               ) : (
-                profileData.name.charAt(0)
+                profileData.name ? profileData.name.charAt(0).toUpperCase() : "T"
               )}
-</div>
+            </div>
+
             {currentRole === "super_admin" && (
               <input
                 id="super-admin-avatar-input"
@@ -1469,8 +1659,19 @@ if (!savedProfile) {
               />
             )}
 
-            {isEditing && (
-              currentRole === "super_admin" ? (
+            {currentRole === "teacher" && (
+              <input
+                id="teacher-avatar-file-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleTeacherAvatarFileChange}
+                className="hidden"
+                aria-label="Select profile picture"
+              />
+            )}
+
+            {currentRole === "super_admin" ? (
+              isEditing && (
                 <label
                   htmlFor="super-admin-avatar-input"
                   className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform cursor-pointer"
@@ -1478,7 +1679,17 @@ if (!savedProfile) {
                 >
                   <Camera className="h-4 w-4" />
                 </label>
-              ) : (
+              )
+            ) : currentRole === "teacher" ? (
+              <label
+                htmlFor="teacher-avatar-file-input"
+                className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#0d5c4d] text-white flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform cursor-pointer"
+                title="Change Profile Photo"
+              >
+                <Camera className="h-4 w-4" />
+              </label>
+            ) : (
+              isEditing && (
                 <button
                   type="button"
                   className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform"
@@ -1487,6 +1698,23 @@ if (!savedProfile) {
                   <Camera className="h-4 w-4" />
                 </button>
               )
+            )}
+
+            {currentRole === "teacher" && profileData.avatarUrl && (
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileData((prev) => ({ ...prev, avatarUrl: "" }));
+                  if (typeof window !== "undefined") {
+                    localStorage.removeItem(`lms_avatar_${currentUser.id || 'teacher'}`);
+                  }
+                  addToast({ type: "info", title: "Photo Removed", message: "Click 'Save Details' to persist this change." });
+                }}
+                title="Remove profile picture"
+                className="absolute -bottom-1.5 -left-1.5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-50 text-red-600 shadow-md transition-transform hover:scale-105 hover:bg-red-100 cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             )}
 
             {currentRole === "super_admin" &&
@@ -1707,7 +1935,6 @@ if (!savedProfile) {
         {(currentRole === "teacher"
           ? [
               { id: "personal", label: "Tutor Studio Profile", icon: User },
-              { id: "qualifications", label: "Qualifications & Credentials", icon: GraduationCap },
               { id: "payout", label: "Bank & Payout Details", icon: CreditCard },
               { id: "social", label: "Public Studio & Social", icon: Globe },
               { id: "teaching", label: "Active Batches & Study Packages", icon: BookOpen },
@@ -1749,36 +1976,714 @@ if (!savedProfile) {
       {/* =================================================================== */}
       {activeTab === "personal" && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                  <User className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>
-                    {currentRole === "teacher"
-                      ? "Tutor Studio Profile & Faculty Credentials"
-                      : currentRole === "super_admin"
-                      ? "Platform Directorate Master Credentials"
-                      : "General Information"}
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {currentRole === "teacher"
-                    ? "Official personal identification, studio profile details, and Ministry of Education service registration."
-                    : currentRole === "super_admin"
-                    ? "Master administrator credentials, root authority, and global tenant control specifications."
-                    : "Official personal identification as registered with the Ministry of Education."}
-                </p>
-              </div>
+          {currentRole === "teacher" ? (
+            !isEditing ? (
+              /* =================================================================== */
+              /* 1. VIEW PROFILE PAGE – READ-ONLY TUTOR PROFILE DASHBOARD            */
+              /* =================================================================== */
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* Header with Edit Details Button */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+                  <div>
+                    <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                      <User className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>Tutor Studio Profile &amp; Faculty Credentials</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Official personal identification, studio profile details, and Ministry of Education service registration.
+                    </p>
+                  </div>
 
-              {currentRole === "teacher" && (
-                <div className="flex items-center gap-2 self-start sm:self-auto">
-                  {isEditing ? (
-                    <>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] hover:bg-[#d8f2eb] border border-[#c4e9e0] font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
+                  >
+                    <Edit3 className="h-4 w-4 text-[#0d5c4d]" />
+                    <span>Edit Details</span>
+                  </button>
+                </div>
+
+                {/* Subject Specializations & Modules (Attractive Badges/Chips) */}
+                <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-extrabold text-xs text-[#0d2b26] flex items-center gap-2 uppercase tracking-wide">
+                      <Award className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>Subject Specializations &amp; Teaching Modules</span>
+                    </h4>
+                    <span className="text-[11px] font-bold text-slate-400">
+                      {subjectsList.length} {subjectsList.length === 1 ? "Subject" : "Subjects"}
+                    </span>
+                  </div>
+                  {subjectsList.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {subjectsList.map((subj) => (
+                        <span
+                          key={subj}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#ecf8f5] text-[#0d2b26] border border-[#c4e9e0] text-xs font-bold shadow-2xs hover:border-[#0d5c4d] transition-colors"
+                        >
+                          <BookOpen className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                          <span>{subj}</span>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic py-1">
+                      No subject specializations listed yet. Click &quot;Edit Details&quot; above to add your subjects and modules.
+                    </p>
+                  )}
+                </div>
+
+                {/* Clean Information Cards Grid (No input borders or form-like elements) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Card 1: Personal Information */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                      <User className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">Personal Information</h4>
+                    </div>
+                    <div className="space-y-3.5">
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Full Legal Name</span>
+                        <p className="text-sm font-semibold text-slate-800 mt-0.5">{profileData.fullName || "—"}</p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Display / Preferred Name</span>
+                        <p className="text-sm font-semibold text-slate-800 mt-0.5">{profileData.name || "—"}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 pt-1">
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Date of Birth</span>
+                          <p className="text-xs font-semibold text-slate-800 mt-1 flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{profileData.dob || "Not specified"}</span>
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Gender</span>
+                          <p className="text-xs font-semibold text-slate-800 mt-1">
+                            {profileData.gender ? (
+                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
+                                {profileData.gender}
+                              </span>
+                            ) : (
+                              "Not specified"
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Professional / Faculty Credentials */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                      <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">Faculty Credentials</h4>
+                    </div>
+                    <div className="space-y-3.5">
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Teacher Service / Faculty ID</span>
+                        <p className="text-sm font-mono font-bold text-[#0d5c4d] mt-0.5">{profileData.studentId || "FAC-2897"}</p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">SLTS Registration Number</span>
+                        <p className="text-sm font-mono font-semibold text-slate-800 mt-0.5">{profileData.indexNumber || "Not Registered"}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 pt-1">
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Academic Title</span>
+                          <p className="text-xs font-semibold text-slate-800 mt-1">{profileData.grade || "Faculty Member"}</p>
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">A/L Experience</span>
+                          <p className="text-xs font-bold text-[#0d5c4d] mt-1">{experienceYears} Years in Service</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Contact Information */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                      <Phone className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">Contact Information</h4>
+                    </div>
+                    <div className="space-y-3.5">
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Primary Mobile Phone</span>
+                        {profileData.phone ? (
+                          <a
+                            href={`tel:${profileData.phone}`}
+                            className="inline-flex items-center gap-2 text-sm font-bold text-[#0d5c4d] hover:underline mt-0.5"
+                          >
+                            <Phone className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                            <span>{profileData.phone}</span>
+                          </a>
+                        ) : (
+                          <p className="text-sm text-slate-400 italic mt-0.5">Not provided</p>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Institutional Email</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <a
+                            href={`mailto:${profileData.email}`}
+                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800 hover:text-[#0d5c4d]"
+                          >
+                            <Mail className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{profileData.email}</span>
+                          </a>
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            <CheckCircle2 className="h-3 w-3" /> Verified
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Residential Address</span>
+                        <p className="text-xs font-semibold text-slate-800 mt-1 flex items-start gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                          <span>
+                            {[profileData.address, profileData.city, profileData.district, profileData.province]
+                              .map((v) => v?.trim())
+                              .filter(Boolean)
+                              .join(", ") || "Sri Lanka"}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 4: Teaching Preferences & Mediums */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                      <BookOpen className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">Teaching Preferences</h4>
+                    </div>
+                    <div className="space-y-3.5">
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Primary Medium of Study</span>
+                        <p className="mt-1">
+                          <span className="inline-block px-3 py-1 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] font-bold text-xs border border-[#c4e9e0]">
+                            {profileData.medium || "English"}
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Languages of Instruction</span>
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {selectedMediums.length > 0 ? (
+                            selectedMediums.map((med) => (
+                              <span
+                                key={med}
+                                className="px-3 py-1 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200"
+                              >
+                                {med}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">None specified</span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Curriculum Focus</span>
+                        <p className="text-xs font-semibold text-slate-700 mt-1">
+                          Sri Lanka G.C.E. Advanced Level &amp; Secondary Education
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 5: Personal Statement / Bio (Full Width) */}
+                  <div className="md:col-span-2 bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-3">
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                      <FileText className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">Personal Statement &amp; Teaching Philosophy</h4>
+                    </div>
+                    {profileData.bio ? (
+                      <blockquote className="p-4 rounded-2xl bg-gradient-to-r from-[#f8faf9] to-[#f2f8f6] border-l-4 border-[#0d5c4d] text-xs sm:text-sm text-slate-700 leading-relaxed italic">
+                        &ldquo;{profileData.bio}&rdquo;
+                      </blockquote>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic py-2">
+                        No personal statement or bio provided yet. Click &quot;Edit Details&quot; to introduce your coaching style, academic ethos, and achievements to prospective students.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* =================================================================== */
+              /* 2. EDIT DETAILS PAGE – FORM-BASED EDITING DESIGN                    */
+              /* =================================================================== */
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* Form Header Card */}
+                <div className="bg-white rounded-3xl border border-[#c4e9e0] p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                      <Edit3 className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>Edit Tutor Studio Profile</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Update your official credentials, teaching specializations, contact info, and profile bio.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={isSavingProfile}
+                      className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      <span>{isSavingProfile ? "Saving..." : "Save Details"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSave} className="space-y-6">
+                  {/* Group 1: Personal Identification */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-5">
+                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+                      <User className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">1. Personal Identification</h4>
+                    </div>
+
+                    {/* Tutor Profile Avatar Uploader */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-[#f8faf9] to-[#f2f8f6] border border-[#d6ede6] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="relative group shrink-0">
+                          <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-[#0d5c4d] text-white flex items-center justify-center font-black text-2xl overflow-hidden border-2 border-white shadow-md">
+                            {profileData.avatarUrl ? (
+                              <img src={profileData.avatarUrl} alt={profileData.name} className="h-full w-full object-cover" />
+                            ) : (
+                              profileData.name ? profileData.name.charAt(0).toUpperCase() : "T"
+                            )}
+                          </div>
+                          <label
+                            htmlFor="teacher-avatar-file-input"
+                            className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-[#0d5c4d] text-white hover:bg-[#0a473b] border-2 border-white flex items-center justify-center shadow cursor-pointer transition-transform hover:scale-105"
+                            title="Upload Photo"
+                          >
+                            <Camera className="h-3.5 w-3.5" />
+                          </label>
+                        </div>
+
+                        <div className="space-y-1">
+                          <h5 className="font-extrabold text-xs text-[#0d2b26] flex items-center gap-1.5 uppercase tracking-wide">
+                            <Camera className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                            <span>Tutor Profile Photo</span>
+                          </h5>
+                          <p className="text-[11px] text-slate-500">
+                            Square JPG, PNG or WebP image. Maximum 5 MB.
+                          </p>
+                          {profileData.avatarUrl && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              <CheckCircle2 className="h-3 w-3" /> Custom Photo Active
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end flex-wrap">
+                        <label
+                          htmlFor="teacher-avatar-file-input"
+                          className="px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Camera className="h-3.5 w-3.5" />
+                          <span>Upload Photo</span>
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => setAvatarModalOpen(true)}
+                          className="px-3.5 py-2 rounded-xl bg-white border border-[#c4e9e0] hover:bg-emerald-50 text-[#0d5c4d] text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          <span>Presets</span>
+                        </button>
+
+                        {profileData.avatarUrl && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProfileData((prev) => ({ ...prev, avatarUrl: "" }));
+                              if (typeof window !== "undefined") {
+                                localStorage.removeItem(`lms_avatar_${currentUser.id || 'teacher'}`);
+                              }
+                              addToast({ type: "info", title: "Photo Removed", message: "Click 'Save Details' to persist this change." });
+                            }}
+                            className="p-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition-colors cursor-pointer"
+                            title="Remove Photo"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">
+                          Full Legal Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={profileData.fullName}
+                          onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                          placeholder="e.g. Sakiththiyan Thankavelu"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">
+                          Display / Preferred Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={profileData.name}
+                          onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                          placeholder="e.g. Sakith"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Date of Birth</label>
+                        <input
+                          type="date"
+                          value={profileData.dob}
+                          onChange={(e) => setProfileData({ ...profileData, dob: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Gender</label>
+                        <select
+                          value={profileData.gender}
+                          onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white cursor-pointer"
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group 2: Professional & Faculty Credentials */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-5">
+                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">2. Professional &amp; Faculty Credentials</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                          <span>Teacher Service / Faculty ID</span>
+                          <span className="text-[10px] text-slate-400 font-normal">Assigned by Administration</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            readOnly
+                            disabled
+                            value={profileData.studentId || "FAC-2897"}
+                            className="w-full h-10 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono font-bold text-[#0d5c4d] cursor-not-allowed"
+                          />
+                          <Lock className="h-3.5 w-3.5 text-slate-400 absolute right-3 top-3.5" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">
+                          Sri Lanka Teachers&apos; Service (SLTS) Reg Number
+                        </label>
+                        <input
+                          type="text"
+                          value={profileData.indexNumber}
+                          onChange={(e) => setProfileData({ ...profileData, indexNumber: e.target.value })}
+                          placeholder="e.g. SLTS-2024-9841"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Academic Title / Position</label>
+                        <input
+                          type="text"
+                          value={profileData.grade}
+                          onChange={(e) => setProfileData({ ...profileData, grade: e.target.value })}
+                          placeholder="e.g. Senior Faculty Member · A/L Masterclass Lead"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Years of A/L Coaching Experience</label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            value={experienceYears}
+                            onChange={(e) => setExperienceYears(Number(e.target.value) || 0)}
+                            className="w-32 h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0d5c4d] focus:outline-none focus:border-[#0d5c4d]"
+                          />
+                          <span className="text-xs font-bold text-slate-600">Years in Active Service</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group 3: Contact Details & Residential Address */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-5">
+                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">3. Contact &amp; Residential Details</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">
+                          Mobile Phone Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          value={profileData.phone}
+                          onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                          placeholder="+94 77 123 4567"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Email Address (Institutional)</label>
+                        <input
+                          type="email"
+                          value={profileData.email}
+                          onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2 space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Residential Street Address</label>
+                        <input
+                          type="text"
+                          value={profileData.address}
+                          onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
+                          placeholder="e.g. No. 12, Temple Road"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">City / Town</label>
+                        <input
+                          type="text"
+                          value={profileData.city}
+                          onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
+                          placeholder="e.g. Jaffna"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">District</label>
+                        <input
+                          type="text"
+                          value={profileData.district}
+                          onChange={(e) => setProfileData({ ...profileData, district: e.target.value })}
+                          placeholder="e.g. Jaffna"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group 4: Teaching Preferences & Subject Specializations */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-5">
+                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">4. Teaching Preferences &amp; Specializations</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Primary Medium of Study</label>
+                        <select
+                          value={profileData.medium || "English"}
+                          onChange={(e) => setProfileData({ ...profileData, medium: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs bg-white font-medium cursor-pointer focus:outline-none focus:border-[#0d5c4d]"
+                        >
+                          <option value="English">English</option>
+                          <option value="Sinhala">Sinhala</option>
+                          <option value="Tamil">Tamil</option>
+                          <option value="Bilingual (English / Sinhala)">Bilingual (English / Sinhala)</option>
+                          <option value="Bilingual (English / Tamil)">Bilingual (English / Tamil)</option>
+                          <option value="Trilingual (English / Sinhala / Tamil)">Trilingual (English / Sinhala / Tamil)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Languages of Instruction</label>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {["English", "Sinhala", "Tamil"].map((med) => {
+                            const isSel = selectedMediums.includes(med);
+                            return (
+                              <button
+                                key={med}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedMediums((prev) =>
+                                    prev.includes(med) ? prev.filter((m) => m !== med) : [...prev, med]
+                                  );
+                                }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                                  isSel
+                                    ? "bg-[#0d5c4d] text-white border-[#0d5c4d]"
+                                    : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                                }`}
+                              >
+                                {isSel ? `✓ ${med}` : `+ ${med}`}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Subject Specializations Manager (Inline) */}
+                    <div className="pt-2 border-t border-slate-100 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <label className="font-extrabold text-xs text-[#0d2b26] flex items-center gap-1.5 uppercase tracking-wide">
+                            <Award className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                            <span>Subject Specializations &amp; Modules</span>
+                          </label>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Add and manage the subjects students search for on your tutor profile.
+                          </p>
+                        </div>
+
+                        {!showSubjectInput && (
+                          <button
+                            type="button"
+                            onClick={() => setShowSubjectInput(true)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all shadow-xs cursor-pointer self-start sm:self-auto"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>Add Subject</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {showSubjectInput && (
+                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-[#0d5c4d]/30 shadow-xs">
+                          <input
+                            type="text"
+                            value={newSubjectInput}
+                            onChange={(e) => setNewSubjectInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addSubject(newSubjectInput);
+                              }
+                            }}
+                            placeholder="Type subject name (e.g. Combined Mathematics, Applied Mechanics)"
+                            className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-[#0d5c4d]"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => addSubject(newSubjectInput)}
+                            className="px-3 py-1.5 rounded-lg bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowSubjectInput(false);
+                              setNewSubjectInput("");
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-700 text-xs font-bold cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {subjectsList.map((subj) => (
+                          <span
+                            key={subj}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-[#0d2b26] border border-[#c4e9e0] text-xs font-bold shadow-2xs group hover:border-[#0d5c4d] transition-colors"
+                          >
+                            <span>{subj}</span>
+                            <button
+                              type="button"
+                              onClick={() => deleteSubject(subj)}
+                              className="h-4 w-4 rounded-full flex items-center justify-center text-slate-400 group-hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                              title={`Remove ${subj}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                        {subjectsList.length === 0 && (
+                          <p className="text-xs text-slate-400 italic">No subject specializations listed yet. Click &quot;+ Add Subject&quot; above.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group 5: Personal Statement / Bio */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-4">
+                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">5. Personal Statement &amp; Bio</h4>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Personal Statement / Bio</label>
+                      <textarea
+                        rows={4}
+                        value={profileData.bio}
+                        onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                        placeholder="Share your coaching philosophy, academic track record, and achievements to inspire students..."
+                        className="w-full p-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] leading-relaxed"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bottom Action Bar */}
+                  <div className="p-4 rounded-2xl bg-white border border-[#c4e9e0] shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <p className="text-xs text-slate-500 font-medium">
+                      Review all changes before submitting to ensure your public tutor profile is accurate.
+                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
                         onClick={() => setIsEditing(false)}
-                        className="px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                        className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
                       >
                         Cancel
                       </button>
@@ -1786,555 +2691,373 @@ if (!savedProfile) {
                         type="button"
                         onClick={handleSave}
                         disabled={isSavingProfile}
-                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                       >
                         <Save className="h-3.5 w-3.5" />
                         <span>{isSavingProfile ? "Saving..." : "Save Details"}</span>
                       </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] hover:bg-[#d8f2eb] border border-[#c4e9e0] font-bold text-xs transition-colors cursor-pointer"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                      <span>Edit Details</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* SUBJECT SPECIALIZATIONS MANAGER (Add, Edit, Delete tags) */}
-            {currentRole === "teacher" && (
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#f8faf9] to-[#f2f8f6] border border-[#d6ede6] space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )
+          ) : (
+            /* NON-TEACHER ROLES (Student, Parent, Super Admin) */
+            <div className="space-y-6">
+              <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
                   <div>
-                    <h4 className="font-extrabold text-xs text-[#0d2b26] flex items-center gap-1.5 uppercase tracking-wide">
-                      <Award className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                      <span>Subject Specializations &amp; Modules</span>
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      Add and manage the specific subjects students search for on your tutor profile.
+                    <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                      <User className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>
+                        {currentRole === "super_admin"
+                          ? "Platform Directorate Master Credentials"
+                          : "General Information"}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {currentRole === "super_admin"
+                        ? "Master administrator credentials, root authority, and global tenant control specifications."
+                        : "Official personal identification as registered with the Ministry of Education."}
+                    </p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Full Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Full Legal Name</label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={profileData.fullName}
+                        onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      />
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        {profileData.fullName}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Preferred Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Display / Preferred Name</label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={profileData.name}
+                        onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      />
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        {profileData.name}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Student ID */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">
+                      {currentRole === "super_admin"
+                        ? "Platform Master Root ID"
+                        : "Student Admission / Reg Number"}
+                    </label>
+                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-bold text-[#0d5c4d]">
+                      {profileData.studentId}
                     </p>
                   </div>
 
-                  {!showSubjectInput && (
-                    <button
-                      type="button"
-                      onClick={() => setShowSubjectInput(true)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all shadow-xs cursor-pointer self-start sm:self-auto"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>Add Subject</span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Inline Add Subject Input */}
-                {showSubjectInput && (
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-[#0d5c4d]/30 shadow-xs">
-                    <input
-                      type="text"
-                      value={newSubjectInput}
-                      onChange={(e) => setNewSubjectInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addSubject(newSubjectInput);
-                        }
-                      }}
-                      placeholder="Type subject name (e.g. Combined Mathematics, Applied Mechanics)"
-                      className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-[#0d5c4d]"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={() => addSubject(newSubjectInput)}
-                      className="px-3 py-1.5 rounded-lg bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      Add
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowSubjectInput(false);
-                        setNewSubjectInput("");
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-700 text-xs font-bold cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-
-                {/* Subject Tags with Delete (X) */}
-                <div className="flex flex-wrap items-center gap-2">
-                  {subjectsList.map((subj) => (
-                    <span
-                      key={subj}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-[#0d2b26] border border-[#c4e9e0] text-xs font-bold shadow-2xs group hover:border-[#0d5c4d] transition-colors"
-                    >
-                      <span>{subj}</span>
-                      <button
-                        type="button"
-                        onClick={() => deleteSubject(subj)}
-                        className="h-4 w-4 rounded-full flex items-center justify-center text-slate-400 group-hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
-                        title={`Remove ${subj}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                  {subjectsList.length === 0 && (
-                    <p className="text-xs text-slate-400 italic">No subject specializations listed yet. Click "+ Add Subject" to add your first module.</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Full Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Full Legal Name</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.fullName}
-                    onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.fullName}
-                  </p>
-                )}
-              </div>
-
-              {/* Preferred Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Display / Preferred Name</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.name}
-                    onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.name}
-                  </p>
-                )}
-              </div>
-
-              {/* Student ID */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher"
-                    ? "Teacher Service / Faculty ID"
-                    : currentRole === "super_admin"
-                    ? "Platform Master Root ID"
-                    : "Student Admission / Reg Number"}
-                </label>
-                <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-bold text-[#0d5c4d]">
-                  {profileData.studentId}
-                </p>
-              </div>
-
-              {/* G.C.E. A/L Index Number */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher"
-                    ? "Sri Lanka Teachers' Service (SLTS) Reg Number"
-                    : currentRole === "super_admin"
-                    ? "Master Root Authority Identifier"
-                    : "Exam Index Number (A/L 2026)"}
-                </label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.indexNumber}
-                    onChange={(e) => setProfileData({ ...profileData, indexNumber: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-semibold text-slate-900">
-                    {profileData.indexNumber}
-                  </p>
-                )}
-              </div>
-
-              {/* Email Address */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Email Address (Institutional)</label>
-                {isEditing ? (
-                 <input
-  type="email"
-  value={profileData.email}
-  readOnly={currentRole === "super_admin"}
-  onChange={(e) => {
-    if (currentRole !== "super_admin") {
-      setProfileData({
-        ...profileData,
-        email: e.target.value,
-      });
-    }
-  }}
-  className={`w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 ${
-    currentRole === "super_admin"
-      ? "bg-slate-100 cursor-not-allowed"
-      : ""
-  }`}
-/>
-                ) : (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    <span>{profileData.email}</span>
-                    <span className="flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      <CheckCircle2 className="h-3 w-3" /> Verified
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Phone Number */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Mobile Phone Number</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.phone}
-                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.phone}
-                  </p>
-                )}
-              </div>
-
-              {/* Date of Birth & Gender */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Date of Birth</label>
-                  {isEditing ? (
-                    <input
-                      type="date"
-                      value={profileData.dob}
-                      onChange={(e) => setProfileData({ ...profileData, dob: e.target.value })}
-                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                    />
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                      {profileData.dob}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Gender</label>
-                  {isEditing ? (
-                    <select
-                      value={profileData.gender}
-                      onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
-                      className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                    >
-  <option value="">Select Gender</option>
-  <option value="Male">Male</option>
-  <option value="Female">Female</option>
-</select>
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                      {profileData.gender}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Medium & Blood Group */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-  {currentRole === "super_admin" ? "Languages" : "Medium of Study"}
-</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={profileData.medium}
-                      onChange={(e) => setProfileData({ ...profileData, medium: e.target.value })}
-                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs"
-                    />
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                      {profileData.medium}
-                    </p>
-                  )}
-                </div>
-
-                {currentRole !== "super_admin" && (
-  <div className="space-y-1.5">
-    <label className="text-xs font-bold text-slate-700">Blood Group</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={profileData.bloodGroup}
-                      onChange={(e) => setProfileData({ ...profileData, bloodGroup: e.target.value })}
-                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-red-600"
-                    />
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-bold text-red-600">
-                      {profileData.bloodGroup}
-                    </p>
-                  )}
-                </div>
-              )}
-              </div>
-
-              {/* Academic Grade, Stream & Target Year (Only for Students) */}
-              {currentRole === "student" && (
-                <div className="md:col-span-2 p-4 rounded-2xl bg-[#ecf8f5]/60 border border-[#c4e9e0] space-y-3">
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
-                    <span className="font-extrabold text-xs text-[#0d2b26]">
-                      Academic Stage, Grade &amp; Examination Pathway
-                    </span>
+                  {/* Exam Index Number */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">
+                      {currentRole === "super_admin"
+                        ? "Master Root Authority Identifier"
+                        : "Exam Index Number (A/L 2026)"}
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={profileData.indexNumber}
+                        onChange={(e) => setProfileData({ ...profileData, indexNumber: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      />
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-semibold text-slate-900">
+                        {profileData.indexNumber}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* Grade Selection */}
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700">Enrolled Grade</label>
-                      {isEditing ? (
-                        <select
-                          value={profileData.gradeLevel || "12"}
-                          onChange={(e) => {
-                            const newLevel = e.target.value;
-                            const isNewAL = newLevel === "12" || newLevel === "13";
-                            const isNewOL = newLevel === "10" || newLevel === "11";
+                  {/* Email Address */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Email Address (Institutional)</label>
+                    {isEditing ? (
+                      <input
+                        type="email"
+                        value={profileData.email}
+                        readOnly={currentRole === "super_admin"}
+                        onChange={(e) => {
+                          if (currentRole !== "super_admin") {
                             setProfileData({
                               ...profileData,
-                              gradeLevel: newLevel,
-                              grade: `Grade ${newLevel}`,
-                              stream: isNewAL
-                                ? (profileData.stream && !profileData.stream.includes("General") && !profileData.stream.includes("O/L") ? profileData.stream : "Physical Science")
-                                : isNewOL
-                                ? "General O/L Curriculum"
-                                : "General Junior Curriculum"
+                              email: e.target.value,
                             });
-                          }}
-                          className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold text-slate-800"
-                        >
-                          <optgroup label="Junior Secondary (Grade 6 - 9: No Streams)">
-                            <option value="6">Grade 6 (Junior Secondary)</option>
-                            <option value="7">Grade 7 (Junior Secondary)</option>
-                            <option value="8">Grade 8 (Junior Secondary)</option>
-                            <option value="9">Grade 9 (Junior Secondary)</option>
-                          </optgroup>
-                          <optgroup label="G.C.E. Ordinary Level (Grade 10 - 11)">
-                            <option value="10">Grade 10 (G.C.E. O/L)</option>
-                            <option value="11">Grade 11 (G.C.E. O/L)</option>
-                          </optgroup>
-                          <optgroup label="G.C.E. Advanced Level (Grade 12 - 13: Streams)">
-                            <option value="12">Grade 12 (G.C.E. A/L)</option>
-                            <option value="13">Grade 13 (G.C.E. A/L)</option>
-                          </optgroup>
-                        </select>
-                      ) : (
-                        <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
-                          Grade {profileData.gradeLevel || "12"}
-                        </p>
-                      )}
-                    </div>
+                          }
+                        }}
+                        className={`w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 ${
+                          currentRole === "super_admin" ? "bg-slate-100 cursor-not-allowed" : ""
+                        }`}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        <span>{profileData.email}</span>
+                        <span className="flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <CheckCircle2 className="h-3 w-3" /> Verified
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-                    {/* Stream Selection - ONLY enabled for Grade 12 or 13! */}
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700">
-                        {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                          ? "A/L Stream Specialization *"
-                          : "Curriculum Stream"}
-                      </label>
+                  {/* Phone Number */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Mobile Phone Number</label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={profileData.phone}
+                        onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      />
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        {profileData.phone}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Date of Birth & Gender */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Date of Birth</label>
                       {isEditing ? (
-                        (profileData.gradeLevel === "12" || profileData.gradeLevel === "13") ? (
-                          <select
-                            value={profileData.stream || "Physical Science"}
-                            onChange={(e) => setProfileData({ ...profileData, stream: e.target.value })}
-                            className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold text-[#0d5c4d]"
-                          >
-                            <option value="Physical Science">Physical Science (Maths, Physics, Chem, ICT)</option>
-                            <option value="Biological Science">Biological Science (Bio, Chem, Physics, Agri)</option>
-                            <option value="Commerce">Commerce (Accounting, Business, Economics, ICT)</option>
-                            <option value="Technology">Technology (Engineering Tech, Science for Tech, Bio-Tech)</option>
-                            <option value="Arts">Arts (Languages, History, Logic, Political Science)</option>
-                          </select>
-                        ) : (
-                          <div className="h-10 px-3 rounded-xl bg-slate-100 border border-slate-200 text-xs flex items-center text-slate-500 font-medium">
-                            {(profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                              ? "General O/L Subjects (No Stream)"
-                              : "General Junior Subjects (No Stream)"}
-                          </div>
-                        )
+                        <input
+                          type="date"
+                          value={profileData.dob}
+                          onChange={(e) => setProfileData({ ...profileData, dob: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
                       ) : (
-                        <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
-                          {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                            ? profileData.stream
-                            : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                            ? "General O/L Subjects (No Stream)"
-                            : "General Junior Subjects (No Stream)"}
+                        <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                          {profileData.dob}
                         </p>
                       )}
                     </div>
 
-                    {/* Target Examination Year */}
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700">Target Exam Year</label>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Gender</label>
                       {isEditing ? (
                         <select
-                          value={profileData.examYear || "2026"}
-                          onChange={(e) => setProfileData({ ...profileData, examYear: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold"
+                          value={profileData.gender}
+                          onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
                         >
-                          <option value="2026">2026 Batch</option>
-                          <option value="2027">2027 Batch</option>
-                          <option value="2028">2028 Batch</option>
-                          <option value="2029">2029 Batch</option>
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
                         </select>
                       ) : (
-                        <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
-                          {profileData.examYear || "2026"} Batch
+                        <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                          {profileData.gender}
                         </p>
                       )}
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* Residential Address */}
-              <div className="md:col-span-2 space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Residential Street Address</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.address}
-                    onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {[
-  profileData.address,
-  profileData.city,
-  profileData.district,
-  profileData.province,
-]
-  .map((value) => value?.trim())
-  .filter(Boolean)
-  .join(", ")}
-                  </p>
-                )}
-              </div>
+                  {/* Medium of Study */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">
+                      {currentRole === "super_admin" ? "Languages" : "Medium of Study"}
+                    </label>
+                    {isEditing ? (
+                      <select
+                        value={profileData.medium || "English"}
+                        onChange={(e) => setProfileData({ ...profileData, medium: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs bg-white font-medium cursor-pointer"
+                      >
+                        <option value="English">English</option>
+                        <option value="Sinhala">Sinhala</option>
+                        <option value="Tamil">Tamil</option>
+                        <option value="Bilingual (English / Sinhala)">Bilingual (English / Sinhala)</option>
+                        <option value="Bilingual (English / Tamil)">Bilingual (English / Tamil)</option>
+                        <option value="Trilingual (English / Sinhala / Tamil)">Trilingual (English / Sinhala / Tamil)</option>
+                      </select>
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        {profileData.medium || "English"}
+                      </p>
+                    )}
+                  </div>
 
-              {/* Bio Statement */}
-              <div className="md:col-span-2 space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Personal Statement / Bio</label>
-                {isEditing ? (
-                  <textarea
-                    rows={3}
-                    value={profileData.bio}
-                    onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
-                    className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] leading-relaxed"
-                  />
-                ) : (
-                  <p className="p-3 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs text-slate-700 leading-relaxed">
-                    {profileData.bio}
-                  </p>
-                )}
-              </div>
-            </form>
-          </div>
-
-          {/* TEACHER INSTRUCTION MEDIUMS & EXPERIENCE (Personal Tab) */}
-          {currentRole === "teacher" && (
-            <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-5">
-              <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-[#0d5c4d]" />
-                    <span>Teaching Mediums &amp; Professional Experience</span>
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Select your languages of instruction and total years of Advanced Level coaching experience.
-                  </p>
-                </div>
-                {isEditing && (
-                  <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                    Editing Mode Active
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700">Mediums of Instruction</label>
-                  {isEditing ? (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {["English", "Sinhala", "Tamil"].map((med) => {
-                        const isSel = selectedMediums.includes(med);
-                        return (
-                          <button
-                            key={med}
-                            type="button"
-                            onClick={() => {
-                              setSelectedMediums((prev) =>
-                                prev.includes(med) ? prev.filter((m) => m !== med) : [...prev, med]
-                              );
-                            }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                              isSel
-                                ? "bg-[#0d5c4d] text-white border-[#0d5c4d]"
-                                : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
-                            }`}
-                          >
-                            {isSel ? `✓ ${med}` : `+ ${med}`}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {selectedMediums.map((med) => (
-                        <span
-                          key={med}
-                          className="px-3 py-1 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] font-bold text-xs border border-[#c4e9e0]"
-                        >
-                          {med}
+                  {/* Academic Grade, Stream & Target Year (Only for Students) */}
+                  {currentRole === "student" && (
+                    <div className="md:col-span-2 p-4 rounded-2xl bg-[#ecf8f5]/60 border border-[#c4e9e0] space-y-3">
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
+                        <span className="font-extrabold text-xs text-[#0d2b26]">
+                          Academic Stage, Grade &amp; Examination Pathway
                         </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                      </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700">Years of Advanced Level Teaching Experience</label>
-                  {isEditing ? (
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="number"
-                        min={0}
-                        max={50}
-                        value={experienceYears}
-                        onChange={(e) => setExperienceYears(Number(e.target.value) || 0)}
-                        className="w-32 h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0d5c4d] focus:outline-none focus:border-[#0d5c4d]"
-                      />
-                      <span className="text-xs font-bold text-slate-600">Years in Service</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700">Enrolled Grade</label>
+                          {isEditing ? (
+                            <select
+                              value={profileData.gradeLevel || "12"}
+                              onChange={(e) => {
+                                const newLevel = e.target.value;
+                                const isNewAL = newLevel === "12" || newLevel === "13";
+                                const isNewOL = newLevel === "10" || newLevel === "11";
+                                setProfileData({
+                                  ...profileData,
+                                  gradeLevel: newLevel,
+                                  grade: `Grade ${newLevel}`,
+                                  stream: isNewAL
+                                    ? (profileData.stream && !profileData.stream.includes("General") && !profileData.stream.includes("O/L") ? profileData.stream : "Physical Science")
+                                    : isNewOL
+                                    ? "General O/L Curriculum"
+                                    : "General Junior Curriculum"
+                                });
+                              }}
+                              className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold text-slate-800"
+                            >
+                              <optgroup label="Junior Secondary (Grade 6 - 9: No Streams)">
+                                <option value="6">Grade 6 (Junior Secondary)</option>
+                                <option value="7">Grade 7 (Junior Secondary)</option>
+                                <option value="8">Grade 8 (Junior Secondary)</option>
+                                <option value="9">Grade 9 (Junior Secondary)</option>
+                              </optgroup>
+                              <optgroup label="G.C.E. Ordinary Level (Grade 10 - 11)">
+                                <option value="10">Grade 10 (G.C.E. O/L)</option>
+                                <option value="11">Grade 11 (G.C.E. O/L)</option>
+                              </optgroup>
+                              <optgroup label="G.C.E. Advanced Level (Grade 12 - 13: Streams)">
+                                <option value="12">Grade 12 (G.C.E. A/L)</option>
+                                <option value="13">Grade 13 (G.C.E. A/L)</option>
+                              </optgroup>
+                            </select>
+                          ) : (
+                            <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
+                              Grade {profileData.gradeLevel || "12"}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700">
+                            {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
+                              ? "A/L Stream Specialization *"
+                              : "Curriculum Stream"}
+                          </label>
+                          {isEditing ? (
+                            (profileData.gradeLevel === "12" || profileData.gradeLevel === "13") ? (
+                              <select
+                                value={profileData.stream || "Physical Science"}
+                                onChange={(e) => setProfileData({ ...profileData, stream: e.target.value })}
+                                className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold text-[#0d5c4d]"
+                              >
+                                <option value="Physical Science">Physical Science (Maths, Physics, Chem, ICT)</option>
+                                <option value="Biological Science">Biological Science (Bio, Chem, Physics, Agri)</option>
+                                <option value="Commerce">Commerce (Accounting, Business, Economics, ICT)</option>
+                                <option value="Technology">Technology (Engineering Tech, Science for Tech, Bio-Tech)</option>
+                                <option value="Arts">Arts (Languages, History, Logic, Political Science)</option>
+                              </select>
+                            ) : (
+                              <div className="h-10 px-3 rounded-xl bg-slate-100 border border-slate-200 text-xs flex items-center text-slate-500 font-medium">
+                                {(profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
+                                  ? "General O/L Subjects (No Stream)"
+                                  : "General Junior Subjects (No Stream)"}
+                              </div>
+                            )
+                          ) : (
+                            <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
+                              {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
+                                ? profileData.stream
+                                : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
+                                ? "General O/L Subjects (No Stream)"
+                                : "General Junior Subjects (No Stream)"}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700">Target Exam Year</label>
+                          {isEditing ? (
+                            <select
+                              value={profileData.examYear || "2026"}
+                              onChange={(e) => setProfileData({ ...profileData, examYear: e.target.value })}
+                              className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold"
+                            >
+                              <option value="2026">2026 Batch</option>
+                              <option value="2027">2027 Batch</option>
+                              <option value="2028">2028 Batch</option>
+                              <option value="2029">2029 Batch</option>
+                            </select>
+                          ) : (
+                            <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
+                              {profileData.examYear || "2026"} Batch
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-bold text-[#0d5c4d]">
-                      {experienceYears} Years of A/L Excellence &amp; Ranker Mentorship
-                    </p>
                   )}
-                </div>
+
+                  {/* Residential Address */}
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Residential Street Address</label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={profileData.address}
+                        onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                      />
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        {[
+                          profileData.address,
+                          profileData.city,
+                          profileData.district,
+                          profileData.province,
+                        ]
+                          .map((value) => value?.trim())
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Bio Statement */}
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Personal Statement / Bio</label>
+                    {isEditing ? (
+                      <textarea
+                        rows={3}
+                        value={profileData.bio}
+                        onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                        className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] leading-relaxed"
+                      />
+                    ) : (
+                      <p className="p-3 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                        {profileData.bio}
+                      </p>
+                    )}
+                  </div>
+                </form>
               </div>
             </div>
           )}
@@ -2402,22 +3125,16 @@ if (!savedProfile) {
                 </button>
               </div>
             </div>
-          ) : (
+          ) : currentRole === "teacher" ? null : (
             <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
               <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
                     <Users className="h-4 w-4 text-[#0d5c4d]" />
-                    <span>
-                      {currentRole === "teacher"
-                        ? "Next of Kin & Emergency Liaison"
-                        : "Parent & Guardian Information"}
-                    </span>
+                    <span>Parent &amp; Guardian Information</span>
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {currentRole === "teacher"
-                      ? "Official contact information for institutional welfare, emergency liaison, and faculty benefits."
-                      : "Contact information for emergencies, parent-teacher conferences, and academic communications."}
+                    Contact information for emergencies, parent-teacher conferences, and academic communications.
                   </p>
                 </div>
                 {isEditing && (
@@ -2430,9 +3147,7 @@ if (!savedProfile) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Primary Contact Name */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Next of Kin Full Name" : "Primary Guardian Name"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Primary Guardian Name</label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -2449,9 +3164,7 @@ if (!savedProfile) {
 
               {/* Relationship */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Relationship to Faculty Member" : "Relationship to Student"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Relationship to Student</label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -2468,9 +3181,7 @@ if (!savedProfile) {
 
               {/* Contact Phone */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Primary Contact Phone" : "Primary Contact Phone"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Primary Contact Phone</label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -2485,7 +3196,7 @@ if (!savedProfile) {
                       href={`tel:${profileData.guardianPhone}`}
                       className="text-[10px] text-[#0d5c4d] font-bold hover:underline"
                     >
-                      {currentRole === "teacher" ? "Call Next of Kin" : "Call Guardian"}
+                      Call Guardian
                     </a>
                   </div>
                 )}
@@ -2493,9 +3204,7 @@ if (!savedProfile) {
 
               {/* Contact Email */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Contact Email Address" : "Guardian Email"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Guardian Email</label>
                 {isEditing ? (
                   <input
                     type="email"
@@ -2512,9 +3221,7 @@ if (!savedProfile) {
 
               {/* Occupation */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Occupation / Workplace" : "Guardian Occupation / Workplace"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Guardian Occupation / Workplace</label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -2531,9 +3238,7 @@ if (!savedProfile) {
 
               {/* Emergency Contact */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Faculty Welfare & Emergency Liaison (24/7)" : "Emergency Contact (24/7)"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Emergency Contact (24/7)</label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -2587,25 +3292,38 @@ if (!savedProfile) {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Packages</span>
-                <p className="text-2xl font-black text-[#0d5c4d] mt-1 font-mono">4 Packages</p>
-                <p className="text-[10px] text-emerald-700 font-bold mt-1">Open for Enrolment</p>
+                <p className="text-2xl font-black text-[#0d5c4d] mt-1 font-mono">
+                  {teacherProfile?.stats?.totalPackages ?? teacherProfile?.packages?.length ?? 0}{" "}
+                  {(teacherProfile?.stats?.totalPackages ?? teacherProfile?.packages?.length ?? 0) === 1 ? "Package" : "Packages"}
+                </p>
+                <p className="text-[10px] text-emerald-700 font-bold mt-1">
+                  {(teacherProfile?.stats?.totalPackages ?? teacherProfile?.packages?.length ?? 0) > 0 ? "Open for Enrolment" : "None Published"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Subscribed Students</span>
-                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">142 Students</p>
-                <p className="text-[10px] text-slate-500 mt-1">Across 4 Active Cohorts</p>
+                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">
+                  {teacherProfile?.stats?.totalSubscribers ?? 0} Students
+                </p>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Across {teacherProfile?.stats?.totalPackages ?? teacherProfile?.packages?.length ?? 0} Batches
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Weekly Live Delivery</span>
-                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">14 Hours</p>
-                <p className="text-[10px] text-slate-500 mt-1">Google Meet &amp; Studio</p>
+                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">
+                  {teacherProfile?.stats?.totalCourses ? `${teacherProfile.stats.totalCourses * 2} Hours` : "0 Hours"}
+                </p>
+                <p className="text-[10px] text-slate-500 mt-1">Studio &amp; Google Meet</p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Monthly Batch Gross</span>
-                <p className="text-2xl font-black text-amber-600 mt-1 font-mono">Rs. 639,000</p>
+                <p className="text-2xl font-black text-amber-600 mt-1 font-mono">
+                  Rs. {(teacherProfile?.stats?.monthlyGrossRevenue ?? 0).toLocaleString()}
+                </p>
                 <p className="text-[10px] text-emerald-700 font-bold mt-1">90% Tutor Payout Share</p>
               </div>
             </div>
@@ -2617,139 +3335,112 @@ if (!savedProfile) {
                 <span className="text-[11px] font-semibold text-slate-500">Auto-billed monthly per subscriber</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  {
-                    title: "Combined Mathematics 2026 (Pure & Applied Theory)",
-                    code: "CMATH-26",
-                    tier: "A/L 2026 Comprehensive Theory",
-                    students: 48,
-                    fee: "Rs. 4,500 / mo",
-                    monthlyGross: "Rs. 216,000 / mo",
-                    delivery: "Google Meet Live Studio & HD Recordings",
-                    schedule: "Mon & Wed · 06:30 PM - 08:30 PM",
-                    progress: 76,
-                    unitsDone: 9,
-                    unitsTotal: 12,
-                    badgeColor: "border-indigo-200 bg-indigo-50/50 text-indigo-800"
-                  },
-                  {
-                    title: "Pure Mathematics 2025 (Fast-Track Paper Class)",
-                    code: "PMATH-25",
-                    tier: "A/L 2025 Revision & Model Papers",
-                    students: 42,
-                    fee: "Rs. 3,500 / mo",
-                    monthlyGross: "Rs. 147,000 / mo",
-                    delivery: "Timed Exam Walkthrough & Video Solutions",
-                    schedule: "Tue & Thu · 07:00 PM - 09:00 PM",
-                    progress: 88,
-                    unitsDone: 14,
-                    unitsTotal: 16,
-                    badgeColor: "border-emerald-200 bg-emerald-50/50 text-emerald-800"
-                  },
-                  {
-                    title: "Applied Mathematics Mechanics & Dynamics Bootcamp",
-                    code: "AMATH-26",
-                    tier: "Mechanics Intensive Topic Series",
-                    students: 32,
-                    fee: "Rs. 4,000 / mo",
-                    monthlyGross: "Rs. 128,000 / mo",
-                    delivery: "Interactive Problem Solving & Whiteboard",
-                    schedule: "Saturday Morning · 08:30 AM - 11:30 AM",
-                    progress: 70,
-                    unitsDone: 7,
-                    unitsTotal: 10,
-                    badgeColor: "border-blue-200 bg-blue-50/50 text-blue-800"
-                  },
-                  {
-                    title: "G.C.E. A/L Top Rankers Model Paper Masterclass",
-                    code: "MC-BOOST",
-                    tier: "Elite Island-Rank Booster",
-                    students: 20,
-                    fee: "Rs. 5,000 / mo",
-                    monthlyGross: "Rs. 100,000 / mo",
-                    delivery: "Curated Challenge Sets & Individual Feedback",
-                    schedule: "Sunday Evening · 06:00 PM - 09:00 PM",
-                    progress: 92,
-                    unitsDone: 11,
-                    unitsTotal: 12,
-                    badgeColor: "border-amber-200 bg-amber-50/50 text-amber-800"
-                  }
-                ].map((course, idx) => (
-                  <div
-                    key={idx}
-                    className="p-5 rounded-2xl border border-[#e6ece8] bg-[#fcfdfc] hover:border-[#b2e5d9] hover:shadow-xs transition-all space-y-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${course.badgeColor}`}>
-                            {course.code}
-                          </span>
-                          <span className="text-[11px] font-semibold text-slate-500">{course.tier}</span>
+              {tutorPackagesList && tutorPackagesList.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {tutorPackagesList.map((course, idx) => (
+                    <div
+                      key={course.id || idx}
+                      className="p-5 rounded-2xl border border-[#e6ece8] bg-[#fcfdfc] hover:border-[#b2e5d9] hover:shadow-xs transition-all space-y-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${course.badgeColor}`}>
+                              {course.code}
+                            </span>
+                            <span className="text-[11px] font-semibold text-slate-500">{course.tier}</span>
+                          </div>
+                          <h4 className="font-extrabold text-sm text-[#0d2b26] mt-1.5">{course.title}</h4>
                         </div>
-                        <h4 className="font-extrabold text-sm text-[#0d2b26] mt-1.5">{course.title}</h4>
+                        <div className="text-right shrink-0">
+                          <span className="text-xs font-mono font-black text-[#0d5c4d] block">
+                            {course.fee}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-semibold">
+                            {course.students} Subscribers
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-xs font-mono font-black text-[#0d5c4d] block">
-                          {course.fee}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-semibold">
-                          {course.students} Subscribers
-                        </span>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-2.5 text-xs bg-white p-3 rounded-xl border border-slate-100">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Monthly Package Gross</span>
-                        <p className="font-bold text-[#0d2b26] font-mono">{course.monthlyGross}</p>
+                      <div className="grid grid-cols-2 gap-2.5 text-xs bg-white p-3 rounded-xl border border-slate-100">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Monthly Package Gross</span>
+                          <p className="font-bold text-[#0d2b26] font-mono">{course.monthlyGross}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Delivery Format</span>
+                          <p className="font-semibold text-slate-800 line-clamp-1">{course.delivery}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Live Online Time Slot</span>
+                          <p className="font-bold text-[#0d5c4d]">{course.schedule}</p>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Delivery Format</span>
-                        <p className="font-semibold text-slate-800 line-clamp-1">{course.delivery}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Live Online Time Slot</span>
-                        <p className="font-bold text-[#0d5c4d]">{course.schedule}</p>
-                      </div>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500 font-medium">Syllabus Completion</span>
-                        <span className="font-bold text-[#0d5c4d]">
-                          {course.unitsDone} of {course.unitsTotal} Units ({course.progress}%)
-                        </span>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500 font-medium">Syllabus Completion</span>
+                          <span className="font-bold text-[#0d5c4d]">
+                            {course.unitsDone} of {course.unitsTotal} Units ({course.progress}%)
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-[#0d5c4d] to-[#147a66] rounded-full transition-all"
+                            style={{ width: `${course.progress}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-[#0d5c4d] to-[#147a66] rounded-full transition-all"
-                          style={{ width: `${course.progress}%` }}
-                        />
-                      </div>
-                    </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setCurrentView("syllabus_builder")}
-                        className="text-[11px] font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Manage Syllabus &amp; Notes</span>
-                        <ChevronRight className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentView("assignments")}
-                        className="text-[11px] font-bold text-slate-600 hover:text-[#0d5c4d] transition-colors cursor-pointer"
-                      >
-                        Submissions &amp; Coursework &rarr;
-                      </button>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentView("syllabus_builder")}
+                          className="text-[11px] font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Manage Syllabus &amp; Notes</span>
+                          <ChevronRight className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCurrentView("assignments")}
+                          className="text-[11px] font-bold text-slate-600 hover:text-[#0d5c4d] transition-colors cursor-pointer"
+                        >
+                          Submissions &amp; Coursework &rarr;
+                        </button>
+                      </div>
                     </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-4 rounded-2xl border-2 border-dashed border-slate-200 bg-[#fbfdfc] space-y-3">
+                  <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-[#0d5c4d] flex items-center justify-center mx-auto">
+                    <BookOpen className="h-6 w-6" />
                   </div>
-                ))}
-              </div>
+                  <h4 className="font-extrabold text-sm text-[#0d2b26]">No Active Study Packages or Batches</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    You have not published any study packages or cohorts yet. Launch the Teaching Studio or Syllabus Builder to set up your curriculum and start enrolling students.
+                  </p>
+                  <div className="pt-2 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView("teaching")}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      <span>Launch Teaching Studio</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView("syllabus_builder")}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Create Course / Syllabus</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2813,416 +3504,103 @@ if (!savedProfile) {
             {/* Day Schedule Notice Banner */}
             <div className="p-3.5 rounded-2xl bg-[#f6fbf9] border border-[#c4e9e0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#0d5c4d]">
               <div className="flex items-center gap-2.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span className="font-bold">Active Live Schedule for {selectedScheduleDay} · Online Teaching Studio</span>
+                <span className={`h-2.5 w-2.5 rounded-full ${dayLiveSessions.length > 0 ? "bg-emerald-500 animate-pulse" : "bg-slate-300"} shrink-0`} />
+                <span className="font-bold">
+                  {dayLiveSessions.length > 0
+                    ? `Active Live Schedule for ${selectedScheduleDay} · Online Teaching Studio (${dayLiveSessions.length} ${dayLiveSessions.length === 1 ? 'Session' : 'Sessions'})`
+                    : `No Live Stream Scheduled for ${selectedScheduleDay}`}
+                </span>
               </div>
-              <span className="font-mono font-bold text-[11px] bg-white px-2.5 py-1 rounded-full border border-[#b2e5d9] self-start sm:self-auto">
-                Studio Streaming Active
+              <span className={`font-mono font-bold text-[11px] bg-white px-2.5 py-1 rounded-full border ${dayLiveSessions.length > 0 ? "border-[#b2e5d9] text-[#0d5c4d]" : "border-slate-200 text-slate-400"} self-start sm:self-auto`}>
+                {dayLiveSessions.length > 0 ? "Studio Streaming Active" : "No Streams"}
               </span>
             </div>
 
             {/* Live Session Cards */}
             <div className="space-y-3">
-              {(dayLiveSessions && dayLiveSessions.length > 0
-                ? dayLiveSessions
-                : (selectedScheduleDay === "Monday"
-                  ? [
-                      {
-                        time: "06:30 PM - 08:30 PM",
-                        subject: "Combined Mathematics - Differential Calculus & Real Analysis",
-                        cohort: "Batch CMATH-26 · 48 Enrolled Subscribers",
-                        type: "Live Theory Lecture",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/cmt-26-live",
-                        isLive: true
-                      },
-                      {
-                        time: "08:45 PM - 09:30 PM",
-                        subject: "1-on-1 Student Doubt Clearing & Homework Review",
-                        cohort: "Open Office Hours · All Active Subscribers",
-                        type: "Interactive Clinic",
-                        platform: "Google Meet Video Room",
-                        meetCode: "meet.google.com/tutor-doubt-hub",
-                        isLive: false
-                      }
-                    ]
-                  : selectedScheduleDay === "Tuesday"
-                  ? [
-                      {
-                        time: "07:00 PM - 09:00 PM",
-                        subject: "Pure Mathematics - 2025 A/L Model Paper Discussion & Time Strategy",
-                        cohort: "Batch PMATH-25 · 42 Enrolled Subscribers",
-                        type: "Live Paper Class",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/pmt-25-paper",
-                        isLive: true
-                      }
-                    ]
-                  : selectedScheduleDay === "Wednesday"
-                  ? [
-                      {
-                        time: "06:30 PM - 08:30 PM",
-                        subject: "Combined Mathematics - Calculus Tutorial & Complex Problem Sets",
-                        cohort: "Batch CMATH-26 · 48 Enrolled Subscribers",
-                        type: "Live Problem Solving",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/cmt-26-live",
-                        isLive: true
-                      },
-                      {
-                        time: "08:40 PM - 09:15 PM",
-                        subject: "Homework Grading, Solution Upload & PDF Releases",
-                        cohort: "LMS Content Management",
-                        type: "Portal Update",
-                        platform: "Tutor Content Studio",
-                        meetCode: "",
-                        isLive: false
-                      }
-                    ]
-                  : selectedScheduleDay === "Thursday"
-                  ? [
-                      {
-                        time: "07:00 PM - 09:00 PM",
-                        subject: "Pure Mathematics - Trigonometry & Complex Numbers Workshop",
-                        cohort: "Batch PMATH-25 · 42 Enrolled Subscribers",
-                        type: "Masterclass Workshop",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/pmt-25-paper",
-                        isLive: true
-                      }
-                    ]
-                  : selectedScheduleDay === "Friday"
-                  ? [
-                      {
-                        time: "06:30 PM - 07:45 PM",
-                        subject: "Weekly Mathematics Olympiad & Advanced Challenge Seminar",
-                        cohort: "Elite Challenge Cohort · Top Rankers",
-                        type: "Special Masterclass",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/mth-olym-live",
-                        isLive: true
-                      },
-                      {
-                        time: "08:00 PM - 09:00 PM",
-                        subject: "Study Notes, Video Recording Archival & Week 08 Wrap-up",
-                        cohort: "All Enrolled Batches",
-                        type: "Content Production",
-                        platform: "LMS Cloud Vault",
-                        meetCode: "",
-                        isLive: false
-                      }
-                    ]
-                  : selectedScheduleDay === "Saturday"
-                  ? [
-                      {
-                        time: "08:30 AM - 11:30 AM",
-                        subject: "Applied Mathematics - Mechanics, Equilibrium & Circular Motion Bootcamp",
-                        cohort: "Batch AMATH-26 · 32 Enrolled Subscribers",
-                        type: "3-Hour Intensive",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/amt-26-mech",
-                        isLive: true
-                      }
-                    ]
-                  : [
-                      {
-                        time: "06:00 PM - 09:00 PM",
-                        subject: "Top Rankers Model Paper Masterclass - Island Rank Problem Clinic",
-                        cohort: "Batch MC-BOOST · 20 Enrolled Subscribers",
-                        type: "Elite Masterclass",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/mc-boost-live",
-                        isLive: true
-                      }
-                    ]
-              )).map((slot, idx) => (
-                <div
-                  key={idx}
-                  className="p-5 rounded-2xl border border-[#e6ece8] bg-white hover:border-[#b2e5d9] shadow-2xs hover:shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-                >
-                  <div className="flex items-start sm:items-center gap-3.5">
-                    <div className="h-12 w-28 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex flex-col items-center justify-center font-bold shrink-0">
-                      <span className="text-[11px] font-black">{slot.type}</span>
-                      <span className="text-[9px] text-slate-500 font-mono mt-0.5">{slot.time}</span>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-extrabold text-sm text-[#0d2b26]">{slot.subject}</span>
-                        {slot.isLive && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Live Session
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        Target: <span className="font-semibold text-slate-700">{slot.cohort}</span> · Platform:{" "}
-                        <span className="font-semibold text-[#0d5c4d]">{slot.platform}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-start md:self-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 w-full md:w-auto justify-end">
-                    {slot.meetCode ? (
-                      <a
-                        href={`https://${slot.meetCode}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                      >
-                        <Video className="h-3.5 w-3.5" />
-                        <span>Launch Google Meet</span>
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setCurrentView("content_vault")}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-                      >
-                        <span>Open Vault</span>
-                        <ChevronRight className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =================================================================== */}
-      {/* TEACHER TAB: QUALIFICATIONS & CREDENTIALS                           */}
-      {/* =================================================================== */}
-      {currentRole === "teacher" && activeTab === "qualifications" && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Academic Qualifications &amp; Pedagogical Degrees</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Verified university credentials, post-graduate education diplomas, and research specializations.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleDownloadTeacherDossier}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-md transition-colors cursor-pointer"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Download Faculty Dossier (PDF)</span>
-                </button>
-              </div>
-            </div>
-
-            {/* University Degrees List */}
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
-                    <Award className="h-4 w-4 text-[#0d5c4d]" />
-                    <span>Higher Education Degrees &amp; Diplomas</span>
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Manage certified university degrees, diplomas, and collegiate qualifications.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDegreeModalState({
-                      isOpen: true,
-                      mode: "add",
-                      data: {
-                        degree: "",
-                        institution: "",
-                        year: new Date().getFullYear().toString(),
-                        honors: "",
-                        details: ""
-                      }
-                    });
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Add Degree / Qualification</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {qualificationsList.map((item, idx) => (
+              {dayLiveSessions && dayLiveSessions.length > 0 ? (
+                dayLiveSessions.map((slot, idx) => (
                   <div
-                    key={item.id || idx}
-                    className="p-5 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3 flex flex-col justify-between hover:border-[#0d5c4d] transition-all shadow-2xs group"
+                    key={idx}
+                    className="p-5 rounded-2xl border border-[#e6ece8] bg-white hover:border-[#b2e5d9] shadow-2xs hover:shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
                   >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2.5 py-0.5 rounded-full border border-[#c4e9e0]">
-                          {item.year || "Year N/A"}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDegreeModalState({
-                                isOpen: true,
-                                mode: "edit",
-                                index: idx,
-                                data: { ...item }
-                              });
-                            }}
-                            className="p-1 rounded-lg text-slate-400 hover:text-[#0d5c4d] hover:bg-white transition-colors cursor-pointer"
-                            title="Edit Qualification"
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteDegree(idx)}
-                            className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                            title="Delete Qualification"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                    <div className="flex items-start sm:items-center gap-3.5">
+                      <div className="h-12 w-28 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex flex-col items-center justify-center font-bold shrink-0">
+                        <span className="text-[11px] font-black">{slot.type}</span>
+                        <span className="text-[9px] text-slate-500 font-mono mt-0.5">{slot.time}</span>
                       </div>
 
-                      <h5 className="font-black text-sm text-[#0d2b26] leading-snug">{item.degree}</h5>
-                      <p className="text-xs font-semibold text-slate-700">{item.institution}</p>
-                      {item.honors && (
-                        <p className="text-xs text-amber-700 font-bold">{item.honors}</p>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-extrabold text-sm text-[#0d2b26]">{slot.subject}</span>
+                          {slot.isLive && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Live Session
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          Target: <span className="font-semibold text-slate-700">{slot.cohort}</span> · Platform:{" "}
+                          <span className="font-semibold text-[#0d5c4d]">{slot.platform}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start md:self-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 w-full md:w-auto justify-end">
+                      {slot.meetCode ? (
+                        <a
+                          href={slot.meetCode.startsWith("http") ? slot.meetCode : `https://${slot.meetCode}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Video className="h-3.5 w-3.5" />
+                          <span>Launch Google Meet</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setCurrentView("content_vault")}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                        >
+                          <span>Open Vault</span>
+                          <ChevronRight className="h-3 w-3" />
+                        </button>
                       )}
                     </div>
-
-                    {item.details && (
-                      <p className="text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 leading-relaxed">
-                        {item.details}
-                      </p>
-                    )}
                   </div>
-                ))}
-
-                {qualificationsList.length === 0 && (
-                  <div className="md:col-span-3 p-8 text-center rounded-2xl border border-dashed border-slate-300 space-y-2">
-                    <GraduationCap className="h-8 w-8 text-slate-400 mx-auto" />
-                    <p className="text-xs font-bold text-slate-600">No degrees or diplomas added yet.</p>
-                    <p className="text-[11px] text-slate-400">Click &quot;Add Degree / Qualification&quot; above to list your higher education background.</p>
+                ))
+              ) : (
+                <div className="text-center py-12 px-4 rounded-2xl border-2 border-dashed border-slate-200 bg-[#fbfdfc] space-y-3">
+                  <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-[#0d5c4d] flex items-center justify-center mx-auto">
+                    <Calendar className="h-6 w-6" />
                   </div>
-                )}
-              </div>
-            </div>
-
-            {/* National Accreditations & Licensing */}
-            <div className="space-y-4 pt-6 border-t border-slate-100">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
-                    <span>Professional Licensing &amp; National Accreditations</span>
+                  <h4 className="font-extrabold text-sm text-[#0d2b26]">
+                    No Live Classes Scheduled for {selectedScheduleDay}
                   </h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Official teaching service licenses, examiner credentials, and state pedagogical awards.
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    There are no live classes scheduled for this day in your timetable. You can schedule a new live session or adjust your timetable anytime.
                   </p>
+                  <div className="pt-2 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView("live_schedule")}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Manage Live Schedule</span>
+                    </button>
+                  </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAccreditationModalState({
-                      isOpen: true,
-                      mode: "add",
-                      data: {
-                        id: "",
-                        title: "",
-                        issuer: "",
-                        regNo: "",
-                        status: "Active & Verified Service",
-                        badge: "Accredited",
-                        badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200"
-                      }
-                    });
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Add License / Accreditation</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {accreditationsList.map((lic, idx) => (
-                  <div
-                    key={lic.id || idx}
-                    className="p-5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs hover:shadow-xs transition-all space-y-3 hover:border-[#0d5c4d] group"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${lic.badgeColor || "bg-emerald-50 text-emerald-800 border-emerald-200"}`}>
-                          {lic.badge}
-                        </span>
-                        <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1.5 leading-snug">{lic.title}</h5>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {lic.regNo && (
-                          <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                            {lic.regNo}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAccreditationModalState({
-                              isOpen: true,
-                              mode: "edit",
-                              index: idx,
-                              data: { ...lic }
-                            });
-                          }}
-                          className="p-1 rounded-lg text-slate-400 hover:text-[#0d5c4d] hover:bg-slate-50 transition-colors cursor-pointer"
-                          title="Edit Accreditation"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteAccreditation(idx)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                          title="Delete Accreditation"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-slate-500 font-medium">{lic.issuer}</p>
-
-                    <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold pt-2 border-t border-slate-100">
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                      <span>{lic.status}</span>
-                    </div>
-                  </div>
-                ))}
-
-                {accreditationsList.length === 0 && (
-                  <div className="md:col-span-2 p-8 text-center rounded-2xl border border-dashed border-slate-300 space-y-2">
-                    <ShieldCheck className="h-8 w-8 text-slate-400 mx-auto" />
-                    <p className="text-xs font-bold text-slate-600">No accreditations or licenses added yet.</p>
-                    <p className="text-[11px] text-slate-400">Click &quot;Add License / Accreditation&quot; above to list teaching licenses and examiner appointments.</p>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </div>
       )}
+
+
 
       {/* =================================================================== */}
       {/* TEACHER TAB: BANK & PAYOUT DETAILS                                  */}
@@ -4483,8 +4861,12 @@ if (!savedProfile) {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                 <div className="absolute bottom-4 left-6 right-6 flex items-end justify-between">
                   <div className="flex items-end gap-4">
-                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-[#0d5c4d] to-[#147a66] border-4 border-white text-white flex items-center justify-center text-3xl font-black shadow-xl">
-                      {profileData.name.charAt(0)}
+                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-[#0d5c4d] to-[#147a66] border-4 border-white text-white flex items-center justify-center text-3xl font-black shadow-xl overflow-hidden">
+                      {profileData.avatarUrl ? (
+                        <img src={profileData.avatarUrl} alt={profileData.name} className="h-full w-full object-cover" />
+                      ) : (
+                        profileData.name.charAt(0)
+                      )}
                     </div>
                     <div className="text-white space-y-0.5">
                       <div className="flex items-center gap-2">
@@ -4558,53 +4940,47 @@ if (!savedProfile) {
                     <span className="text-[11px] font-semibold text-emerald-700">Admission Open</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {[
-                      {
-                        title: "Combined Mathematics 2026 (Theory & Revision)",
-                        fee: "Rs. 4,500 / month",
-                        schedule: "Mon & Wed · 06:30 PM",
-                        features: ["Live Interactive Stream", "Recorded HD Archive", "Past Paper Vault", "WhatsApp Q&A"]
-                      },
-                      {
-                        title: "Pure Mathematics Fast-Track Paper Class",
-                        fee: "Rs. 3,500 / month",
-                        schedule: "Tue & Thu · 07:00 PM",
-                        features: ["Timed Exam Simulations", "Model Papers", "Marking Scheme Review", "Monthly Assessment"]
-                      }
-                    ].map((pkg, idx) => (
-                      <div key={idx} className="p-4 rounded-2xl bg-white border border-[#e2eae5] hover:border-[#0d5c4d] shadow-2xs space-y-3 transition-all">
-                        <div className="flex items-start justify-between gap-2">
-                          <h5 className="font-bold text-sm text-[#0d2b26]">{pkg.title}</h5>
-                          <span className="font-mono font-black text-xs text-[#0d5c4d] whitespace-nowrap bg-[#ecf8f5] px-2.5 py-1 rounded-lg">
-                            {pkg.fee}
-                          </span>
+                  {tutorPackagesList && tutorPackagesList.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {tutorPackagesList.map((pkg, idx) => (
+                        <div key={pkg.id || idx} className="p-4 rounded-2xl bg-white border border-[#e2eae5] hover:border-[#0d5c4d] shadow-2xs space-y-3 transition-all">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-teal-200 bg-teal-50 text-teal-800">
+                                {pkg.code}
+                              </span>
+                              <h5 className="font-bold text-sm text-[#0d2b26] mt-1">{pkg.title}</h5>
+                            </div>
+                            <span className="font-mono font-black text-xs text-[#0d5c4d] whitespace-nowrap bg-[#ecf8f5] px-2.5 py-1 rounded-lg">
+                              {pkg.fee}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-medium">🕒 {pkg.schedule}</p>
+                          <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                            <span className="font-semibold text-slate-700">{pkg.tier}</span> · {pkg.delivery}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              addToast({
+                                type: "info",
+                                title: "Enrollment Notice",
+                                message: `In public mode, clicking this lets students subscribe to ${pkg.title}.`
+                              });
+                            }}
+                            className="w-full py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Enroll in Batch Now
+                          </button>
                         </div>
-                        <p className="text-[11px] text-slate-500 font-medium">🕒 {pkg.schedule}</p>
-                        <ul className="space-y-1 text-[11px] text-slate-600">
-                          {pkg.features.map((f, i) => (
-                            <li key={i} className="flex items-center gap-1.5">
-                              <Check className="h-3 w-3 text-emerald-600" />
-                              <span>{f}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            addToast({
-                              type: "info",
-                              title: "Enrollment Notice",
-                              message: `In public mode, clicking this lets students subscribe to ${pkg.title}.`
-                            });
-                          }}
-                          className="w-full py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-colors cursor-pointer"
-                        >
-                          Enroll in Batch Now
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center rounded-2xl border border-dashed border-slate-200 bg-[#f8faf9] space-y-1">
+                      <p className="text-xs font-bold text-slate-600">No study packages published yet</p>
+                      <p className="text-[11px] text-slate-400">Packages created in the Teaching Studio or Connect Hub will automatically appear here.</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Social Channels & Contact */}
@@ -5299,6 +5675,120 @@ if (!savedProfile) {
                   className="px-5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs transition-colors shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   Apply Cover Banner
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AVATAR PRESETS MODAL */}
+      {avatarModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-[#c4e9e0] space-y-4">
+            <div className="px-6 pt-6 pb-2 flex items-center justify-between border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
+                  <Camera className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[#0d2b26]">Select Profile Picture</h3>
+                  <p className="text-xs text-slate-500">Pick a professional educator preset or paste a custom image link.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAvatarModalOpen(false)}
+                className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="px-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700">Curated Educator Avatars</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {EDUCATOR_AVATARS.map((preset, idx) => {
+                    const isSelected = profileData.avatarUrl === preset.url;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setProfileData((prev) => ({ ...prev, avatarUrl: preset.url }));
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, preset.url);
+                            localStorage.setItem("lms_avatar_teacher", preset.url);
+                          }
+                          setAvatarModalOpen(false);
+                          addToast({
+                            type: "success",
+                            title: "Preset Selected",
+                            message: "Profile photo updated. Click 'Save Details' to persist."
+                          });
+                        }}
+                        className={`group relative rounded-2xl overflow-hidden border-2 aspect-square transition-all cursor-pointer ${
+                          isSelected ? "border-[#0d5c4d] ring-2 ring-[#0d5c4d]/30" : "border-slate-200 hover:border-[#0d5c4d]"
+                        }`}
+                      >
+                        <img src={preset.url} alt={preset.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-1.5 text-white text-[10px] font-bold">
+                          <span className="truncate">{preset.title}</span>
+                        </div>
+                        {isSelected && (
+                          <div className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full bg-[#0d5c4d] text-white flex items-center justify-center shadow">
+                            <Check className="h-3 w-3" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <label className="text-xs font-bold text-slate-700">Or Paste Custom Image URL</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    value={customAvatarUrlInput}
+                    onChange={(e) => setCustomAvatarUrlInput(e.target.value)}
+                    placeholder="https://images.unsplash.com/photo-..."
+                    className="flex-1 h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!customAvatarUrlInput.trim()) return;
+                      setProfileData((prev) => ({ ...prev, avatarUrl: customAvatarUrlInput.trim() }));
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, customAvatarUrlInput.trim());
+                        localStorage.setItem("lms_avatar_teacher", customAvatarUrlInput.trim());
+                      }
+                      setCustomAvatarUrlInput("");
+                      setAvatarModalOpen(false);
+                      addToast({
+                        type: "success",
+                        title: "Custom Photo Applied",
+                        message: "Profile photo updated. Click 'Save Details' to persist."
+                      });
+                    }}
+                    disabled={!customAvatarUrlInput.trim()}
+                    className="px-4 py-2 h-10 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-3 pb-6 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setAvatarModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Close
                 </button>
               </div>
             </div>

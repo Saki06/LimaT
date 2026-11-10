@@ -111,6 +111,8 @@ const parseQualificationsField = (raw: any) => {
       accreditations: Array.isArray(raw.accreditations) ? raw.accreditations : [],
       bankAccounts: Array.isArray(raw.bankAccounts) ? raw.bankAccounts : [],
       socialChannels: Array.isArray(raw.socialChannels) ? raw.socialChannels : [],
+      dob: raw.dob || raw.dateOfBirth || '',
+      gender: raw.gender || '',
     };
   }
   return {
@@ -118,6 +120,8 @@ const parseQualificationsField = (raw: any) => {
     accreditations: [],
     bankAccounts: [],
     socialChannels: [],
+    dob: '',
+    gender: '',
   };
 };
 
@@ -160,6 +164,8 @@ export const getMyTeacherProfile = async (req: AuthenticatedRequest, res: Respon
         accreditations: parsedQ.accreditations,
         bankAccounts: parsedQ.bankAccounts,
         socialChannels: parsedQ.socialChannels,
+        dob: parsedQ.dob,
+        gender: parsedQ.gender,
         stats: {
           totalSubscribers,
           monthlyGrossRevenue,
@@ -219,6 +225,8 @@ export const updateMyTeacherProfile = async (req: AuthenticatedRequest, res: Res
       whatsappNumber,
       websiteUrl,
       coverImageUrl,
+      dob,
+      gender,
     } = req.body;
 
     // Ensure teacher profile exists
@@ -253,12 +261,14 @@ export const updateMyTeacherProfile = async (req: AuthenticatedRequest, res: Res
 
     // Merge qualifications object if any extended collection is provided
     let qualificationsPayload: any = undefined;
-    if (qualifications !== undefined || accreditations !== undefined || bankAccounts !== undefined || socialChannels !== undefined) {
+    if (qualifications !== undefined || accreditations !== undefined || bankAccounts !== undefined || socialChannels !== undefined || dob !== undefined || gender !== undefined) {
       qualificationsPayload = {
         degrees: qualifications !== undefined ? (Array.isArray(qualifications) ? qualifications : existingQ.qualifications) : existingQ.qualifications,
         accreditations: accreditations !== undefined ? accreditations : existingQ.accreditations,
         bankAccounts: bankAccounts !== undefined ? bankAccounts : existingQ.bankAccounts,
         socialChannels: socialChannels !== undefined ? socialChannels : existingQ.socialChannels,
+        dob: dob !== undefined ? dob : (existingQ.dob || ''),
+        gender: gender !== undefined ? gender : (existingQ.gender || ''),
       };
     }
 
@@ -355,6 +365,8 @@ export const updateMyTeacherProfile = async (req: AuthenticatedRequest, res: Res
         accreditations: parsedUpdated.accreditations,
         bankAccounts: parsedUpdated.bankAccounts,
         socialChannels: parsedUpdated.socialChannels,
+        dob: parsedUpdated.dob,
+        gender: parsedUpdated.gender,
       },
     });
   } catch (error) {

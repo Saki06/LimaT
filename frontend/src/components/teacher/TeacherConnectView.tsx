@@ -202,24 +202,49 @@ export function TeacherConnectView() {
     return <Card className="p-10 text-center"><p className="text-lg font-black text-[#0d2b26]">Tutor Connect Hub is currently disabled</p><p className="mt-2 text-sm text-slate-500">Please contact platform administration.</p></Card>;
   }
 
-  // Active tab inside Teacher Connect Hub - Default to Packages
+  // Active tab inside Teacher Connect Hub - Default to Packages or restore from URL/localStorage
   const [activeTab, setActiveTab] = useState<TeacherConnectTab>("packages");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlTab = params.get("tab") as TeacherConnectTab;
+      if (urlTab && ["packages", "subscribers", "slips"].includes(urlTab)) {
+        setActiveTab(urlTab);
+      } else {
+        const savedTab = localStorage.getItem("lms_teacher_connect_tab") as TeacherConnectTab;
+        if (savedTab && ["packages", "subscribers", "slips"].includes(savedTab)) {
+          setActiveTab(savedTab);
+        }
+      }
+    }
+  }, []);
+
+  const handleTabChange = (tab: TeacherConnectTab) => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("lms_teacher_connect_tab", tab);
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", tab);
+      window.history.replaceState({}, "", url.pathname + "?" + url.searchParams.toString());
+    }
+  };
 
   const mapBackendPackageToFrontend = (pkg: any): TutorPackage => ({
     id: pkg.id,
-    teacherId: pkg.teacherId || "usr_teacher_01",
+    teacherId: pkg.teacherId || "",
     title: pkg.title,
-    subject: pkg.courses?.[0]?.course?.title || "Combined Mathematics",
-    grade: "Grade 12 & 13 (A/L)",
-    monthlyFeeLkr: pkg.price || 2500,
+    subject: pkg.courses?.[0]?.course?.title || pkg.title || "Tuition Package",
+    grade: pkg.grade || pkg.courses?.[0]?.course?.gradeName || "All Grades",
+    monthlyFeeLkr: Number(pkg.price) || 0,
     billingCycle: pkg.billingCycle === "ONE_TIME" ? "Full Syllabus Pass" : "Monthly",
-    description: pkg.description || "Comprehensive tuition module with live interactive classes and revision notes.",
-    features: Array.isArray(pkg.features) && pkg.features.length > 0 ? pkg.features : ["Live Interactive Classes / Week", "Recorded Video Access"],
-    liveClassesPerWeek: 3,
+    description: pkg.description || "",
+    features: Array.isArray(pkg.features) && pkg.features.length > 0 ? pkg.features : [],
+    liveClassesPerWeek: pkg.liveClassesPerWeek || (pkg.liveClasses?.length || 0),
     status: pkg.isPublished ? "active" : "draft",
-    enrolledCount: pkg._count?.subscriptions || 0,
+    enrolledCount: pkg._count?.subscriptions || pkg.subscriptions?.length || 0,
     badge: pkg.price > 0 ? "POPULAR" : "FREE",
-    createdAt: new Date(pkg.createdAt).toISOString().split("T")[0],
+    createdAt: pkg.createdAt ? new Date(pkg.createdAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
   });
 
   // Packages CRUD state
@@ -254,18 +279,17 @@ export function TeacherConnectView() {
   // Form State
   const initialPackageForm = {
     title: "",
-    subject: "Combined Mathematics",
-    grade: "Grade 12 & 13 (A/L)",
-    monthlyFeeLkr: 3000,
+    subject: "",
+    grade: "All Grades (Grades 1 – 13)",
+    monthlyFeeLkr: 0,
     billingCycle: "Monthly" as "Monthly" | "Term (3 Months)" | "Full Syllabus Pass",
     description: "",
     features: [
-      "Live Interactive Classes / Week (Google Meet)",
-      "Recorded Video Lessons Archive with 24/7 Access",
-      "Printable Theory & Exercise Tutes (PDF)",
-      "Monthly Model Paper Discussion & Marking"
+      "Live Interactive Classes",
+      "Recorded Video Lessons Archive",
+      "Printable Study Notes & Tutes (PDF)"
     ],
-    liveClassesPerWeek: 3,
+    liveClassesPerWeek: 1,
     status: "active" as "active" | "draft",
     badge: ""
   };
@@ -444,18 +468,18 @@ export function TeacherConnectView() {
       prev.map((p) =>
         p.id === editingPackage.id
           ? {
-              ...p,
-              title: packageFormData.title.trim(),
-              subject: packageFormData.subject,
-              grade: packageFormData.grade,
-              monthlyFeeLkr: Number(packageFormData.monthlyFeeLkr) || p.monthlyFeeLkr,
-              billingCycle: packageFormData.billingCycle,
-              description: packageFormData.description.trim(),
-              features: packageFormData.features,
-              liveClassesPerWeek: Number(packageFormData.liveClassesPerWeek) || p.liveClassesPerWeek,
-              status: packageFormData.status,
-              badge: packageFormData.badge.trim() || undefined
-            }
+            ...p,
+            title: packageFormData.title.trim(),
+            subject: packageFormData.subject,
+            grade: packageFormData.grade,
+            monthlyFeeLkr: Number(packageFormData.monthlyFeeLkr) || p.monthlyFeeLkr,
+            billingCycle: packageFormData.billingCycle,
+            description: packageFormData.description.trim(),
+            features: packageFormData.features,
+            liveClassesPerWeek: Number(packageFormData.liveClassesPerWeek) || p.liveClassesPerWeek,
+            status: packageFormData.status,
+            badge: packageFormData.badge.trim() || undefined
+          }
           : p
       )
     );
@@ -531,10 +555,10 @@ export function TeacherConnectView() {
       prev.map((s) =>
         s.id === subId
           ? {
-              ...s,
-              status: "active",
-              validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
-            }
+            ...s,
+            status: "active",
+            validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+          }
           : s
       )
     );
@@ -667,7 +691,7 @@ export function TeacherConnectView() {
                 {pendingSlips.length} Slips
               </p>
               <button
-                onClick={() => setActiveTab("slips")}
+                onClick={() => handleTabChange("slips")}
                 className="text-[10px] text-[#b47a16] hover:underline font-bold mt-0.5 cursor-pointer block"
               >
                 Review &amp; approve &rarr;
@@ -696,46 +720,41 @@ export function TeacherConnectView() {
       {/* Teacher Connect Navigation Tabs */}
       <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-white/80 backdrop-blur-md border border-[#c4e9e0] shadow-xs">
         <button
-          onClick={() => setActiveTab("packages")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "packages"
+          onClick={() => handleTabChange("packages")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "packages"
               ? "bg-[#0d5c4d] text-white shadow-xs font-black"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-          }`}
+            }`}
         >
           <Package className="h-4 w-4" />
           <span>Fee Packages</span>
-          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-            activeTab === "packages" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-          }`}>
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeTab === "packages" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+            }`}>
             {packages.length}
           </span>
         </button>
 
         <button
-          onClick={() => setActiveTab("subscribers")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "subscribers"
+          onClick={() => handleTabChange("subscribers")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "subscribers"
               ? "bg-[#0d5c4d] text-white shadow-xs font-black"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-          }`}
+            }`}
         >
           <Users className="h-4 w-4" />
           <span>Subscribed Students</span>
-          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-            activeTab === "subscribers" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-          }`}>
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeTab === "subscribers" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+            }`}>
             {filteredSubscribers.length}
           </span>
         </button>
 
         <button
-          onClick={() => setActiveTab("slips")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "slips"
+          onClick={() => handleTabChange("slips")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "slips"
               ? "bg-[#0d5c4d] text-white shadow-xs font-black"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-          }`}
+            }`}
         >
           <Receipt className="h-4 w-4" />
           <span>Bank Slip Approvals</span>
@@ -840,11 +859,10 @@ export function TeacherConnectView() {
                           </span>
                         )}
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
-                            pkg.status === "active"
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${pkg.status === "active"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                               : "bg-amber-50 text-amber-700 border-amber-200"
-                          }`}
+                            }`}
                         >
                           {pkg.status}
                         </span>
@@ -945,11 +963,10 @@ export function TeacherConnectView() {
                         size="sm"
                         variant="outline"
                         onClick={() => handleTogglePackageStatus(pkg.id)}
-                        className={`text-xs font-bold cursor-pointer border ${
-                          pkg.status === "active"
+                        className={`text-xs font-bold cursor-pointer border ${pkg.status === "active"
                             ? "border-amber-200 text-amber-700 hover:bg-amber-50"
                             : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                        }`}
+                          }`}
                         title={pkg.status === "active" ? "Switch to Draft" : "Publish to Students"}
                       >
                         {pkg.status === "active" ? "Pause" : "Publish"}

@@ -106,8 +106,28 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     deleteLibraryResource,
     recordResourceView,
     recordResourceDownload,
-    fetchLibraryResources
+    fetchLibraryResources,
+    teacherProfile,
+    refreshTeacherProfile
   } = useApp();
+
+  // Make sure the tutor's own profile (with their subject specializations) is loaded
+  useEffect(() => {
+    if (!teacherProfile && currentUser?.role === "teacher") {
+      void refreshTeacherProfile();
+    }
+  }, [teacherProfile, currentUser?.role, refreshTeacherProfile]);
+
+  // Subjects this tutor teaches: profile specializations + subjects of their own courses
+  const teacherSubjectOptions: string[] = useMemo(() => {
+    const set = new Set<string>();
+    (teacherProfile?.specialization || "")
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter(Boolean)
+      .forEach((s: string) => set.add(s));
+    return Array.from(set);
+  }, [teacherProfile]);
 
   // Filter courses strictly for this individual Tutor's workspace
   const teacherCourses: Course[] = useMemo(() => {
@@ -125,6 +145,8 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
       ? "assignments"
       : currentView === "submissions"
       ? "grading"
+      : currentView === "analytics"
+      ? "analytics"
       : initialTab
   );
 
@@ -164,10 +186,13 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
       setCourseworkSubTab("resources");
     } else if (currentView === "submissions") {
       setActiveTab("grading");
+    } else if (currentView === "analytics") {
+      setActiveTab("analytics");
     } else if (currentView === "dashboard") {
       setActiveTab("home");
     }
   }, [currentView]);
+
 
   const [selectedSubId, setSelectedSubId] = useState<string>(submissions[0]?.id || "");
   const [subFilter, setSubFilter] = useState<"all" | "pending" | "marked" | "released">("pending");
@@ -241,7 +266,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [newDueDate, setNewDueDate] = useState("2026-10-18 23:59");
   const [newMaxMarks, setNewMaxMarks] = useState(100);
   const [newInstructions, setNewInstructions] = useState("");
-  const [newCourseId, setNewCourseId] = useState(courses[0]?.id || "");
+  const [newCourseId, setNewCourseId] = useState(teacherCourses[0]?.id || courses[0]?.id || "");
   const [asgPdfFile, setAsgPdfFile] = useState<{ name: string; size: string } | null>(null);
 
   // Edit assignment form state
@@ -257,7 +282,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [editAsgPdfFile, setEditAsgPdfFile] = useState<{ name: string; size: string } | null>(null);
 
   // Dynamically extract syllabus units & topics for the chosen assignment course
-  const currentAsgCourse = courses.find((c) => c.id === newCourseId) || courses[0];
+  const currentAsgCourse = teacherCourses.find((c) => c.id === newCourseId) || courses.find((c) => c.id === newCourseId) || teacherCourses[0] || courses[0];
   const asgAvailableTopics = useMemo(() => {
     if (!currentAsgCourse?.units || currentAsgCourse.units.length === 0) return [];
     return currentAsgCourse.units.flatMap((u) =>
@@ -508,7 +533,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     const finalTopic = newTopic === "__custom__" ? customTopic || "General Topic" : newTopic;
     createAssignment({
       courseId: targetCourse?.id || courses[0]?.id,
-      subjectName: targetCourse?.title || "Combined Mathematics",
+      subjectName: targetCourse?.title || teacherCourses[0]?.title || "General",
       title: newTitle,
       topicName: finalTopic,
       dueDate: newDueDate,
@@ -879,7 +904,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       {totalEnrolledStudents}
                     </span>
                     <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
-                      +12 this term
+                      {totalEnrolledStudents > 0 ? "Active Enrolment" : "No Subscribers"}
                     </Badge>
                   </div>
                   <p className="text-[11px] text-[#0d5c4d] font-semibold flex items-center gap-1">
@@ -916,7 +941,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                     </Badge>
                   </div>
                   <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                    Avg. 68% Syllabus covered <ChevronRight className="h-3 w-3 text-slate-400" />
+                    {teacherCourses.length > 0 ? `${teacherCourses.length} Active Batches` : "No Active Batches"} <ChevronRight className="h-3 w-3 text-slate-400" />
                   </p>
                 </div>
                 <div className="h-11 w-11 rounded-2xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
@@ -930,6 +955,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
               onClick={() => {
                 setSubFilter("pending");
                 setActiveTab("grading");
+                setCurrentView("submissions");
               }}
               className="border-[#e6ece8] bg-white hover:border-amber-300 hover:bg-amber-50/20 transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
             >
@@ -1282,6 +1308,8 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                               variant="outline"
                               onClick={() => {
                                 setActiveTab("assignments");
+                                setCourseworkSubTab("assignments");
+                                setCurrentView("assignments");
                                 setAssignmentFilter(course.id);
                               }}
                               className="text-xs border-slate-200 text-slate-700 hover:bg-slate-50 font-medium"
@@ -1315,7 +1343,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                   </div>
                   <Button
                     size="sm"
-                    onClick={() => setActiveTab("grading")}
+                    onClick={() => {
+                      setActiveTab("grading");
+                      setCurrentView("submissions");
+                    }}
                     variant="outline"
                     className="border-[#c4e9e0] text-[#0d5c4d] font-bold text-xs hover:bg-[#ecf8f5]"
                   >
@@ -1369,6 +1400,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                                 setSelectedSubId(sub.id);
                                 setSubFilter("pending");
                                 setActiveTab("grading");
+                                setCurrentView("submissions");
                               }}
                               className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold shadow-2xs"
                             >
@@ -1385,6 +1417,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                                 onClick={() => {
                                   setSelectedSubId(sub.id);
                                   setActiveTab("grading");
+                                  setCurrentView("submissions");
                                 }}
                                 className="text-xs border-slate-200 text-slate-700 hover:bg-slate-50"
                               >
@@ -1527,6 +1560,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       onClick={() => {
                         setSubFilter("pending");
                         setActiveTab("grading");
+                        setCurrentView("submissions");
                       }}
                       className="w-full bg-[#b47a16] hover:bg-[#925f0e] text-white text-xs font-bold mt-1"
                     >
@@ -1549,6 +1583,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       onClick={() => {
                         setSubFilter("marked");
                         setActiveTab("grading");
+                        setCurrentView("submissions");
                       }}
                       className="w-full border-[#0d5c4d] text-[#0d5c4d] hover:bg-[#ecf8f5] text-xs font-bold mt-1"
                     >
@@ -2096,7 +2131,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
             <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200 shadow-2xs overflow-x-auto">
               <button
                 type="button"
-                onClick={() => setCourseworkSubTab("assignments")}
+                onClick={() => {
+                  setCourseworkSubTab("assignments");
+                  setCurrentView("assignments");
+                }}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   courseworkSubTab === "assignments"
                     ? "bg-[#0d5c4d] text-white shadow-xs"
@@ -2109,7 +2147,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
 
               <button
                 type="button"
-                onClick={() => setCourseworkSubTab("quizzes")}
+                onClick={() => {
+                  setCourseworkSubTab("quizzes");
+                  setCurrentView("quizzes");
+                }}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   courseworkSubTab === "quizzes"
                     ? "bg-[#0d5c4d] text-white shadow-xs"
@@ -2127,7 +2168,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
 
               <button
                 type="button"
-                onClick={() => setCourseworkSubTab("resources")}
+                onClick={() => {
+                  setCourseworkSubTab("resources");
+                  setCurrentView("library");
+                }}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   courseworkSubTab === "resources"
                     ? "bg-[#0d5c4d] text-white shadow-xs"
@@ -2225,6 +2269,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                   const pendingCount = submissions.filter(
                     (s) => s.assignmentId === asg.id && s.status === "submitted"
                   ).length;
+                  const enrolledCount = totalEnrolledStudents > 0 ? totalEnrolledStudents : 0;
+                  const progressPct = enrolledCount > 0
+                    ? Math.min(100, Math.round((submissionCount / enrolledCount) * 100))
+                    : (submissionCount > 0 ? 100 : 0);
 
                   return (
                     <Card key={asg.id} className="border-[#e6ece8] bg-white shadow-2xs hover:shadow-xs transition-shadow">
@@ -2232,7 +2280,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs font-black text-[#0d5c4d] bg-[#ecf8f5] border border-[#c4e9e0] px-2.5 py-0.5 rounded-full">
-                              📚 {asg.subjectName || "Combined Mathematics"}
+                              📚 {asg.subjectName || teacherCourses[0]?.title || "Course"}
                             </span>
                             <Badge variant="outline" className="text-[10px] font-bold text-slate-700 bg-slate-50 border-slate-200">
                               {asg.topicName}
@@ -2264,10 +2312,17 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                         <div className="p-3 rounded-xl bg-[#f8faf9] border border-[#e6ece8] space-y-2">
                           <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
                             <span>Submissions Progress</span>
-                            <span>{submissionCount} / 35 Enrolled (80%)</span>
+                            <span>
+                              {enrolledCount > 0
+                                ? `${submissionCount} / ${enrolledCount} Enrolled (${progressPct}%)`
+                                : `${submissionCount} Submissions (0 Enrolled)`}
+                            </span>
                           </div>
                           <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
-                            <div className="h-full bg-[#0d5c4d] rounded-full" style={{ width: "80%" }}></div>
+                            <div
+                              className="h-full bg-[#0d5c4d] rounded-full transition-all duration-300"
+                              style={{ width: `${progressPct}%` }}
+                            ></div>
                           </div>
                           <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
                             <span className="flex items-center gap-1 text-[#b47a16] font-bold">
@@ -2371,7 +2426,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                         <CardHeader className="p-5 pb-3">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <span className="text-xs font-black text-[#0d5c4d] bg-[#ecf8f5] border border-[#c4e9e0] px-2.5 py-0.5 rounded-full">
-                              📚 {quiz.subjectName || "Combined Mathematics"}
+                              📚 {quiz.subjectName || teacherCourses[0]?.title || "Course"}
                             </span>
                             <div className="flex items-center gap-1.5">
                               <Badge
@@ -2827,6 +2882,37 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                             </div>
                           </div>
 
+                          {/* Draft / Published status strip */}
+                          {res.status === "draft" || res.status === "unpublished" ? (
+                            <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-amber-50 border border-amber-200">
+                              <span className="text-[11px] font-bold text-amber-800">
+                                🟡 {res.status === "draft" ? "Draft" : "Unpublished"} — hidden from students
+                              </span>
+                              <Button
+                                size="sm"
+                                onClick={() => updateLibraryResource(res.id, { status: "published" })}
+                                className="h-6 text-[11px] font-bold bg-[#0d5c4d] hover:bg-[#083e34] text-white px-2.5 cursor-pointer"
+                                title="Publish this material to students"
+                              >
+                                Publish
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-emerald-50 border border-emerald-200">
+                              <span className="text-[11px] font-bold text-emerald-800">
+                                🟢 Published — visible to students
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => updateLibraryResource(res.id, { status: "unpublished" })}
+                                className="text-[11px] font-bold text-slate-600 hover:text-rose-600 underline cursor-pointer"
+                                title="Hide this material from students"
+                              >
+                                Unpublish
+                              </button>
+                            </div>
+                          )}
+
                           {/* Actions Footer */}
                           <div className="flex items-center justify-between gap-1.5 pt-3 border-t border-slate-100">
                             <div className="flex items-center gap-1">
@@ -3060,7 +3146,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 }}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                {courses.map((c) => (
+                {(teacherCourses.length > 0 ? teacherCourses : courses).map((c) => (
                   <option key={c.id} value={c.id}>
                     📚 {c.title} ({c.code || c.className || "A/L"})
                   </option>
@@ -3253,7 +3339,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 }}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                {courses.map((c) => (
+                {(teacherCourses.length > 0 ? teacherCourses : courses).map((c) => (
                   <option key={c.id} value={c.id}>
                     📚 {c.title} ({c.code || c.className || "A/L"})
                   </option>
@@ -3451,7 +3537,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 }}
                 className="w-full h-9 px-2.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-none focus:border-[#0d5c4d]"
               >
-                {courses.map((c) => (
+                {(teacherCourses.length > 0 ? teacherCourses : courses).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.title} ({c.code})
                   </option>
@@ -4327,7 +4413,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
 
                 <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-slate-700">
                   <div><strong>Candidate Name:</strong> {activeSubmission?.studentName}</div>
-                  <div><strong>Subject:</strong> {assignments.find((a) => a.id === activeSubmission?.assignmentId)?.subjectName || "Combined Mathematics"}</div>
+                  <div><strong>Subject:</strong> {assignments.find((a) => a.id === activeSubmission?.assignmentId)?.subjectName || teacherCourses[0]?.title || "General"}</div>
                   <div><strong>Assignment:</strong> {activeSubmission?.assignmentTitle}</div>
                   <div><strong>Submitted At:</strong> {activeSubmission?.submittedAt}</div>
                 </div>
@@ -4633,6 +4719,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
         }}
         resourceToEdit={resourceToEdit}
         courses={teacherCourses}
+        subjectOptions={teacherSubjectOptions}
         onSave={(data, publish) => {
           if (resourceToEdit) {
             updateLibraryResource(resourceToEdit.id, {
@@ -4675,96 +4762,130 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
         >
           <div className="space-y-4">
             {/* Toolbar: Sub-tabs (Document Reader vs Marking Scheme vs Table of Contents) */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-[#f8faf9] rounded-xl border border-slate-200">
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setResourceViewerTab("document")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                    resourceViewerTab === "document"
-                      ? "bg-[#0d5c4d] text-white"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
-                >
-                  📄 Document Pages
-                </button>
-
-                {inspectingResource.hasMarkingScheme && (
+            {(!inspectingResource.fileUrl || inspectingResource.hasMarkingScheme) && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-[#f8faf9] rounded-xl border border-slate-200">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => setResourceViewerTab("marking")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${
-                      resourceViewerTab === "marking"
+                    onClick={() => setResourceViewerTab("document")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      resourceViewerTab === "document"
                         ? "bg-[#0d5c4d] text-white"
                         : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                     }`}
                   >
-                    <span>📑 Marking Scheme &amp; Answers</span>
-                    <Badge variant="success" className="text-[9px] px-1 py-0">
-                      Verified
-                    </Badge>
+                    📄 Document
                   </button>
-                )}
 
-                <button
-                  type="button"
-                  onClick={() => setResourceViewerTab("toc")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                    resourceViewerTab === "toc"
-                      ? "bg-[#0d5c4d] text-white"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
-                >
-                  📑 Table of Contents
-                </button>
-              </div>
+                  {inspectingResource.hasMarkingScheme && (
+                    <button
+                      type="button"
+                      onClick={() => setResourceViewerTab("marking")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${
+                        resourceViewerTab === "marking"
+                          ? "bg-[#0d5c4d] text-white"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                      }`}
+                    >
+                      <span>📑 Marking Scheme &amp; Answers</span>
+                      <Badge variant="success" className="text-[9px] px-1 py-0">
+                        Verified
+                      </Badge>
+                    </button>
+                  )}
 
-              {/* Zoom & Page Stepper */}
-              {resourceViewerTab === "document" && (
-                <div className="flex items-center gap-2 self-end sm:self-auto text-xs">
-                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                  {!inspectingResource.fileUrl && (
                     <button
-                      onClick={() => setResourceViewerZoom((z) => Math.max(75, z - 10))}
-                      className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
-                      title="Zoom Out"
+                      type="button"
+                      onClick={() => setResourceViewerTab("toc")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                        resourceViewerTab === "toc"
+                          ? "bg-[#0d5c4d] text-white"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                      }`}
                     >
-                      <ZoomOut className="h-3.5 w-3.5" />
+                      📑 Table of Contents
                     </button>
-                    <span className="font-mono font-bold text-[11px] w-10 text-center">{resourceViewerZoom}%</span>
-                    <button
-                      onClick={() => setResourceViewerZoom((z) => Math.min(150, z + 10))}
-                      className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
-                      title="Zoom In"
-                    >
-                      <ZoomIn className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
-                    <button
-                      disabled={resourceViewerPage <= 1}
-                      onClick={() => setResourceViewerPage((p) => Math.max(1, p - 1))}
-                      className="p-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
-                    >
-                      ◀
-                    </button>
-                    <span className="font-mono text-[11px] font-bold">
-                      Page {resourceViewerPage} of {inspectingResource.pageCount || 20}
-                    </span>
-                    <button
-                      disabled={resourceViewerPage >= (inspectingResource.pageCount || 20)}
-                      onClick={() => setResourceViewerPage((p) => Math.min(inspectingResource.pageCount || 20, p + 1))}
-                      className="p-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
-                    >
-                      ▶
-                    </button>
-                  </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* TAB 1: Document Page Reader Preview */}
-            {resourceViewerTab === "document" && (
+                {/* Zoom & Page Stepper only for mock generated reader */}
+                {resourceViewerTab === "document" && !inspectingResource.fileUrl && (
+                  <div className="flex items-center gap-2 self-end sm:self-auto text-xs">
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                      <button
+                        onClick={() => setResourceViewerZoom((z) => Math.max(75, z - 10))}
+                        className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
+                        title="Zoom Out"
+                      >
+                        <ZoomOut className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="font-mono font-bold text-[11px] w-10 text-center">{resourceViewerZoom}%</span>
+                      <button
+                        onClick={() => setResourceViewerZoom((z) => Math.min(150, z + 10))}
+                        className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
+                        title="Zoom In"
+                      >
+                        <ZoomIn className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                      <button
+                        disabled={resourceViewerPage <= 1}
+                        onClick={() => setResourceViewerPage((p) => Math.max(1, p - 1))}
+                        className="p-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
+                      >
+                        ◀
+                      </button>
+                      <span className="font-mono text-[11px] font-bold">
+                        Page {resourceViewerPage} of {inspectingResource.pageCount || 20}
+                      </span>
+                      <button
+                        disabled={resourceViewerPage >= (inspectingResource.pageCount || 20)}
+                        onClick={() => setResourceViewerPage((p) => Math.min(inspectingResource.pageCount || 20, p + 1))}
+                        className="p-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
+                      >
+                        ▶
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 1 (real file): Uploaded material viewer */}
+            {resourceViewerTab === "document" && inspectingResource.fileUrl && (
+              <div className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-100">
+                {inspectingResource.fileType === "PDF" ? (
+                  <iframe
+                    src={inspectingResource.fileUrl}
+                    title={inspectingResource.fileName || inspectingResource.title}
+                    className="w-full h-[650px] bg-white border-0"
+                  />
+                ) : (
+                  <div className="p-8 flex flex-col items-center gap-3 text-center">
+                    <FileText className="h-10 w-10 text-[#0d5c4d]" />
+                    <p className="text-sm font-bold text-slate-900">
+                      {inspectingResource.fileName || inspectingResource.title}
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      {inspectingResource.fileType} • {inspectingResource.fileSize} — preview is available for PDF files only.
+                    </p>
+                    <a
+                      href={inspectingResource.fileUrl}
+                      download={inspectingResource.fileName || inspectingResource.title}
+                      className="px-4 py-2 rounded-xl bg-[#0d5c4d] text-white text-xs font-bold"
+                    >
+                      Download File
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 1: Document Page Reader Preview (sample, when no real file) */}
+            {resourceViewerTab === "document" && !inspectingResource.fileUrl && (
               <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 overflow-y-auto max-h-[500px] flex justify-center">
                 <div
                   className="bg-white rounded-xl shadow-md border border-slate-300 p-8 text-slate-900 transition-all font-serif"
