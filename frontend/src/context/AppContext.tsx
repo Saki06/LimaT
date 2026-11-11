@@ -520,6 +520,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [currentRole, authUser?.role, authToken]);
 
+    // Load Super Admin display name after authentication
+  useEffect(() => {
+    if (
+      currentRole !== 'super_admin' ||
+      authUser?.role !== 'SUPER_ADMIN' ||
+      !authToken
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadSuperAdminDisplayName = async () => {
+      try {
+        const response = await api.superAdminProfile.get();
+
+        if (cancelled || !response.success) return;
+
+        const preferredName =
+          response.data?.superAdminProfile?.preferredName?.trim();
+
+        if (!preferredName) return;
+
+        setAuthUser((previous: any) => {
+          if (!previous || previous.id !== authUser.id) {
+            return previous;
+          }
+
+          if (previous.preferredName === preferredName) {
+            return previous;
+          }
+
+          const updated = {
+            ...previous,
+            preferredName,
+          };
+
+          api.user.set(updated);
+
+          return updated;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.warn(
+            'Could not load Super Admin display name:',
+            error
+          );
+        }
+      }
+    };
+
+    loadSuperAdminDisplayName();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, authUser?.id, authUser?.role, authToken]);
+
   // Restore session & navigation state from URL query or localStorage on initial load
   useEffect(() => {
     let resolvedRole: UserRole | null = null;
@@ -1031,7 +1089,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ? {
       ...baseUser,
       id: authUser.id,
-      name: `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() || authUser.name || authUser.email || 'User',
+      name:
+  (currentRole === 'super_admin'
+    ? authUser.preferredName?.trim()
+    : '') ||
+  `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() ||
+  authUser.name ||
+  authUser.email ||
+  'User',
       email: authUser.email,
       role: currentRole,
       avatar: userAvatar

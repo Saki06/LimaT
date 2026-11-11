@@ -763,6 +763,13 @@ if (!savedProfile) {
   return;
 }
 
+// Restore saved Super Admin display name after page refresh
+if (savedProfile.preferredName) {
+  updateAuthUser({
+    preferredName: savedProfile.preferredName,
+  });
+}
+
         setProfileData((previous) => ({
           ...previous,
           email: response.data.email ?? previous.email,
@@ -1368,6 +1375,9 @@ if (!savedProfile) {
         if (!response.success) {
           throw new Error(response.message || "Profile update failed");
         }
+        updateAuthUser({
+  preferredName: profileData.name.trim(),
+});
 
         if (avatarFile) {
           const avatarResponse = await api.superAdminProfile.uploadAvatar(
