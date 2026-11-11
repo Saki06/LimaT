@@ -489,6 +489,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 const [superAdminAvatarVersion, setSuperAdminAvatarVersion] = useState(0);
 
 const refreshSuperAdminAvatar = useCallback(() => {
+  setSuperAdminAvatarUrl(null);
   setSuperAdminAvatarVersion((previous) => previous + 1);
 }, []);
 
