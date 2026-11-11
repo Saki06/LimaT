@@ -118,8 +118,9 @@ export function ProfileView() {
     updateTeacherProfile,
     refreshTeacherProfile,
     updateAuthUser,
+    refreshSuperAdminAvatar,
     timetable
-  } = useApp();
+    } = useApp();
 
   const [activeTab, setActiveTab] = useState<ProfileTab>("personal");
   const [isEditing, setIsEditing] = useState(false);
@@ -974,6 +975,7 @@ if (savedProfile.preferredName) {
       setAvatarFile(null);
       setAvatarPreviewUrl(null);
 
+      refreshSuperAdminAvatar();
       addToast({
         type: "success",
         title: "Avatar Removed",
@@ -1387,6 +1389,8 @@ if (savedProfile.preferredName) {
           setSavedAvatarUrl(avatarResponse.data.avatarUrl);
           setAvatarFile(null);
           setAvatarPreviewUrl(null);
+
+          refreshSuperAdminAvatar();
         }
 
         setIsEditing(false);
