@@ -2877,7 +2877,9 @@ useEffect(() => {
         title: ann.title || 'Official Announcement',
         message: ann.message || '',
         targetAudience: ann.targetAudience || 'Platform-Wide (Everyone)',
-        priority: ann.priority || 'normal'
+        priority: ann.priority || 'normal',
+        authorName: ann.authorName,
+        authorRole: ann.authorRole,
       });
       if (res.success && res.data) {
         setAnnouncements((prev) => [res.data, ...prev]);

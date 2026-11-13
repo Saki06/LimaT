@@ -55,7 +55,8 @@ import {
   AlertCircle,
   AlertTriangle,
   Mail,
-  FileText
+  FileText,
+  Loader2
 } from "lucide-react";
 import {
   TeacherQualification,
@@ -119,7 +120,8 @@ export function ProfileView() {
     updateAuthUser,
     refreshSuperAdminAvatar,
     timetable,
-    assignments
+    assignments,
+    submissions
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<ProfileTab>("personal");
@@ -167,6 +169,53 @@ export function ProfileView() {
 
   const [studentStatisticsError, setStudentStatisticsError] =
     useState<string | null>(null);
+
+  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const [isLoadingEnrolledCourses, setIsLoadingEnrolledCourses] = useState(false);
+  const [sportsRegistrations, setSportsRegistrations] = useState<any[]>([]);
+  const [isLoadingSports, setIsLoadingSports] = useState(false);
+
+  // Real student learning progress computed from enrollments & submissions
+  const studentSubmissions = useMemo(() => {
+    return (submissions || []).filter(
+      (s: any) => s.studentId === currentUser?.id || s.studentName === currentUser?.name
+    );
+  }, [submissions, currentUser]);
+
+  const gradedSubmissions = useMemo(() => {
+    return studentSubmissions.filter(
+      (s: any) => typeof s.marksObtained === "number" && s.marksObtained > 0
+    );
+  }, [studentSubmissions]);
+
+  const averageQuizScore = useMemo(() => {
+    if (gradedSubmissions.length === 0) return 0;
+    const sum = gradedSubmissions.reduce((acc: number, s: any) => {
+      const max = s.maxMarks || 100;
+      return acc + ((s.marksObtained || 0) / max) * 100;
+    }, 0);
+    return Math.round(sum / gradedSubmissions.length);
+  }, [gradedSubmissions]);
+
+  const overallSyllabusProgress = useMemo(() => {
+    if (enrolledCourses.length === 0) return 0;
+    let total = 0;
+    let completed = 0;
+    enrolledCourses.forEach((c: any) => {
+      if (c.totalLessons) total += c.totalLessons;
+      if (c.completedLessons) completed += c.completedLessons;
+    });
+    return total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+  }, [enrolledCourses]);
+
+  const estimatedStudyHours = useMemo(() => {
+    let hours = 0;
+    enrolledCourses.forEach((c: any) => {
+      hours += (c.completedLessons || 0) * 1.5;
+    });
+    hours += studentSubmissions.length * 1.0;
+    return Math.round(hours * 10) / 10;
+  }, [enrolledCourses, studentSubmissions]);
 
   useEffect(() => {
     if (currentRole !== "super_admin") {
@@ -314,11 +363,9 @@ export function ProfileView() {
   };
 
   const handleDownloadSportsCertificate = () => {
-    addToast({
-      type: "success",
-      title: "Sports Portfolio Downloaded",
-      message: "Official Athletic Achievement Record & College Colors Transcript (PDF) has been saved."
-    });
+    if (typeof window !== "undefined") {
+      window.print();
+    }
   };
 
   // Editable Profile State based on role
@@ -469,49 +516,55 @@ export function ProfileView() {
       };
     }
 
+    const userFullName = currentUser.name || "Student";
+    const userFirstName = userFullName.split(" ")[0] || "Student";
+    const studentUserGrade = (currentUser as any)?.grade || (currentUser as any)?.studentProfile?.gradeLevel || "Grade 12";
+    const studentGradeNum = studentUserGrade.replace(/\D/g, "") || "12";
+    const studentUserSection = (currentUser as any)?.class || (currentUser as any)?.studentProfile?.section || "Physical Sciences & Technology";
+
     return {
-      name: currentUser.name || "Sathurjan K.",
-      fullName: "Sathurjan Kandasamy",
-      preferredName: "Sathu",
-      studentId: "STU-2026-0842",
-      indexNumber: "AL/2026/89421",
-      email: currentUser.email || "sathurjan@gmail.com",
-      phone: "+94 77 123 4567",
-      altPhone: "+94 11 234 5678",
-      dob: "2008-03-14",
-      gender: "Male",
-      bloodGroup: "O+",
-      medium: "English & Tamil",
-      address: "No. 42, Temple Road, Wellawatte",
-      city: "Colombo 06",
-      district: "Colombo",
-      province: "Western Province",
-      postalCode: "00600",
-      bio: "Passionate Advanced Level student preparing under leading private educators in Pure Maths, Quantum Physics, Chemistry and Software Architecture.",
-      schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
-      schoolCode: "LMT-COLOMBO",
-      gradeLevel: "12",
-      grade: (currentUser.grade && currentUser.grade !== "Grade 12") ? currentUser.grade : "Grade 12",
-      classRoom: (currentUser.class && currentUser.class !== "12-Physical Science") ? currentUser.class : "Physical Science A/L Masterclass Batch",
-      stream: "Physical Science",
-      examYear: "2026",
-      academicYear: "Batch 2026 - 2027",
-      house: "Lions Sports & Athletics Academy",
-      classTeacher: "Academic Lead (Grade 12 Faculty)",
+      name: userFullName,
+      fullName: userFullName,
+      preferredName: userFirstName,
+      studentId: (currentUser as any)?.studentIdNo || (currentUser as any)?.studentProfile?.studentIdNo || (currentUser?.id ? `STU-${currentUser.id.slice(0, 4).toUpperCase()}` : "STU-0001"),
+      indexNumber: (typeof window !== "undefined" ? localStorage.getItem(`lms_index_${currentUser.id || 'student'}`) || "" : "") || (currentUser as any)?.studentIdNo || (currentUser as any)?.studentProfile?.studentIdNo || "",
+      email: currentUser.email || "",
+      phone: (currentUser as any)?.phone || (typeof window !== "undefined" ? localStorage.getItem(`lms_phone_${currentUser.id || 'student'}`) || "" : ""),
+      altPhone: "",
+      dob: (typeof window !== "undefined" ? localStorage.getItem(`lms_dob_${currentUser.id || 'student'}`) || "" : ""),
+      gender: (typeof window !== "undefined" ? localStorage.getItem(`lms_gender_${currentUser.id || 'student'}`) || "Male" : "Male"),
+      bloodGroup: (typeof window !== "undefined" ? localStorage.getItem(`lms_blood_${currentUser.id || 'student'}`) || "" : ""),
+      medium: (typeof window !== "undefined" ? localStorage.getItem(`lms_medium_${currentUser.id || 'student'}`) || "English & Tamil" : "English & Tamil"),
+      address: (typeof window !== "undefined" ? localStorage.getItem(`lms_address_${currentUser.id || 'student'}`) || "" : ""),
+      city: (typeof window !== "undefined" ? localStorage.getItem(`lms_city_${currentUser.id || 'student'}`) || "" : ""),
+      district: (typeof window !== "undefined" ? localStorage.getItem(`lms_district_${currentUser.id || 'student'}`) || "" : ""),
+      province: (typeof window !== "undefined" ? localStorage.getItem(`lms_province_${currentUser.id || 'student'}`) || "" : ""),
+      postalCode: (typeof window !== "undefined" ? localStorage.getItem(`lms_postal_${currentUser.id || 'student'}`) || "" : ""),
+      bio: (typeof window !== "undefined" ? localStorage.getItem(`lms_bio_${currentUser.id || 'student'}`) || "" : "") || "Enrolled student preparing for academic examinations and masterclasses.",
+      schoolName: currentUser.schoolName || "",
+      schoolCode: "",
+      gradeLevel: studentGradeNum,
+      grade: studentUserGrade,
+      classRoom: studentUserSection,
+      stream: studentUserSection,
+      examYear: (typeof window !== "undefined" ? localStorage.getItem(`lms_exam_year_${currentUser.id || 'student'}`) || "2026" : "2026"),
+      academicYear: `Batch ${new Date().getFullYear()}`,
+      house: "",
+      classTeacher: "",
       admittedDate: "January 2024",
       attendanceRate: "96.4%",
-      gpa: "3.84 / 4.0",
-      guardianName: "K. Kandasamy",
-      guardianRelationship: "Father",
-      guardianPhone: "+94 71 888 4321",
-      guardianEmail: "kandasamy.k@gmail.com",
-      guardianOccupation: "Chartered Civil Engineer",
-      motherName: "S. Kandasamy",
-      motherPhone: "+94 77 555 8912",
-      emergencyContact: "K. Kandasamy (+94 71 888 4321)",
-      transportMode: "Independent Transport / Online Live Stream",
-      healthNotes: "No known allergies. Normal athletic health clearance.",
-      extracurricular: "Vice Captain Lions Cricket 1st XI, Senior Athletic Squad, Science Club"
+      gpa: "",
+      guardianName: (typeof window !== "undefined" ? localStorage.getItem(`lms_guardian_name_${currentUser.id || 'student'}`) || "" : ""),
+      guardianRelationship: (typeof window !== "undefined" ? localStorage.getItem(`lms_guardian_rel_${currentUser.id || 'student'}`) || "" : ""),
+      guardianPhone: (typeof window !== "undefined" ? localStorage.getItem(`lms_guardian_phone_${currentUser.id || 'student'}`) || "" : ""),
+      guardianEmail: (typeof window !== "undefined" ? localStorage.getItem(`lms_guardian_email_${currentUser.id || 'student'}`) || "" : ""),
+      guardianOccupation: (typeof window !== "undefined" ? localStorage.getItem(`lms_guardian_occ_${currentUser.id || 'student'}`) || "" : ""),
+      motherName: "",
+      motherPhone: "",
+      emergencyContact: (typeof window !== "undefined" ? localStorage.getItem(`lms_emergency_${currentUser.id || 'student'}`) || "" : ""),
+      transportMode: "Online LMS / Live Classroom",
+      healthNotes: "Normal athletic health clearance.",
+      extracurricular: ""
     };
   }, [currentRole, currentUser, teacherProfile]);
 
@@ -825,19 +878,25 @@ if (savedProfile.preferredName) {
         const data = response.data;
         const studentUser = data.user;
         const fullName = [studentUser?.firstName, studentUser?.lastName].filter(Boolean).join(" ");
+        const guardianUser = data.guardian?.user;
+        const guardianFullName = guardianUser ? [guardianUser.firstName, guardianUser.lastName].filter(Boolean).join(" ") : "";
 
         setProfileData((previous) => ({
           ...previous,
           email: studentUser?.email ?? previous.email,
           studentId: data.studentIdNo ?? previous.studentId,
+          indexNumber: previous.indexNumber || data.studentIdNo || previous.studentId,
           fullName: fullName || previous.fullName,
-          name: studentUser?.firstName || previous.name,
+          name: fullName || studentUser?.firstName || previous.name,
+          preferredName: studentUser?.firstName || previous.preferredName,
           grade: data.gradeLevel ?? previous.grade,
-          gradeLevel: data.gradeLevel ?? previous.gradeLevel,
+          gradeLevel: data.gradeLevel ? (data.gradeLevel.match(/\d+/)?.[0] || data.gradeLevel) : previous.gradeLevel,
           classRoom: data.section ?? previous.classRoom,
-          guardianName: data.guardian?.user ? `${data.guardian.user.firstName || ''} ${data.guardian.user.lastName || ''}`.trim() : previous.guardianName,
+          stream: data.section ?? previous.stream,
+          guardianName: guardianFullName || previous.guardianName,
           guardianPhone: data.guardian?.phoneNumber ?? previous.guardianPhone,
-          guardianEmail: data.guardian?.user?.email ?? previous.guardianEmail,
+          guardianEmail: guardianUser?.email ?? previous.guardianEmail,
+          guardianRelationship: data.guardian ? (previous.guardianRelationship || "Guardian / Parent") : previous.guardianRelationship,
         }));
       } catch (error) {
         if (cancelled) return;
@@ -846,6 +905,65 @@ if (savedProfile.preferredName) {
     };
 
     loadStudentProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, currentUser.id]);
+
+  // Load actual enrolled courses for student
+  useEffect(() => {
+    if (currentRole !== "student") return;
+
+    let cancelled = false;
+    const fetchEnrolledCourses = async () => {
+      setIsLoadingEnrolledCourses(true);
+      try {
+        const response = await api.students.getMyCourses();
+        if (!cancelled && response.success && Array.isArray(response.data)) {
+          setEnrolledCourses(response.data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to load student enrolled courses:", err);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingEnrolledCourses(false);
+        }
+      }
+    };
+
+    fetchEnrolledCourses();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, currentUser.id]);
+
+  // Load real sports registrations for student
+  useEffect(() => {
+    if (currentRole !== "student") return;
+
+    let cancelled = false;
+    const fetchSports = async () => {
+      setIsLoadingSports(true);
+      try {
+        const response: any = await api.sports.getMyRegistrations();
+        const list = Array.isArray(response) ? response : (response?.data && Array.isArray(response.data) ? response.data : []);
+        if (!cancelled) {
+          setSportsRegistrations(list);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to load sports registrations:", err);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingSports(false);
+        }
+      }
+    };
+
+    fetchSports();
     return () => {
       cancelled = true;
     };
@@ -1475,6 +1593,21 @@ if (savedProfile.preferredName) {
         localStorage.setItem(`lms_dob_${currentUser.id || 'student'}`, profileData.dob || "");
         localStorage.setItem(`lms_gender_${currentUser.id || 'student'}`, profileData.gender || "");
         localStorage.setItem(`lms_medium_${currentUser.id || 'student'}`, profileData.medium || "");
+        localStorage.setItem(`lms_phone_${currentUser.id || 'student'}`, profileData.phone || "");
+        localStorage.setItem(`lms_address_${currentUser.id || 'student'}`, profileData.address || "");
+        localStorage.setItem(`lms_city_${currentUser.id || 'student'}`, profileData.city || "");
+        localStorage.setItem(`lms_district_${currentUser.id || 'student'}`, profileData.district || "");
+        localStorage.setItem(`lms_province_${currentUser.id || 'student'}`, profileData.province || "");
+        localStorage.setItem(`lms_postal_${currentUser.id || 'student'}`, profileData.postalCode || "");
+        localStorage.setItem(`lms_bio_${currentUser.id || 'student'}`, profileData.bio || "");
+        localStorage.setItem(`lms_index_${currentUser.id || 'student'}`, profileData.indexNumber || "");
+        localStorage.setItem(`lms_exam_year_${currentUser.id || 'student'}`, profileData.examYear || "");
+        localStorage.setItem(`lms_guardian_name_${currentUser.id || 'student'}`, profileData.guardianName || "");
+        localStorage.setItem(`lms_guardian_phone_${currentUser.id || 'student'}`, profileData.guardianPhone || "");
+        localStorage.setItem(`lms_guardian_email_${currentUser.id || 'student'}`, profileData.guardianEmail || "");
+        localStorage.setItem(`lms_guardian_rel_${currentUser.id || 'student'}`, profileData.guardianRelationship || "");
+        localStorage.setItem(`lms_guardian_occ_${currentUser.id || 'student'}`, profileData.guardianOccupation || "");
+        localStorage.setItem(`lms_emergency_${currentUser.id || 'student'}`, profileData.emergencyContact || "");
       }
       try {
         const nameParts = (profileData.fullName || profileData.name || "").trim().split(/\s+/);
@@ -1779,11 +1912,7 @@ if (savedProfile.preferredName) {
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold">
                 {currentRole === "student"
-                  ? (profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                    ? `${profileData.grade || "Grade 12"} • ${profileData.stream || "Physical Science"}`
-                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                    ? `${profileData.grade || "Grade 11"} • G.C.E. O/L`
-                    : `${profileData.grade || "Grade 8"} • Junior Secondary`
+                  ? profileData.grade || (profileData.gradeLevel ? `Grade ${profileData.gradeLevel}` : "Student")
                   : profileData.stream}
               </span>
             </div>
@@ -1803,13 +1932,15 @@ if (savedProfile.preferredName) {
                     : profileData.schoolName}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <BookOpen className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                <span>{profileData.classRoom}</span>
-              </div>
+              {currentRole !== "student" && profileData.classRoom && (
+                <div className="flex items-center gap-1.5">
+                  <BookOpen className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                  <span>{profileData.classRoom}</span>
+                </div>
+              )}
               <div className="flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                <span>{profileData.city}, Sri Lanka</span>
+                <span>{profileData.city ? `${profileData.city}, Sri Lanka` : "Sri Lanka"}</span>
               </div>
               <button
                 onClick={handleCopyId}
@@ -2732,7 +2863,7 @@ if (savedProfile.preferredName) {
                     <p className="text-xs text-slate-500 mt-0.5">
                       {currentRole === "super_admin"
                         ? "Master administrator credentials, root authority, and global tenant control specifications."
-                        : "Official personal identification as registered with the Ministry of Education."}
+                        : "Official personal identification and student academic registration."}
                     </p>
                   </div>
                 </div>
@@ -2750,7 +2881,7 @@ if (savedProfile.preferredName) {
                       />
                     ) : (
                       <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                        {profileData.fullName}
+                        {profileData.fullName || "—"}
                       </p>
                     )}
                   </div>
@@ -2767,7 +2898,7 @@ if (savedProfile.preferredName) {
                       />
                     ) : (
                       <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                        {profileData.name}
+                        {profileData.name || "—"}
                       </p>
                     )}
                   </div>
@@ -2780,7 +2911,7 @@ if (savedProfile.preferredName) {
                         : "Student Admission / Reg Number"}
                     </label>
                     <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-bold text-[#0d5c4d]">
-                      {profileData.studentId}
+                      {profileData.studentId || "—"}
                     </p>
                   </div>
 
@@ -2789,7 +2920,7 @@ if (savedProfile.preferredName) {
                     <label className="text-xs font-bold text-slate-700">
                       {currentRole === "super_admin"
                         ? "Master Root Authority Identifier"
-                        : "Exam Index Number (A/L 2026)"}
+                        : `Exam Index Number ${profileData.examYear ? `(${profileData.examYear})` : ""}`.trim()}
                     </label>
                     {isEditing ? (
                       <input
@@ -2800,7 +2931,7 @@ if (savedProfile.preferredName) {
                       />
                     ) : (
                       <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-semibold text-slate-900">
-                        {profileData.indexNumber}
+                        {profileData.indexNumber || profileData.studentId || "—"}
                       </p>
                     )}
                   </div>
@@ -2914,121 +3045,6 @@ if (savedProfile.preferredName) {
                       </p>
                     )}
                   </div>
-
-                  {/* Academic Grade, Stream & Target Year (Only for Students) */}
-                  {currentRole === "student" && (
-                    <div className="md:col-span-2 p-4 rounded-2xl bg-[#ecf8f5]/60 border border-[#c4e9e0] space-y-3">
-                      <div className="flex items-center gap-2">
-                        <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
-                        <span className="font-extrabold text-xs text-[#0d2b26]">
-                          Academic Stage, Grade &amp; Examination Pathway
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-slate-700">Enrolled Grade</label>
-                          {isEditing ? (
-                            <select
-                              value={profileData.gradeLevel || "12"}
-                              onChange={(e) => {
-                                const newLevel = e.target.value;
-                                const isNewAL = newLevel === "12" || newLevel === "13";
-                                const isNewOL = newLevel === "10" || newLevel === "11";
-                                setProfileData({
-                                  ...profileData,
-                                  gradeLevel: newLevel,
-                                  grade: `Grade ${newLevel}`,
-                                  stream: isNewAL
-                                    ? (profileData.stream && !profileData.stream.includes("General") && !profileData.stream.includes("O/L") ? profileData.stream : "Physical Science")
-                                    : isNewOL
-                                    ? "General O/L Curriculum"
-                                    : "General Junior Curriculum"
-                                });
-                              }}
-                              className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold text-slate-800"
-                            >
-                              <optgroup label="Junior Secondary (Grade 6 - 9: No Streams)">
-                                <option value="6">Grade 6 (Junior Secondary)</option>
-                                <option value="7">Grade 7 (Junior Secondary)</option>
-                                <option value="8">Grade 8 (Junior Secondary)</option>
-                                <option value="9">Grade 9 (Junior Secondary)</option>
-                              </optgroup>
-                              <optgroup label="G.C.E. Ordinary Level (Grade 10 - 11)">
-                                <option value="10">Grade 10 (G.C.E. O/L)</option>
-                                <option value="11">Grade 11 (G.C.E. O/L)</option>
-                              </optgroup>
-                              <optgroup label="G.C.E. Advanced Level (Grade 12 - 13: Streams)">
-                                <option value="12">Grade 12 (G.C.E. A/L)</option>
-                                <option value="13">Grade 13 (G.C.E. A/L)</option>
-                              </optgroup>
-                            </select>
-                          ) : (
-                            <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
-                              Grade {profileData.gradeLevel || "12"}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-slate-700">
-                            {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                              ? "A/L Stream Specialization *"
-                              : "Curriculum Stream"}
-                          </label>
-                          {isEditing ? (
-                            (profileData.gradeLevel === "12" || profileData.gradeLevel === "13") ? (
-                              <select
-                                value={profileData.stream || "Physical Science"}
-                                onChange={(e) => setProfileData({ ...profileData, stream: e.target.value })}
-                                className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold text-[#0d5c4d]"
-                              >
-                                <option value="Physical Science">Physical Science (Maths, Physics, Chem, ICT)</option>
-                                <option value="Biological Science">Biological Science (Bio, Chem, Physics, Agri)</option>
-                                <option value="Commerce">Commerce (Accounting, Business, Economics, ICT)</option>
-                                <option value="Technology">Technology (Engineering Tech, Science for Tech, Bio-Tech)</option>
-                                <option value="Arts">Arts (Languages, History, Logic, Political Science)</option>
-                              </select>
-                            ) : (
-                              <div className="h-10 px-3 rounded-xl bg-slate-100 border border-slate-200 text-xs flex items-center text-slate-500 font-medium">
-                                {(profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                                  ? "General O/L Subjects (No Stream)"
-                                  : "General Junior Subjects (No Stream)"}
-                              </div>
-                            )
-                          ) : (
-                            <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
-                              {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                                ? profileData.stream
-                                : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                                ? "General O/L Subjects (No Stream)"
-                                : "General Junior Subjects (No Stream)"}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-slate-700">Target Exam Year</label>
-                          {isEditing ? (
-                            <select
-                              value={profileData.examYear || "2026"}
-                              onChange={(e) => setProfileData({ ...profileData, examYear: e.target.value })}
-                              className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold"
-                            >
-                              <option value="2026">2026 Batch</option>
-                              <option value="2027">2027 Batch</option>
-                              <option value="2028">2028 Batch</option>
-                              <option value="2029">2029 Batch</option>
-                            </select>
-                          ) : (
-                            <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
-                              {profileData.examYear || "2026"} Batch
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Residential Address */}
                   <div className="md:col-span-2 space-y-1.5">
@@ -3171,7 +3187,7 @@ if (savedProfile.preferredName) {
                   />
                 ) : (
                   <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianName}
+                    {profileData.guardianName || "Not registered"}
                   </p>
                 )}
               </div>
@@ -3188,7 +3204,7 @@ if (savedProfile.preferredName) {
                   />
                 ) : (
                   <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianRelationship}
+                    {profileData.guardianRelationship || "Not specified"}
                   </p>
                 )}
               </div>
@@ -3205,13 +3221,15 @@ if (savedProfile.preferredName) {
                   />
                 ) : (
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    <span>{profileData.guardianPhone}</span>
-                    <a
-                      href={`tel:${profileData.guardianPhone}`}
-                      className="text-[10px] text-[#0d5c4d] font-bold hover:underline"
-                    >
-                      Call Guardian
-                    </a>
+                    <span>{profileData.guardianPhone || "Not specified"}</span>
+                    {profileData.guardianPhone && (
+                      <a
+                        href={`tel:${profileData.guardianPhone}`}
+                        className="text-[10px] text-[#0d5c4d] font-bold hover:underline"
+                      >
+                        Call Guardian
+                      </a>
+                    )}
                   </div>
                 )}
               </div>
@@ -3228,7 +3246,7 @@ if (savedProfile.preferredName) {
                   />
                 ) : (
                   <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianEmail}
+                    {profileData.guardianEmail || "Not specified"}
                   </p>
                 )}
               </div>
@@ -3245,7 +3263,7 @@ if (savedProfile.preferredName) {
                   />
                 ) : (
                   <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianOccupation}
+                    {profileData.guardianOccupation || "Not specified"}
                   </p>
                 )}
               </div>
@@ -3261,8 +3279,8 @@ if (savedProfile.preferredName) {
                     className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
                   />
                 ) : (
-                  <p className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs font-bold text-red-900">
-                    {profileData.emergencyContact}
+                  <p className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800">
+                    {profileData.emergencyContact || "Not specified"}
                   </p>
                 )}
               </div>
@@ -4096,44 +4114,42 @@ if (savedProfile.preferredName) {
             {/* Tuition Hub & Subscription Details Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Enrolled Tutors</span>
-                <p className="font-black text-sm text-[#0d2b26]">4 Independent Educators</p>
-                <p className="text-[11px] text-slate-500">Pure Maths, Physics, Chem, ICT</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Enrolled Courses</span>
+                <p className="font-black text-sm text-[#0d2b26]">
+                  {enrolledCourses.length > 0 ? `${enrolledCourses.length} Enrolled ${enrolledCourses.length === 1 ? "Course" : "Courses"}` : "0 Enrolled"}
+                </p>
+                <p className="text-[11px] text-slate-500 truncate">
+                  {enrolledCourses.length > 0 ? enrolledCourses.map((c: any) => c.title).slice(0, 2).join(", ") : "No courses enrolled"}
+                </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                    ? "Target Examination"
-                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                    ? "Target Examination"
-                    : "Academic Stage"}
+                  Target Academic Stage
                 </span>
                 <p className="font-black text-sm text-[#0d2b26]">
-                  {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                    ? `G.C.E. Advanced Level ${profileData.examYear || "2026"}`
-                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                    ? `G.C.E. Ordinary Level ${profileData.examYear || "2026"}`
-                    : `Junior Secondary (${profileData.grade || "Grade 8"})`}
+                  {profileData.grade || "Grade 12"}
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                    ? `${profileData.stream || "Physical Science"} Masterclass Batch`
-                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                    ? `Grade ${profileData.gradeLevel || "11"} O/L Tuition Batches`
-                    : `General Academic Subject Batches`}
+                  {profileData.stream || profileData.classRoom || "Tuition Cohort"}
                 </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tuition Subscriptions</span>
-                <p className="font-black text-sm text-[#0d5c4d]">4 Monthly Passes Active</p>
-                <p className="text-[11px] text-emerald-600 font-semibold">Bank Slips Verified &bull; Paid</p>
+                <p className="font-black text-sm text-[#0d5c4d]">
+                  {enrolledCourses.length > 0 ? `${enrolledCourses.length} Active ${enrolledCourses.length === 1 ? "Pass" : "Passes"}` : "0 Active Passes"}
+                </p>
+                <p className="text-[11px] text-emerald-600 font-semibold">
+                  {enrolledCourses.length > 0 ? "Bank Slips Verified • Paid" : "Enroll to activate passes"}
+                </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Weekly Live Classes</span>
-                <p className="font-black text-sm text-[#0d2b26]">12 Hours / Week</p>
+                <p className="font-black text-sm text-[#0d2b26]">
+                  {enrolledCourses.reduce((acc: number, c: any) => acc + (Array.isArray(c.liveClasses) ? c.liveClasses.length : 0), 0)} Scheduled
+                </p>
                 <p className="text-[11px] text-slate-500">Google Meet &amp; Video Vault</p>
               </div>
             </div>
@@ -4143,132 +4159,103 @@ if (savedProfile.preferredName) {
               <div className="flex items-center justify-between">
                 <h4 className="font-bold text-sm text-[#0d2b26]">Active Tuition Classes &amp; Tutors</h4>
                 <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  4 Active Batches
+                  {enrolledCourses.length} Active {enrolledCourses.length === 1 ? "Batch" : "Batches"}
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  {
-                    name: "Combined Mathematics",
-                    code: "Batch CMATH-26",
-                    teacher: "Senior Mathematics Educator",
-                    title: "Lead Mathematics Specialist & Paper Author",
-                    nextSession: "Saturday 08:30 AM – 11:30 AM (Model Paper Class)",
-                    weeklySessions: [
-                      { day: "Tue", time: "07:00 PM – 09:00 PM", label: "Pure Maths Theory" },
-                      { day: "Thu", time: "07:00 PM – 09:00 PM", label: "Applied Mechanics Lab" },
-                      { day: "Sat", time: "08:30 AM – 11:30 AM", label: "Model Paper Discussion" },
-                      { day: "Mon", time: "08:45 PM – 09:30 PM", label: "Doubt Clinic & Homework" }
-                    ],
-                    color: "border-emerald-200 bg-emerald-50/20"
-                  },
-                  {
-                    name: "Physics (Theory & Practicals)",
-                    code: "Batch PHY-26",
-                    teacher: "Eng. K. Thanushan",
-                    title: "Senior Physics Educator & Concept Specialist",
-                    nextSession: "Sunday 04:00 PM – 07:00 PM (Model Paper & Practical)",
-                    weeklySessions: [
-                      { day: "Wed", time: "06:30 PM – 08:30 PM", label: "Waves & Optics Theory" },
-                      { day: "Fri", time: "07:00 PM – 09:00 PM", label: "Structured Problem Lab" },
-                      { day: "Sun", time: "04:00 PM – 07:00 PM", label: "Model Paper & Practical" }
-                    ],
-                    color: "border-blue-200 bg-blue-50/20"
-                  },
-                  {
-                    name: "Chemistry (Theory & Revision)",
-                    code: "Batch CHEM-26",
-                    teacher: "Dr. Nilmini Silva",
-                    title: "Chemistry Senior Lecturer & Reaction Lab Lead",
-                    nextSession: "Wednesday 06:30 PM – 08:30 PM (Organic Reaction Mechanics)",
-                    weeklySessions: [
-                      { day: "Tue", time: "05:00 PM – 07:00 PM", label: "Inorganic & Physical Chemistry" },
-                      { day: "Wed", time: "06:30 PM – 08:30 PM", label: "Organic Reaction Mechanics" },
-                      { day: "Sun", time: "08:30 AM – 10:30 AM", label: "Model Paper Discussion" }
-                    ],
-                    color: "border-purple-200 bg-purple-50/20"
-                  },
-                  {
-                    name: "Information & Communication Tech",
-                    code: "Batch ICT-26",
-                    teacher: "Eng. S. Wickramasinghe",
-                    title: "Collegiate ICT Lead & Python Master Trainer",
-                    nextSession: "Friday 07:00 PM – 09:00 PM (Systems & Networking)",
-                    weeklySessions: [
-                      { day: "Thu", time: "05:00 PM – 07:00 PM", label: "Python & Algorithms Lab" },
-                      { day: "Fri", time: "07:00 PM – 09:00 PM", label: "Systems Architecture & Networking" },
-                      { day: "Sat", time: "04:00 PM – 06:00 PM", label: "Model Paper & Code Review" }
-                    ],
-                    color: "border-amber-200 bg-amber-50/20"
-                  }
-                ].map((subject, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-4 rounded-2xl border ${subject.color} flex flex-col justify-between gap-3 transition-all hover:shadow-xs bg-white`}
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-extrabold text-sm text-slate-900">{subject.name}</span>
-                        <span className="text-[10px] font-mono font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-[#c4e9e0]">
-                          {subject.code}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-800">{subject.teacher}</p>
-                        <p className="text-[11px] text-slate-500">{subject.title}</p>
-                      </div>
+              {isLoadingEnrolledCourses ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
+                  <Loader2 className="h-6 w-6 animate-spin text-[#0d5c4d] mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-slate-600">Loading enrolled courses &amp; tutors...</p>
+                </div>
+              ) : enrolledCourses.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {enrolledCourses.map((course: any, idx: number) => {
+                    const teacherName = course.teacher?.user
+                      ? `${course.teacher.user.firstName || ''} ${course.teacher.user.lastName || ''}`.trim()
+                      : course.teacherName || "Assigned Educator";
+                    const nextLive = Array.isArray(course.liveClasses) && course.liveClasses.length > 0 ? course.liveClasses[0] : null;
 
-                      {/* Next Upcoming Live Session Banner */}
-                      <div className="p-2.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] flex items-center gap-2 text-xs">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                        <span className="font-extrabold text-[#0d5c4d]">Next:</span>
-                        <span className="font-bold text-slate-800 truncate">{subject.nextSession}</span>
-                      </div>
+                    return (
+                      <div
+                        key={course.id || idx}
+                        className="p-5 rounded-2xl border border-emerald-200 bg-white flex flex-col justify-between gap-4 transition-all hover:shadow-md"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-extrabold text-sm text-slate-900">{course.title}</span>
+                            <span className="text-[10px] font-mono font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-[#c4e9e0]">
+                              {course.code || "BATCH"}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">{teacherName}</p>
+                            <p className="text-[11px] text-slate-500">
+                              {course.gradeLevel || course.gradeName || profileData.grade} &bull; {course.subject || profileData.stream || "Tuition Batch"}
+                            </p>
+                          </div>
 
-                      {/* Multi-Day Weekly Schedule Breakdown */}
-                      <div className="space-y-1 pt-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                          Weekly Live Schedule ({subject.weeklySessions.length} Sessions / Week):
-                        </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                          {subject.weeklySessions.map((slot, sIdx) => (
-                            <div
-                              key={sIdx}
-                              className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px] flex items-center justify-between gap-1 text-slate-700"
-                            >
-                              <div className="flex items-center gap-1 font-bold text-slate-900">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#0d5c4d]" />
-                                <span>{slot.day}</span>
-                                <span className="font-medium text-slate-500">{slot.time}</span>
-                              </div>
-                              <span className="text-[9px] text-slate-400 font-semibold truncate max-w-[85px] text-right">
-                                {slot.label}
-                              </span>
+                          {nextLive ? (
+                            <div className="p-2.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] flex items-center gap-2 text-xs">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                              <span className="font-extrabold text-[#0d5c4d]">Next Live:</span>
+                              <span className="font-bold text-slate-800 truncate">{nextLive.title || "Scheduled Class"}</span>
                             </div>
-                          ))}
+                          ) : (
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2 text-xs text-slate-600">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                              <span className="font-semibold text-slate-700">Tuition Status:</span>
+                              <span className="font-medium text-slate-500">Live Access Active</span>
+                            </div>
+                          )}
+
+                          {Array.isArray(course.assignments) && course.assignments.length > 0 && (
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-medium">
+                              <FileText className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                              <span>{course.assignments.length} Coursework / Assessments</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span>{course.enrollmentType === 'PACKAGE' ? `Package: ${course.packageName || 'Active'}` : 'Enrolled'}</span>
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCourseId(course.id);
+                              setCurrentView("courses");
+                            }}
+                            className="text-xs font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Open Course</span>
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-                        <CheckCircle2 className="h-3 w-3" />
-                        <span>Monthly Pass: Active</span>
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() => setCurrentView("live_schedule")}
-                        className="text-xs font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Join Live</span>
-                        <ExternalLink className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                  <GraduationCap className="h-10 w-10 text-slate-400 mx-auto" />
+                  <p className="text-sm font-bold text-slate-700">No Enrolled Subject Batches Found</p>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    You are not currently enrolled in any course batches. Explore tuition packages and live masterclasses to get started.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("courses")}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    <span>Browse Available Courses</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -4295,19 +4282,6 @@ if (savedProfile.preferredName) {
                 <Video className="h-3.5 w-3.5" />
                 <span>Live Online Proctored</span>
               </div>
-            </div>
-
-            {/* Candidate Online Notice Banner */}
-            <div className="p-3.5 rounded-2xl bg-[#f6fbf9] border border-[#c4e9e0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#0d5c4d]">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span className="font-bold">Candidate Index: {profileData.indexNumber || (currentUser as any)?.studentIdNo || "STU-9904"}</span>
-                <span className="hidden sm:inline text-slate-400">|</span>
-                <span className="hidden sm:inline text-slate-600">Online Submission Timer Active &bull; Upload scanned PDF scripts</span>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#b2e5d9] font-extrabold text-[10px] text-[#0d5c4d] shadow-2xs self-start sm:self-auto">
-                Webcam &amp; Portal Monitored ✓
-              </span>
             </div>
 
             {/* Exams Grid */}
@@ -4407,8 +4381,12 @@ if (savedProfile.preferredName) {
 
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] text-xs font-bold border border-[#b2e5d9] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Term 2 On-Track &bull; 76% Covered</span>
+                  <span className={`w-2 h-2 rounded-full ${enrolledCourses.length > 0 ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
+                  <span>
+                    {enrolledCourses.length > 0
+                      ? `${overallSyllabusProgress}% Covered across ${enrolledCourses.length} ${enrolledCourses.length === 1 ? 'batch' : 'batches'}`
+                      : "No Active Batches"}
+                  </span>
                 </span>
               </div>
             </div>
@@ -4421,15 +4399,19 @@ if (savedProfile.preferredName) {
                   <TrendingUp className="h-4 w-4 text-[#0d5c4d]" />
                 </div>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-[#0d5c4d]">76%</p>
-                  <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                    +4% this wk
-                  </span>
+                  <p className="text-2xl font-black text-[#0d5c4d]">{overallSyllabusProgress}%</p>
+                  {enrolledCourses.length > 0 && (
+                    <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                      Active
+                    </span>
+                  )}
                 </div>
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
-                  <div className="bg-[#0d5c4d] h-full rounded-full transition-all duration-500" style={{ width: "76%" }} />
+                  <div className="bg-[#0d5c4d] h-full rounded-full transition-all duration-500" style={{ width: `${overallSyllabusProgress}%` }} />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1.5">Average across 4 enrolled tutor masterclasses</p>
+                <p className="text-[10px] text-slate-400 mt-1.5">
+                  {enrolledCourses.length > 0 ? `Average across ${enrolledCourses.length} enrolled ${enrolledCourses.length === 1 ? 'course' : 'courses'}` : "No courses enrolled"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
@@ -4438,14 +4420,18 @@ if (savedProfile.preferredName) {
                   <Clock className="h-4 w-4 text-emerald-600" />
                 </div>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-slate-800">148.5</p>
+                  <p className="text-2xl font-black text-slate-800">{estimatedStudyHours}</p>
                   <span className="text-xs font-bold text-slate-400">hours</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-500">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>108h Live Sessions &bull; 40.5h Replays</span>
+                  <span>
+                    {enrolledCourses.reduce((acc: number, c: any) => acc + (c.completedLessons || 0), 0)} Completed Lessons
+                  </span>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">24.5 hrs logged in past 7 days</p>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {studentSubmissions.length > 0 ? `${studentSubmissions.length} coursework tasks completed` : "Active coursework logging"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
@@ -4454,15 +4440,19 @@ if (savedProfile.preferredName) {
                   <Flame className="h-4 w-4 text-amber-500" />
                 </div>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-amber-600">19 Days</p>
+                  <p className="text-2xl font-black text-amber-600">
+                    {enrolledCourses.length > 0 ? (studentSubmissions.length > 0 ? `${Math.min(30, studentSubmissions.length * 3 + 2)} Days` : "Active") : "0 Days"}
+                  </p>
                   <span className="text-base">🔥</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-2">
                   <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-extrabold border border-amber-200">
-                    Consistency Master
+                    {enrolledCourses.length > 0 ? "Consistency Tracked" : "Not Started"}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">Best streak: 28 days continuous</p>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {enrolledCourses.length > 0 ? "Regular live class & assignment activity" : "Enroll to begin learning streak"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
@@ -4471,62 +4461,95 @@ if (savedProfile.preferredName) {
                   <Target className="h-4 w-4 text-teal-600" />
                 </div>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-[#0d5c4d]">89.2%</p>
+                  <p className="text-2xl font-black text-[#0d5c4d]">
+                    {gradedSubmissions.length > 0 ? `${averageQuizScore}%` : (studentSubmissions.length > 0 ? "Pending" : "0%")}
+                  </p>
                   <span className="text-[10px] font-bold text-slate-500">Avg Score</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-600 font-semibold">
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>38 of 42 Practice Sets Passed</span>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">715 practice problems completed</p>
-              </div>
-            </div>
-
-            {/* Weekly Study Rhythm & Consistency */}
-            <div className="bg-[#fcfdfc] rounded-2xl border border-[#e2eae5] p-5 shadow-2xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-[#0d5c4d]" />
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26]">
-                    Weekly Study Rhythm &amp; Learning Volume
-                  </h4>
-                </div>
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-slate-500 font-medium">Weekly Goal: <strong className="text-slate-800">25 hrs</strong></span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
-                    24.5 hrs Completed (98%)
+                  <span>
+                    {gradedSubmissions.length > 0
+                      ? `${gradedSubmissions.length} of ${studentSubmissions.length} Graded`
+                      : (studentSubmissions.length > 0 ? `${studentSubmissions.length} Awaiting Review` : "No submissions yet")}
                   </span>
                 </div>
-              </div>
-
-              {/* Day-by-Day Visual Activity Bars */}
-              <div className="grid grid-cols-7 gap-2 pt-2">
-                {[
-                  { day: "Mon", hours: 2.5, percent: 50, active: true },
-                  { day: "Tue", hours: 3.5, percent: 70, active: true },
-                  { day: "Wed", hours: 2.0, percent: 40, active: true },
-                  { day: "Thu", hours: 4.0, percent: 80, active: true },
-                  { day: "Fri", hours: 3.0, percent: 60, active: true },
-                  { day: "Sat", hours: 5.5, percent: 100, active: true, peak: true },
-                  { day: "Sun", hours: 4.0, percent: 80, active: true }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col items-center gap-2">
-                    <span className="text-[10px] font-extrabold text-[#0d5c4d]">{item.hours}h</span>
-                    <div className="w-full bg-slate-100 h-24 rounded-xl flex items-end p-1 justify-center relative group">
-                      <div
-                        className={`w-full rounded-lg transition-all duration-300 ${
-                          item.peak
-                            ? "bg-gradient-to-t from-[#0d5c4d] to-emerald-400 shadow-xs"
-                            : "bg-[#0d5c4d]/80 hover:bg-[#0d5c4d]"
-                        }`}
-                        style={{ height: `${item.percent}%` }}
-                      />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-500">{item.day}</span>
-                  </div>
-                ))}
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {studentSubmissions.length > 0 ? `${studentSubmissions.length} total assignment submissions` : "Take quizzes to record score"}
+                </p>
               </div>
             </div>
+
+            {/* Enrolled Courses Syllabus Breakdown */}
+            {enrolledCourses && enrolledCourses.length > 0 ? (
+              <div className="bg-[#fcfdfc] rounded-2xl border border-[#e2eae5] p-5 shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-[#0d5c4d]" />
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26]">
+                      Enrolled Subject Mastery &amp; Unit Breakdown
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("progress")}
+                    className="text-xs font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Open Comprehensive Learning Analytics</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 pt-1">
+                  {enrolledCourses.map((c: any, idx: number) => {
+                    const courseProgress = c.totalLessons > 0 ? Math.min(100, Math.round(((c.completedLessons || 0) / c.totalLessons) * 100)) : 0;
+                    const teacherName = c.teacher?.user
+                      ? `${c.teacher.user.firstName || ''} ${c.teacher.user.lastName || ''}`.trim()
+                      : c.teacherName || "Assigned Educator";
+
+                    return (
+                      <div
+                        key={c.id || idx}
+                        className="p-4 rounded-xl bg-white border border-slate-200/80 hover:border-emerald-300 transition-all space-y-2"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <div>
+                            <span className="font-bold text-xs text-slate-900">{c.title}</span>
+                            <span className="text-[10px] text-slate-500 ml-2">by {teacherName}</span>
+                          </div>
+                          <span className="font-mono text-xs font-bold text-[#0d5c4d]">
+                            {c.completedLessons || 0} / {c.totalLessons || 0} Lessons ({courseProgress}%)
+                          </span>
+                        </div>
+
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className="bg-[#0d5c4d] h-full rounded-full transition-all duration-500"
+                            style={{ width: `${courseProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                <TrendingUp className="h-10 w-10 text-slate-400 mx-auto" />
+                <p className="text-sm font-bold text-slate-700">No Learning Progress Recorded</p>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  You are not currently enrolled in any course batches. Once enrolled, lesson completions, quiz mastery, and syllabus coverage will be automatically tracked here.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("courses")}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span>Browse Available Courses</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -4542,10 +4565,10 @@ if (savedProfile.preferredName) {
               <div>
                 <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Student Athletic Portfolio &amp; Sports Achievement Records</span>
+                  <span>Student Athletic Portfolio &amp; Sports Records</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Verified institutional sports credentials, tournament records, representative honours, and fitness certifications.
+                  Verified sports registrations, tournament records, squad rosters, and athletic fitness certifications.
                 </p>
               </div>
               <button
@@ -4554,289 +4577,170 @@ if (savedProfile.preferredName) {
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-md transition-colors self-start sm:self-auto cursor-pointer"
               >
                 <Download className="h-4 w-4" />
-                <span>Download Sports Record (PDF)</span>
+                <span>Print / Save Record (PDF)</span>
               </button>
             </div>
 
-            {/* Top Athletic Metrics / Honours Summary */}
+            {/* Top Athletic Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Primary Sport</span>
-                <p className="text-lg font-black text-[#0d5c4d] mt-1">Cricket (First XI)</p>
+                <p className="text-lg font-black text-[#0d5c4d] mt-1">
+                  {sportsRegistrations.length > 0 ? (sportsRegistrations[0].event?.sportType || "Athletics") : "Not Enrolled"}
+                </p>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">Vice Captain</span>
-                  <span className="text-[10px] text-slate-500 font-semibold">Jersey #07</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
+                    {sportsRegistrations.length > 0 ? (sportsRegistrations[0].roleInTeam || "Participant") : "No Active Sports"}
+                  </span>
+                  {sportsRegistrations.length > 0 && sportsRegistrations[0].jerseyNumber && (
+                    <span className="text-[10px] text-slate-500 font-semibold">Jersey #{sportsRegistrations[0].jerseyNumber}</span>
+                  )}
                 </div>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Academy Honours</span>
-                <p className="text-lg font-black text-[#0d2b26] mt-1">Double Colorsman</p>
-                <p className="text-[10px] text-emerald-600 font-bold mt-1">Cricket &amp; Track Athletics</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registered Events</span>
+                <p className="text-lg font-black text-[#0d2b26] mt-1">
+                  {sportsRegistrations.length > 0 ? `${sportsRegistrations.length} Active ${sportsRegistrations.length === 1 ? 'Event' : 'Events'}` : "0 Events"}
+                </p>
+                <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                  {sportsRegistrations.length > 0 ? "Confirmed Participation" : "Standard Student Status"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Career Medals</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Event Standing</span>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-amber-600 font-mono">12</p>
-                  <span className="text-[11px] font-bold text-slate-600">Medals Won</span>
+                  <p className="text-xl font-black text-amber-600 font-mono">
+                    {sportsRegistrations.length > 0 ? (sportsRegistrations[0].status || "Active") : "None"}
+                  </p>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-0.5">6 Gold • 4 Silver • 2 Bronze</p>
+                <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                  {sportsRegistrations.length > 0 ? (sportsRegistrations[0].event?.title || "Inter-House Sports") : "No active tournaments"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fitness Level</span>
-                <p className="text-lg font-black text-[#0d5c4d] mt-1 font-mono">Grade A+ (Elite)</p>
-                <p className="text-[10px] text-emerald-700 font-bold mt-1">Yo-Yo IR1: Level 19.4 • Fit</p>
+                <p className="text-lg font-black text-[#0d5c4d] mt-1 font-mono">Cleared &amp; Fit</p>
+                <p className="text-[10px] text-emerald-700 font-bold mt-1">Standard Athletic Health Clearance</p>
               </div>
             </div>
 
-            {/* Active Teams & Squad Roster Enrollment */}
-            <div className="space-y-3">
-              <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                <span>Enrolled Teams &amp; Squad Rosters</span>
-              </h4>
+            {/* Active Teams & Event Registrations */}
+            {isLoadingSports ? (
+              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
+                <Loader2 className="h-6 w-6 animate-spin text-[#0d5c4d] mx-auto mb-2" />
+                <p className="text-xs font-semibold text-slate-600">Loading sports registrations...</p>
+              </div>
+            ) : sportsRegistrations && sportsRegistrations.length > 0 ? (
+              <div className="space-y-4">
+                <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
+                  <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                  <span>Enrolled Sports Teams &amp; Event Rosters</span>
+                </h4>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                {/* Team 1: Cricket */}
-                <div className="p-4 rounded-2xl bg-[#fcfdfc] border border-[#e2eae5] hover:border-[#b2e5d9] transition-all space-y-3 shadow-2xs">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-extrabold">
-                        Major Sport
-                      </span>
-                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Lions Academy First XI Cricket</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {sportsRegistrations.map((reg: any, idx: number) => (
+                    <div
+                      key={reg.id || idx}
+                      className="p-5 rounded-2xl bg-[#fcfdfc] border border-[#e2eae5] hover:border-[#b2e5d9] transition-all space-y-3 shadow-2xs"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-extrabold">
+                            {reg.event?.sportType || "Sports Event"}
+                          </span>
+                          <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">
+                            {reg.event?.title || "Championship Event"}
+                          </h5>
+                        </div>
+                        <span className="text-xl">🏆</span>
+                      </div>
+
+                      <div className="text-xs space-y-1 text-slate-600">
+                        <p>
+                          <span className="font-bold text-slate-800">Role:</span> {reg.roleInTeam || "Participant"}
+                          {reg.jerseyNumber ? ` (Jersey #${reg.jerseyNumber})` : ""}
+                        </p>
+                        <p>
+                          <span className="font-bold text-slate-800">Venue:</span> {reg.event?.venue || "Main Sports Oval"}
+                        </p>
+                        <p>
+                          <span className="font-bold text-slate-800">Event Date:</span> {reg.event?.startDate ? new Date(reg.event.startDate).toLocaleDateString() : "Scheduled"}
+                        </p>
+                        {reg.notes && (
+                          <p>
+                            <span className="font-bold text-slate-800">Notes:</span> {reg.notes}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                        <span className="text-emerald-700 font-bold">{reg.status || "CONFIRMED"}</span>
+                        <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">Roster Verified ✓</span>
+                      </div>
                     </div>
-                    <span className="text-xl">🏏</span>
-                  </div>
-                  <div className="text-xs space-y-1 text-slate-600">
-                    <p><span className="font-bold text-slate-800">Role:</span> All-Rounder / Vice Captain</p>
-                    <p><span className="font-bold text-slate-800">Specialty:</span> Right-Hand Bat, Right-Arm Medium Fast</p>
-                    <p><span className="font-bold text-slate-800">Coach:</span> Senior Academy Coach</p>
-                    <p><span className="font-bold text-slate-800">Schedule:</span> Mon, Wed, Fri (3:30 - 5:30 PM)</p>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                    <span className="text-emerald-700 font-bold">16 Appearances</span>
-                    <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">Active Captaincy ✓</span>
-                  </div>
+                  ))}
                 </div>
 
-                {/* Team 2: Athletics */}
-                <div className="p-4 rounded-2xl bg-[#fcfdfc] border border-[#e2eae5] hover:border-[#b2e5d9] transition-all space-y-3 shadow-2xs">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-extrabold">
-                        Track &amp; Field
+                {/* Physical Biometrics & Health Clearance Card */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
+                        <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                        <span>Physical Biometrics &amp; Conditioning</span>
+                      </h5>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-extrabold border border-emerald-200">
+                        Medical Fit ✓
                       </span>
-                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Lions Senior Track &amp; Sprint Squad</h5>
                     </div>
-                    <span className="text-xl">🏃</span>
-                  </div>
-                  <div className="text-xs space-y-1 text-slate-600">
-                    <p><span className="font-bold text-slate-800">Events:</span> 100m, 200m &amp; 4x100m Relay Anchor</p>
-                    <p><span className="font-bold text-slate-800">Personal Best:</span> 100m: 11.02s | 200m: 22.45s</p>
-                    <p><span className="font-bold text-slate-800">Coach:</span> Coach M. Faizal</p>
-                    <p><span className="font-bold text-slate-800">Schedule:</span> Tue, Thu (6:00 - 7:30 AM)</p>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                    <span className="text-emerald-700 font-bold">National Qualifier</span>
-                    <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-bold">Championship Record Holder</span>
-                  </div>
-                </div>
 
-                {/* Team 3: Inter-House */}
-                <div className="p-4 rounded-2xl bg-[#fcfdfc] border border-[#e2eae5] hover:border-[#b2e5d9] transition-all space-y-3 shadow-2xs">
-                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>• General Fitness: <span className="font-bold text-slate-800">Cleared for Competitive Sports</span></p>
+                      <p>• Emergency Response: <span className="font-bold text-slate-800">On-field First Aid Registered</span></p>
+                      <p>• Clearance Validity: <span className="font-bold text-slate-800">Academic Year {new Date().getFullYear()}</span></p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3 flex flex-col justify-between">
                     <div>
-                      <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-800 text-[10px] font-extrabold">
-                        Academy League
-                      </span>
-                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Lions Academy Gold Squad</h5>
+                      <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
+                        <ShieldCheck className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                        <span>Sports Department Endorsement</span>
+                      </h5>
+                      <p className="text-xs text-slate-600 italic mt-2 leading-relaxed bg-white p-3 rounded-xl border border-slate-200">
+                        &ldquo;{currentUser.name || 'This student'} is officially enrolled on our athletic squad rosters, demonstrating teamwork, physical discipline, and sportsmanship.&rdquo;
+                      </p>
                     </div>
-                    <span className="text-xl">🏆</span>
-                  </div>
-                  <div className="text-xs space-y-1 text-slate-600">
-                    <p><span className="font-bold text-slate-800">Role:</span> Senior Academy Sports Captain</p>
-                    <p><span className="font-bold text-slate-800">Meet Points:</span> 28 Individual Championship Points</p>
-                    <p><span className="font-bold text-slate-800">Squad Mentor:</span> Eng. K. Thanushan</p>
-                    <p><span className="font-bold text-slate-800">Squad Rank:</span> 1st Place Overall (2026)</p>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                    <span className="text-purple-700 font-bold">Best Senior Athlete</span>
-                    <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-bold">Academy Shield ✓</span>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60">
+                      <span className="font-bold text-slate-700">Sports &amp; Athletics Directorate</span>
+                      <span className="px-2 py-0.5 rounded-full bg-white border border-[#c4e9e0] text-[#0d5c4d] font-bold">
+                        Official Record Verified ✓
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Official Tournament Achievements & Medals Table */}
-            <div className="space-y-3">
-              <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                <Medal className="h-3.5 w-3.5 text-amber-500" />
-                <span>Official Tournament Achievements &amp; Medal Records</span>
-              </h4>
-
-              <div className="bg-white rounded-2xl border border-[#e6ece8] shadow-xs overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-[#fcfdfc] border-b border-[#e6ece8] text-slate-400 font-bold uppercase text-[10px]">
-                      <tr>
-                        <th className="py-3 px-4">Event / Tournament</th>
-                        <th className="py-3 px-4">Sport</th>
-                        <th className="py-3 px-4 text-center">Medal / Award</th>
-                        <th className="py-3 px-4">Level</th>
-                        <th className="py-3 px-4">Date</th>
-                        <th className="py-3 px-4">Performance Highlights</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#f0f4f1]">
-                      {[
-                        {
-                          tournament: "All-Island Academy & Club Tier 1 Tournament (Finals)",
-                          sport: "Cricket",
-                          medal: "Gold Medal & Man of the Match",
-                          medalType: "gold",
-                          level: "National Tier 1",
-                          date: "Sept 2026",
-                          highlights: "Scored 78* (62 balls) & took 4/28 vs Colombo CC. Lions Academy won by 38 runs."
-                        },
-                        {
-                          tournament: "Sri Lanka All-Island Academy Athletics Meet",
-                          sport: "Athletics",
-                          medal: "Gold Medal (New Record)",
-                          medalType: "gold",
-                          level: "All-Island National",
-                          date: "July 2025",
-                          highlights: "4x100m Relay Anchor Leg (Championship Record: 42.18s)."
-                        },
-                        {
-                          tournament: "Western Provincial Track & Field Championship",
-                          sport: "Athletics",
-                          medal: "Silver Medal",
-                          medalType: "silver",
-                          level: "Provincial",
-                          date: "Aug 2025",
-                          highlights: "200m Sprint Final: 22.45 seconds (PB)."
-                        },
-                        {
-                          tournament: "Lions Sports Academy Annual Awards Night 2025/2026",
-                          sport: "Multi-Sport",
-                          medal: "Academy Double Colors Award",
-                          medalType: "colors",
-                          level: "Institutional",
-                          date: "Feb 2026",
-                          highlights: "Honoured with Lions Golden Emblem for cricket and sprint athletics excellence."
-                        },
-                        {
-                          tournament: "Annual Academy Championship League",
-                          sport: "Athletics",
-                          medal: "Senior Champion Trophy",
-                          medalType: "trophy",
-                          level: "Academy League",
-                          date: "Feb 2026",
-                          highlights: "Gold in 100m, Gold in 200m, Gold in 4x100m Relay. Total 28 Points for Lions Gold Squad."
-                        },
-                        {
-                          tournament: "All-Island Junior Badminton Championship",
-                          sport: "Badminton",
-                          medal: "Bronze Medal",
-                          medalType: "bronze",
-                          level: "National Junior",
-                          date: "Nov 2024",
-                          highlights: "Under-16 Boys Doubles Semi-Finalist."
-                        }
-                      ].map((item, idx) => (
-                        <tr key={idx} className="hover:bg-[#f9fbf9] transition-colors">
-                          <td className="py-3.5 px-4 font-bold text-slate-900">{item.tournament}</td>
-                          <td className="py-3.5 px-4">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ecf8f5] text-[#0d5c4d]">
-                              {item.sport}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <span
-                              className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-                                item.medalType === "gold"
-                                  ? "bg-amber-100 text-amber-900 border border-amber-300"
-                                  : item.medalType === "silver"
-                                  ? "bg-slate-200 text-slate-800 border border-slate-300"
-                                  : item.medalType === "colors"
-                                  ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
-                                  : item.medalType === "trophy"
-                                  ? "bg-purple-100 text-purple-900 border border-purple-300"
-                                  : "bg-orange-100 text-orange-900 border border-orange-300"
-                              }`}
-                            >
-                              {item.medal}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-600 font-semibold">{item.level}</td>
-                          <td className="py-3.5 px-4 text-slate-500 font-mono text-[11px]">{item.date}</td>
-                          <td className="py-3.5 px-4 text-slate-600 text-[11px] max-w-xs">{item.highlights}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            ) : (
+              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                <Trophy className="h-10 w-10 text-slate-400 mx-auto" />
+                <p className="text-sm font-bold text-slate-700">No Sports Registrations Found</p>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  This student is not currently registered for any athletic tournaments, sports teams, or inter-house competitions.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("sports")}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  <Trophy className="h-3.5 w-3.5" />
+                  <span>Explore Sports &amp; Tournaments</span>
+                </button>
               </div>
-            </div>
-
-            {/* Fitness, Biometrics & Coach Clearance */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Biometrics */}
-              <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3">
-                <div className="flex items-center justify-between">
-                  <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                    <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                    <span>Physical Biometrics &amp; Conditioning</span>
-                  </h5>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-extrabold border border-emerald-200">
-                    Medical Fit ✓
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Height / Weight</p>
-                    <p className="font-black text-[#0d2b26] mt-0.5">178 cm / 68 kg</p>
-                  </div>
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Yo-Yo Test</p>
-                    <p className="font-black text-[#0d5c4d] mt-0.5">Level 19.4</p>
-                  </div>
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">VO2 Max</p>
-                    <p className="font-black text-amber-600 mt-0.5">58.2 ml/kg</p>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-slate-500 space-y-1 pt-1 border-t border-slate-200/60">
-                  <p>• Medical Examiner: <span className="font-bold text-slate-700">Dr. H. Wickremasinghe, MBBS</span> (Sports Medicine Board)</p>
-                  <p>• Clearance Validity: <span className="font-bold text-slate-700">Full Academic Year 2026/2027</span></p>
-                </div>
-              </div>
-
-              {/* Coach Endorsement */}
-              <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3 flex flex-col justify-between">
-                <div>
-                  <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                    <span>Head Coach &amp; Academy Director Endorsement</span>
-                  </h5>
-                  <p className="text-xs text-slate-600 italic mt-2 leading-relaxed bg-white p-3 rounded-xl border border-slate-200">
-                    &ldquo;Sathurjan is an exemplary natural leader on the field. His tactical awareness as Vice Captain in our Lions First XI cricket squad and explosive anchor leg in athletics reflect exceptional dedication, balancing top physical fitness with academic brilliance.&rdquo;
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60">
-                  <span className="font-bold text-slate-700">Senior Academy Sports Director</span>
-                  <span className="px-2 py-0.5 rounded-full bg-white border border-[#c4e9e0] text-[#0d5c4d] font-bold">
-                    Official Stamp Verified ✓
-                  </span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}

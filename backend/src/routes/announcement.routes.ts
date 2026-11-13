@@ -7,13 +7,13 @@ import {
   deleteAnnouncement,
   togglePinAnnouncement,
 } from '../controllers/announcement.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import { authenticateToken, optionalAuthenticateToken } from '../middlewares/auth.middleware';
 
 const router = Router();
 
 // Public / Authenticated read routes
-router.get('/', getAnnouncements);
-router.get('/:id', getAnnouncementById);
+router.get('/', optionalAuthenticateToken, getAnnouncements);
+router.get('/:id', optionalAuthenticateToken, getAnnouncementById);
 
 // Protected routes (Admin / Teacher / Directorate)
 router.post('/', authenticateToken, createAnnouncement);

@@ -1437,6 +1437,8 @@ export const api = {
       targetAudience?: string;
       priority?: 'normal' | 'high' | 'urgent';
       isPinned?: boolean;
+      authorName?: string;
+      authorRole?: string;
     }) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/announcements`, {
