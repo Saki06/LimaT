@@ -30,18 +30,18 @@ export function SportsAndEventsViews({ defaultTab = "sports" }: { defaultTab?: "
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<"sports" | "events">(defaultTab);
-  const [selectedSport, setSelectedSport] = useState<string>("Cricket");
+  const [selectedSport, setSelectedSport] = useState<string>("All");
   const [selectedFixtureForScore, setSelectedFixtureForScore] = useState<string | null>(null);
 
   // Score recording modal states
-  const [homeScore, setHomeScore] = useState("215/8 (50 ov)");
-  const [awayScore, setAwayScore] = useState("198 all out");
-  const [outcome, setOutcome] = useState("St. Michael Won by 17 runs");
+  const [homeScore, setHomeScore] = useState("");
+  const [awayScore, setAwayScore] = useState("");
 
   const handleScoreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFixtureForScore) return;
-    recordMatchResult(selectedFixtureForScore, homeScore, awayScore, outcome);
+    if (!homeScore.trim() || !awayScore.trim()) return;
+    recordMatchResult(selectedFixtureForScore, homeScore, awayScore, "");
     setSelectedFixtureForScore(null);
   };
 
@@ -116,7 +116,7 @@ export function SportsAndEventsViews({ defaultTab = "sports" }: { defaultTab?: "
               </h2>
 
               {teams
-                .filter((tm) => tm.sportName === selectedSport || selectedSport === "Cricket")
+                .filter((tm) => tm.sportName === selectedSport || selectedSport === "All")
                 .map((team) => (
                   <Card key={team.id} className="border-[#e6ece8] bg-white shadow-xs overflow-hidden">
                     <CardHeader className="p-5 pb-2 border-b border-[#e6ece8]">
@@ -156,6 +156,11 @@ export function SportsAndEventsViews({ defaultTab = "sports" }: { defaultTab?: "
                     </CardContent>
                   </Card>
                 ))}
+              {teams.length === 0 && (
+                <p className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">
+                  No sports teams have been created yet.
+                </p>
+              )}
             </div>
 
             {/* Right: Fixtures & League Standings (7 cols) */}
@@ -170,6 +175,11 @@ export function SportsAndEventsViews({ defaultTab = "sports" }: { defaultTab?: "
                 </div>
 
                 <div className="space-y-3">
+                  {fixtures.length === 0 && (
+                    <p className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">
+                      No fixtures have been scheduled yet.
+                    </p>
+                  )}
                   {fixtures.map((fix) => (
                     <div
                       key={fix.id}
@@ -243,6 +253,11 @@ export function SportsAndEventsViews({ defaultTab = "sports" }: { defaultTab?: "
                 </h2>
 
                 <div className="overflow-x-auto rounded-2xl border border-[#e6ece8] bg-white shadow-xs">
+                  {standings.length === 0 && (
+                    <p className="p-5 text-sm text-slate-500">
+                      Standings will appear after match results are recorded.
+                    </p>
+                  )}
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="border-b border-[#e6ece8] bg-[#f8faf9] text-slate-500 uppercase text-[10px] font-bold">
@@ -284,8 +299,15 @@ export function SportsAndEventsViews({ defaultTab = "sports" }: { defaultTab?: "
         /* ================= School Events ================= */
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.length === 0 && (
+              <p className="col-span-full rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">
+                No school events are available yet.
+              </p>
+            )}
             {events.map((evt) => {
-              const capacityPct = Math.min(100, Math.round((evt.registeredCount / evt.capacity) * 100));
+              const capacityPct = evt.capacity > 0
+                ? Math.min(100, Math.round((evt.registeredCount / evt.capacity) * 100))
+                : null;
 
               return (
                 <Card
@@ -326,15 +348,19 @@ export function SportsAndEventsViews({ defaultTab = "sports" }: { defaultTab?: "
                         <div className="flex justify-between text-[11px] text-slate-500 font-semibold">
                           <span>Registrations</span>
                           <span>
-                            {evt.registeredCount} / {evt.capacity} Seats ({capacityPct}%)
+                            {capacityPct === null
+                              ? `${evt.registeredCount} registered`
+                              : `${evt.registeredCount} / ${evt.capacity} seats (${capacityPct}%)`}
                           </span>
                         </div>
-                        <div className="h-2 w-full bg-[#eef3f0] rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-[#0d5c4d] rounded-full transition-all"
-                            style={{ width: `${capacityPct}%` }}
-                          />
-                        </div>
+                        {capacityPct !== null && (
+                          <div className="h-2 w-full bg-[#eef3f0] rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-[#0d5c4d] rounded-full transition-all"
+                              style={{ width: `${capacityPct}%` }}
+                            />
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </div>
@@ -399,20 +425,6 @@ export function SportsAndEventsViews({ defaultTab = "sports" }: { defaultTab?: "
                 className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Match Outcome Summary
-            </label>
-            <input
-              type="text"
-              required
-              value={outcome}
-              onChange={(e) => setOutcome(e.target.value)}
-              placeholder="e.g. St. Michael Won by 17 runs"
-              className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
-            />
           </div>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Calendar, Clock, MapPin, Search, Trophy } from "lucide-react";
+import { Calendar, Clock, MapPin, Pencil, Search, Trophy, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Fixture } from "@/types/lms";
@@ -18,12 +18,16 @@ export function MatchCenterFixturesView({
   defaultFixtures = [],
   isAdminOrTeacher = false,
   onScheduleNewFixture,
+  onEditFixture,
   onRecordScore,
+  onDeleteFixture,
 }: {
   defaultFixtures?: Fixture[];
   isAdminOrTeacher?: boolean;
   onScheduleNewFixture?: () => void;
+  onEditFixture?: (fixture: Fixture) => void;
   onRecordScore?: (fixtureId: string) => void;
+  onDeleteFixture?: (fixtureId: string) => void;
 }) {
   const [statusFilter, setStatusFilter] = useState<MatchStatusFilter>("all");
   const [selectedSport, setSelectedSport] = useState("All sports");
@@ -165,11 +169,36 @@ export function MatchCenterFixturesView({
                 <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{fixture.time}</span>
                 <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{fixture.venue}</span>
               </div>
-              {isAdminOrTeacher && fixture.status !== "completed" && onRecordScore && (
-                <div className="mt-3 flex justify-end">
-                  <Button variant="outline" size="sm" onClick={() => onRecordScore(fixture.id)}>
-                    Record result
-                  </Button>
+              {isAdminOrTeacher && (
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  {onEditFixture && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onEditFixture(fixture)}
+                      className="text-slate-500 hover:text-[#0d5c4d] h-8 px-2"
+                      title="Edit fixture"
+                      aria-label={`Edit ${fixture.homeTeam} versus ${fixture.awayTeam}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {onDeleteFixture && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDeleteFixture(fixture.id)}
+                      className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 h-8 px-2"
+                      title="Cancel/Delete Fixture"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {fixture.status !== "completed" && onRecordScore && (
+                    <Button variant="outline" size="sm" onClick={() => onRecordScore(fixture.id)}>
+                      Record result
+                    </Button>
+                  )}
                 </div>
               )}
             </article>

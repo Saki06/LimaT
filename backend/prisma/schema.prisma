@@ -51,6 +51,57 @@ enum SubscriptionStatus {
   PENDING
 }
 
+enum PaymentStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+  REFUNDED
+}
+
+enum TeamRole {
+  CAPTAIN
+  VICE_CAPTAIN
+  PLAYER
+  COACH
+  SUPPORT_STAFF
+}
+
+enum NotificationType {
+  REGISTRATION_CONFIRMATION
+  PAYMENT_STATUS_CHANGE
+  FIXTURE_SCHEDULE
+  MATCH_REMINDER
+  MATCH_RESULT
+  TEAM_ANNOUNCEMENT
+  SYSTEM_ALERT
+}
+
+enum LocationType {
+  PROVINCE
+  DISTRICT
+}
+
+enum MatchStatus {
+  UPCOMING
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum BracketType {
+  KNOCKOUT
+  GROUP
+  ROUND_ROBIN
+  LEAGUE
+}
+
+enum BracketPosition {
+  WINNER_BRACKET
+  LOSER_BRACKET
+  GROUP_STAGE
+}
+
 enum LiveClassStatus {
   SCHEDULED
   LIVE
@@ -91,51 +142,96 @@ enum ResourceType {
 
 // Multi-tenant School / Institution
 model Tenant {
-  id                 String             @id @default(uuid())
-  slug               String             @unique
-  name               String
-  domain             String?            @unique
-  status             TenantStatus       @default(ACTIVE)
-  plan               String             @default("PRO")
-  settings           Json?
-  users              User[]
-  courses            Course[]
-  packages           Package[]
-  liveClasses        LiveClassSession[]
-  assignments        Assignment[]
-  libraryResources   LibraryResource[]
-  sportsEvents       SportsEvent[]
-  sportsDisciplines  SportsDiscipline[]
-  sportsTeams        SportsTeam[]
-  sportsTournaments  SportsTournament[]
-  sportsFixtures     SportsFixture[]
-  announcements      Announcement[]
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  deletedAt          DateTime?
+  id                    String                  @id @default(uuid())
+  slug                  String                  @unique
+  name                  String
+  domain                String?                 @unique
+  status                TenantStatus            @default(ACTIVE)
+  plan                  String                  @default("PRO")
+  settings              Json?
+  users                 User[]
+  courses               Course[]
+  packages              Package[]
+  subscriptions         TenantSubscription[]
+  liveClasses           LiveClassSession[]
+  assignments           Assignment[]
+  libraryResources      LibraryResource[]
+  sportsEvents          SportsEvent[]
+  sportsDisciplines     SportsDiscipline[]
+  sportsTeams           SportsTeam[]
+  sportsTournaments     SportsTournament[]
+  sportsFixtures        SportsFixture[]
+  sportsPayments        SportsRegistrationPayment[] @relation("SportsPayments")
+  sportsTeamMembers     SportsTeamMember[] @relation("SportsTeamMembers")
+  sportsTeamInvitations SportsTeamInvitation[] @relation("SportsTeamInvitations")
+  athleteProfiles       AthleteProfile[] @relation("AthleteProfiles")
+  sportsLocations       SportsLocation[] @relation("SportsLocations")
+  tournamentBrackets    TournamentBracket[] @relation("TournamentBrackets")
+  bracketMatches        BracketMatch[] @relation("BracketMatches")
+  liveMatchUpdates      LiveMatchUpdate[] @relation("LiveMatchUpdates")
+  fixtureCalendarViews  FixtureCalendarView[] @relation("FixtureCalendarViews")
+  announcements         Announcement[]
+
+  // Phase 3: Notifications
+  notifications         Notification[] @relation("Notifications")
+  emailServices         EmailNotificationService[] @relation("EmailServices")
+  smsServices           SMSNotificationService[] @relation("SMSServices")
+  pushServices          PushNotificationService[] @relation("PushServices")
+  notificationTemplates NotificationTemplate[] @relation("NotificationTemplates")
+  deliveryLogs          NotificationDeliveryLog[] @relation("DeliveryLogs")
+
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  deletedAt             DateTime?
 
   @@index([slug])
 }
 
+
+model TenantSubscription {
+  id           String             @id @default(uuid())
+  tenantId     String
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  amount       Decimal            @db.Decimal(12, 2)
+  currency     String             @default("LKR")
+  billingCycle BillingCycle       @default(MONTHLY)
+  status       SubscriptionStatus @default(PENDING)
+  startDate    DateTime
+  endDate      DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([tenantId, status])
+  @@index([status, startDate, endDate])
+}
+
+
 // Core User Account
 model User {
-  id                  String               @id @default(uuid())
-  tenantId            String?
-  tenant              Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  email               String               @unique
-  passwordHash        String
-  role                Role
-  firstName           String
-  lastName            String
-  avatarUrl           String?
-  isActive            Boolean              @default(true)
-  studentProfile      StudentProfile?
-  teacherProfile      TeacherProfile?
-  parentProfile       ParentProfile?
-  superAdminProfile   SuperAdminProfile?
-  sportsRegistrations SportsRegistration[]
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  id                    String                @id @default(uuid())
+  tenantId              String?
+  tenant                Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email                 String                @unique
+  passwordHash          String
+  role                  Role
+  firstName             String
+  lastName              String
+  avatarUrl             String?
+  isActive              Boolean               @default(true)
+  studentProfile        StudentProfile?
+  teacherProfile        TeacherProfile?
+  parentProfile         ParentProfile?
+  superAdminProfile     SuperAdminProfile?
+  sportsRegistrations   SportsRegistration[]
+  athleteProfile        AthleteProfile?       @relation("AthleteProfile")
+  teamMemberships       SportsTeamMember[]    @relation("TeamMemberships")
+  teamInvitations       SportsTeamInvitation[] @relation("TeamInvitations")
+
+  // Phase 3: Notifications
+  notifications         Notification[] @relation("Notifications")
+
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
 
   @@index([tenantId, role])
   @@index([email])
@@ -147,6 +243,7 @@ model StudentProfile {
   user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   studentIdNo           String                 @unique
   gradeLevel            String
+  phoneNumber           String?
   section               String?
   guardianId            String?
   guardian              ParentProfile?         @relation(fields: [guardianId], references: [id])
@@ -241,28 +338,31 @@ model Enrollment {
 }
 
 model SportsEvent {
-  id            String               @id @default(uuid())
-  tenantId      String
-  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  disciplineId  String?
-  discipline    SportsDiscipline?    @relation(fields: [disciplineId], references: [id], onDelete: SetNull)
-  title         String
-  sportType     String
-  ageCategory   String?
-  gender        String?
-  fee           Int                  @default(0)
-  maxParticipants Int?
-  description   String?
-  isTeamSport   Boolean              @default(false)
-  venue         String
-  startDate     DateTime
-  endDate       DateTime?
-  status        EventStatus          @default(UPCOMING)
-  registrations SportsRegistration[]
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  id                  String               @id @default(uuid())
+  tenantId            String
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  disciplineId        String?
+  discipline          SportsDiscipline?    @relation(fields: [disciplineId], references: [id], onDelete: SetNull)
+  title               String
+  sportType           String
+  ageCategory         String?
+  gender              String?
+  fee                 Int                  @default(0)
+  maxParticipants     Int?
+  description         String?
+  isTeamSport         Boolean              @default(false)
+  venue               String
+  startDate           DateTime
+  endDate             DateTime?
+  status              EventStatus          @default(UPCOMING)
+  registrationOpenDate  DateTime?
+  registrationCloseDate DateTime?          // When registration closes
+  registrations       SportsRegistration[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 
   @@index([tenantId, status])
+  @@index([registrationCloseDate])
 }
 
 model SportsDiscipline {
@@ -282,39 +382,42 @@ model SportsDiscipline {
 }
 
 model SportsRegistration {
-  id            String             @id @default(uuid())
-  eventId       String
-  event         SportsEvent        @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jerseyNumber  Int?
-  roleInTeam    String?
-  status        RegistrationStatus @default(PENDING)
-  notes         String?
+  id                String                     @id @default(uuid())
+  eventId           String
+  event             SportsEvent                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jerseyNumber      Int?
+  roleInTeam        String?
+  status            RegistrationStatus        @default(PENDING)
+  notes             String?
   registrationNumber String?
-  athleteDetails Json?
-  paymentStatus String             @default("PENDING")
-  totalAmount   Int                @default(0)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  athleteDetails    Json?
+  paymentStatus     String                    @default("PENDING")
+  totalAmount       Int                       @default(0)
+  payments          SportsRegistrationPayment[] @relation("PaymentRecords")
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
 
   @@unique([eventId, userId])
   @@index([registrationNumber])
 }
 
 model SportsTeam {
-  id                String   @id @default(uuid())
+  id                String                 @id @default(uuid())
   tenantId          String
-  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sportName         String
   name              String
-  coachName         String   @default("")
-  trainingSchedule  String   @default("")
-  status            String   @default("active")
-  playersCount      Int      @default(0)
-  players           Json     @default("[]")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  coachName         String                 @default("")
+  trainingSchedule  String                 @default("")
+  status            String                 @default("active")
+  playersCount      Int                    @default(0)
+  players           Json                   @default("[]")
+  members           SportsTeamMember[]     @relation("Members")
+  invitations       SportsTeamInvitation[] @relation("Invitations")
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
 
   @@index([tenantId, sportName])
 }
@@ -341,6 +444,7 @@ model SportsTournament {
   champion            String?
   runnerUp            String?
   fixtures            SportsFixture[]
+  brackets           TournamentBracket[] @relation("Brackets")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -363,11 +467,13 @@ model SportsFixture {
   date              DateTime
   time              String
   venue             String
-  status            String   @default("scheduled")
+  status            MatchStatus @default(UPCOMING)
   homeScore         String?
   awayScore         String?
   outcome           String?
   recordedAt        DateTime?
+  liveUpdates       LiveMatchUpdate[] @relation("LiveUpdates")
+  bracketMatches    BracketMatch[] @relation("BracketFixtures")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -587,6 +693,335 @@ model LibraryResource {
   @@index([packageId])
 }
 
+model SportsRegistrationPayment {
+  id                 String         @id @default(uuid())
+  tenantId           String
+  tenant             Tenant         @relation("SportsPayments", fields: [tenantId], references: [id], onDelete: Cascade)
+  registrationId     String
+  registration       SportsRegistration @relation("PaymentRecords", fields: [registrationId], references: [id], onDelete: Cascade)
+  amount             Decimal        @db.Decimal(12, 2)
+  currency           String         @default("LKR")
+  paymentMethod      String         @default("BANK_TRANSFER") // BANK_TRANSFER, CARD, CHEQUE, CASH
+  status             PaymentStatus  @default(PENDING)
+  paymentSlipUrl     String?
+  paymentSlipFileName String?
+  receiptNumber      String?        @unique
+  bankRefNo          String?
+  notes              String?
+  submittedAt        DateTime?
+  approvedAt         DateTime?
+  approvedBy         String?        // Admin ID who approved
+  rejectedAt         DateTime?
+  rejectedReason     String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([registrationId, status])
+  @@index([tenantId, status])
+  @@index([receiptNumber])
+  @@index([createdAt])
+}
+
+model SportsTeamMember {
+  id            String     @id @default(uuid())
+  tenantId      String
+  tenant        Tenant     @relation("SportsTeamMembers", fields: [tenantId], references: [id], onDelete: Cascade)
+  teamId        String
+  team          SportsTeam @relation("Members", fields: [teamId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User       @relation("TeamMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  role          TeamRole   @default(PLAYER)
+  jerseyNumber  Int?
+  joinedAt      DateTime   @default(now())
+  leftAt        DateTime?
+  isActive      Boolean    @default(true)
+
+  @@unique([teamId, userId])
+  @@index([tenantId, teamId])
+  @@index([userId])
+}
+
+model SportsTeamInvitation {
+  id        String    @id @default(uuid())
+  tenantId  String
+  tenant    Tenant    @relation("SportsTeamInvitations", fields: [tenantId], references: [id], onDelete: Cascade)
+  teamId    String
+  team      SportsTeam @relation("Invitations", fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation("TeamInvitations", fields: [userId], references: [id], onDelete: Cascade)
+  code      String    @unique
+  status    String    @default("PENDING") // PENDING, ACCEPTED, REJECTED, EXPIRED
+  expiresAt DateTime
+  acceptedAt DateTime?
+  rejectedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([teamId, userId])
+  @@index([code])
+  @@index([tenantId, status])
+}
+
+model AthleteProfile {
+  id                String      @id @default(uuid())
+  tenantId          String
+  tenant            Tenant      @relation("AthleteProfiles", fields: [tenantId], references: [id], onDelete: Cascade)
+  userId            String      @unique
+  user              User        @relation("AthleteProfile", fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth       DateTime?
+  gender            String?     // Boys, Girls, Mixed
+  schoolName        String?
+  province          String?
+  district          String?
+  height            Float?      // in cm
+  weight            Float?      // in kg
+  bloodType         String?
+  emergencyContact  String?
+  achievements      Json?       @default("[]") // Array of achievement objects
+  participationHistory Json?    @default("[]") // Array of past events
+  sportsInterests   String[]    @default([])
+  isTeamInterested  Boolean     @default(false)
+  bio               String?
+  profileImageUrl   String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([district])
+  @@index([province])
+  @@index([createdAt])
+}
+
+model SportsLocation {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation("SportsLocations", fields: [tenantId], references: [id], onDelete: Cascade)
+  type      LocationType
+  name      String
+  code      String
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, type, code])
+  @@index([tenantId, type, isActive])
+}
+
+// Phase 2: Tournament Brackets and Live Scoring
+model TournamentBracket {
+  id              String         @id @default(uuid())
+  tenantId        String
+  tenant          Tenant         @relation("TournamentBrackets", fields: [tenantId], references: [id], onDelete: Cascade)
+  tournamentId    String
+  tournament      SportsTournament @relation("Brackets", fields: [tournamentId], references: [id], onDelete: Cascade)
+  type            BracketType
+  stage           Int            @default(1) // 1 for group stage, 2-N for knockout rounds
+  stageName       String         @default("Round 1")
+  matchCount      Int            @default(0)
+  matches         BracketMatch[] @relation("BracketMatches")
+  status          String         @default("pending") // pending, in_progress, completed
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([tenantId, tournamentId, stage])
+  @@index([tenantId, tournamentId, status])
+}
+
+model BracketMatch {
+  id               String         @id @default(uuid())
+  tenantId         String
+  tenant           Tenant         @relation("BracketMatches", fields: [tenantId], references: [id], onDelete: Cascade)
+  bracketId        String
+  bracket          TournamentBracket @relation("BracketMatches", fields: [bracketId], references: [id], onDelete: Cascade)
+  fixtureId        String?
+  fixture          SportsFixture? @relation("BracketFixtures", fields: [fixtureId], references: [id], onDelete: SetNull)
+  matchNumber      Int            // Position in bracket (1, 2, 3, etc)
+  team1Id          String?
+  team1Name        String?
+  team1Score       Int?
+  team2Id          String?
+  team2Name        String?
+  team2Score       Int?
+  winnerId         String?        // ID of winning team/competitor
+  winnerName       String?
+  position         BracketPosition @default(WINNER_BRACKET)
+  status           MatchStatus    @default(UPCOMING)
+  scheduledDate    DateTime?
+  scheduledTime    String?
+  venue            String?
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([tenantId, bracketId, matchNumber])
+  @@index([tenantId, bracketId, status])
+  @@index([tenantId, fixtureId])
+}
+
+// Live Match Updates
+model LiveMatchUpdate {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation("LiveMatchUpdates", fields: [tenantId], references: [id], onDelete: Cascade)
+  fixtureId       String
+  fixture         SportsFixture @relation("LiveUpdates", fields: [fixtureId], references: [id], onDelete: Cascade)
+  homeScore       Int
+  awayScore       Int
+  period          Int      @default(1) // Half/Quarter/Set/Innings
+  periodTime      String?  // Time within period
+  event           String?  // Goal, Wicket, Foul, etc
+  playerName      String?  // Player involved in event
+  teamId          String?  // Team that scored/involved
+  updateTime      DateTime @default(now())
+  updatedBy       String   // Admin/Official ID who made the update
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId, fixtureId, createdAt])
+  @@index([tenantId, fixtureId, updateTime])
+}
+
+// Fixture Calendar support - extends SportsFixture
+model FixtureCalendarView {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation("FixtureCalendarViews", fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  filterCriteria  Json     @default("{}")
+  createdBy       String
+  isPublic        Boolean  @default(false)
+  displayOrder    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId, isPublic])
+}
+
+// Phase 3: Notification System
+model Notification {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation("Notifications", fields: [tenantId], references: [id], onDelete: Cascade)
+  recipientId     String
+  recipient       User     @relation("Notifications", fields: [recipientId], references: [id], onDelete: Cascade)
+  type            NotificationType
+  title           String
+  message         String
+  relatedEntityId String?  // Registration ID, Payment ID, Fixture ID, etc
+  relatedEntityType String? // "REGISTRATION", "PAYMENT", "FIXTURE", "TEAM", etc
+  read            Boolean  @default(false)
+  readAt          DateTime?
+  actionUrl       String?  // Deep link to related resource
+  createdAt       DateTime @default(now())
+  sentVia         String?  // "IN_APP", "EMAIL", "SMS"
+
+  @@index([tenantId, recipientId, read])
+  @@index([tenantId, recipientId, createdAt])
+  @@index([tenantId, type])
+}
+
+// Email notification service configuration
+model EmailNotificationService {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation("EmailServices", fields: [tenantId], references: [id], onDelete: Cascade)
+  provider        String   // "SMTP", "SENDGRID", "AWS_SES", "MAILGUN"
+  isActive        Boolean  @default(true)
+  senderEmail     String
+  senderName      String?
+
+  // Encrypted provider credentials
+  providerConfig  Json     // { apiKey, apiSecret, host, port, etc }
+
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, provider])
+  @@index([tenantId, isActive])
+}
+
+// SMS notification service configuration
+model SMSNotificationService {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation("SMSServices", fields: [tenantId], references: [id], onDelete: Cascade)
+  provider        String   // "TWILIO", "AWS_SNS", "NEXMO", "FIREBASE"
+  isActive        Boolean  @default(true)
+  senderPhoneOrId String   // Phone number for Twilio, account ID for others
+
+  // Encrypted provider credentials
+  providerConfig  Json     // { accountSid, authToken, apiKey, etc }
+
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, provider])
+  @@index([tenantId, isActive])
+}
+
+// Push notification service configuration
+model PushNotificationService {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation("PushServices", fields: [tenantId], references: [id], onDelete: Cascade)
+  provider        String   // "FIREBASE", "ONESIGNAL", "EXPO"
+  isActive        Boolean  @default(true)
+
+  // Encrypted provider credentials
+  providerConfig  Json     // { apiKey, serverKey, projectId, etc }
+
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, provider])
+  @@index([tenantId, isActive])
+}
+
+// Notification template for consistency
+model NotificationTemplate {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation("NotificationTemplates", fields: [tenantId], references: [id], onDelete: Cascade)
+  type            NotificationType
+  channel         String   // "IN_APP", "EMAIL", "SMS", "PUSH"
+  titleTemplate   String   // Supports {{variable}} placeholders
+  messageTemplate String   // Supports {{variable}} placeholders
+  isActive        Boolean  @default(true)
+
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, type, channel])
+  @@index([tenantId, isActive])
+}
+
+// Notification delivery log for audit and retry
+model NotificationDeliveryLog {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation("DeliveryLogs", fields: [tenantId], references: [id], onDelete: Cascade)
+  notificationId  String
+  channel         String   // "IN_APP", "EMAIL", "SMS", "PUSH"
+  recipientEmail  String?
+  recipientPhone  String?
+  recipientPushToken String?
+  status          String   // "PENDING", "SENT", "DELIVERED", "FAILED"
+  errorMessage    String?
+  retryCount      Int      @default(0)
+  maxRetries      Int      @default(3)
+  nextRetryAt     DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId, notificationId])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, nextRetryAt]) // For retry processing
+}
+
 model SuperAdminProfile {
   id            String   @id @default(uuid())
   userId        String   @unique
@@ -600,7 +1035,12 @@ model SuperAdminProfile {
   province      String?
   postalCode    String?
   bio           String?
+  dateOfBirth   DateTime?
+  gender        String?
+  languages     String?
+  rootAuthorityId String? @unique
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
