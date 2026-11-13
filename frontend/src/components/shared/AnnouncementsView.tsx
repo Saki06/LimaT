@@ -401,11 +401,8 @@ export function AnnouncementsView() {
           <div>
             <h1 className="text-2xl font-black text-[#0d2b26] flex items-center gap-2">
               <Bell className="h-6 w-6 text-[#0d5c4d]" />
-              Official Notice Board &amp; School Circulars
+              Official Notice Board &amp; Circulars
             </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Live school announcements, exam schedules, holiday notices, and masterclass updates.
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
