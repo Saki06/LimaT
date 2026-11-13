@@ -79,6 +79,7 @@ interface AppContextType {
   authUser: any | null;
   authToken: string | null;
   updateAuthUser: (updates: Record<string, any>) => void;
+  refreshSuperAdminAvatar: () => void;
   loginUser: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   registerUser: (input: {
     role: 'student' | 'teacher' | 'parent';
@@ -485,6 +486,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState<any | null>(null);
 
+  const [superAdminAvatarUrl, setSuperAdminAvatarUrl] = useState<string | null>(null);
+const [superAdminAvatarVersion, setSuperAdminAvatarVersion] = useState(0);
+
+const refreshSuperAdminAvatar = useCallback(() => {
+  setSuperAdminAvatarUrl(null);
+  setSuperAdminAvatarVersion((previous) => previous + 1);
+}, []);
+
   // Load real tenants for Super Admin
   useEffect(() => {
     if (currentRole !== 'super_admin' && authUser?.role !== 'SUPER_ADMIN') {
@@ -520,6 +529,122 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [currentRole, authUser?.role, authToken]);
+
+    // Load Super Admin display name after authentication
+  useEffect(() => {
+    if (
+      currentRole !== 'super_admin' ||
+      authUser?.role !== 'SUPER_ADMIN' ||
+      !authToken
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadSuperAdminDisplayName = async () => {
+      try {
+        const response = await api.superAdminProfile.get();
+
+        if (cancelled || !response.success) return;
+
+        const preferredName =
+          response.data?.superAdminProfile?.preferredName?.trim();
+
+        if (!preferredName) return;
+
+        setAuthUser((previous: any) => {
+          if (!previous || previous.id !== authUser.id) {
+            return previous;
+          }
+
+          if (previous.preferredName === preferredName) {
+            return previous;
+          }
+
+          const updated = {
+            ...previous,
+            preferredName,
+          };
+
+          api.user.set(updated);
+
+          return updated;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.warn(
+            'Could not load Super Admin display name:',
+            error
+          );
+        }
+      }
+    };
+
+    loadSuperAdminDisplayName();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, authUser?.id, authUser?.role, authToken]);
+
+  // Load protected Super Admin avatar
+useEffect(() => {
+  if (
+    currentRole !== 'super_admin' ||
+    authUser?.role !== 'SUPER_ADMIN' ||
+    !authToken
+  ) {
+    setSuperAdminAvatarUrl(null);
+    return;
+  }
+
+  let cancelled = false;
+  let objectUrl: string | null = null;
+
+  const loadSuperAdminAvatar = async () => {
+    try {
+      const response = await api.superAdminProfile.get();
+
+      if (cancelled || !response.success) return;
+
+      const avatarUrl = response.data?.avatarUrl;
+
+      if (!avatarUrl) {
+        setSuperAdminAvatarUrl(null);
+        return;
+      }
+
+      const blob = await api.superAdminProfile.getAvatarBlob(avatarUrl);
+
+      if (cancelled) return;
+
+      objectUrl = URL.createObjectURL(blob);
+      setSuperAdminAvatarUrl(objectUrl);
+    } catch (error) {
+      if (!cancelled) {
+        console.warn('Could not load Super Admin avatar:', error);
+        setSuperAdminAvatarUrl(null);
+      }
+    }
+  };
+
+  void loadSuperAdminAvatar();
+
+  return () => {
+    cancelled = true;
+
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
+}, [
+  currentRole,
+  authUser?.id,
+  authUser?.role,
+  authToken,
+  superAdminAvatarVersion
+]);
 
   // Restore session & navigation state from URL query or localStorage on initial load
   useEffect(() => {
@@ -1035,16 +1160,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const t = getTranslation(locale);
   const baseUser = mockUsers[currentRole];
   const userAvatar =
-    (currentRole === 'teacher' ? (teacherProfile?.user?.avatarUrl || teacherProfile?.avatarUrl) : null) ||
-    authUser?.avatarUrl ||
-    (typeof window !== 'undefined' ? (localStorage.getItem(`lms_avatar_${authUser?.id || 'teacher'}`) || localStorage.getItem('lms_avatar_teacher')) : null) ||
-    baseUser.avatar;
+  (currentRole === 'super_admin' && authUser?.role === 'SUPER_ADMIN'
+    ? superAdminAvatarUrl
+    : null) ||
+  (currentRole === 'teacher'
+    ? (teacherProfile?.user?.avatarUrl || teacherProfile?.avatarUrl)
+    : null) ||
+  (currentRole !== 'super_admin' ? authUser?.avatarUrl : null) ||
+  (currentRole !== 'super_admin' && typeof window !== 'undefined'
+    ? (localStorage.getItem(`lms_avatar_${authUser?.id || 'teacher'}`) ||
+       localStorage.getItem('lms_avatar_teacher'))
+    : null) ||
+  baseUser.avatar;
 
   const currentUser: User = authUser
     ? {
       ...baseUser,
       id: authUser.id,
-      name: `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() || authUser.name || authUser.email || 'User',
+      name:
+  (currentRole === 'super_admin'
+    ? authUser.preferredName?.trim()
+    : '') ||
+  `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() ||
+  authUser.name ||
+  authUser.email ||
+  'User',
       email: authUser.email,
       role: currentRole,
       avatar: userAvatar
@@ -3204,6 +3344,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         authUser,
         authToken,
         updateAuthUser,
+        refreshSuperAdminAvatar,
         loginUser,
         registerUser,
         logoutUser
