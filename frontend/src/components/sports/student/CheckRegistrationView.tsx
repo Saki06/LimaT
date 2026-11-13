@@ -19,10 +19,11 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SportsRegistration } from "@/lib/api";
 import { StoredAthleteRegistration } from "@/components/sports/sportsRegistrationData";
 
 interface CheckRegistrationViewProps {
-  registrations: StoredAthleteRegistration[];
+  registrations: SportsRegistration[];
   onOpenRegister: () => void;
 }
 
@@ -36,83 +37,130 @@ export function CheckRegistrationView({
   const [searchedRecord, setSearchedRecord] = useState<StoredAthleteRegistration | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [isSearchingBackend, setIsSearchingBackend] = useState(false);
+  const [lookupError, setLookupError] = useState("");
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setHasSearched(true);
     const cleanId = searchRegId.trim().toUpperCase();
     const cleanPhone = searchMobile.trim().replace(/\s+/g, "");
-
-    const found = registrations.find((registration) =>
-      (cleanId && registration.registrationNumber.toUpperCase() === cleanId) ||
-      (cleanPhone && registration.mobile.replace(/\s+/g, "") === cleanPhone)
-    );
-
-    if (found) {
-      setSearchedRecord(found);
+    setSearchedRecord(null);
+    setLookupError("");
+    const query = cleanId || cleanPhone;
+    if (!query) {
+      setLookupError("Enter your registration number or registered mobile number.");
       return;
     }
 
-    // Direct Backend Verification Lookup
-    const query = cleanId || cleanPhone;
-    if (query) {
-      setIsSearchingBackend(true);
-      try {
-        const records = await verifySportsRegistration(query);
-        if (records.length > 0) {
-          const rec = records[0];
-          const details = (rec.athleteDetails || {}) as Record<string, unknown>;
-          const status = rec.status === "CONFIRMED" ? "Approved" : rec.status === "REJECTED" ? "Rejected" : "Pending";
-          const transformed: StoredAthleteRegistration = {
-            id: rec.registrationNumber || rec.id,
-            registrationNumber: rec.registrationNumber || query,
-            athleteName: (details.athleteName as string) || (details.firstName as string) || "Athlete Participant",
-            firstName: (details.firstName as string) || "",
-            lastName: (details.lastName as string) || "",
-            dob: (details.dob as string) || "",
-            age: (details.age as number) || 0,
-            gender: (details.gender as any) || "Boys",
-            nicOrStudentId: (details.nicOrStudentId as string) || "",
-            mobile: (details.mobile as string) || cleanPhone,
-            email: (details.email as string) || "",
-            province: (details.province as string) || "",
-            district: (details.district as string) || "",
-            schoolName: (details.schoolName as string) || "Academy",
-            grade: (details.grade as string) || "",
-            sports: (details.sports as string[]) || [rec.event?.sportType || "Sports"],
-            selectedEvents: (details.selectedEvents as any) || [
-              {
-                id: rec.eventId,
-                sportName: rec.event?.sportType || "Championship",
-                eventName: rec.event?.title || "Event",
-                ageCategory: "Open",
-                gender: "All",
-                fee: rec.event?.fee || rec.totalAmount || 0,
-              }
-            ],
-            isTeamInterest: Boolean(details.isTeamInterest),
-            consentTimestamp: rec.createdAt,
-            paymentStatus: (rec.paymentStatus as any) || "PAID",
-            totalAmount: rec.totalAmount,
-            status,
-            createdAt: rec.createdAt,
-          };
-          setSearchedRecord(transformed);
-          setIsSearchingBackend(false);
-          return;
-        }
-      } catch {
-        // ignore
-      } finally {
-        setIsSearchingBackend(false);
-      }
-    }
+    setIsSearchingBackend(true);
+    try {
+      const records = await verifySportsRegistration(query);
+      if (records.length === 0) return;
 
-    setSearchedRecord(null);
+      const rec = records[0];
+      const details = (rec.athleteDetails || {}) as Record<string, unknown>;
+      const selectedEvents = Array.isArray(details.selectedEvents)
+        ? (details.selectedEvents as StoredAthleteRegistration["selectedEvents"])
+        : records.map((registration) => ({
+            id: registration.eventId,
+            sportName: registration.event?.sportType || "Sports",
+            eventName: registration.event?.title || "Event",
+            ageCategory: "Open",
+            gender: "All",
+            fee: registration.event?.fee ?? 0,
+          }));
+      const status = records.some((registration) => registration.status === "REJECTED")
+        ? "Rejected"
+        : records.some((registration) => registration.status === "CONFIRMED")
+          ? "Approved"
+          : "Pending";
+      setSearchedRecord({
+        id: rec.registrationNumber || rec.id,
+        registrationNumber: rec.registrationNumber || cleanId,
+        athleteName: String(details.athleteName || `${details.firstName || ""} ${details.lastName || ""}`).trim() || "Athlete Participant",
+        firstName: String(details.firstName || ""),
+        lastName: String(details.lastName || ""),
+        dob: String(details.dob || ""),
+        age: typeof details.age === "number" ? details.age : 0,
+        gender: details.gender === "Girls" || details.gender === "Mixed" ? details.gender : "Boys",
+        nicOrStudentId: String(details.nicOrStudentId || ""),
+        mobile: String(details.mobile || cleanPhone),
+        email: String(details.email || ""),
+        province: String(details.province || ""),
+        district: String(details.district || ""),
+        schoolName: String(details.schoolName || "Academy"),
+        grade: String(details.grade || ""),
+        sports: Array.isArray(details.sports) ? details.sports.map(String) : [rec.event?.sportType || "Sports"],
+        selectedEvents,
+        isTeamInterest: Boolean(details.isTeamInterest),
+        ...(details.teamSquad && typeof details.teamSquad === "object"
+          ? { teamSquad: details.teamSquad as StoredAthleteRegistration["teamSquad"] }
+          : {}),
+        ...(typeof details.guardianName === "string" ? { guardianName: details.guardianName } : {}),
+        ...(typeof details.guardianRelationship === "string"
+          ? { guardianRelationship: details.guardianRelationship }
+          : {}),
+        ...(typeof details.guardianMobile === "string" ? { guardianMobile: details.guardianMobile } : {}),
+        consentTimestamp: rec.createdAt,
+        paymentStatus: (rec.paymentStatus as StoredAthleteRegistration["paymentStatus"]) || "PAID",
+        totalAmount: rec.totalAmount,
+        status,
+        createdAt: rec.createdAt,
+      });
+    } catch (error) {
+      setLookupError(error instanceof Error ? error.message : "Unable to verify this registration.");
+    } finally {
+      setIsSearchingBackend(false);
+    }
   };
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
+      <Card className="border-[#e6ece8] bg-white shadow-xs">
+        <CardContent className="space-y-4 p-6">
+          <div>
+            <h3 className="text-lg font-black text-[#0d2b26]">My Sports Registrations</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Registrations associated with your signed-in account.
+            </p>
+          </div>
+          {registrations.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
+              <p className="font-bold text-slate-700">No registrations yet</p>
+              <Button type="button" onClick={onOpenRegister} className="mt-3">
+                Browse and register
+              </Button>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {registrations.map((registration) => (
+                <li
+                  key={registration.id}
+                  className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="font-bold text-slate-800">
+                      {registration.event?.title || registration.event?.sportType || "Sports event"}
+                    </p>
+                    <p className="font-mono text-xs text-slate-500">
+                      {registration.registrationNumber || "Reference pending"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant={registration.status === "CONFIRMED" ? "success" : registration.status === "REJECTED" ? "destructive" : "secondary"}>
+                      {registration.status}
+                    </Badge>
+                    <span className="text-xs font-semibold text-slate-600">
+                      LKR {registration.totalAmount.toLocaleString()}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Search Header Form */}
       <Card className="border-[#e6ece8] bg-white shadow-xs">
         <CardContent className="p-6 space-y-4">
@@ -136,6 +184,7 @@ export function CheckRegistrationView({
                 value={searchRegId}
                 onChange={(e) => setSearchRegId(e.target.value)}
                 placeholder="Registration ID"
+                required
                 className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
               />
             </div>
@@ -145,10 +194,11 @@ export function CheckRegistrationView({
                 Registered Mobile Number
               </label>
               <input
-                type="text"
+                type="tel"
                 value={searchMobile}
                 onChange={(e) => setSearchMobile(e.target.value)}
                 placeholder="Registered mobile number"
+                required
                 className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
               />
             </div>
@@ -156,12 +206,14 @@ export function CheckRegistrationView({
             <div className="sm:col-span-1 flex items-end">
               <Button
                 type="submit"
+                disabled={isSearchingBackend}
                 className="w-full h-10 bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-black rounded-xl"
               >
-                Search
+                {isSearchingBackend ? "Checking..." : "Search"}
               </Button>
             </div>
           </form>
+          {lookupError && <p role="alert" className="text-sm text-red-600">{lookupError}</p>}
 
         </CardContent>
       </Card>
@@ -342,6 +394,10 @@ export function CheckRegistrationView({
                   </div>
                 </div>
               </div>
+            </div>
+          ) : lookupError ? null : isSearchingBackend ? (
+            <div role="status" className="rounded-2xl border border-[#e6ece8] bg-white p-8 text-center text-sm text-slate-500">
+              Checking registration details...
             </div>
           ) : (
             <Card className="border-[#e6ece8] bg-white p-8 text-center space-y-3">

@@ -69,6 +69,7 @@ export function SportsView({
     updateTournament,
     deleteTournament,
     createFixture,
+    updateFixture,
     deleteFixture,
     createSportsTeam,
     updateSportsTeam,
@@ -88,19 +89,17 @@ export function SportsView({
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<SportsTab>(initialTab);
-
-  React.useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, [initialTab]);
+  if (activeTab !== initialTab) setActiveTab(initialTab);
 
   const [selectedSport, setSelectedSport] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Eezhagam / Championship Sports Web Registration Platform States
-  const [athleteRegistrations, setAthleteRegistrations] = useState<StoredAthleteRegistration[]>([]);
+  const [adminAthleteRegistrations, setAdminAthleteRegistrations] = useState<StoredAthleteRegistration[]>([]);
+  const athleteRegistrations = activeTab === "admin_registrations"
+    ? adminAthleteRegistrations
+    : mapRegistrationRecords(sportsRegistrations);
 
   React.useEffect(() => {
     void Promise.all([fetchSportsEvents(), fetchSportsOperations()]).catch((error) => {
@@ -108,13 +107,7 @@ export function SportsView({
     });
   }, [fetchSportsEvents, fetchSportsOperations]);
 
-  React.useEffect(() => {
-    if (activeTab === "check_registration") {
-      setAthleteRegistrations(mapRegistrationRecords(sportsRegistrations));
-    }
-  }, [activeTab, sportsRegistrations]);
-
-  const mapRegistrationRecords = (records: SportsRegistration[]): StoredAthleteRegistration[] => {
+  function mapRegistrationRecords(records: SportsRegistration[]): StoredAthleteRegistration[] {
     const mapped = new Map<string, StoredAthleteRegistration>();
     records.forEach((registration) => {
       if (!registration.registrationNumber || !registration.athleteDetails ||
@@ -124,8 +117,7 @@ export function SportsView({
         typeof details.athleteName !== "string" ||
         typeof details.firstName !== "string" ||
         typeof details.lastName !== "string" ||
-        !Array.isArray(details.selectedEvents) ||
-        typeof details.registrationNumber !== "string"
+        !Array.isArray(details.selectedEvents)
       ) return;
       const status = records.some((item) =>
         item.registrationNumber === registration.registrationNumber && item.status === "REJECTED"
@@ -148,15 +140,13 @@ export function SportsView({
       });
     });
     return Array.from(mapped.values());
-  };
+  }
 
   const handleNewRegistration = async (newRecord: StoredAthleteRegistration) => {
     const result = await submitChampionshipRegistration({
       eventIds: newRecord.selectedEvents.map((event) => event.id),
-      registrationNumber: newRecord.registrationNumber,
       athleteDetails: newRecord as unknown as Record<string, unknown>,
     });
-    if (result.success) setAthleteRegistrations((prev) => [newRecord, ...prev]);
     return result;
   };
 
@@ -165,7 +155,7 @@ export function SportsView({
     newStatus: "Confirmed" | "Pending" | "Approved" | "Rejected"
   ) => {
     await updateChampionshipRegistrationStatus(id, newStatus);
-    setAthleteRegistrations((prev) => prev.map((registration) =>
+    setAdminAthleteRegistrations((prev) => prev.map((registration) =>
       registration.registrationNumber === id ? { ...registration, status: newStatus } : registration
     ));
   };
@@ -173,7 +163,7 @@ export function SportsView({
   React.useEffect(() => {
     if (activeTab !== "admin_registrations") return;
     api.sports.getRegistrations()
-      .then((records) => setAthleteRegistrations(mapRegistrationRecords(records)))
+      .then((records) => setAdminAthleteRegistrations(mapRegistrationRecords(records)))
       .catch((error) => addToast({
         type: "error",
         title: "Unable to Load Sports Registrations",
@@ -207,6 +197,7 @@ export function SportsView({
   const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] = useState(false);
   const [isScheduleFixtureModalOpen, setIsScheduleFixtureModalOpen] = useState(false);
   const [selectedFixtureForScore, setSelectedFixtureForScore] = useState<string | null>(null);
+  const [editingFixture, setEditingFixture] = useState<Fixture | null>(null);
 
   // Tournament Form State
   const [tournamentForm, setTournamentForm] = useState({
@@ -278,7 +269,6 @@ export function SportsView({
       });
     }
   }, [editingTournament]);
-
   // Create Team Squad Modal State
   const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
   const [selectedSportForTeams, setSelectedSportForTeams] = useState<string>("All");
@@ -293,6 +283,24 @@ export function SportsView({
   });
 
   const isAdminOrTeacher = currentRole === "admin" || currentRole === "teacher";
+
+  const handleOpenTournamentEditor = (tournament: Tournament) => {
+    setEditTournamentForm({
+      name: tournament.name,
+      sportName: tournament.sportName,
+      category: tournament.category,
+      format: tournament.format,
+      status: tournament.status,
+      currentRound: tournament.currentRound || "",
+      venue: tournament.venue,
+      organizer: tournament.organizer,
+      trophyTitle: tournament.trophyTitle,
+      champion: tournament.champion || "",
+      runnerUp: tournament.runnerUp || "",
+      description: tournament.description || "",
+    });
+    setEditingTournament(tournament);
+  };
 
   // Filtered Tournaments
   const filteredTournaments = tournaments.filter((tr) => {
@@ -369,7 +377,7 @@ export function SportsView({
   };
 
   // Handle Schedule Fixture Submit
-  const handleScheduleFixture = (e: React.FormEvent) => {
+  const handleScheduleFixture = async (e: React.FormEvent) => {
     e.preventDefault();
     if (
       !fixtureForm.competitionName.trim() ||
@@ -381,19 +389,29 @@ export function SportsView({
       !fixtureForm.venue.trim()
     ) return;
 
-    createFixture({
-      tournamentId: fixtureForm.tournamentId || null,
-      competitionName: fixtureForm.competitionName,
-      sportName: fixtureForm.sportName,
-      homeTeam: fixtureForm.homeTeam,
-      awayTeam: fixtureForm.awayTeam,
-      date: fixtureForm.date,
-      time: fixtureForm.time,
-      venue: fixtureForm.venue,
-      status: "scheduled"
-    });
+    try {
+      const fixture = {
+        tournamentId: fixtureForm.tournamentId || null,
+        competitionName: fixtureForm.competitionName,
+        sportName: fixtureForm.sportName,
+        homeTeam: fixtureForm.homeTeam,
+        awayTeam: fixtureForm.awayTeam,
+        date: fixtureForm.date,
+        time: fixtureForm.time,
+        venue: fixtureForm.venue,
+        status: editingFixture?.status || "scheduled" as const,
+      };
+      if (editingFixture) {
+        await updateFixture(editingFixture.id, fixture);
+      } else {
+        await createFixture(fixture);
+      }
+    } catch {
+      return;
+    }
 
     setIsScheduleFixtureModalOpen(false);
+    setEditingFixture(null);
     setFixtureForm({
       tournamentId: "",
       competitionName: "",
@@ -407,16 +425,34 @@ export function SportsView({
   };
 
   // Handle Score Submit
-  const handleScoreSubmit = (e: React.FormEvent) => {
+  const handleScoreSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFixtureForScore) return;
-    recordMatchResult(selectedFixtureForScore, homeScore, awayScore, outcome);
+    try {
+      await recordMatchResult(selectedFixtureForScore, homeScore, awayScore, outcome);
+    } catch {
+      return;
+    }
     setSelectedFixtureForScore(null);
     setHomeScore("");
     setAwayScore("");
     setOutcome("");
   };
 
+  const handleEditFixture = (fixture: Fixture) => {
+    setEditingFixture(fixture);
+    setFixtureForm({
+      tournamentId: fixture.tournamentId || "",
+      competitionName: fixture.competitionName,
+      sportName: fixture.sportName,
+      homeTeam: fixture.homeTeam,
+      awayTeam: fixture.awayTeam,
+      date: fixture.date,
+      time: fixture.time,
+      venue: fixture.venue,
+    });
+    setIsScheduleFixtureModalOpen(true);
+  };
   const handleUpdateTournamentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTournament) return;
@@ -526,7 +562,10 @@ export function SportsView({
                     <span>Approvals Desk</span>
                   </Button>
                   <Button
-                    onClick={() => setIsScheduleFixtureModalOpen(true)}
+                    onClick={() => {
+                      setEditingFixture(null);
+                      setIsScheduleFixtureModalOpen(true);
+                    }}
                     variant="outline"
                     className="bg-white/10 hover:bg-white/20 border-white/30 text-white font-bold text-xs h-10 px-3.5 rounded-xl cursor-pointer"
                   >
@@ -923,6 +962,7 @@ export function SportsView({
                               sportName: tr.sportName,
                               venue: tr.venue
                             });
+                            setEditingFixture(null);
                             setIsScheduleFixtureModalOpen(true);
                           }}
                           className="text-[11px] font-bold text-slate-700 border-slate-200 hover:bg-slate-100"
@@ -964,7 +1004,11 @@ export function SportsView({
         <MatchCenterFixturesView
           defaultFixtures={fixtures}
           isAdminOrTeacher={isAdminOrTeacher}
-          onScheduleNewFixture={() => setIsScheduleFixtureModalOpen(true)}
+          onScheduleNewFixture={() => {
+            setEditingFixture(null);
+            setIsScheduleFixtureModalOpen(true);
+          }}
+          onEditFixture={handleEditFixture}
           onRecordScore={(fixtureId: string) => setSelectedFixtureForScore(fixtureId)}
           onDeleteFixture={(fixtureId: string) => deleteFixture(fixtureId)}
         />
@@ -1145,7 +1189,7 @@ export function SportsView({
       {/* ========================================================================= */}
       {activeTab === "check_registration" && (
         <CheckRegistrationView
-          registrations={athleteRegistrations}
+          registrations={sportsRegistrations}
           onOpenRegister={() => setActiveTab("registration")}
         />
       )}
@@ -1384,9 +1428,14 @@ export function SportsView({
       {isScheduleFixtureModalOpen && (
         <Modal
           isOpen={isScheduleFixtureModalOpen}
-          onClose={() => setIsScheduleFixtureModalOpen(false)}
-          title="Schedule Match Fixture 📅"
-          description="Schedule a match under an existing tournament or inter-collegiate friendly."
+          onClose={() => {
+            setIsScheduleFixtureModalOpen(false);
+            setEditingFixture(null);
+          }}
+          title={editingFixture ? "Edit Match Fixture" : "Schedule Match Fixture"}
+          description={editingFixture
+            ? "Update this fixture's schedule and participating teams."
+            : "Schedule a match under an existing tournament or inter-collegiate friendly."}
         >
           <form onSubmit={handleScheduleFixture} className="space-y-4">
             <div>
@@ -1522,7 +1571,10 @@ export function SportsView({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsScheduleFixtureModalOpen(false)}
+                onClick={() => {
+                  setIsScheduleFixtureModalOpen(false);
+                  setEditingFixture(null);
+                }}
               >
                 Cancel
               </Button>
@@ -1530,7 +1582,7 @@ export function SportsView({
                 type="submit"
                 className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold"
               >
-                Confirm Match Schedule
+                {editingFixture ? "Save Fixture" : "Confirm Match Schedule"}
               </Button>
             </div>
           </form>

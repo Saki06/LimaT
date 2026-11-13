@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Calendar, Clock, MapPin, Search, Trophy, Trash2 } from "lucide-react";
+import { Calendar, Clock, MapPin, Pencil, Search, Trophy, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Fixture } from "@/types/lms";
@@ -18,12 +18,14 @@ export function MatchCenterFixturesView({
   defaultFixtures = [],
   isAdminOrTeacher = false,
   onScheduleNewFixture,
+  onEditFixture,
   onRecordScore,
   onDeleteFixture,
 }: {
   defaultFixtures?: Fixture[];
   isAdminOrTeacher?: boolean;
   onScheduleNewFixture?: () => void;
+  onEditFixture?: (fixture: Fixture) => void;
   onRecordScore?: (fixtureId: string) => void;
   onDeleteFixture?: (fixtureId: string) => void;
 }) {
@@ -169,6 +171,18 @@ export function MatchCenterFixturesView({
               </div>
               {isAdminOrTeacher && (
                 <div className="mt-3 flex items-center justify-end gap-2">
+                  {onEditFixture && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onEditFixture(fixture)}
+                      className="text-slate-500 hover:text-[#0d5c4d] h-8 px-2"
+                      title="Edit fixture"
+                      aria-label={`Edit ${fixture.homeTeam} versus ${fixture.awayTeam}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
                   {onDeleteFixture && (
                     <Button
                       variant="ghost"

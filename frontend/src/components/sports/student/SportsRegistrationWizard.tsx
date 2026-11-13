@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   CheckCircle2,
   ChevronRight,
@@ -39,7 +39,12 @@ import {
 
 interface SportsRegistrationWizardProps {
   championshipSports: ChampionshipSportItem[];
-  onRegistrationComplete: (registration: StoredAthleteRegistration) => Promise<{ success: boolean; message?: string }>;
+  onRegistrationComplete: (registration: StoredAthleteRegistration) => Promise<{
+    success: boolean;
+    message?: string;
+    registrationNumber?: string;
+    totalAmount?: number;
+  }>;
   onCancel: () => void;
   currentUser?: { name?: string; role?: string; email?: string } | null;
 }
@@ -97,27 +102,22 @@ export function SportsRegistrationWizard({
   const [teamCoachName, setTeamCoachName] = useState("");
   const [teamCoachPhone, setTeamCoachPhone] = useState("");
   const [enteredTeamCode, setEnteredTeamCode] = useState("");
-  const [squadPlayers, setSquadPlayers] = useState<SquadPlayer[]>([]);
-
-  // Sync Captain (Player 1) with athlete registrant's name & ID
-  React.useEffect(() => {
+  const [squadPlayers, setSquadPlayers] = useState<SquadPlayer[]>(() => {
     const fullName = `${firstName} ${lastName}`.trim();
-    if (fullName) {
-      setSquadPlayers((prev) => {
-        if (prev.length === 0) {
-          return [          { id: "1", name: fullName, jerseyNumber: "1", role: "Captain", nicOrStudentId }];
-        }
-        return prev.map((pl, idx) => (idx === 0 ? { ...pl, name: fullName, nicOrStudentId } : pl));
-      });
-    }
-  }, [firstName, lastName, nicOrStudentId]);
+    return fullName
+      ? [{ id: "1", name: fullName, jerseyNumber: "1", role: "Captain", nicOrStudentId }]
+      : [];
+  });
 
-  // Set default team name from selected school
-  React.useEffect(() => {
-    if (selectedSchool && !teamName) {
-      setTeamName(`${selectedSchool} Championship Squad`);
-    }
-  }, [selectedSchool]);
+  const syncCaptainDetails = (name: string, playerId: string) => {
+    const fullName = name.trim();
+    if (!fullName) return;
+    setSquadPlayers((prev) => prev.length === 0
+      ? [{ id: "1", name: fullName, jerseyNumber: "1", role: "Captain", nicOrStudentId: playerId }]
+      : prev.map((player, index) => index === 0
+        ? { ...player, name: fullName, nicOrStudentId: playerId }
+        : player));
+  };
 
   const hasTeamSportSelected = useMemo(() => {
     return selectedSportIds.some((id) => {
@@ -297,7 +297,6 @@ export function SportsRegistrationWizard({
   const handleConfirmRegistration = async () => {
     setIsSubmitting(true);
     setSubmissionError("");
-    const regId = `SPORT-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const generatedTeamCode =
       teamRegistrationMode === "captain"
         ? `TEAM-${(selectedSchool || "SCH").slice(0, 3).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`
@@ -316,8 +315,8 @@ export function SportsRegistrationWizard({
         : undefined;
 
     const newRecord: StoredAthleteRegistration = {
-      id: regId,
-      registrationNumber: regId,
+      id: "",
+      registrationNumber: "",
       athleteName: `${firstName} ${lastName}`.trim(),
       firstName,
       lastName,
@@ -338,6 +337,7 @@ export function SportsRegistrationWizard({
       guardianName: calculatedAge < 18 ? guardianName : undefined,
       guardianRelationship: calculatedAge < 18 ? guardianRelationship : undefined,
       guardianMobile: calculatedAge < 18 ? guardianMobile : undefined,
+      guardianConsent: calculatedAge < 18 ? guardianConsent : true,
       consentTimestamp: new Date().toISOString(),
       paymentStatus: "PENDING",
       totalAmount,
@@ -347,11 +347,16 @@ export function SportsRegistrationWizard({
 
     try {
       const result = await onRegistrationComplete(newRecord);
-      if (!result.success) {
+      if (!result.success || !result.registrationNumber) {
         setSubmissionError(result.message || "Unable to submit your registration.");
         return;
       }
-      setConfirmedRecord(newRecord);
+      setConfirmedRecord({
+        ...newRecord,
+        id: result.registrationNumber,
+        registrationNumber: result.registrationNumber,
+        totalAmount: result.totalAmount ?? newRecord.totalAmount,
+      });
       setCurrentStep(10);
     } finally {
       setIsSubmitting(false);
@@ -513,7 +518,10 @@ export function SportsRegistrationWizard({
                       type="text"
                       required
                       value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
+                      onChange={(e) => {
+                        setFirstName(e.target.value);
+                        syncCaptainDetails(`${e.target.value} ${lastName}`, nicOrStudentId);
+                      }}
                       placeholder="e.g. Sathurjan"
                       className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
                     />
@@ -524,7 +532,10 @@ export function SportsRegistrationWizard({
                       type="text"
                       required
                       value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
+                      onChange={(e) => {
+                        setLastName(e.target.value);
+                        syncCaptainDetails(`${firstName} ${e.target.value}`, nicOrStudentId);
+                      }}
                       placeholder="e.g. Kavinathan"
                       className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
                     />
@@ -574,7 +585,10 @@ export function SportsRegistrationWizard({
                     <label className="text-xs font-bold text-slate-700 block mb-1">Gender *</label>
                     <select
                       value={gender}
-                      onChange={(e) => setGender(e.target.value as any)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === "Boys" || value === "Girls" || value === "Mixed") setGender(value);
+                      }}
                       className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
                     >
                       <option value="Boys">Boys (Male)</option>
@@ -590,7 +604,10 @@ export function SportsRegistrationWizard({
                     <input
                       type="text"
                       value={nicOrStudentId}
-                      onChange={(e) => setNicOrStudentId(e.target.value)}
+                      onChange={(e) => {
+                        setNicOrStudentId(e.target.value);
+                        syncCaptainDetails(`${firstName} ${lastName}`, e.target.value);
+                      }}
                       placeholder="e.g. 200813504921 or STU-88"
                       className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
                     />
@@ -644,7 +661,10 @@ export function SportsRegistrationWizard({
                   </label>
                   <input
                     value={selectedSchool}
-                    onChange={(e) => setSelectedSchool(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedSchool(e.target.value);
+                      if (e.target.value && !teamName) setTeamName(`${e.target.value} Championship Squad`);
+                    }}
                     placeholder="Enter school or institution"
                     className="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
                   />
@@ -785,13 +805,20 @@ export function SportsRegistrationWizard({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {sport.events.map((ev) => {
                           const isChecked = selectedEventIds.includes(ev.id);
+                          const isFull = ev.maxParticipants !== null &&
+                            (ev.registrationCount ?? 0) >= ev.maxParticipants;
+                          const isUnavailable = isFull ||
+                            ev.status === "COMPLETED" ||
+                            ev.status === "CANCELLED";
                           return (
                             <label
                               key={ev.id}
-                              className={`p-2.5 rounded-lg border text-xs cursor-pointer flex items-center justify-between select-none transition-all ${
+                              className={`p-2.5 rounded-lg border text-xs flex items-center justify-between select-none transition-all ${
                                 isChecked
                                   ? "border-[#0d5c4d] bg-[#ecf8f5] font-bold text-[#0d2b26]"
-                                  : "border-slate-200 hover:bg-slate-50 text-slate-700"
+                                  : isUnavailable
+                                    ? "border-slate-200 bg-slate-50 text-slate-400"
+                                    : "border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer"
                               }`}
                             >
                               <div className="flex items-center gap-2">
@@ -799,6 +826,7 @@ export function SportsRegistrationWizard({
                                   type="checkbox"
                                   checked={isChecked}
                                   onChange={() => handleToggleEvent(ev.id)}
+                                  disabled={isUnavailable && !isChecked}
                                   className="rounded text-[#0d5c4d] focus:ring-0"
                                 />
                                 <div>
@@ -806,11 +834,25 @@ export function SportsRegistrationWizard({
                                   <span className="text-[10px] text-slate-500 font-medium">
                                     {ev.ageCategory} • {ev.gender}
                                   </span>
+                                  {(ev.venue || ev.startDate) && (
+                                    <span className="block text-[10px] text-slate-500">
+                                      {[ev.venue, ev.startDate ? new Date(ev.startDate).toLocaleString() : null]
+                                        .filter(Boolean)
+                                        .join(" • ")}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                              <span className="text-[11px] font-mono font-bold text-emerald-800">
-                                LKR {ev.fee}
-                              </span>
+                              <div className="text-right">
+                                <span className="block text-[11px] font-mono font-bold text-emerald-800">
+                                  LKR {ev.fee}
+                                </span>
+                                {isUnavailable && (
+                                  <span className="text-[9px] font-bold text-rose-600">
+                                    {isFull ? "Full" : "Closed"}
+                                  </span>
+                                )}
+                              </div>
                             </label>
                           );
                         })}
@@ -1382,7 +1424,7 @@ export function SportsRegistrationWizard({
                 <div className="flex items-center justify-between pt-1">
                   <div>
                     <span className="text-[10px] font-bold uppercase text-slate-400">
-                      Total Registration Fee
+                      Estimated Registration Fee
                     </span>
                     <p className="text-lg font-black text-emerald-800">LKR {totalAmount.toLocaleString()}</p>
                   </div>

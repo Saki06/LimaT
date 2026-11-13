@@ -24,9 +24,11 @@ export interface ChampionshipSportItem {
     ageCategory: ChampionshipAgeBracket;
     gender: "Boys" | "Girls" | "Mixed" | "All";
     fee: number;
-    maxParticipants: number;
+    maxParticipants: number | null;
+    registrationCount?: number;
     venue?: string;
     startDate?: string;
+    status?: "UPCOMING" | "LIVE" | "COMPLETED" | "CANCELLED";
   }[];
 }
 
@@ -77,6 +79,7 @@ export interface StoredAthleteRegistration {
   guardianName?: string;
   guardianRelationship?: string;
   guardianMobile?: string;
+  guardianConsent?: boolean;
   consentTimestamp: string;
   paymentStatus: "PAID" | "PENDING" | "FAILED" | "REFUNDED";
   totalAmount: number;

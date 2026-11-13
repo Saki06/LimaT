@@ -125,9 +125,9 @@ interface AppContextType {
   }) => Promise<{ success: boolean; message?: string }>;
   submitChampionshipRegistration: (input: {
     eventIds: string[];
-    registrationNumber: string;
+    registrationNumber?: string;
     athleteDetails: Record<string, unknown>;
-  }) => Promise<{ success: boolean; message?: string }>;
+  }) => Promise<{ success: boolean; message?: string; registrationNumber?: string }>;
   updateChampionshipRegistrationStatus: (
     registrationNumber: string,
     status: StoredAthleteRegistration['status']
@@ -176,6 +176,7 @@ interface AppContextType {
   updateTournament: (id: string, updates: Partial<Tournament>) => Promise<void>;
   deleteTournament: (id: string) => Promise<void>;
   createFixture: (fixture: Partial<Fixture>) => Promise<void>;
+  updateFixture: (id: string, updates: Partial<Fixture>) => Promise<void>;
   deleteFixture: (id: string) => Promise<void>;
   createSportsTeam: (team: Omit<SportsTeamRecord, 'id' | 'playersCount'>) => Promise<void>;
   updateSportsTeam: (id: string, updates: Partial<Omit<SportsTeamRecord, 'id'>>) => Promise<void>;
@@ -1407,18 +1408,19 @@ useEffect(() => {
 
   const submitChampionshipRegistration = async (input: {
     eventIds: string[];
-    registrationNumber: string;
+    registrationNumber?: string;
     athleteDetails: Record<string, unknown>;
-  }): Promise<{ success: boolean; message?: string }> => {
+  }): Promise<{ success: boolean; message?: string; registrationNumber?: string }> => {
     try {
-      await api.sports.registerChampionship(input);
+      const registrations = await api.sports.registerChampionship(input);
+      const regNum = registrations?.[0]?.registrationNumber || input.registrationNumber;
       await Promise.all([fetchSportsEvents(), fetchMySportsRegistrations()]);
       addToast({
         type: 'success',
         title: 'Championship Registration Submitted',
         message: 'Your athlete registration has been saved and sent for review.',
       });
-      return { success: true };
+      return { success: true, registrationNumber: regNum };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
       addToast({ type: 'error', title: 'Championship Registration Failed', message });
@@ -2190,6 +2192,31 @@ useEffect(() => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
       addToast({ type: 'error', title: 'Unable to Schedule Fixture', message });
+    }
+  };
+
+  const updateFixture = async (id: string, updates: Partial<Fixture>) => {
+    try {
+      await api.sports.updateFixture(id, {
+        tournamentId: updates.tournamentId || null,
+        sportName: updates.sportName,
+        homeTeam: updates.homeTeam,
+        awayTeam: updates.awayTeam,
+        date: updates.date,
+        time: updates.time,
+        venue: updates.venue,
+        competitionName: updates.competitionName,
+        status: updates.status,
+      });
+      await fetchSportsOperations();
+      addToast({
+        type: 'success',
+        title: 'Fixture Updated',
+        message: 'Match fixture details were saved.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
+      addToast({ type: 'error', title: 'Unable to Update Fixture', message });
     }
   };
 
@@ -3306,6 +3333,7 @@ useEffect(() => {
         updateTournament,
         deleteTournament,
         createFixture,
+        updateFixture,
         deleteFixture,
         createSportsTeam,
         updateSportsTeam,

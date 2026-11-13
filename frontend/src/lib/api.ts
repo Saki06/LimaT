@@ -1899,7 +1899,7 @@ export const api = {
 
     async registerChampionship(input: {
       eventIds: string[];
-      registrationNumber: string;
+      registrationNumber?: string;
       athleteDetails: Record<string, unknown>;
     }): Promise<SportsRegistration[]> {
       return sportsRequest<SportsRegistration[]>('/registrations/championship', {
