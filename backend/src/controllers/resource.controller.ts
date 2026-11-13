@@ -37,6 +37,11 @@ const getStudentProfile = async (userId: string) => {
           package: true,
         },
       },
+      enrollments: {
+        include: {
+          course: { select: { id: true, teacherId: true } },
+        },
+      },
     },
   });
 };
@@ -320,7 +325,11 @@ export const getResources = async (req: AuthenticatedRequest, res: Response): Pr
             if (sub.package?.teacherId === r.teacherId) return true;
             return false;
           });
-          isLocked = !hasActiveSub;
+          const hasEnrollment = studentProfile.enrollments?.some((enr: any) => {
+            if (enr.course?.teacherId === r.teacherId) return true;
+            return false;
+          });
+          isLocked = !hasActiveSub && !hasEnrollment;
         } else {
           // Not subscribed or unauthenticated
           isLocked = true;
@@ -470,7 +479,11 @@ if (resource.status !== 'published') {
           if (sub.package?.teacherId === resource.teacherId) return true;
           return false;
         });
-        isLocked = !hasSub;
+        const hasEnrollment = student?.enrollments?.some((enr: any) => {
+          if (enr.course?.teacherId === resource.teacherId) return true;
+          return false;
+        });
+        isLocked = !hasSub && !hasEnrollment;
       }
     } else if (resource.visibility === 'SUBSCRIBERS_ONLY') {
       isLocked = true;

@@ -159,13 +159,13 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             resourceType: initialTab === "past_papers" ? "PAST_PAPER" : undefined,
           });
         }
-        if (!res || !res.success || !Array.isArray(res.data) || res.data.length === 0) {
+        if (!res || !res.success || !Array.isArray(res.data)) {
           res = await api.resources.getAll({
             resourceType: initialTab === "past_papers" ? "PAST_PAPER" : undefined,
           });
         }
 
-        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res?.success && Array.isArray(res.data)) {
           const mapped: LibraryResource[] = res.data.map((item: any) => ({
             id: item.id,
             title: item.title,
@@ -503,19 +503,19 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 <>
                   <div className="text-center px-2 border-r border-white/20">
                     <p className="text-lg font-bold text-white">
-                      {libraryResources.filter((r) => r.resourceType === "past_paper").length}
+                      {combinedResources.filter((r) => r.resourceType === "past_paper").length}
                     </p>
                     <p className="text-[10px] text-emerald-200">Past Papers</p>
                   </div>
                   <div className="text-center px-2 border-r border-white/20">
                     <p className="text-lg font-bold text-[#f3b738]">
-                      {libraryResources.filter((r) => r.resourceType === "past_paper" && r.examType?.includes("Advanced")).length}
+                      {combinedResources.filter((r) => r.resourceType === "past_paper" && r.examType?.includes("Advanced")).length}
                     </p>
                     <p className="text-[10px] text-emerald-200">G.C.E. A/L</p>
                   </div>
                   <div className="text-center px-2">
                     <p className="text-lg font-bold text-[#86efac]">
-                      {libraryResources.filter((r) => r.resourceType === "past_paper" && r.hasMarkingScheme).length}
+                      {combinedResources.filter((r) => r.resourceType === "past_paper" && r.hasMarkingScheme).length}
                     </p>
                     <p className="text-[10px] text-emerald-200">Marking Schemes</p>
                   </div>
@@ -524,19 +524,19 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 <>
                   <div className="text-center px-2 border-r border-white/20">
                     <p className="text-lg font-bold text-white">
-                      {libraryResources.filter((r) => r.resourceType !== "past_paper").length}
+                      {combinedResources.filter((r) => r.resourceType !== "past_paper").length}
                     </p>
                     <p className="text-[10px] text-emerald-200">Total Items</p>
                   </div>
                   <div className="text-center px-2 border-r border-white/20">
                     <p className="text-lg font-bold text-[#86efac]">
-                      {libraryResources.filter((r) => r.resourceType === "tute").length}
+                      {combinedResources.filter((r) => r.resourceType === "tute").length}
                     </p>
                     <p className="text-[10px] text-emerald-200">Tutes</p>
                   </div>
                   <div className="text-center px-2">
                     <p className="text-lg font-bold text-purple-200">
-                      {libraryResources.filter((r) => r.resourceType === "book").length}
+                      {combinedResources.filter((r) => r.resourceType === "book").length}
                     </p>
                     <p className="text-[10px] text-emerald-200">Books</p>
                   </div>
@@ -2739,7 +2739,7 @@ function TeacherUploadModal({
   const [fileType, setFileType] = useState(resource?.fileType || "PDF");
   const [fileSize, setFileSize] = useState(resource?.fileSize || "4.5 MB");
   const [visibility, setVisibility] = useState<"public" | "subscribers_only" | "class_only" | "private">(
-    resource?.visibility || "public"
+    resource?.visibility || "subscribers_only"
   );
 
   // Available packages for this tutor

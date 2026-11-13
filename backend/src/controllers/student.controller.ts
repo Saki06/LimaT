@@ -1817,12 +1817,25 @@ export const getMyLibraryResources = async (
       .map((s) => s.package?.teacherId)
       .filter((tId): tId is string => Boolean(tId));
 
+    // Get student's direct course enrollments
+    const enrollments = await prisma.enrollment.findMany({
+      where: { studentId: profile.id },
+      include: {
+        course: { select: { id: true, teacherId: true } },
+      },
+    });
+    const enrolledTeacherIds = enrollments
+      .map((e) => e.course?.teacherId)
+      .filter((tId): tId is string => Boolean(tId));
+
+    const allAllowedTeacherIds = Array.from(new Set([...subscribedTeacherIds, ...enrolledTeacherIds]));
+
     const accessConditions: any[] = [
       { visibility: 'PUBLIC' },
       { packageId: { in: subscribedPackageIds } },
     ];
-    if (subscribedTeacherIds.length > 0) {
-      accessConditions.push({ teacherId: { in: subscribedTeacherIds } });
+    if (allAllowedTeacherIds.length > 0) {
+      accessConditions.push({ teacherId: { in: allAllowedTeacherIds } });
     }
 
     const whereClause: any = {
