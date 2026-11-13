@@ -208,15 +208,72 @@ export const getAssignments = async (req: AuthenticatedRequest, res: Response): 
       }
     }
 
-    // For student, identify student profile
+    // For student, identify student profile and filter strictly by enrollments / subscriptions
     let studentProfileId: string | null = null;
     if (user.role === 'STUDENT') {
       const student = await prisma.studentProfile.findUnique({
         where: { userId: user.userId },
       });
-      if (student) {
-        studentProfileId = student.id;
+      if (!student) {
+        res.status(200).json({ success: true, data: [] });
+        return;
       }
+      studentProfileId = student.id;
+
+      // 1. Direct course enrollments
+      const enrollments = await prisma.enrollment.findMany({
+        where: { studentId: student.id },
+        select: { courseId: true },
+      });
+      const enrolledCourseIds = enrollments.map((e) => e.courseId);
+
+      // 2. Active package subscriptions
+      const activeSubs = await prisma.packageSubscription.findMany({
+        where: {
+          studentId: student.id,
+          status: 'ACTIVE',
+          endDate: { gte: new Date() },
+        },
+        include: {
+          package: {
+            include: {
+              courses: { select: { courseId: true } },
+            },
+          },
+        },
+      });
+
+      const subscribedCourseIds: string[] = [];
+      const subscribedTeacherIds: string[] = [];
+      activeSubs.forEach((sub) => {
+        if (sub.package?.teacherId) {
+          subscribedTeacherIds.push(sub.package.teacherId);
+        }
+        sub.package?.courses?.forEach((pc) => {
+          subscribedCourseIds.push(pc.courseId);
+        });
+      });
+
+      const allowedCourseIds = Array.from(new Set([...enrolledCourseIds, ...subscribedCourseIds]));
+      const allowedTeacherIds = Array.from(new Set(subscribedTeacherIds));
+
+      if (allowedCourseIds.length === 0 && allowedTeacherIds.length === 0) {
+        res.status(200).json({ success: true, data: [] });
+        return;
+      }
+
+      const accessConditions: any[] = [];
+      if (allowedCourseIds.length > 0) {
+        accessConditions.push({ courseId: { in: allowedCourseIds } });
+      }
+      if (allowedTeacherIds.length > 0) {
+        accessConditions.push({ teacherId: { in: allowedTeacherIds } });
+      }
+
+      whereClause.AND = [
+        ...(whereClause.AND || []),
+        { OR: accessConditions },
+      ];
     }
 
     let assignments = await prisma.assignment.findMany({
@@ -329,13 +386,53 @@ export const getAssignmentById = async (req: AuthenticatedRequest, res: Response
       return;
     }
 
-    // If student, filter out other students' submissions
+    // If student, verify access and filter out other students' submissions
     let filteredSubmissions = assignment.submissions;
     if (user.role === 'STUDENT') {
       const student = await prisma.studentProfile.findUnique({
         where: { userId: user.userId },
       });
-      filteredSubmissions = assignment.submissions.filter((s: any) => s.studentId === student?.id);
+      if (!student) {
+        res.status(403).json({ success: false, message: 'You do not have access to this assignment' });
+        return;
+      }
+
+      let hasAccess = false;
+      if (assignment.courseId) {
+        const enrollment = await prisma.enrollment.findFirst({
+          where: { studentId: student.id, courseId: assignment.courseId },
+        });
+        if (enrollment) {
+          hasAccess = true;
+        }
+      }
+
+      if (!hasAccess) {
+        const orConditions: any[] = [{ package: { teacherId: assignment.teacherId } }];
+        if (assignment.courseId) {
+          orConditions.push({ package: { courses: { some: { courseId: assignment.courseId } } } });
+        }
+
+        const activeSub = await prisma.packageSubscription.findFirst({
+          where: {
+            studentId: student.id,
+            status: 'ACTIVE',
+            endDate: { gte: new Date() },
+            OR: orConditions,
+          },
+        });
+
+        if (activeSub) {
+          hasAccess = true;
+        }
+      }
+
+      if (!hasAccess) {
+        res.status(403).json({ success: false, message: 'You do not have access to this assignment' });
+        return;
+      }
+
+      filteredSubmissions = assignment.submissions.filter((s: any) => s.studentId === student.id);
     }
 
     res.status(200).json({

@@ -566,23 +566,23 @@ export const getTutorsMarketplace = async (req: Request, res: Response): Promise
       const lowestFee =
         t.packages.length > 0
           ? Math.min(...t.packages.map((p) => p.price))
-          : 3500;
+          : 0;
 
       return {
         id: t.id,
         userId: t.userId,
-        name: `${t.user.firstName} ${t.user.lastName}`,
+        name: `${t.user.firstName} ${t.user.lastName}`.trim(),
         email: t.user.email,
         avatarUrl: t.user.avatarUrl,
         title: t.title || 'Specialist Educator',
         specialization: t.specialization,
         bio: t.bio,
-        rating: t.rating || 4.9,
+        rating: null, // Only displayed when real student reviews exist
         isVerified: t.isVerified,
         mediums: t.mediums,
-        experienceYears: t.experienceYears || 5,
-        city: t.city || 'Colombo',
-        district: t.district || 'Colombo',
+        experienceYears: t.experienceYears || 0,
+        city: t.city || '',
+        district: t.district || '',
         coverImageUrl: t.coverImageUrl,
         publicSlug: t.publicSlug,
         youtubeUrl: t.youtubeUrl,
@@ -592,6 +592,10 @@ export const getTutorsMarketplace = async (req: Request, res: Response): Promise
         coursesCount: t._count.courses,
         monthlyFeeLkr: lowestFee,
         packages: t.packages,
+        bankName: t.bankName,
+        bankAccountName: t.bankAccountName,
+        bankAccountNumber: t.bankAccountNumber,
+        bankBranch: t.bankBranch,
       };
     });
 

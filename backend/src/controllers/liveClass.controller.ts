@@ -203,6 +203,42 @@ export const getLiveClasses = async (req: AuthenticatedRequest, res: Response): 
       if (teacherProfile) {
         whereClause.teacherId = teacherProfile.id;
       }
+    } else if (user.role === 'STUDENT') {
+      const studentProfile = await prisma.studentProfile.findUnique({
+        where: { userId: user.userId },
+      });
+
+      if (!studentProfile) {
+        res.status(200).json({ success: true, data: [] });
+        return;
+      }
+
+      const enrollments = await prisma.enrollment.findMany({
+        where: { studentId: studentProfile.id },
+        select: { courseId: true },
+      });
+      const enrolledCourseIds = enrollments.map((e) => e.courseId);
+
+      const subscriptions = await prisma.packageSubscription.findMany({
+        where: {
+          studentId: studentProfile.id,
+          status: 'ACTIVE',
+          endDate: { gte: new Date() },
+        },
+        select: { packageId: true },
+      });
+      const subscribedPackageIds = subscriptions.map((s) => s.packageId);
+
+      // If student has not enrolled in any course or subscribed to any package, return empty
+      if (enrolledCourseIds.length === 0 && subscribedPackageIds.length === 0) {
+        res.status(200).json({ success: true, data: [] });
+        return;
+      }
+
+      whereClause.OR = [
+        ...(enrolledCourseIds.length > 0 ? [{ courseId: { in: enrolledCourseIds } }] : []),
+        ...(subscribedPackageIds.length > 0 ? [{ packageId: { in: subscribedPackageIds } }] : []),
+      ];
     }
 
     let liveClasses = await prisma.liveClassSession.findMany({

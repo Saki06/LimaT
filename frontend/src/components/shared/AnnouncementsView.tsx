@@ -76,7 +76,7 @@ export function getAnnouncementCategory(a: Announcement): "exam" | "holiday" | "
 }
 
 export function AnnouncementsView() {
-  const { announcements, t, currentRole, currentUser, createAnnouncement, updateAnnouncement, deleteAnnouncement } = useApp();
+  const { announcements, t, currentRole, currentUser, createAnnouncement, updateAnnouncement, deleteAnnouncement, fetchAnnouncements } = useApp();
   const isAdmin = currentRole === "admin";
   const isTeacher = currentRole === "teacher";
   const isStudent = currentRole === "student";
@@ -410,9 +410,15 @@ export function AnnouncementsView() {
 
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => {
+              onClick={async () => {
                 setIsRefreshing(true);
-                setTimeout(() => setIsRefreshing(false), 500);
+                try {
+                  if (fetchAnnouncements) {
+                    await fetchAnnouncements();
+                  }
+                } finally {
+                  setTimeout(() => setIsRefreshing(false), 400);
+                }
               }}
               variant="outline"
               className="h-9 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 gap-1.5 cursor-pointer shadow-2xs"
@@ -881,7 +887,7 @@ export function AnnouncementsView() {
                   Central Administration & Academic Operations Desk
                 </p>
                 <p className="text-[9px] text-slate-400 mt-0.5">
-                  Ref: EP/NOTICE/2026-{previewCircular.id.replace("ann_", "0")} &bull; Dispatched: {previewCircular.publishedAt}
+                  Ref: EP/NOTICE/2026-{previewCircular.id.replace("ann_", "").slice(0, 8).toUpperCase()} &bull; Dispatched: {previewCircular.publishedAt}
                 </p>
               </div>
 

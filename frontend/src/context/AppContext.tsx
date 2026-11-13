@@ -204,6 +204,7 @@ interface AppContextType {
   createAnnouncement: (announcement: Partial<Announcement>) => void;
   updateAnnouncement: (id: string, updates: Partial<Omit<Announcement, 'id'>>) => void;
   deleteAnnouncement: (id: string) => void;
+  fetchAnnouncements: () => Promise<void>;
   createSchool: (school: Partial<School>) => void;
   createClass: (schoolClass: Partial<SchoolClass>) => Promise<void>;
   updateClass: (id: string, updates: Partial<SchoolClass>) => Promise<void>;
@@ -631,7 +632,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           maxMarks: Number(a.maxMarks) || 100,
           dueDate: a.dueDate
             ? new Date(a.dueDate).toISOString().replace('T', ' ').substring(0, 16)
-            : '2026-11-30 23:59',
+            : '',
           status: a.status?.toLowerCase() === 'draft' ? 'draft' : 'published',
           attachmentName: a.attachmentName || undefined,
           submissionsCount: a.submissionsCount || a._count?.submissions || 0,
@@ -692,26 +693,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ? `${c.teacher.user.firstName} ${c.teacher.user.lastName || ''}`.trim()
       : 'Assigned Tutor';
 
-    const units: SyllabusUnit[] = Array.isArray(c.syllabus?.units)
-      ? c.syllabus.units
-      : [
-        {
-          id: `unt_${c.id}_default`,
-          subjectId: c.id,
-          title: 'Unit 1: Course Introduction & Overview',
-          order: 1,
-          topics: [
-            {
-              id: `top_${c.id}_default`,
-              unitId: `unt_${c.id}_default`,
-              title: 'Topic 1: Foundations',
-              description: c.description || 'Welcome to the course.',
-              order: 1,
-              lessons: []
-            }
-          ]
-        }
-      ];
+    let syllabusObj: any = c.syllabus;
+    if (typeof syllabusObj === 'string') {
+      try {
+        syllabusObj = JSON.parse(syllabusObj);
+      } catch (e) {
+        syllabusObj = null;
+      }
+    }
+
+    const units: SyllabusUnit[] = Array.isArray(syllabusObj?.units)
+      ? syllabusObj.units
+      : [];
+
+    let totalLessons = 0;
+    let completedLessons = 0;
+    units.forEach((u) => {
+      u.topics?.forEach((t) => {
+        totalLessons += (t.lessons?.length || 0);
+        t.lessons?.forEach((l) => {
+          if (currentUser?.id && l.completedByStudentIds?.includes(currentUser.id)) {
+            completedLessons += 1;
+          }
+        });
+      });
+    });
 
     return {
       id: c.id,
@@ -724,8 +730,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       className: 'Online Cohort',
       bannerColor: '#0d5c4d',
       units,
-      totalLessons: 0,
-      completedLessons: 0
+      totalLessons,
+      completedLessons
     };
   };
 
@@ -768,19 +774,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const token = api.token.get();
       if (!token) return;
 
-      const res = await api.liveClasses.getAll();
-      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
-        const mapped = res.data.map(mapLiveClassToTimetableEntry);
-        setTimetable(mapped);
+      if (currentRole === 'student') {
+        const studentRes = await api.students.getMyTimetable();
+        if (studentRes?.success && Array.isArray(studentRes.data)) {
+          setTimetable(studentRes.data);
+          return;
+        }
+        setTimetable([]);
         return;
       }
 
-      const studentRes = await api.students.getMyTimetable();
-      if (studentRes?.success && Array.isArray(studentRes.data) && studentRes.data.length > 0) {
-        setTimetable(studentRes.data);
+      const res = await api.liveClasses.getAll();
+      if (res?.success && Array.isArray(res.data)) {
+        const mapped = res.data.map(mapLiveClassToTimetableEntry);
+        setTimetable(mapped);
+      } else {
+        setTimetable([]);
       }
     } catch (err) {
       console.warn('Could not load timetable from backend:', err);
+      setTimetable([]);
     }
   };
 
@@ -2090,18 +2103,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const createAssignment = async (asg: Partial<Assignment>) => {
     const targetCourse = courses.find((c) => c.id === asg.courseId);
-    const resolvedSubjectName = asg.subjectName || targetCourse?.title || 'Combined Mathematics';
+    const resolvedSubjectName = asg.subjectName || targetCourse?.title || 'Coursework';
 
     const tempId = `asg_${Date.now()}`;
     const newAsg: Assignment = {
       id: tempId,
-      courseId: asg.courseId || targetCourse?.id || 'crs_math_12',
+      courseId: asg.courseId || targetCourse?.id || '',
       subjectName: resolvedSubjectName,
       title: asg.title || 'New Assignment',
       instructions: asg.instructions || 'Follow problem set guidelines.',
       topicName: asg.topicName || 'General Topic',
       maxMarks: asg.maxMarks || 100,
-      dueDate: asg.dueDate || '2026-10-15 23:59',
+      dueDate: asg.dueDate || '',
       status: 'published',
       attachmentName: asg.attachmentName,
       submissionsCount: 0,
@@ -3171,6 +3184,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         recordResourceView,
         recordResourceDownload,
         fetchLibraryResources,
+        fetchAnnouncements,
         teacherProfile,
         updateTeacherProfile,
         refreshTeacherProfile,

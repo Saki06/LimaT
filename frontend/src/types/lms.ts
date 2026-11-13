@@ -549,6 +549,8 @@ export interface ConnectMessage {
 
 export interface ConnectPurchase {
   id: string;
+  packageId?: string;
+  packageName?: string;
   teacherId: string;
   teacherName: string;
   teacherInitials: string;

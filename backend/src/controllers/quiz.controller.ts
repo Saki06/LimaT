@@ -178,7 +178,66 @@ export const getQuizzes = async (req: AuthenticatedRequest, res: Response): Prom
       const student = await prisma.studentProfile.findUnique({
         where: { userId: user.userId },
       });
-      studentProfileId = student?.id;
+      if (!student) {
+        res.status(404).json({ success: false, message: 'Student profile not found' });
+        return;
+      }
+      studentProfileId = student.id;
+
+      // 1. Direct course enrollments
+      const enrollments = await prisma.enrollment.findMany({
+        where: { studentId: student.id },
+        select: { courseId: true },
+      });
+      const enrolledCourseIds = enrollments.map((e) => e.courseId);
+
+      // 2. Active package subscriptions
+      const activeSubs = await prisma.packageSubscription.findMany({
+        where: {
+          studentId: student.id,
+          status: 'ACTIVE',
+          endDate: { gte: new Date() },
+        },
+        include: {
+          package: {
+            include: {
+              courses: { select: { courseId: true } },
+            },
+          },
+        },
+      });
+
+      const subscribedCourseIds: string[] = [];
+      const subscribedTeacherIds: string[] = [];
+      activeSubs.forEach((sub) => {
+        if (sub.package?.teacherId) {
+          subscribedTeacherIds.push(sub.package.teacherId);
+        }
+        sub.package?.courses?.forEach((pc) => {
+          subscribedCourseIds.push(pc.courseId);
+        });
+      });
+
+      const allowedCourseIds = Array.from(new Set([...enrolledCourseIds, ...subscribedCourseIds]));
+      const allowedTeacherIds = Array.from(new Set(subscribedTeacherIds));
+
+      if (allowedCourseIds.length === 0 && allowedTeacherIds.length === 0) {
+        res.status(200).json({ success: true, data: [] });
+        return;
+      }
+
+      const accessConditions: any[] = [];
+      if (allowedCourseIds.length > 0) {
+        accessConditions.push({ courseId: { in: allowedCourseIds } });
+      }
+      if (allowedTeacherIds.length > 0) {
+        accessConditions.push({ teacherId: { in: allowedTeacherIds } });
+      }
+
+      whereClause.AND = [
+        ...(whereClause.AND || []),
+        { OR: accessConditions },
+      ];
     }
 
     const quizzes = await prisma.assignment.findMany({
@@ -221,7 +280,11 @@ export const getQuizById = async (req: AuthenticatedRequest, res: Response): Pro
       const student = await prisma.studentProfile.findUnique({
         where: { userId: user.userId },
       });
-      studentProfileId = student?.id;
+      if (!student) {
+        res.status(404).json({ success: false, message: 'Student profile not found' });
+        return;
+      }
+      studentProfileId = student.id;
     }
 
     const quiz = await prisma.assignment.findUnique({
@@ -244,6 +307,46 @@ export const getQuizById = async (req: AuthenticatedRequest, res: Response): Pro
     if (!quiz || quiz.topicName !== 'ONLINE_QUIZ') {
       res.status(404).json({ success: false, message: 'Quiz not found' });
       return;
+    }
+
+    if (user && user.role === 'STUDENT' && studentProfileId) {
+      let hasAccess = false;
+
+      // 1. If quiz is tied to a course, check direct course enrollment
+      if (quiz.courseId) {
+        const enrollment = await prisma.enrollment.findFirst({
+          where: { studentId: studentProfileId, courseId: quiz.courseId },
+        });
+        if (enrollment) {
+          hasAccess = true;
+        }
+      }
+
+      // 2. Check active package subscription (teacher-level or course-level)
+      if (!hasAccess) {
+        const orConditions: any[] = [{ package: { teacherId: quiz.teacherId } }];
+        if (quiz.courseId) {
+          orConditions.push({ package: { courses: { some: { courseId: quiz.courseId } } } });
+        }
+
+        const activeSub = await prisma.packageSubscription.findFirst({
+          where: {
+            studentId: studentProfileId,
+            status: 'ACTIVE',
+            endDate: { gte: new Date() },
+            OR: orConditions,
+          },
+        });
+
+        if (activeSub) {
+          hasAccess = true;
+        }
+      }
+
+      if (!hasAccess) {
+        res.status(403).json({ success: false, message: 'You do not have access to this quiz' });
+        return;
+      }
     }
 
     res.status(200).json({ success: true, data: formatQuiz(quiz, studentProfileId) });

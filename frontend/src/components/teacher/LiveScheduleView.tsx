@@ -283,12 +283,11 @@ export function LiveScheduleView() {
       let res: any = null;
       if (!isTeacher && api.students?.getMyLiveClasses) {
         res = await api.students.getMyLiveClasses();
-      }
-      if (!res || !res.success || !Array.isArray(res.data) || res.data.length === 0) {
+      } else {
         res = await api.liveClasses.getAll();
       }
 
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
         const mapped: LiveSlot[] = res.data.map((item: any) => {
           const startD = new Date(item.startTime);
           const daysOfWeek: LiveSlot["day"][] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -944,11 +943,13 @@ export function LiveScheduleView() {
           <div className="h-12 w-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
             <Video className="h-6 w-6" />
           </div>
-          <h3 className="font-bold text-slate-800 text-base">No live classes match your filter</h3>
+          <h3 className="font-bold text-slate-800 text-base">
+            {isTeacher ? "No live classes match your filter" : "No Enrolled Live Classes"}
+          </h3>
           <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
             {isTeacher
               ? "Click 'Schedule Live Class' to set up your interactive teaching session."
-              : "Check back later for newly scheduled live lectures."}
+              : "You have not enrolled or subscribed to any teacher classes yet. Visit 'Find Teachers' to enroll and unlock live sessions."}
           </p>
         </Card>
       ) : selectedTab === "recordings" ? (

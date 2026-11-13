@@ -62,19 +62,22 @@ export function AssignmentViews() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedFileName, setSelectedFileName] = useState<string>("Alex_Solution_AnswerSheet.pdf");
-  const [selectedFileSize, setSelectedFileSize] = useState<string>("2.4 MB");
+  const [selectedFileName, setSelectedFileName] = useState<string>("");
+  const [selectedFileSize, setSelectedFileSize] = useState<string>("");
   const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string>("");
   const [isCopied, setIsCopied] = useState(false);
   const [declaredHonorCode, setDeclaredHonorCode] = useState(true);
+
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Load assignments from live backend API
   const fetchAssignments = async () => {
     setIsLoading(true);
     try {
       const res = await api.assignments.getAll();
-      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res?.success && Array.isArray(res.data)) {
         setBackendAssignments(res.data);
+        setIsLoaded(true);
       }
     } catch (err) {
       console.warn("Could not load backend assignments:", err);
@@ -87,11 +90,11 @@ export function AssignmentViews() {
     fetchAssignments();
   }, []);
 
-  // Merge backend data with local fallback
+  // Use live backend data
   const combinedAssignments = useMemo(() => {
-    if (backendAssignments.length === 0) return assignments;
-    return backendAssignments;
-  }, [backendAssignments, assignments]);
+    if (isLoaded) return backendAssignments;
+    return assignments.length > 0 ? assignments : backendAssignments;
+  }, [isLoaded, backendAssignments, assignments]);
 
   const currentAssignment = useMemo(() => {
     return (
@@ -189,7 +192,7 @@ export function AssignmentViews() {
     resolver: zodResolver(submissionSchema),
     defaultValues: {
       textContent: currentSubmission?.textContent || "",
-      fileName: selectedFileName
+      fileName: ""
     }
   });
 
@@ -256,11 +259,15 @@ export function AssignmentViews() {
   };
 
   const handleDownloadBrief = () => {
-    addToast({
-      type: "success",
-      title: "Downloading Problem Brief 📥",
-      message: `${currentAssignment?.attachmentName || "Assignment_Brief.pdf"} downloaded successfully.`
-    });
+    if (currentAssignment?.attachmentUrl) {
+      window.open(currentAssignment.attachmentUrl, "_blank");
+    } else {
+      addToast({
+        type: "info",
+        title: "Coursework Brief",
+        message: `${currentAssignment?.attachmentName || "Assignment brief"} is attached to this coursework.`
+      });
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -323,7 +330,9 @@ export function AssignmentViews() {
               <FileText className="h-3.5 w-3.5 text-emerald-300" />
               <span>Coursework &amp; Assessments</span>
               <span className="h-1 w-1 rounded-full bg-emerald-400" />
-              <span className="text-emerald-300 font-bold">2026/2027 Term 3</span>
+              <span className="text-emerald-300 font-bold">
+                {(currentUser as any)?.gradeLevel || currentUser?.grade || "Academic Portal"}
+              </span>
             </div>
 
             <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-3xl text-white">
@@ -486,14 +495,13 @@ export function AssignmentViews() {
                 }
 
                 // Format Due Date
-                let dueFormatted = asg.dueDate || "Nov 15, 2026";
-                if (dueFormatted.includes("T")) {
-                  dueFormatted = new Date(dueFormatted).toLocaleDateString("en-GB", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric"
-                  });
-                }
+                let dueFormatted = asg.dueDate
+                  ? new Date(asg.dueDate).toLocaleDateString("en-GB", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric"
+                    })
+                  : "Open Submission";
 
                 return (
                   <div
@@ -545,7 +553,7 @@ export function AssignmentViews() {
 
                   <span className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200">
                     <Clock className="h-3.5 w-3.5" />
-                    Deadline: {currentAssignment.dueDate ? new Date(currentAssignment.dueDate).toLocaleDateString("en-GB", { month: "short", day: "numeric", year: "numeric" }) : "Nov 15, 2026"}
+                    Deadline: {currentAssignment.dueDate ? new Date(currentAssignment.dueDate).toLocaleDateString("en-GB", { month: "short", day: "numeric", year: "numeric" }) : "Open Submission"}
                   </span>
                 </div>
 
@@ -713,8 +721,14 @@ export function AssignmentViews() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 text-xs text-slate-600 hover:text-[#0d5c4d] gap-1"
-                            onClick={() => addToast({ type: "info", title: "File Download", message: "Viewing submitted answer sheet." })}
+                            className="h-7 text-xs text-slate-600 hover:text-[#0d5c4d] gap-1 cursor-pointer"
+                            onClick={() => {
+                              if (currentSubmission.fileAttachmentUrl) {
+                                window.open(currentSubmission.fileAttachmentUrl, "_blank");
+                              } else {
+                                addToast({ type: "info", title: "File Attachment", message: `Attachment: ${currentSubmission.fileAttachmentName}` });
+                              }
+                            }}
                           >
                             <Download className="h-3 w-3" /> View
                           </Button>
@@ -791,21 +805,57 @@ export function AssignmentViews() {
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
               {t.academic.uploadFile || "Attach Solution Document (PDF / Image)"}
             </label>
-            <label className="border-2 border-dashed border-[#c4e9e0] hover:border-[#0d5c4d] rounded-2xl p-6 text-center cursor-pointer bg-[#ecf8f5]/40 transition-colors block">
-              <input
-                type="file"
-                accept=".pdf,.docx,.png,.jpg,.jpeg"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <UploadCloud className="h-8 w-8 text-[#0d5c4d] mx-auto mb-2" />
-              <p className="text-xs text-slate-900 font-bold">
-                Selected File: <span className="text-[#0d5c4d]">{selectedFileName}</span>
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1">
-                File size: {selectedFileSize} · Click or drag to replace (Supports PDF, DOCX, PNG up to 25MB)
-              </p>
-            </label>
+            {selectedFileName ? (
+              <div className="border-2 border-[#c4e9e0] rounded-2xl p-4 bg-[#ecf8f5]/40 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-white border border-[#c4e9e0] flex items-center justify-center text-[#0d5c4d] shrink-0">
+                    <FileCheck className="h-5 w-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold text-slate-900">{selectedFileName}</p>
+                    <p className="text-[11px] text-slate-500">{selectedFileSize}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-[#0d5c4d] hover:underline cursor-pointer">
+                    Replace
+                    <input
+                      type="file"
+                      accept=".pdf,.docx,.png,.jpg,.jpeg"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFileName("");
+                      setSelectedFileSize("");
+                      setSelectedFileDataUrl("");
+                    }}
+                    className="text-slate-400 hover:text-rose-500 p-1 cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className="border-2 border-dashed border-slate-300 hover:border-[#0d5c4d] rounded-2xl p-6 text-center cursor-pointer bg-[#f8faf9] hover:bg-[#ecf8f5]/30 transition-colors block">
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.png,.jpg,.jpeg"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <UploadCloud className="h-8 w-8 text-[#0d5c4d] mx-auto mb-2" />
+                <p className="text-xs text-slate-900 font-bold">
+                  Click or drag file here to attach
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Supports PDF, DOCX, PNG up to 25MB
+                </p>
+              </label>
+            )}
           </div>
 
           {/* Honor Code Declaration */}

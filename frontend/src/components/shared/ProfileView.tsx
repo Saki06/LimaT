@@ -63,7 +63,6 @@ import {
   TeacherBankAccount,
   TeacherSocialChannel
 } from "@/types/lms";
-import { initialExams, initialExamTermResult } from "@/data/mockData";
 import { api } from "@/lib/api";
 
 type ProfileTab =
@@ -118,7 +117,8 @@ export function ProfileView() {
     updateTeacherProfile,
     refreshTeacherProfile,
     updateAuthUser,
-    timetable
+    timetable,
+    assignments
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<ProfileTab>("personal");
@@ -4287,7 +4287,7 @@ if (!savedProfile) {
             <div className="p-3.5 rounded-2xl bg-[#f6fbf9] border border-[#c4e9e0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#0d5c4d]">
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span className="font-bold">Candidate Index: {profileData.indexNumber || "LMT-2026-12A-042"}</span>
+                <span className="font-bold">Candidate Index: {profileData.indexNumber || (currentUser as any)?.studentIdNo || "STU-9904"}</span>
                 <span className="hidden sm:inline text-slate-400">|</span>
                 <span className="hidden sm:inline text-slate-600">Online Submission Timer Active &bull; Upload scanned PDF scripts</span>
               </div>
@@ -4297,72 +4297,78 @@ if (!savedProfile) {
             </div>
 
             {/* Exams Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {initialExams.map((exam) => (
-                <div
-                  key={exam.id}
-                  className="bg-[#fcfdfc] rounded-2xl border border-[#e6ece8] p-5 shadow-2xs hover:shadow-md hover:border-[#b2e5d9] transition-all space-y-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <span className="px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-bold uppercase tracking-wider">
-                        {exam.subject}
+            {assignments && assignments.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {assignments.slice(0, 4).map((asg: any) => (
+                  <div
+                    key={asg.id}
+                    className="bg-[#fcfdfc] rounded-2xl border border-[#e6ece8] p-5 shadow-2xs hover:shadow-md hover:border-[#b2e5d9] transition-all space-y-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-bold uppercase tracking-wider">
+                          {asg.subjectName || "Coursework"}
+                        </span>
+                        <h4 className="font-extrabold text-sm text-[#0d2b26] mt-1.5 leading-snug">
+                          {asg.title}
+                        </h4>
+                      </div>
+
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-extrabold text-[11px] border border-amber-200 shrink-0">
+                        {asg.maxMarks} Marks
                       </span>
-                      <h4 className="font-extrabold text-sm text-[#0d2b26] mt-1.5 leading-snug">
-                        {exam.title}
-                      </h4>
                     </div>
 
-                    <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-extrabold text-[11px] border border-amber-200 shrink-0">
-                      {exam.durationMinutes / 60} Hours
-                    </span>
+                    <div className="grid grid-cols-2 gap-3 text-xs bg-white p-3 rounded-xl border border-[#eef3f0]">
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <Calendar className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-medium">Due Date</p>
+                          <p className="font-bold">{asg.dueDate ? new Date(asg.dueDate).toLocaleDateString() : "Open Submission"}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <Clock className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-medium">Session Window</p>
+                          <p className="font-bold">Active Window</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <Video className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-medium">Exam Platform</p>
+                          <p className="font-bold line-clamp-1">Apex Portal</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <ShieldCheck className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-medium">Mode</p>
+                          <p className="font-bold text-[#0d5c4d]">Web Proctored</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-[#f0f4f1] text-xs">
+                      <span className="text-slate-500 text-[11px]">
+                        Mentor: <span className="text-slate-800 font-bold">{asg.teacherName || "Assigned Faculty"}</span>
+                      </span>
+                      <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                        Active Assessment ✓
+                      </span>
+                    </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs bg-white p-3 rounded-xl border border-[#eef3f0]">
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <Calendar className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-medium">Date</p>
-                        <p className="font-bold">{exam.date}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <Clock className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-medium">Time Window</p>
-                        <p className="font-bold">{exam.time}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <Video className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-medium">Exam Platform</p>
-                        <p className="font-bold line-clamp-1">{exam.hallName}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <ShieldCheck className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-medium">Mode</p>
-                        <p className="font-bold text-[#0d5c4d]">{exam.seatNumber}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-[#f0f4f1] text-xs">
-                    <span className="text-slate-500 text-[11px]">
-                      Conducting Mentor: <span className="text-slate-800 font-bold">{exam.invigilator}</span>
-                    </span>
-                    <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      Online Scheduled ✓
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center rounded-2xl border border-dashed border-[#e6ece8] bg-white text-xs text-slate-500">
+                No formal examinations or assessments scheduled for your profile currently.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -4877,10 +4883,6 @@ if (!savedProfile) {
                       </div>
                       <p className="text-xs sm:text-sm text-slate-200">{profileData.grade}</p>
                     </div>
-                  </div>
-                  <div className="hidden sm:flex items-center gap-1.5 bg-black/40 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/20 text-white text-xs font-bold">
-                    <span className="text-amber-400">★ 4.9</span>
-                    <span>· 142 Active Students</span>
                   </div>
                 </div>
               </div>

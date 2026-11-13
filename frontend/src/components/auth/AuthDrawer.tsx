@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Maximize2, X, Shield, GraduationCap, Users, Sparkles } from "lucide-react";
+import { Maximize2, X, Shield, Sparkles } from "lucide-react";
 import { SupportedRole, AuthDisplayMode, AuthTab } from "./types";
 import { LoginForm } from "./LoginForm";
 import { StudentSignupForm } from "./StudentSignupForm";
@@ -78,46 +78,6 @@ export function AuthDrawer({
 
   const authContent = (
     <div className="space-y-4">
-      {/* Role Badge Indicator */}
-      {selectedRole !== "teacher" && !(selectedRole === "parent" && authTab === "signup") && (
-        <div
-          className={`p-3 rounded-2xl flex items-center justify-between border ${
-            selectedRole === "student"
-              ? "bg-[#ecf8f5] border-[#c4e9e0] text-[#0d5c4d]"
-              : selectedRole === "parent"
-              ? "bg-[#f0f5fa] border-[#cbdfe8] text-[#1e3a5f]"
-              : selectedRole === "admin"
-              ? "bg-slate-100 border-slate-300 text-slate-800"
-              : "bg-amber-100 border-amber-300 text-amber-950 font-black"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {selectedRole === "student" && <GraduationCap className="h-4 w-4" />}
-            {selectedRole === "parent" && <Users className="h-4 w-4" />}
-            {selectedRole === "admin" && <Shield className="h-4 w-4 text-slate-700" />}
-            {selectedRole === "super_admin" && <span className="text-sm">👑</span>}
-            <span className="text-xs font-black uppercase tracking-wider">
-              {selectedRole === "student"
-                ? "Student Portal"
-                : selectedRole === "parent"
-                ? "Parent & Guardian Desk"
-                : selectedRole === "admin"
-                ? "Admin Operations"
-                : "Super Admin SaaS Console"}
-            </span>
-          </div>
-          <span className="text-[10px] font-bold opacity-75">
-            {selectedRole === "student"
-              ? "Direct Enrollment"
-              : selectedRole === "parent"
-              ? "Fee & Attendance"
-              : selectedRole === "admin"
-              ? "Tuition Desk"
-              : "Platform Control"}
-          </span>
-        </div>
-      )}
-
       {/* Tab Switcher: Sign In vs Create Account */}
       {selectedRole !== "super_admin" && selectedRole !== "admin" ? (
         <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 text-xs font-bold">

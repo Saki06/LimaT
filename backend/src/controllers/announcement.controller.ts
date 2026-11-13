@@ -20,37 +20,39 @@ export const getAnnouncements = async (
     const authReq = req as AuthenticatedRequest;
     const requestedTenantId = req.query.tenantId ? String(req.query.tenantId).trim() : undefined;
     const userTenantId = authReq.user?.tenantId;
-    const tenantId = requestedTenantId || userTenantId;
+    let tenantId = requestedTenantId || userTenantId;
 
-    const whereClause: any = {};
+    if (!tenantId && authReq.user?.role !== 'SUPER_ADMIN') {
+      const firstTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+      tenantId = firstTenant?.id;
+    }
+
+    const andConditions: any[] = [];
     if (tenantId) {
-      whereClause.tenantId = tenantId;
+      andConditions.push({ tenantId });
     }
 
     // Role filtering: Students see STUDENT or null (platform-wide)
     if (role === 'STUDENT') {
-      whereClause.OR = [
-        { targetRole: 'STUDENT' },
-        { targetRole: null },
-      ];
+      andConditions.push({
+        OR: [{ targetRole: 'STUDENT' }, { targetRole: null }],
+      });
     } else if (role && role !== 'ALL') {
-      whereClause.OR = [
-        { targetRole: role as any },
-        { targetRole: null },
-      ];
+      andConditions.push({
+        OR: [{ targetRole: role as any }, { targetRole: null }],
+      });
     }
 
     if (search) {
-      whereClause.AND = [
-        ...(whereClause.AND || []),
-        {
-          OR: [
-            { title: { contains: search, mode: 'insensitive' } },
-            { content: { contains: search, mode: 'insensitive' } },
-          ],
-        },
-      ];
+      andConditions.push({
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { content: { contains: search, mode: 'insensitive' } },
+        ],
+      });
     }
+
+    const whereClause: any = andConditions.length > 0 ? { AND: andConditions } : {};
 
     const records = await prisma.announcement.findMany({
       where: whereClause,

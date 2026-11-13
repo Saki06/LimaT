@@ -1,4 +1,4 @@
-﻿export const API_BASE_URL =
+export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export interface AuthResponse {
@@ -1193,6 +1193,9 @@ export const api = {
       slipUrl?: string;
       slipFileName?: string;
       paymentNotes?: string;
+      cardNumber?: string;
+      cardExpiry?: string;
+      cardCvc?: string;
     }) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/students/packages/${packageId}/checkout`, {

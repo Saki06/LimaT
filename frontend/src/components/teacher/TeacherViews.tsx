@@ -140,6 +140,65 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     );
   }, [courses, currentUser]);
 
+  // Tutor's study packages
+  const [tutorPackages, setTutorPackages] = useState<any[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.packages
+      .getMyPackages()
+      .then((res: any) => {
+        if (!isMounted) return;
+        const list = Array.isArray(res) ? res : res?.packages || res?.data || [];
+        if (Array.isArray(list) && list.length > 0) {
+          setTutorPackages(list);
+        } else {
+          api.packages.getAll().then((allRes: any) => {
+            if (!isMounted) return;
+            const allList = Array.isArray(allRes) ? allRes : allRes?.packages || allRes?.data || [];
+            setTutorPackages(Array.isArray(allList) ? allList : []);
+          }).catch(() => {});
+        }
+      })
+      .catch(() => {
+        api.packages.getAll().then((allRes: any) => {
+          if (!isMounted) return;
+          const allList = Array.isArray(allRes) ? allRes : allRes?.packages || allRes?.data || [];
+          setTutorPackages(Array.isArray(allList) ? allList : []);
+        }).catch(() => {});
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser]);
+
+  // Target Batch / Audience options for notices & announcements
+  const teacherBatchOptions = useMemo(() => {
+    const list: { label: string; value: string }[] = [
+      { label: "👥 All Enrolled Students (All Batches)", value: "All Enrolled Students" },
+    ];
+
+    teacherCourses.forEach((c) => {
+      const label = `📚 ${c.title}${c.code ? ` (${c.code})` : ""}`;
+      const value = c.title;
+      if (!list.some((item) => item.value === value)) {
+        list.push({ label, value });
+      }
+    });
+
+    tutorPackages.forEach((pkg: any) => {
+      const title = pkg.title || pkg.name;
+      if (title && !list.some((item) => item.value === title)) {
+        list.push({
+          label: `📦 ${title}${pkg.grade ? ` (${pkg.grade})` : ""}`,
+          value: title,
+        });
+      }
+    });
+
+    return list;
+  }, [teacherCourses, tutorPackages]);
+
   const [activeTab, setActiveTab] = useState<"home" | "grading" | "assignments" | "analytics">(
     currentView === "assignments" || currentView === "quizzes" || currentView === "resources" || currentView === "materials" || currentView === "library"
       ? "assignments"
@@ -416,6 +475,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [annTitle, setAnnTitle] = useState("");
   const [annMessage, setAnnMessage] = useState("");
   const [annAudience, setAnnAudience] = useState("All Enrolled Students");
+  const [customAudience, setCustomAudience] = useState("");
   const [annPriority, setAnnPriority] = useState<"normal" | "high">("normal");
 
   // Edit announcement / notice state
@@ -424,6 +484,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [editAnnTitle, setEditAnnTitle] = useState("");
   const [editAnnMessage, setEditAnnMessage] = useState("");
   const [editAnnAudience, setEditAnnAudience] = useState("All Enrolled Students");
+  const [editCustomAudience, setEditCustomAudience] = useState("");
   const [editAnnPriority, setEditAnnPriority] = useState<"normal" | "high">("normal");
 
   // View announcement modal state
@@ -615,10 +676,15 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const handleCreateAnnouncementSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!annTitle.trim()) return;
+    const resolvedAudience =
+      annAudience === "__custom__"
+        ? (customAudience.trim() || "All Enrolled Students")
+        : annAudience;
+
     createAnnouncement({
       title: annTitle.trim(),
       message: annMessage.trim(),
-      targetAudience: annAudience,
+      targetAudience: resolvedAudience,
       priority: annPriority,
       authorName: currentUser.name || activeTenant?.adminName || "Tutor",
       authorRole: "Tutor"
@@ -626,13 +692,22 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     setIsCreateAnnouncementModalOpen(false);
     setAnnTitle("");
     setAnnMessage("");
+    setCustomAudience("");
+    setAnnAudience("All Enrolled Students");
   };
 
   const handleOpenEditNotice = (notice: Announcement) => {
     setEditingNotice(notice);
     setEditAnnTitle(notice.title);
     setEditAnnMessage(notice.message);
-    setEditAnnAudience(notice.targetAudience);
+    const match = teacherBatchOptions.some((opt) => opt.value === notice.targetAudience);
+    if (match) {
+      setEditAnnAudience(notice.targetAudience);
+      setEditCustomAudience("");
+    } else {
+      setEditAnnAudience("__custom__");
+      setEditCustomAudience(notice.targetAudience);
+    }
     setEditAnnPriority(notice.priority === "urgent" ? "high" : (notice.priority as any) || "normal");
     setIsEditAnnouncementModalOpen(true);
   };
@@ -640,14 +715,20 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const handleEditAnnouncementSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingNotice || !editAnnTitle.trim()) return;
+    const resolvedAudience =
+      editAnnAudience === "__custom__"
+        ? (editCustomAudience.trim() || "All Enrolled Students")
+        : editAnnAudience;
+
     updateAnnouncement(editingNotice.id, {
       title: editAnnTitle.trim(),
       message: editAnnMessage.trim(),
-      targetAudience: editAnnAudience,
+      targetAudience: resolvedAudience,
       priority: editAnnPriority
     });
     setIsEditAnnouncementModalOpen(false);
     setEditingNotice(null);
+    setEditCustomAudience("");
   };
 
   const handleDeleteNotice = (id: string) => {
@@ -4048,9 +4129,12 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 onChange={(e) => setAnnAudience(e.target.value)}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                <option value="All Enrolled Students">All Enrolled Students</option>
-                <option value="Target A/L Batch">Target A/L Batch</option>
-                <option value="Revision Batch">Revision Batch</option>
+                {teacherBatchOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+                <option value="__custom__">✏️ Other / Custom Batch Name...</option>
               </select>
             </div>
             <div>
@@ -4067,6 +4151,22 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
               </select>
             </div>
           </div>
+
+          {annAudience === "__custom__" && (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Custom Batch Name
+              </label>
+              <input
+                type="text"
+                required
+                value={customAudience}
+                onChange={(e) => setCustomAudience(e.target.value)}
+                placeholder="e.g. 2026 A/L Revision Batch, Saturday Group A"
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
@@ -4131,9 +4231,12 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 onChange={(e) => setEditAnnAudience(e.target.value)}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                <option value="All Enrolled Students">All Enrolled Students</option>
-                <option value="Target A/L Batch">Target A/L Batch</option>
-                <option value="Revision Batch">Revision Batch</option>
+                {teacherBatchOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+                <option value="__custom__">✏️ Other / Custom Batch Name...</option>
               </select>
             </div>
             <div>
@@ -4150,6 +4253,22 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
               </select>
             </div>
           </div>
+
+          {editAnnAudience === "__custom__" && (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Custom Batch Name
+              </label>
+              <input
+                type="text"
+                required
+                value={editCustomAudience}
+                onChange={(e) => setEditCustomAudience(e.target.value)}
+                placeholder="e.g. 2026 A/L Revision Batch, Saturday Group A"
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
