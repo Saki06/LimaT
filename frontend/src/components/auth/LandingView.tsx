@@ -36,6 +36,8 @@ import {
   Phone,
   Heart,
   ChevronRight,
+  ChevronDown,
+  MapPin,
   BarChart3,
   CreditCard,
   Send
@@ -116,6 +118,32 @@ export function LandingView({
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(true);
+  const [studentGrade, setStudentGrade] = useState("");
+  const [studentGender, setStudentGender] = useState("");
+  const [studentMedium, setStudentMedium] = useState("Tamil Medium");
+  const [studentStream, setStudentStream] = useState("");
+  const [studentDistrict, setStudentDistrict] = useState("Jaffna");
+
+  const isStudentAL = studentGrade === "Grade 12 (A/L)" || studentGrade === "Grade 13 (A/L)";
+
+  const isValidSriLankanPhone = (phone: string) => {
+    const cleaned = phone.trim().replace(/[\s-]/g, "");
+    return /^(?:0[1-9]\d{8}|\+94[1-9]\d{8})$/.test(cleaned);
+  };
+
+  const isValidEmailAddress = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(email.trim());
+  };
+
+  const phoneError =
+    signupPhone.trim().length > 0 && !isValidSriLankanPhone(signupPhone)
+      ? "Enter valid 10-digit SL number (e.g. 0771234567)"
+      : "";
+
+  const emailError =
+    signupEmail.trim().length > 0 && !isValidEmailAddress(signupEmail)
+      ? "Enter a valid email (e.g. name@gmail.com)"
+      : "";
 
   // Sri Lankan Parent-Specific Sign In & Registration States
   const [parentLoginMethod, setParentLoginMethod] = useState<"password" | "otp">("password");
@@ -130,6 +158,11 @@ export function LandingView({
   const [childPhoneOrId, setChildPhoneOrId] = useState("");
   const [childBatch, setChildBatch] = useState("2026 A/L Theory (English / Tamil)");
   const [parentConsent, setParentConsent] = useState(true);
+
+  const parentPhoneError =
+    parentPhone.trim().length > 0 && !isValidSriLankanPhone(parentPhone)
+      ? "Enter valid 10-digit SL number (e.g. 0771234567)"
+      : "";
 
   // Pre-fill credentials based on role (Tutor Platform)
   const rolePresetCredentials: Record<SupportedRole, { name: string; email: string; detail: string; school: string }> = {
@@ -314,6 +347,14 @@ export function LandingView({
         });
         return;
       }
+      if (!isValidSriLankanPhone(parentPhone)) {
+        addToast({
+          type: "error",
+          title: "Invalid Mobile Number",
+          message: "Please enter a valid 10-digit Sri Lankan mobile number (e.g. 077 123 4567 or +94771234567)."
+        });
+        return;
+      }
       if (!parentConsent) {
         addToast({
           type: "error",
@@ -367,6 +408,33 @@ export function LandingView({
     }
 
     // Student / Tutor Registration
+    if (!isValidSriLankanPhone(signupPhone)) {
+      addToast({
+        type: "error",
+        title: "Invalid Mobile Number",
+        message: "Please enter a valid 10-digit Sri Lankan mobile number (e.g. 077 123 4567 or +94771234567)."
+      });
+      return;
+    }
+
+    if (!isValidEmailAddress(signupEmail)) {
+      addToast({
+        type: "error",
+        title: "Invalid Email Address",
+        message: "Please enter a valid email address (e.g. student@gmail.com)."
+      });
+      return;
+    }
+
+    if (signupPassword.trim().length < 6) {
+      addToast({
+        type: "error",
+        title: "Weak Password",
+        message: "Password must be at least 6 characters long."
+      });
+      return;
+    }
+
     const nameParts = (signupName.trim() || (selectedRole === "teacher" ? "Master Tutor" : "New Student")).split(" ");
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(" ");
@@ -382,7 +450,11 @@ export function LandingView({
           email,
           password: pwd,
           phoneNumber: signupPhone.trim(),
-          gradeLevel: "Grade 10",
+          gradeLevel: selectedRole === "student" ? studentGrade : undefined,
+          section: selectedRole === "student" ? (isStudentAL ? studentStream : studentMedium) : undefined,
+          gender: selectedRole === "student" ? studentGender : undefined,
+          medium: selectedRole === "student" ? studentMedium : undefined,
+          district: selectedRole === "student" ? studentDistrict : undefined,
           specialization: selectedRole === "teacher" ? "Science & Mathematics" : undefined
         });
         if (res.success) {
@@ -761,12 +833,20 @@ export function LandingView({
                       <input
                         type="tel"
                         required
+                        maxLength={15}
                         value={parentPhone}
-                        onChange={(e) => setParentPhone(e.target.value)}
+                        onChange={(e) => setParentPhone(e.target.value.replace(/[^0-9+\s-]/g, ""))}
                         placeholder="e.g. 077 123 4567"
-                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10 transition-all font-medium"
+                        className={`w-full h-10 pl-9 pr-3 rounded-xl bg-white border text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all font-medium ${
+                          parentPhoneError
+                            ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                            : "border-slate-200 focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10"
+                        }`}
                       />
                     </div>
+                    {parentPhoneError && (
+                      <p className="text-[10px] font-bold text-rose-600 mt-1">{parentPhoneError}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -901,6 +981,171 @@ export function LandingView({
                 </div>
               </div>
 
+              {selectedRole === "student" && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Enrolled Grade *
+                      </label>
+                      <div className="relative">
+                        <GraduationCap className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          required
+                          value={studentGrade}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setStudentGrade(val);
+                            if (val !== "Grade 12 (A/L)" && val !== "Grade 13 (A/L)") {
+                              setStudentStream("");
+                            } else if (!studentStream) {
+                              setStudentStream("Physical Science (Maths)");
+                            }
+                          }}
+                          className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium appearance-none cursor-pointer"
+                        >
+                          <option value="" disabled>Select Grade</option>
+                          {[
+                            "Grade 6",
+                            "Grade 7",
+                            "Grade 8",
+                            "Grade 9",
+                            "Grade 10",
+                            "Grade 11 (O/L)",
+                            "Grade 12 (A/L)",
+                            "Grade 13 (A/L)",
+                          ].map((g) => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Gender *
+                      </label>
+                      <div className="relative">
+                        <UserIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          required
+                          value={studentGender}
+                          onChange={(e) => setStudentGender(e.target.value)}
+                          className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium appearance-none cursor-pointer"
+                        >
+                          <option value="" disabled>Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                        <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {isStudentAL && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        A/L Subject Stream *
+                      </label>
+                      <div className="relative">
+                        <BookOpen className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          required
+                          value={studentStream}
+                          onChange={(e) => setStudentStream(e.target.value)}
+                          className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium appearance-none cursor-pointer"
+                        >
+                          {[
+                            "Physical Science (Maths)",
+                            "Biological Science",
+                            "Commerce",
+                            "Arts",
+                            "Engineering Technology",
+                            "Bio Systems Technology",
+                          ].map((stream) => (
+                            <option key={stream} value={stream}>{stream}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Medium of Study *
+                      </label>
+                      <div className="relative">
+                        <Globe className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          required
+                          value={studentMedium}
+                          onChange={(e) => setStudentMedium(e.target.value)}
+                          className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium appearance-none cursor-pointer"
+                        >
+                          {[
+                            "Tamil Medium",
+                            "English Medium",
+                            "Sinhala Medium",
+                          ].map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        District / City *
+                      </label>
+                      <div className="relative">
+                        <MapPin className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          required
+                          value={studentDistrict}
+                          onChange={(e) => setStudentDistrict(e.target.value)}
+                          className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium appearance-none cursor-pointer"
+                        >
+                          {[
+                            "Jaffna",
+                            "Colombo",
+                            "Kandy",
+                            "Batticaloa",
+                            "Vavuniya",
+                            "Kilinochchi",
+                            "Trincomalee",
+                            "Mannar",
+                            "Mullaitivu",
+                            "Gampaha",
+                            "Nuwara Eliya",
+                            "Ampara",
+                            "Puttalam",
+                            "Kurunegala",
+                            "Galle",
+                            "Matara",
+                            "Badulla",
+                            "Ratnapura",
+                            "Anuradhapura",
+                            "Polonnaruwa",
+                            "Kegalle",
+                            "Kalutara",
+                            "Matale",
+                            "Hambantota",
+                            "Monaragala",
+                          ].map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -911,12 +1156,20 @@ export function LandingView({
                     <input
                       type="tel"
                       required
+                      maxLength={15}
                       value={signupPhone}
-                      onChange={(e) => setSignupPhone(e.target.value)}
+                      onChange={(e) => setSignupPhone(e.target.value.replace(/[^0-9+\s-]/g, ""))}
                       placeholder="e.g. 077 123 4567"
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
+                      className={`w-full h-10 pl-9 pr-3 rounded-xl bg-white border text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all font-medium ${
+                        phoneError
+                          ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                          : "border-slate-200 focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      }`}
                     />
                   </div>
+                  {phoneError && (
+                    <p className="text-[10px] font-bold text-rose-600 mt-1">{phoneError}</p>
+                  )}
                 </div>
 
                 <div>
@@ -931,9 +1184,16 @@ export function LandingView({
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
                       placeholder={selectedRole === "teacher" ? "tutor@soloclass.lk" : "student@gmail.com"}
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
+                      className={`w-full h-10 pl-9 pr-3 rounded-xl bg-white border text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all font-medium ${
+                        emailError
+                          ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                          : "border-slate-200 focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      }`}
                     />
                   </div>
+                  {emailError && (
+                    <p className="text-[10px] font-bold text-rose-600 mt-1">{emailError}</p>
+                  )}
                 </div>
               </div>
 

@@ -12,19 +12,251 @@ import {
   CheckCheck,
   CheckCircle2,
   FileText,
-  LogOut
+  LogOut,
+  BookOpen,
+  GraduationCap,
+  Library,
+  Video,
+  Trophy,
+  User,
+  Home,
+  ArrowRight
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { Announcement } from "@/types/lms";
 
 export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () => void }) {
-  const { currentRole, currentUser, t, announcements, setCurrentView, setIsLanding, setLandingPortal, logoutUser } = useApp();
+  const {
+    currentRole,
+    currentUser,
+    t,
+    announcements,
+    courses,
+    assignments,
+    quizzes,
+    libraryResources,
+    setSelectedCourseId,
+    setSelectedAssignmentId,
+    setSelectedQuizId,
+    setCurrentView,
+    setIsLanding,
+    setLandingPortal,
+    logoutUser
+  } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [hasUnread, setHasUnread] = useState(true);
+  const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>([]);
   const [selectedAnnouncementModal, setSelectedAnnouncementModal] = useState<Announcement | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const { activeTenant } = useApp();
+
+  const readStorageKey = `lms_read_announcements_${currentUser?.id || currentRole || "guest"}`;
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem(readStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setReadAnnouncementIds(parsed);
+          return;
+        }
+      }
+    } catch {
+      // ignore storage parse error
+    }
+    setReadAnnouncementIds([]);
+  }, [readStorageKey]);
+
+  const markAnnouncementsRead = (idsToMark: string[]) => {
+    setReadAnnouncementIds((prev) => {
+      const merged = Array.from(new Set([...prev, ...idsToMark]));
+      if (typeof window !== "undefined") {
+        localStorage.setItem(readStorageKey, JSON.stringify(merged));
+      }
+      return merged;
+    });
+  };
+
+  const unreadCount = React.useMemo(
+    () => announcements.filter((a) => !readAnnouncementIds.includes(a.id)).length,
+    [announcements, readAnnouncementIds]
+  );
+  const hasUnread = unreadCount > 0;
+
+  const searchResults = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+
+    const items: Array<{
+      id: string;
+      title: string;
+      subtitle: string;
+      category: string;
+      onSelect: () => void;
+    }> = [];
+
+    // 1. Navigation pages matching current role
+    const navPages =
+      currentRole === "student"
+        ? [
+            { id: "nav-dashboard", title: "Dashboard", subtitle: "Student Overview & Schedule", view: "dashboard" },
+            { id: "nav-connect", title: "Find Teachers & Tutors", subtitle: "Browse & Subscribe to Tutors", view: "connect" },
+            { id: "nav-live", title: "Live Video Classes", subtitle: "Join Live & Upcoming Sessions", view: "live_schedule" },
+            { id: "nav-courses", title: "Syllabus & Lessons", subtitle: "Enrolled Courses & Units", view: "courses" },
+            { id: "nav-assignments", title: "Assignments", subtitle: "Homework & Submissions", view: "assignments" },
+            { id: "nav-quizzes", title: "Exams & Online Quizzes", subtitle: "Timed MCQ Practice Tests", view: "quizzes" },
+            { id: "nav-pastpapers", title: "Past Papers", subtitle: "Term & Exam Past Papers", view: "past_papers" },
+            { id: "nav-library", title: "Library & Study Notes", subtitle: "Books, Tutes & Resources", view: "library" },
+            { id: "nav-notices", title: "Notice Board & Circulars", subtitle: "Official Announcements", view: "announcements" },
+            { id: "nav-sports", title: "My Sports & Tournaments", subtitle: "Championships & Registrations", view: "sports_tournaments" },
+            { id: "nav-profile", title: "My Profile", subtitle: "Personal & Academic Settings", view: "profile" },
+          ]
+        : currentRole === "teacher"
+        ? [
+            { id: "nav-dashboard", title: "Tutor Studio Overview", subtitle: "Teaching Dashboard", view: "dashboard" },
+            { id: "nav-live", title: "Live Video Classes", subtitle: "Schedule & Broadcast Classes", view: "live_schedule" },
+            { id: "nav-connect", title: "Packages & Subscribers", subtitle: "Manage Student Subscriptions", view: "connect" },
+            { id: "nav-syllabus", title: "Packages & Syllabus", subtitle: "Course Units & Lessons", view: "syllabus" },
+            { id: "nav-assignments", title: "Assignments", subtitle: "Create & Manage Assignments", view: "assignments" },
+            { id: "nav-quizzes", title: "Online Quizzes (MCQ)", subtitle: "Create & Manage Exams", view: "quizzes" },
+            { id: "nav-submissions", title: "Student Submissions", subtitle: "Grade & Review Work", view: "submissions" },
+            { id: "nav-library", title: "Past Papers & Tutes", subtitle: "Upload Study Resources", view: "library" },
+            { id: "nav-profile", title: "Tutor Profile & Studio", subtitle: "Educator Settings", view: "profile" },
+          ]
+        : [
+            { id: "nav-dashboard", title: "Dashboard Overview", subtitle: "Main Portal View", view: "dashboard" },
+            { id: "nav-notices", title: "Announcements & Notices", subtitle: "Circulars & Alerts", view: "announcements" },
+            { id: "nav-profile", title: "My Profile", subtitle: "Account Settings", view: "profile" },
+          ];
+
+    navPages.forEach((p) => {
+      if (p.title.toLowerCase().includes(q) || p.subtitle.toLowerCase().includes(q)) {
+        items.push({
+          id: p.id,
+          title: p.title,
+          subtitle: p.subtitle,
+          category: "Page",
+          onSelect: () => setCurrentView(p.view),
+        });
+      }
+    });
+
+    // 2. Courses
+    courses.forEach((c) => {
+      if (
+        c.title?.toLowerCase().includes(q) ||
+        c.code?.toLowerCase().includes(q) ||
+        c.teacherName?.toLowerCase().includes(q)
+      ) {
+        items.push({
+          id: `course-${c.id}`,
+          title: c.title,
+          subtitle: `${c.code || "Course"} • ${c.teacherName || "Tutor"}`,
+          category: "Course",
+          onSelect: () => {
+            setSelectedCourseId(c.id);
+            setCurrentView(currentRole === "teacher" ? "syllabus" : "courses");
+          },
+        });
+      }
+    });
+
+    // 3. Assignments
+    assignments.forEach((a) => {
+      if (
+        a.title?.toLowerCase().includes(q) ||
+        a.subjectName?.toLowerCase().includes(q) ||
+        a.topicName?.toLowerCase().includes(q)
+      ) {
+        items.push({
+          id: `assign-${a.id}`,
+          title: a.title,
+          subtitle: `${a.subjectName} • ${a.topicName || "Assignment"}`,
+          category: "Assignment",
+          onSelect: () => {
+            setSelectedAssignmentId(a.id);
+            setCurrentView("assignments");
+          },
+        });
+      }
+    });
+
+    // 4. Quizzes / Exams
+    quizzes.forEach((qz) => {
+      if (
+        qz.title?.toLowerCase().includes(q) ||
+        qz.subjectName?.toLowerCase().includes(q)
+      ) {
+        items.push({
+          id: `quiz-${qz.id}`,
+          title: qz.title,
+          subtitle: `${qz.subjectName || "Exam"} • ${qz.durationMinutes || 30} mins`,
+          category: "Exam",
+          onSelect: () => {
+            setSelectedQuizId(qz.id);
+            setCurrentView("quizzes");
+          },
+        });
+      }
+    });
+
+    // 5. Library & Past Papers
+    libraryResources.forEach((res) => {
+      if (
+        res.title?.toLowerCase().includes(q) ||
+        res.subject?.toLowerCase().includes(q) ||
+        res.author?.toLowerCase().includes(q)
+      ) {
+        items.push({
+          id: `lib-${res.id}`,
+          title: res.title,
+          subtitle: `${res.subject || "Resource"} • ${res.category || "Library"}`,
+          category: "Library",
+          onSelect: () => {
+            setCurrentView(
+              String(res.category || "").toLowerCase().includes("paper") ? "past_papers" : "library"
+            );
+          },
+        });
+      }
+    });
+
+    // 6. Announcements
+    announcements.forEach((ann) => {
+      if (
+        ann.title?.toLowerCase().includes(q) ||
+        ann.message?.toLowerCase().includes(q)
+      ) {
+        items.push({
+          id: `ann-${ann.id}`,
+          title: ann.title,
+          subtitle: `${ann.authorName || "Notice"} • ${ann.publishedAt || ""}`,
+          category: "Notice",
+          onSelect: () => {
+            setSelectedAnnouncementModal(ann);
+          },
+        });
+      }
+    });
+
+    return items.slice(0, 8);
+  }, [
+    searchQuery,
+    currentRole,
+    courses,
+    assignments,
+    quizzes,
+    libraryResources,
+    announcements,
+    setCurrentView,
+    setSelectedCourseId,
+    setSelectedAssignmentId,
+    setSelectedQuizId,
+  ]);
 
   return (
     <header className="h-16 sm:h-20 border-b border-[#e6ece8] bg-white px-3 sm:px-8 flex items-center justify-between shrink-0 z-50 select-none relative">
@@ -67,15 +299,87 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
       </div>
 
       {/* Center Search */}
-      <div className="hidden md:flex items-center max-w-sm w-full mx-6">
-        <div className="relative w-full">
-          <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+      <div className="hidden md:flex items-center max-w-sm w-full mx-6 relative">
+        <div className="relative w-full z-50">
+          <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
+            value={searchQuery}
+            onFocus={() => setIsSearchOpen(true)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setIsSearchOpen(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setIsSearchOpen(false);
+              } else if (e.key === "Enter" && searchResults.length > 0) {
+                e.preventDefault();
+                searchResults[0].onSelect();
+                setIsSearchOpen(false);
+                setSearchQuery("");
+              }
+            }}
             placeholder={t.common.search}
-            className="w-full h-10 pl-10 pr-4 rounded-xl bg-[#f6f9f7] border border-[#e2e8e4] text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:bg-white focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all"
+            className="w-full h-10 pl-10 pr-8 rounded-xl bg-[#f6f9f7] border border-[#e2e8e4] text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:bg-white focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setIsSearchOpen(false);
+              }}
+              className="p-1 rounded-md text-slate-400 hover:text-slate-700 absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer"
+              title="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
+
+        {isSearchOpen && searchQuery.trim().length > 0 && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setIsSearchOpen(false)}
+            />
+            <div className="absolute left-0 right-0 top-full mt-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 max-h-96 overflow-y-auto">
+              {searchResults.length > 0 ? (
+                <div className="space-y-1">
+                  {searchResults.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        item.onSelect();
+                        setIsSearchOpen(false);
+                        setSearchQuery("");
+                      }}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-[#ecf8f5] transition-colors text-left group cursor-pointer"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 group-hover:text-[#0d5c4d] truncate">
+                          {item.title}
+                        </p>
+                        <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                          {item.subtitle}
+                        </p>
+                      </div>
+                      <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 group-hover:bg-white group-hover:text-[#0d5c4d] border border-slate-200/70 shrink-0">
+                        {item.category}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-6 px-4 text-center text-xs text-slate-500">
+                  No matching courses, pages, assignments, or resources found for &ldquo;{searchQuery}&rdquo;.
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Right controls */}
@@ -115,7 +419,7 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
                     </p>
                     {hasUnread && (
                       <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">
-                        {announcements.length} New
+                        {unreadCount} New
                       </span>
                     )}
                   </div>
@@ -123,7 +427,7 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
                     {hasUnread && (
                       <button
                         type="button"
-                        onClick={() => setHasUnread(false)}
+                        onClick={() => markAnnouncementsRead(announcements.map((a) => a.id))}
                         className="text-[10px] text-[#0d5c4d] font-bold hover:underline cursor-pointer flex items-center gap-1"
                       >
                         <CheckCheck className="h-3 w-3" />
@@ -141,30 +445,55 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
                 </div>
 
                 <div className="mt-3 space-y-2.5 max-h-80 overflow-y-auto pr-1">
-                  {announcements.map((a) => (
-                    <div
-                      key={a.id}
-                      onClick={() => {
-                        setSelectedAnnouncementModal(a);
-                        setShowNotifications(false);
-                      }}
-                      className="p-3 rounded-xl bg-[#f8faf9] border border-[#e6ece8] hover:bg-[#edf5f2] hover:border-[#b2e5d9] transition-all cursor-pointer group"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-bold text-slate-900 group-hover:text-[#0d5c4d] transition-colors line-clamp-1">
-                          {a.title}
-                        </p>
-                        <span className="text-[10px] text-slate-400 shrink-0">{a.publishedAt}</span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 mt-1 line-clamp-2 leading-relaxed">
-                        {a.message}
+                  {announcements.length > 0 ? (
+                    announcements.map((a) => {
+                      const isUnreadItem = !readAnnouncementIds.includes(a.id);
+                      return (
+                        <div
+                          key={a.id}
+                          onClick={() => {
+                            markAnnouncementsRead([a.id]);
+                            setSelectedAnnouncementModal(a);
+                            setShowNotifications(false);
+                          }}
+                          className={`p-3 rounded-xl border transition-all cursor-pointer group ${
+                            isUnreadItem
+                              ? "bg-[#f4fbf8] border-[#bce6d9] hover:bg-[#eaf7f2]"
+                              : "bg-[#f8faf9] border-[#e6ece8] hover:bg-[#edf5f2] hover:border-[#b2e5d9]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {isUnreadItem && (
+                                <span className="h-2 w-2 rounded-full bg-[#0d5c4d] shrink-0" />
+                              )}
+                              <p className="text-xs font-bold text-slate-900 group-hover:text-[#0d5c4d] transition-colors line-clamp-1">
+                                {a.title}
+                              </p>
+                            </div>
+                            <span className="text-[10px] text-slate-400 shrink-0">{a.publishedAt}</span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 mt-1 line-clamp-2 leading-relaxed">
+                            {a.message}
+                          </p>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="py-6 px-3 text-center space-y-1">
+                      <Bell className="h-6 w-6 text-slate-300 mx-auto" />
+                      <p className="text-xs font-bold text-slate-600">No announcements yet</p>
+                      <p className="text-[11px] text-slate-400">
+                        You&apos;re all caught up! New notices for your grade or classes will appear here.
                       </p>
                     </div>
-                  ))}
+                  )}
                 </div>
 
                 <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-medium">Click any to view full details</span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    {announcements.length > 0 ? "Click any to view full details" : "Official Notice Board"}
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
@@ -204,7 +533,7 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
               {currentUser.name}
             </p>
             <p className="text-[10px] text-slate-500 mt-1 leading-none">
-              {currentUser.role === "student" ? currentUser.class : currentUser.role} · <span className="text-[#0d5c4d] font-semibold">View Profile</span>
+              {currentUser.role === "student" ? (currentUser.grade || "Student") : currentUser.role} · <span className="text-[#0d5c4d] font-semibold">View Profile</span>
             </p>
           </div>
         </button>

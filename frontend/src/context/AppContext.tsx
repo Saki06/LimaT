@@ -89,6 +89,10 @@ interface AppContextType {
     password: string;
     phoneNumber?: string;
     gradeLevel?: string;
+    section?: string;
+    gender?: string;
+    medium?: string;
+    district?: string;
     studentIdNo?: string;
     specialization?: string;
     childStudentId?: string;
@@ -945,6 +949,7 @@ useEffect(() => {
   };
 
   useEffect(() => {
+    fetchAnnouncements();
     fetchAssignments();
     fetchSubmissions();
     fetchCourses();
@@ -953,7 +958,7 @@ useEffect(() => {
     fetchTimetable();
     fetchClasses();
     fetchSubjects();
-  }, [currentRole, activeTenantId]);
+  }, [currentRole, activeTenantId, authToken]);
 
   useEffect(() => {
     if (!authToken) return;
@@ -1045,6 +1050,10 @@ useEffect(() => {
     password: string;
     phoneNumber?: string;
     gradeLevel?: string;
+    section?: string;
+    gender?: string;
+    medium?: string;
+    district?: string;
     studentIdNo?: string;
     specialization?: string;
     childStudentId?: string;
@@ -1058,6 +1067,7 @@ useEffect(() => {
           email: input.email,
           password: input.password,
           gradeLevel: input.gradeLevel,
+          section: input.section,
           studentIdNo: input.studentIdNo,
         });
       } else if (input.role === 'teacher') {
@@ -1080,6 +1090,15 @@ useEffect(() => {
       }
 
       if (res && res.success && res.token && res.user) {
+        if (typeof window !== 'undefined' && res.user.id) {
+          if (input.gender) localStorage.setItem(`lms_gender_${res.user.id}`, input.gender);
+          if (input.medium) localStorage.setItem(`lms_medium_${res.user.id}`, input.medium);
+          if (input.district) {
+            localStorage.setItem(`lms_city_${res.user.id}`, input.district);
+            localStorage.setItem(`lms_district_${res.user.id}`, input.district);
+          }
+          if (input.phoneNumber) localStorage.setItem(`lms_phone_${res.user.id}`, input.phoneNumber);
+        }
         api.token.set(res.token);
         api.user.set(res.user);
         setEvents((prev) => prev.filter((event) => event.organizer !== sportsEventOrganizer));
@@ -1187,7 +1206,10 @@ useEffect(() => {
   'User',
       email: authUser.email,
       role: currentRole,
-      avatar: userAvatar
+      avatar: userAvatar,
+      grade: authUser.studentProfile?.gradeLevel || authUser.grade || '',
+      class: authUser.studentProfile?.gradeLevel || authUser.grade || 'Student',
+      ...(authUser.studentProfile ? { studentProfile: authUser.studentProfile } : {}),
     }
     : {
       ...baseUser,

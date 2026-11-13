@@ -121,10 +121,16 @@ const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
 export const registerStudent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { firstName, lastName, email, password, gradeLevel, studentIdNo, tenantId } = req.body;
+    const { firstName, lastName, email, password, gradeLevel, section, studentIdNo, tenantId } = req.body;
 
     if (!email || !password || !firstName) {
       res.status(400).json({ success: false, message: 'Missing required student registration fields' });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(String(email).trim())) {
+      res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
       return;
     }
 
@@ -186,6 +192,7 @@ if (
           create: {
             studentIdNo: studentIdNo || 'STU-' + Math.floor(1000 + Math.random() * 9000),
             gradeLevel: gradeLevel || 'Grade 10',
+            section: section || null,
           },
         },
       },

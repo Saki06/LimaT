@@ -65,20 +65,79 @@ interface NavItem {
 }
 
 export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
-  const { currentRole, currentView, setCurrentView, t, submissions, isFeatureEnabled, setIsLanding, setLandingPortal } = useApp();
+  const { currentRole, currentView, setCurrentView, t, submissions, assignments, events, timetable, isFeatureEnabled, setIsLanding, setLandingPortal } = useApp();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     my_learning: true,
     school_life: false,
     sports: true
   });
-  const [selectedStreakDate, setSelectedStreakDate] = useState<number>(2);
-  const [miniCalMonth, setMiniCalMonth] = useState<number>(9); // 9 = October
-  const [miniCalYear, setMiniCalYear] = useState<number>(2026);
+  const [now, setNow] = useState(() => new Date());
+  const [selectedStreakDate, setSelectedStreakDate] = useState<number>(() => new Date().getDate());
+  const [miniCalMonth, setMiniCalMonth] = useState<number>(() => new Date().getMonth());
+  const [miniCalYear, setMiniCalYear] = useState<number>(() => new Date().getFullYear());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+  // Automatically shift the green "Today" highlight when the date rolls over (even if tab stays open past midnight)
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      const latest = new Date();
+      setNow((prev) => {
+        if (
+          prev.getDate() !== latest.getDate() ||
+          prev.getMonth() !== latest.getMonth() ||
+          prev.getFullYear() !== latest.getFullYear()
+        ) {
+          setSelectedStreakDate(latest.getDate());
+          setMiniCalMonth(latest.getMonth());
+          setMiniCalYear(latest.getFullYear());
+          return latest;
+        }
+        return prev;
+      });
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  const currentMonthLabel = `${monthNames[miniCalMonth]} ${miniCalYear}`;
+  const firstDayOfMonth = new Date(miniCalYear, miniCalMonth, 1).getDay();
+  const daysInMonth = new Date(miniCalYear, miniCalMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(miniCalYear, miniCalMonth, 0).getDate();
+  const prevMonthTrailingDays = Array.from(
+    { length: firstDayOfMonth },
+    (_, i) => daysInPrevMonth - firstDayOfMonth + 1 + i
+  );
+
+  // Collect real event/assignment dates in the currently viewed month & year
+  const scheduledDaysInMonth = React.useMemo(() => {
+    const daySet = new Set<number>();
+    assignments.forEach((a) => {
+      if (!a.dueDate) return;
+      const d = new Date(a.dueDate);
+      if (!isNaN(d.getTime()) && d.getFullYear() === miniCalYear && d.getMonth() === miniCalMonth) {
+        daySet.add(d.getDate());
+      }
+    });
+    events.forEach((ev) => {
+      if (!ev.date) return;
+      const d = new Date(ev.date);
+      if (!isNaN(d.getTime()) && d.getFullYear() === miniCalYear && d.getMonth() === miniCalMonth) {
+        daySet.add(d.getDate());
+      }
+    });
+    return daySet;
+  }, [assignments, events, miniCalMonth, miniCalYear]);
 
   const pendingSubmissionsCount = submissions.filter(
     (s) => s.status === "submitted"
+  ).length;
+
+  const activeLiveClassesCount = timetable.filter(
+    (entry: any) => String(entry?.status || "").toUpperCase() === "LIVE"
   ).length;
 
   const handleNavClick = (view: string) => {
@@ -103,8 +162,6 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
             id: "connect",
             label: "Find Teachers",
             icon: GraduationCap,
-            badge: "Tutors",
-            badgeVariant: "gold" as const,
             group: "Core Learning"
           }
         ]
@@ -115,7 +172,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
             id: "live_schedule",
             label: "Live Video Classes",
             icon: Video,
-            badge: "Live",
+            badge: activeLiveClassesCount > 0 ? "Live" : undefined,
             badgeVariant: "gold" as const,
             group: "Core Learning"
           }
@@ -136,7 +193,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                 id: "assignments",
                 label: t.nav.assignments,
                 icon: FileText,
-                badge: "2 Active"
+                badge: assignments.length > 0 ? `${assignments.length} Active` : undefined
               },
               { id: "quizzes", label: t.nav.quizzes, icon: GraduationCap }
             ]
@@ -146,8 +203,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
               {
                 id: "past_papers",
                 label: t.nav.pastPapers || "Past Papers",
-                icon: Layers,
-                badge: "Archive"
+                icon: Layers
               }
             ]
           : [])
@@ -159,8 +215,6 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
             id: "library",
             label: t.nav.library || "Library",
             icon: Library,
-            badge: "Hub",
-            badgeVariant: "default" as const,
             group: "Core Learning"
           }
         ]
@@ -171,8 +225,6 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
       id: "announcements",
       label: "Notice Board & Circulars",
       icon: Bell,
-      badge: "Notices",
-      badgeVariant: "default" as const,
       group: "Notices & Updates"
     },
 
@@ -181,20 +233,17 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
       id: "sports",
       label: "My Sports",
       icon: Trophy,
-      badgeVariant: "gold" as const,
       group: "Sports & Academy",
       children: [
         {
           id: "sports_tournaments",
           label: "Tournaments & Championships",
-          icon: Trophy,
-          badge: "Live"
+          icon: Trophy
         },
         {
           id: "sports_registration",
           label: "Online Registration",
-          icon: Sparkles,
-          badge: "Open"
+          icon: Sparkles
         },
         {
           id: "sports_check",
@@ -227,7 +276,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
             id: "live_schedule",
             label: "Live Video Classes",
             icon: Video,
-            badge: "Live",
+            badge: activeLiveClassesCount > 0 ? "Live" : undefined,
             badgeVariant: "default" as const,
             group: "Teaching Studio"
           }
@@ -239,8 +288,6 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
             id: "connect",
             label: "Packages & Subscribers",
             icon: Package,
-            badge: "Packages",
-            badgeVariant: "gold" as const,
             group: "Teaching Studio"
           }
         ]
@@ -268,8 +315,6 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
             id: "library",
             label: "Past Papers & Tutes",
             icon: Library,
-            badge: "Author",
-            badgeVariant: "gold" as const,
             group: "Assessments & Review"
           }
         ]
@@ -385,16 +430,14 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
 
   const parentNav: NavItem[] = [
     { id: "dashboard", label: "Tuition Overview", icon: Home, group: "Parent Portal" },
-    { id: "tuition_classes", label: "Enrolled Tutors", icon: GraduationCap, badge: "3 Active", badgeVariant: "gold" as const, group: "Tuition & Academics" },
-    { id: "fees", label: "Fees & Bank Slips", icon: CreditCard, badge: "1 Review", badgeVariant: "warning" as const, group: "Tuition & Billing" },
+    { id: "tuition_classes", label: "Enrolled Tutors", icon: GraduationCap, group: "Tuition & Academics" },
+    { id: "fees", label: "Fees & Bank Slips", icon: CreditCard, group: "Tuition & Billing" },
     { id: "progress", label: "Model Paper Marks", icon: Award, group: "Monitoring & Logs" },
-    { id: "circulars", label: "Tutor Announcements", icon: Bell, badge: "Notice", badgeVariant: "default" as const, group: "Communication" },
+    { id: "circulars", label: "Tutor Announcements", icon: Bell, group: "Communication" },
     {
       id: "connect",
       label: "Find More Tutors",
       icon: Sparkles,
-      badge: "Explore",
-      badgeVariant: "gold" as const,
       group: "Tuition Marketplace"
     }
   ];
@@ -646,17 +689,17 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
               <div className="rounded-2xl p-2.5 bg-gradient-to-br from-[#f6fbf9] to-[#edf7f4] border border-[#d6ede6] text-[11px] text-slate-600 shadow-2xs">
                 {currentRole === "student" ? (
                   !isCalendarOpen ? (
-                    /* COMPACT STUDY STREAK CARD - Preserves vertical length for all menu options */
+                    /* COMPACT CALENDAR BAR - Preserves vertical length for all menu options */
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="h-7 w-7 rounded-lg bg-amber-100/80 border border-amber-200/60 flex items-center justify-center shrink-0">
-                          <Flame className="h-4 w-4 text-amber-500 fill-amber-500" />
+                        <div className="h-7 w-7 rounded-lg bg-[#ecf8f5] border border-[#c4e9e0] flex items-center justify-center shrink-0">
+                          <Calendar className="h-4 w-4 text-[#0d5c4d]" />
                         </div>
                         <div>
                           <p className="text-[11px] font-bold text-[#0d2b26] flex items-center gap-1 leading-tight">
-                            7d Streak Active
+                            {now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                           </p>
-                          <p className="text-[9.5px] text-slate-500">October 2026</p>
+                          <p className="text-[9.5px] text-slate-500">Academic Calendar</p>
                         </div>
                       </div>
                       <button
@@ -666,7 +709,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                         title="Expand Calendar"
                       >
                         <Calendar className="h-3 w-3" />
-                        <span>Calendar</span>
+                        <span>Open</span>
                         <ChevronDown className="h-3 w-3" />
                       </button>
                     </div>
@@ -678,7 +721,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                         <div className="flex items-center gap-1.5">
                           <Calendar className="h-3.5 w-3.5 text-[#0d5c4d]" />
                           <span className="font-extrabold text-[#0d2b26] text-xs">
-                            {miniCalMonth === 9 ? "October 2026" : miniCalMonth === 8 ? "September 2026" : "November 2026"}
+                            {currentMonthLabel}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
@@ -686,9 +729,14 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setMiniCalMonth((prev) => (prev > 0 ? prev - 1 : 11));
+                              if (miniCalMonth === 0) {
+                                setMiniCalMonth(11);
+                                setMiniCalYear((y) => y - 1);
+                              } else {
+                                setMiniCalMonth((prev) => prev - 1);
+                              }
                             }}
-                            className="p-1 rounded-md hover:bg-slate-200/60 text-slate-500 hover:text-slate-800 transition-colors"
+                            className="p-1 rounded-md hover:bg-slate-200/60 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
                             title="Previous Month"
                           >
                             <ChevronLeft className="h-3 w-3" />
@@ -697,9 +745,14 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setMiniCalMonth((prev) => (prev < 11 ? prev + 1 : 0));
+                              if (miniCalMonth === 11) {
+                                setMiniCalMonth(0);
+                                setMiniCalYear((y) => y + 1);
+                              } else {
+                                setMiniCalMonth((prev) => prev + 1);
+                              }
                             }}
-                            className="p-1 rounded-md hover:bg-slate-200/60 text-slate-500 hover:text-slate-800 transition-colors"
+                            className="p-1 rounded-md hover:bg-slate-200/60 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
                             title="Next Month"
                           >
                             <ChevronRight className="h-3 w-3" />
@@ -728,20 +781,22 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
 
                       {/* Date Cells Grid */}
                       <div className="grid grid-cols-7 gap-1 text-center">
-                        {[27, 28, 29, 30].map((d) => (
+                        {prevMonthTrailingDays.map((d) => (
                           <span key={`prev-${d}`} className="h-5 flex items-center justify-center text-[9px] text-slate-300 select-none">
                             {d}
                           </span>
                         ))}
-                        {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
-                          const isToday = d === 2;
+                        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => {
+                          const isToday =
+                            d === now.getDate() &&
+                            miniCalMonth === now.getMonth() &&
+                            miniCalYear === now.getFullYear();
                           const isSelected = selectedStreakDate === d;
-                          const hasStreak = [25, 26, 27, 28, 29, 30, 1].includes(d);
-                          const hasEvent = [4, 12, 15, 22].includes(d);
+                          const hasEvent = scheduledDaysInMonth.has(d);
 
                           return (
                             <button
-                              key={`oct-${d}`}
+                              key={`day-${miniCalYear}-${miniCalMonth}-${d}`}
                               type="button"
                               onClick={() => {
                                 setSelectedStreakDate(d);
@@ -751,18 +806,13 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                                   ? "bg-[#0d5c4d] text-white font-black shadow-xs ring-1 ring-[#0d5c4d]/30"
                                   : isSelected
                                   ? "bg-[#d8efe8] text-[#0d5c4d] font-bold"
-                                  : hasStreak
-                                  ? "bg-[#ecf8f5] text-[#0d5c4d] font-semibold hover:bg-[#def3ed]"
                                   : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
                               }`}
-                              title={`October ${d}, 2026 ${isToday ? "(Today)" : ""} ${hasStreak ? "• 2+ Hrs Studied" : ""} ${hasEvent ? "• Event Scheduled" : ""}`}
+                              title={`${monthNames[miniCalMonth]} ${d}, ${miniCalYear}${isToday ? " (Today)" : ""}${hasEvent ? " • Task / Event Due" : ""}`}
                             >
                               <span>{d}</span>
                               {hasEvent && !isToday && (
                                 <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-amber-500" />
-                              )}
-                              {hasStreak && !isToday && !hasEvent && (
-                                <span className="absolute bottom-0.5 h-0.5 w-1.5 rounded-full bg-emerald-500/60" />
                               )}
                             </button>
                           );
@@ -771,10 +821,17 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
 
                       {/* Mini Calendar Footer Info */}
                       <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/60 text-[9.5px]">
-                        <span className="font-bold text-[#0d5c4d] flex items-center gap-1">
-                          <Flame className="h-3 w-3 text-amber-500 fill-amber-500" />
-                          <span>7d Streak Active</span>
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMiniCalMonth(now.getMonth());
+                            setMiniCalYear(now.getFullYear());
+                            setSelectedStreakDate(now.getDate());
+                          }}
+                          className="font-bold text-[#0d5c4d] hover:underline cursor-pointer"
+                        >
+                          Today: {now.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </button>
                         <button
                           type="button"
                           onClick={() => setIsCalendarOpen(false)}

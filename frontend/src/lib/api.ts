@@ -373,6 +373,7 @@ export const api = {
       email: string;
       password: string;
       gradeLevel?: string;
+      section?: string;
       studentIdNo?: string;
     }): Promise<AuthResponse> {
       const response = await fetch(`${API_BASE_URL}/auth/register/student`, {

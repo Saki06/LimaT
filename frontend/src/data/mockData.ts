@@ -23,11 +23,11 @@ import {
 export const mockUsers: Record<string, User> = {
   student: {
     id: 'usr_student_01',
-    name: 'Sathurjan K.',
-    email: 'sathurjan@gmail.com',
+    name: 'Student',
+    email: 'student@limat.lk',
     role: 'student',
-    grade: 'Grade 12 (A/L 2026/2027)',
-    class: 'Physical Science A/L Masterclass Batch',
+    grade: 'Student',
+    class: '',
     schoolId: 'sch_01',
     schoolName: 'LimaT Independent Tuition Masterclass'
   },
