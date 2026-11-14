@@ -21,7 +21,8 @@ import {
   ChevronRight,
   GraduationCap,
   PlayCircle,
-  Users
+  Users,
+  RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ export function StudentDashboard() {
     activeTenant
   } = useApp();
 
-  const tutorName = activeTenant?.adminName || activeTenant?.name || "Dr. Samantha Perera";
+  const tutorName = activeTenant?.adminName || activeTenant?.name || "Lead Tutor";
   const tutorSubject = activeTenant?.tagline || "A/L Combined Mathematics";
   const tutorInitials =
     tutorName
@@ -61,44 +62,116 @@ export function StudentDashboard() {
   const [isLoadingDashboard, setIsLoadingDashboard] = useState<boolean>(false);
 
   // Fetch real-time student dashboard metrics from backend
-  useEffect(() => {
-    let isMounted = true;
-    const fetchDashboard = async () => {
-      try {
-        setIsLoadingDashboard(true);
-        const res = await api.students.getDashboardOverview();
-        if (isMounted && res.success && res.data) {
-          setDashboardData(res.data);
+  const fetchDashboard = async (showToast = false) => {
+    try {
+      setIsLoadingDashboard(true);
+      const res = await api.students.getDashboardOverview();
+      if (res && res.success && res.data) {
+        setDashboardData(res.data);
+        if (showToast) {
+          addToast({
+            type: "success",
+            title: "Dashboard Refreshed",
+            message: "Live metrics and course schedules are updated."
+          });
         }
-      } catch (err) {
-        console.warn("Using offline / context student dashboard metrics:", err);
-      } finally {
-        if (isMounted) setIsLoadingDashboard(false);
       }
-    };
-    fetchDashboard();
-    return () => {
-      isMounted = false;
-    };
+    } catch (err) {
+      console.warn("Using offline / context student dashboard metrics:", err);
+    } finally {
+      setIsLoadingDashboard(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboard(false);
   }, []);
 
   // Compute live or fallback metrics
   const enrolledCoursesCount = dashboardData?.metrics?.enrolledCoursesCount ?? courses.length;
-  const upcomingLiveCount = dashboardData?.metrics?.upcomingLiveClassesCount ?? 1;
-  const pendingAssignmentsCount = dashboardData?.metrics?.pendingAssignmentsCount ?? assignments.length;
-  const attendanceRate = dashboardData?.metrics?.attendanceRate ?? 94;
-  const averageScore = dashboardData?.metrics?.averageScore ?? 88;
+  const upcomingLiveCount = dashboardData?.metrics?.upcomingLiveClassesCount ?? (dashboardData?.upcomingLiveClasses?.length ?? 0);
+  const pendingAssignmentsCount = dashboardData?.metrics?.pendingAssignmentsCount ?? (dashboardData?.pendingAssignments?.length ?? assignments.length);
+  const attendanceRate = dashboardData?.metrics?.attendanceRate ?? 100;
+  const averageScore = dashboardData?.metrics?.averageScore ?? 0;
+
+  // Active live class / Next upcoming class
+  const activeLiveNow = dashboardData?.upcomingLiveClasses?.find((c: any) => c.status === "LIVE");
+  const nextUpcomingLive =
+    dashboardData?.upcomingLiveClasses?.find((c: any) => c.status === "SCHEDULED") ||
+    dashboardData?.upcomingLiveClasses?.[0];
 
   // Learning Feed State
   const [activeFeedFilter, setActiveFeedFilter] = useState<string>("all");
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState<boolean>(false);
 
   const feedPosts = useMemo(() => {
+    const studentGradeStr = String((currentUser as any)?.studentProfile?.gradeLevel || (currentUser as any)?.grade || "");
+    const studentGradeNum = studentGradeStr.match(/\d+/)?.[0];
+
+    const enrolledTeacherNames: string[] = [];
+    const enrolledBatchTitles: string[] = [];
+
+    dashboardData?.enrollments?.forEach((e: any) => {
+      if (e.course?.teacher?.user) {
+        const u = e.course.teacher.user;
+        if (u.firstName) enrolledTeacherNames.push(u.firstName.toLowerCase());
+        if (u.lastName) enrolledTeacherNames.push(u.lastName.toLowerCase());
+        enrolledTeacherNames.push(`${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase());
+      }
+      if (e.course?.title) enrolledBatchTitles.push(e.course.title.toLowerCase());
+    });
+
+    dashboardData?.activeSubscriptions?.forEach((sub: any) => {
+      if (sub.package?.teacher?.user) {
+        const u = sub.package.teacher.user;
+        if (u.firstName) enrolledTeacherNames.push(u.firstName.toLowerCase());
+        if (u.lastName) enrolledTeacherNames.push(u.lastName.toLowerCase());
+        enrolledTeacherNames.push(`${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase());
+      }
+      if (sub.package?.title) enrolledBatchTitles.push(sub.package.title.toLowerCase());
+    });
+
     return announcements.filter((a) => {
       if (a.targetAudience === "Tutors & Coaches") return false;
+
+      const audienceLower = (a.targetAudience || "").toLowerCase();
+      const contentLower = `${a.title} ${a.message}`.toLowerCase();
+
+      // 1. Grade-level filtering
+      const gradeMatch = audienceLower.match(/grade\s*(\d+)/i) || contentLower.match(/grade\s*(\d+)/i);
+      if (gradeMatch && studentGradeNum) {
+        if (gradeMatch[1] !== studentGradeNum) return false;
+      }
+
+      // 2. Teacher notices filtering
+      const authorRole = (a.authorRole || "").toUpperCase();
+      const isFromTeacher =
+        authorRole === "TEACHER" ||
+        authorRole === "TUTOR" ||
+        authorRole.includes("TUTOR") ||
+        authorRole.includes("TEACHER");
+
+      if (isFromTeacher) {
+        const author = (a.authorName || "").toLowerCase().trim();
+        const isStudentOfTeacher = enrolledTeacherNames.some(
+          (name) => name && (author.includes(name) || name.includes(author))
+        );
+        const isEnrolledInBatch = enrolledBatchTitles.some(
+          (title) => title && (audienceLower.includes(title) || title.includes(audienceLower))
+        );
+
+        if (!isStudentOfTeacher && !isEnrolledInBatch) {
+          return false;
+        }
+      }
+
+      if (activeFeedFilter === "tutor") {
+        return isFromTeacher;
+      }
+
       return true;
     });
-  }, [announcements]);
+  }, [announcements, currentUser, dashboardData, activeFeedFilter]);
 
   const totalLessons = courses.reduce((acc, c) => acc + c.totalLessons, 0);
   const completedLessons = courses.reduce((acc, c) => acc + c.completedLessons, 0);
@@ -158,11 +231,19 @@ export function StudentDashboard() {
           >
             <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Quiz Arena
           </Button>
+          <Button
+            onClick={() => fetchDashboard(true)}
+            disabled={isLoadingDashboard}
+            className="bg-white/15 hover:bg-white/25 text-white border border-white/25 font-bold text-xs cursor-pointer backdrop-blur-xs h-9 px-3 rounded-xl"
+            title="Refresh Dashboard"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoadingDashboard ? "animate-spin" : ""}`} />
+          </Button>
         </div>
       </div>
 
-      {/* Top 4 Student Executive KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Top 3 Student Executive KPI Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Card 1: Enrolled Courses */}
         <Card
           onClick={() => setCurrentView("courses")}
@@ -246,73 +327,111 @@ export function StudentDashboard() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Card 4: Attendance & Academic Standing */}
-        <Card
-          onClick={() => setCurrentView("results")}
-          className="border-[#e6ece8] bg-white hover:border-[#a2dfd2] hover:bg-emerald-50/20 transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
-        >
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Attendance &amp; Score
-              </span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-[#0d2b26]">
-                  {attendanceRate}%
-                </span>
-                <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
-                  Avg {averageScore}%
-                </Badge>
-              </div>
-              <p className="text-[11px] text-[#0d5c4d] font-semibold flex items-center gap-1">
-                View Performance <ChevronRight className="h-3 w-3" />
-              </p>
-            </div>
-            <div className="h-11 w-11 rounded-2xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-              <Award className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Main Grid: Continue Learning + Performance Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Continue Learning Course Cards (2 Columns) */}
         <div className="lg:col-span-2 space-y-4">
-          {/* LIVE NOW Class Alert Bar (Indigo & Violet Gradient Theme) */}
-          <div className="relative overflow-hidden rounded-2xl border border-indigo-200/80 bg-gradient-to-r from-indigo-50/90 via-purple-50/50 to-white p-4 sm:p-5 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2.5">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600"></span>
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-black uppercase tracking-wider">
-                    LIVE NOW
-                  </span>
-                  <span className="text-xs text-indigo-900/60 font-semibold">Started 12 mins ago</span>
+          {/* Live Lecture Banner (Dynamic: LIVE NOW / Upcoming Scheduled / Studio Ready) */}
+          {activeLiveNow ? (
+            <div className="relative overflow-hidden rounded-2xl border border-rose-300 bg-gradient-to-r from-rose-50/95 via-purple-50/60 to-white p-4 sm:p-5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600"></span>
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-black uppercase tracking-wider">
+                      LIVE NOW
+                    </span>
+                    <span className="text-xs text-rose-900/70 font-semibold">Active Session in Progress</span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                      {activeLiveNow.title || activeLiveNow.course?.title || "Live Lecture Masterclass"}
+                    </h3>
+                    <p className="text-xs text-slate-600 font-medium">
+                      <span className="font-bold text-slate-900">
+                        {activeLiveNow.teacher?.user ? `${activeLiveNow.teacher.user.firstName} ${activeLiveNow.teacher.user.lastName}` : tutorName}
+                      </span> • Live Studio Broadcast
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <h3 className="text-base sm:text-lg font-black text-indigo-950 tracking-tight">
-                    {tutorSubject} — Live Masterclass
+                <button
+                  onClick={() => {
+                    if (activeLiveNow.meetingUrl) window.open(activeLiveNow.meetingUrl, "_blank");
+                    else setIsLiveClassModalOpen(true);
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-700 hover:to-indigo-700 text-white text-xs font-black shadow-md transition-all hover:scale-[1.02] shrink-0 self-start sm:self-auto cursor-pointer"
+                >
+                  <span>Join Class →</span>
+                </button>
+              </div>
+            </div>
+          ) : nextUpcomingLive ? (
+            <div className="relative overflow-hidden rounded-2xl border border-indigo-200/80 bg-gradient-to-r from-indigo-50/90 via-purple-50/50 to-white p-4 sm:p-5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase tracking-wider">
+                      Upcoming Masterclass
+                    </span>
+                    <span className="text-xs text-indigo-900/60 font-semibold">
+                      {nextUpcomingLive.startTime ? new Date(nextUpcomingLive.startTime).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : "Scheduled Session"}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-indigo-950 tracking-tight">
+                      {nextUpcomingLive.title || nextUpcomingLive.course?.title || "Curriculum Masterclass"}
+                    </h3>
+                    <p className="text-xs text-slate-600 font-medium">
+                      <span className="font-bold text-indigo-900">
+                        {nextUpcomingLive.teacher?.user ? `${nextUpcomingLive.teacher.user.firstName} ${nextUpcomingLive.teacher.user.lastName}` : tutorName}
+                      </span> • Live Studio Session
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setCurrentView("live_schedule")}
+                  className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-black shadow-md hover:shadow-indigo-500/25 transition-all hover:scale-[1.02] shrink-0 self-start sm:self-auto cursor-pointer"
+                >
+                  <span>View Schedule →</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="relative overflow-hidden rounded-2xl border border-[#d6ede6] bg-gradient-to-r from-[#ecf8f5]/80 via-teal-50/40 to-white p-4 sm:p-5 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#0d5c4d]/10 text-[#0d5c4d] text-[10px] font-black uppercase tracking-wider">
+                      Live Studio
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">No live lectures currently in progress</span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-[#0d2b26]">
+                    Interactive Live Lectures &amp; Masterclasses
                   </h3>
-                  <p className="text-xs text-slate-600 font-medium">
-                    <span className="font-bold text-indigo-900">{tutorName}</span> • Solo Masterclass • 142 watching
+                  <p className="text-xs text-slate-500">
+                    Check your timetable for upcoming video sessions and revision batches.
                   </p>
                 </div>
+                <button
+                  onClick={() => setCurrentView("live_schedule")}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold transition-all shrink-0 cursor-pointer"
+                >
+                  <Video className="h-3.5 w-3.5" />
+                  <span>Live Schedule</span>
+                </button>
               </div>
-
-              <button
-                onClick={() => setIsLiveClassModalOpen(true)}
-                className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-black shadow-md hover:shadow-indigo-500/25 transition-all hover:scale-[1.02] shrink-0 self-start sm:self-auto cursor-pointer"
-              >
-                <span>Join Class →</span>
-              </button>
             </div>
-          </div>
+          )}
 
           {/* =================================================================== */}
           {/* LEARNING FEED (Clean White & Mint Theme)                           */}
@@ -364,54 +483,66 @@ export function StudentDashboard() {
             {/* Post Cards Feed */}
             <div className="space-y-3.5">
               {feedPosts.length > 0 ? (
-                feedPosts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="rounded-2xl bg-[#fbfdfc] hover:bg-white border border-[#e2eae5] hover:border-[#b2e5d9] p-4 sm:p-5 space-y-3 shadow-2xs hover:shadow-md transition-all"
-                  >
-                    {/* Author Header */}
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-[#0d5c4d] flex items-center justify-center text-white font-black text-sm shrink-0 shadow-xs">
-                        {tutorInitials}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-extrabold text-sm text-[#0d2b26]">{post.authorName || tutorName}</h4>
-                          {post.priority === "high" || post.priority === "urgent" ? (
-                            <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black uppercase tracking-wider">
-                              Important
-                            </span>
-                          ) : null}
+                feedPosts.map((post) => {
+                  const postAuthor = post.authorName || tutorName;
+                  const authorInitials =
+                    postAuthor
+                      .split(" ")
+                      .filter(Boolean)
+                      .map((n: string) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase() || "EP";
+
+                  return (
+                    <div
+                      key={post.id}
+                      className="rounded-2xl bg-[#fbfdfc] hover:bg-white border border-[#e2eae5] hover:border-[#b2e5d9] p-4 sm:p-5 space-y-3 shadow-2xs hover:shadow-md transition-all"
+                    >
+                      {/* Author Header */}
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-[#0d5c4d] flex items-center justify-center text-white font-black text-sm shrink-0 shadow-xs">
+                          {authorInitials}
                         </div>
-                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                          {tutorSubject} • {post.publishedAt}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-extrabold text-sm text-[#0d2b26]">{postAuthor}</h4>
+                            {post.priority === "high" || post.priority === "urgent" ? (
+                              <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black uppercase tracking-wider">
+                                Important
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                            {post.authorRole || "Official"} • {post.publishedAt || "Recently"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Body Content */}
+                      <div className="space-y-1">
+                        <h5 className="font-extrabold text-xs sm:text-sm text-[#0d2b26]">{post.title}</h5>
+                        <p className="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+                          {post.message}
                         </p>
                       </div>
-                    </div>
 
-                    {/* Body Content */}
-                    <div className="space-y-1">
-                      <h5 className="font-extrabold text-xs sm:text-sm text-[#0d2b26]">{post.title}</h5>
-                      <p className="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line">
-                        {post.message}
-                      </p>
+                      {/* Tags */}
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                        <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold">
+                          {post.targetAudience}
+                        </span>
+                        <span className="px-2.5 py-1 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-[11px] font-bold">
+                          {post.authorRole || "Notice"}
+                        </span>
+                      </div>
                     </div>
-
-                    {/* Tags */}
-                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                      <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-bold">
-                        {post.targetAudience}
-                      </span>
-                      <span className="px-2.5 py-1 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0] text-[11px] font-bold">
-                        {tutorSubject}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="p-8 text-center rounded-2xl border border-dashed border-[#d6ede6] bg-[#fbfdfc] space-y-2">
                   <p className="text-xs font-bold text-slate-600">No active updates</p>
-                  <p className="text-[11px] text-slate-400">Updates posted by your tutor will appear right here.</p>
+                  <p className="text-[11px] text-slate-400">Official updates from your registered courses will appear right here.</p>
                 </div>
               )}
             </div>
@@ -427,29 +558,45 @@ export function StudentDashboard() {
                 <FileText className="h-4 w-4 text-[#b47a16]" />
                 Pending Assignments
               </CardTitle>
-              <Badge variant="warning">{assignments.length}</Badge>
+              <Badge variant="warning">
+                {(dashboardData?.pendingAssignments?.length ?? assignments.length)}
+              </Badge>
             </CardHeader>
             <CardContent className="p-5 pt-1 space-y-2.5">
-              {assignments.map((asg) => (
-                <div
-                  key={asg.id}
-                  onClick={() => {
-                    setSelectedAssignmentId(asg.id);
-                    setCurrentView("assignments");
-                  }}
-                  className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] hover:border-[#0d5c4d]/50 cursor-pointer transition-all group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#0d5c4d] group-hover:underline">
-                      {asg.subjectName}
-                    </span>
-                    <span className="text-[10px] text-[#b47a16] font-mono font-bold">
-                      Due: {asg.dueDate.split(" ")[0]}
-                    </span>
+              {(dashboardData?.pendingAssignments && dashboardData.pendingAssignments.length > 0
+                ? dashboardData.pendingAssignments
+                : assignments
+              ).length > 0 ? (
+                (dashboardData?.pendingAssignments && dashboardData.pendingAssignments.length > 0
+                  ? dashboardData.pendingAssignments
+                  : assignments
+                ).slice(0, 5).map((asg: any) => (
+                  <div
+                    key={asg.id}
+                    onClick={() => {
+                      setSelectedAssignmentId(asg.id);
+                      setCurrentView("assignments");
+                    }}
+                    className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] hover:border-[#0d5c4d]/50 cursor-pointer transition-all group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#0d5c4d] group-hover:underline">
+                        {asg.course?.title || asg.subjectName || "Assignment"}
+                      </span>
+                      <span className="text-[10px] text-[#b47a16] font-mono font-bold">
+                        Due: {asg.dueDate ? String(asg.dueDate).split("T")[0].split(" ")[0] : "Soon"}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-800 mt-1 line-clamp-1">{asg.title}</p>
                   </div>
-                  <p className="text-xs font-semibold text-slate-800 mt-1 line-clamp-1">{asg.title}</p>
+                ))
+              ) : (
+                <div className="p-4 text-center rounded-xl bg-[#f8faf9] border border-[#e6ece8]">
+                  <CheckCircle2 className="h-6 w-6 text-emerald-600 mx-auto mb-1.5" />
+                  <p className="text-xs font-bold text-slate-700">All Homework Submitted!</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">No pending assignments at this time.</p>
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
 
@@ -465,21 +612,47 @@ export function StudentDashboard() {
               </span>
             </CardHeader>
             <CardContent className="p-5 pt-1">
-              <div className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] space-y-2">
-                <div className="flex items-center justify-between text-[11px] text-slate-500">
-                  <span className="font-semibold text-slate-700">{tutorSubject}</span>
-                  <span className="text-[#0d5c4d] font-bold">Tomorrow • 7:30 PM</span>
+              {nextUpcomingLive ? (
+                <div className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="font-semibold text-slate-700 truncate max-w-[150px]">
+                      {nextUpcomingLive.course?.title || nextUpcomingLive.package?.title || "Masterclass"}
+                    </span>
+                    <span className="text-[#0d5c4d] font-bold shrink-0">
+                      {nextUpcomingLive.startTime
+                        ? new Date(nextUpcomingLive.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : "Scheduled"}
+                    </span>
+                  </div>
+                  <p className="text-xs font-bold text-[#0d2b26]">{nextUpcomingLive.title || "Curriculum Lecture"}</p>
+                  <p className="text-[11px] text-slate-500">
+                    Instructor: {nextUpcomingLive.teacher?.user ? `${nextUpcomingLive.teacher.user.firstName} ${nextUpcomingLive.teacher.user.lastName}` : tutorName}
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (nextUpcomingLive.meetingUrl) window.open(nextUpcomingLive.meetingUrl, "_blank");
+                      else setIsLiveClassModalOpen(true);
+                    }}
+                    className="w-full mt-2 h-8 text-xs bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold cursor-pointer"
+                  >
+                    Join Live Stream
+                  </Button>
                 </div>
-                <p className="text-xs font-bold text-[#0d2b26]">Definite Integrals & Area Under Curves</p>
-                <p className="text-[11px] text-slate-500">Instructor: {tutorName}</p>
-                <Button
-                  size="sm"
-                  onClick={() => setIsLiveClassModalOpen(true)}
-                  className="w-full mt-2 h-8 text-xs bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold cursor-pointer"
-                >
-                  Join Live Stream
-                </Button>
-              </div>
+              ) : (
+                <div className="p-4 text-center rounded-xl bg-[#f8faf9] border border-[#e6ece8] space-y-2">
+                  <p className="text-xs font-bold text-slate-700">No Upcoming Live Sessions</p>
+                  <p className="text-[11px] text-slate-400">Scheduled video sessions will appear here.</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentView("live_schedule")}
+                    className="w-full mt-1 h-8 text-xs border-[#c4e9e0] text-[#0d5c4d] font-bold hover:bg-[#ecf8f5] cursor-pointer"
+                  >
+                    View Timetable
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -492,23 +665,43 @@ export function StudentDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-5 pt-1">
-              <div className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] space-y-1.5">
-                <span className="text-[10px] font-bold text-[#b47a16] uppercase tracking-wider">
-                  Saturday, 7:00 PM • 3 Days Left
-                </span>
-                <p className="text-xs font-bold text-[#0d2b26]">Term Evaluation Paper — 100 Marks</p>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Timed evaluation covering Units 1 to 5. Solutions will be discussed live right after submission.
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setCurrentView("quizzes")}
-                  className="w-full mt-2 h-8 text-xs border-[#c4e9e0] text-[#0d5c4d] font-bold hover:bg-[#ecf8f5] cursor-pointer"
-                >
-                  Go to Quiz Arena
-                </Button>
-              </div>
+              {quizzes && quizzes.length > 0 ? (
+                <div className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] space-y-1.5">
+                  <span className="text-[10px] font-bold text-[#b47a16] uppercase tracking-wider">
+                    Evaluation Arena &bull; {quizzes.length} Available
+                  </span>
+                  <p className="text-xs font-bold text-[#0d2b26]">{quizzes[0].title}</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    {quizzes[0].subjectName ? `${quizzes[0].subjectName} • ` : ""}Timed evaluation test. Test your knowledge and get immediate score analytics.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentView("quizzes")}
+                    className="w-full mt-2 h-8 text-xs border-[#c4e9e0] text-[#0d5c4d] font-bold hover:bg-[#ecf8f5] cursor-pointer"
+                  >
+                    Go to Quiz Arena
+                  </Button>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] space-y-1.5">
+                  <span className="text-[10px] font-bold text-[#b47a16] uppercase tracking-wider">
+                    Quiz &amp; Evaluation Arena
+                  </span>
+                  <p className="text-xs font-bold text-[#0d2b26]">Test Your Knowledge</p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Take chapter quizzes and term evaluation mock tests to master your syllabus.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCurrentView("quizzes")}
+                    className="w-full mt-2 h-8 text-xs border-[#c4e9e0] text-[#0d5c4d] font-bold hover:bg-[#ecf8f5] cursor-pointer"
+                  >
+                    Explore Quiz Arena
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

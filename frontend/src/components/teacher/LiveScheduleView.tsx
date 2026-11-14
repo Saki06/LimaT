@@ -75,90 +75,62 @@ export interface LiveSlot {
   viewsCount?: number;
 }
 
-const INITIAL_SLOTS: LiveSlot[] = [
-  {
-    id: "slot-1",
-    title: "Pure Mathematics: Calculus & Limits Derivations",
-    subject: "Combined Mathematics",
-    grade: "Grade 12 & 13",
-    day: "Tuesday",
-    startTime: "07:00 PM",
-    endTime: "09:00 PM",
-    platform: "In-App Live Studio (Jitsi)",
-    meetingUrl: "https://meet.jit.si/limat-math-calculus-live",
-    meetingId: "limat-math-calculus-live",
-    passcode: "MATH2026",
-    type: "Live Masterclass + Q&A",
-    enrolledCount: 142,
-    status: "live_now",
-    recordingUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    handoutUrl: "https://example.com/handouts/calculus_limits_tute.pdf",
-    handoutName: "Unit 02 Calculus Handout & Problem Set #4.pdf",
-    duration: "2h 00m",
-    viewsCount: 184
-  },
-  {
-    id: "slot-2",
-    title: "Applied Mathematics: Newton's Laws, Friction & Work-Energy",
-    subject: "Combined Mathematics",
-    grade: "Grade 12 & 13",
-    day: "Thursday",
-    startTime: "07:00 PM",
-    endTime: "09:00 PM",
-    platform: "Google Meet",
-    meetingUrl: "https://meet.google.com/sam-math-live",
-    meetingId: "sam-math-live",
-    passcode: "PHYS2026",
-    type: "Problem Solving Lab",
-    enrolledCount: 142,
-    status: "scheduled",
-    handoutUrl: "https://example.com/handouts/applied_math_mechanics.pdf",
-    handoutName: "Newton's Laws & Friction Workshop Problems.pdf",
-    duration: "2h 00m",
-    viewsCount: 0
-  },
-  {
-    id: "slot-3",
-    title: "A/L Past Paper 2025 Model Examination Breakdown",
-    subject: "Combined Mathematics",
-    grade: "Grade 13 Revision",
-    day: "Saturday",
-    startTime: "09:00 AM",
-    endTime: "11:30 AM",
-    platform: "Zoom",
-    meetingUrl: "https://zoom.us/j/9876543210",
-    meetingId: "987 654 3210",
-    passcode: "AL2026",
-    type: "Paper Marking Session",
-    enrolledCount: 142,
-    status: "scheduled",
-    handoutUrl: "https://example.com/handouts/al_model_paper_2025.pdf",
-    handoutName: "G.C.E. A/L Model Paper 2025 (Pure & Applied).pdf",
-    duration: "2h 30m",
-    viewsCount: 0
-  },
-  {
-    id: "slot-4",
-    title: "Trigonometry Deep Dive & Complex Numbers",
-    subject: "Combined Mathematics",
-    grade: "Grade 12",
-    day: "Sunday",
-    startTime: "04:00 PM",
-    endTime: "06:00 PM",
-    platform: "In-App Live Studio (Jitsi)",
-    meetingUrl: "https://meet.jit.si/limat-trig-complex-mastery",
-    meetingId: "limat-trig-complex-mastery",
-    passcode: "TRIG2026",
-    type: "Special Concept Booster",
-    enrolledCount: 98,
-    status: "completed",
-    recordingUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    handoutUrl: "https://example.com/handouts/trigonometry_complex_numbers.pdf",
-    handoutName: "Complex Numbers Argand Diagrams Summary.pdf",
-    duration: "1h 55m",
-    viewsCount: 312
+function parseTimeString(timeStr?: string): { hours: number; minutes: number } {
+  if (!timeStr) return { hours: 9, minutes: 0 };
+  const cleaned = timeStr.trim().toUpperCase();
+  const isPM = cleaned.includes("PM");
+  const isAM = cleaned.includes("AM");
+  const numPart = cleaned.replace(/[^0-9:]/g, "");
+  const [hStr, mStr] = numPart.split(":");
+  let h = parseInt(hStr || "9", 10);
+  const m = parseInt(mStr || "0", 10);
+  if (isPM && h < 12) h += 12;
+  if (isAM && h === 12) h = 0;
+  return { hours: h, minutes: m };
+}
+
+function calculateSlotStartDate(dayName: string, timeStr?: string): Date {
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const targetDay = days.indexOf(dayName);
+  const now = new Date();
+  const currentDay = now.getDay();
+  let daysUntil = (targetDay - currentDay + 7) % 7;
+  if (daysUntil === 0) daysUntil = 7;
+
+  const target = new Date(now);
+  target.setDate(now.getDate() + daysUntil);
+  const { hours, minutes } = parseTimeString(timeStr);
+  target.setHours(hours, minutes, 0, 0);
+  return target;
+}
+
+function parseDurationMinutes(durStr?: string): number {
+  if (!durStr) return 90;
+  let total = 0;
+  const hoursMatch = durStr.match(/(\d+)\s*h/i);
+  const minsMatch = durStr.match(/(\d+)\s*m/i);
+  if (hoursMatch) total += parseInt(hoursMatch[1], 10) * 60;
+  if (minsMatch) total += parseInt(minsMatch[1], 10);
+  return total > 0 ? total : 90;
+}
+
+function extractGradeFromCourse(course?: any, fallbackText?: string): string {
+  const text = course?.title || fallbackText || "";
+  const match = text.match(/Grade\s*\d+(\s*(&|and|-)\s*\d+)?/i);
+  if (match) return match[0];
+  if (text.toLowerCase().includes("a/l") || text.toLowerCase().includes("advanced level")) {
+    return "Grade 12 & 13 (A/L)";
   }
-];
+  if (text.toLowerCase().includes("o/l") || text.toLowerCase().includes("ordinary level")) {
+    return "Grade 10 & 11 (O/L)";
+  }
+  if (course?.gradeName && course.gradeName !== "Active Batch") {
+    return course.gradeName;
+  }
+  return "Grade 8";
+}
+
+const INITIAL_SLOTS: LiveSlot[] = [];
 
 const DAYS = [
   "All Days",
@@ -175,7 +147,33 @@ export function LiveScheduleView() {
   const { currentUser, currentRole, addToast, courses: contextCourses } = useApp();
   const isTeacher = currentRole === "teacher" || currentRole === "admin" || currentRole === "super_admin";
 
+  // Filter courses strictly for this teacher's account
+  const teacherCourses = useMemo(() => {
+    const isGlobalAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
+    if (isGlobalAdmin) return contextCourses || [];
+    return (contextCourses || []).filter(
+      (c) =>
+        (c.teacherId && currentUser?.id && c.teacherId === currentUser.id) ||
+        (c.teacherName && currentUser?.name && c.teacherName.toLowerCase() === currentUser.name.toLowerCase())
+    );
+  }, [contextCourses, currentUser]);
+
+  // Helper to dynamically resolve grade for a live slot
+  const getSlotGrade = (slot: LiveSlot) => {
+    if (slot.grade && slot.grade !== "Grade 12 & 13") {
+      return slot.grade;
+    }
+    const matched = teacherCourses.find((c) => c.id === slot.courseId || c.title === slot.subject) ||
+                    contextCourses?.find((c) => c.id === slot.courseId || c.title === slot.subject);
+    return extractGradeFromCourse(matched, slot.subject || slot.title);
+  };
+
   const [slots, setSlots] = useState<LiveSlot[]>(INITIAL_SLOTS);
+
+  // Derive the next scheduled live class dynamically
+  const nextScheduledSlot = useMemo(() => {
+    return slots.find((s) => s.status === "scheduled" || s.status === "live_now") || slots[0] || null;
+  }, [slots]);
   const [selectedDay, setSelectedDay] = useState<string>("All Days");
   const [selectedTab, setSelectedTab] = useState<"all" | "live" | "upcoming" | "recordings">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -192,8 +190,8 @@ export function LiveScheduleView() {
   // Form State
   const [formData, setFormData] = useState<Omit<LiveSlot, "id">>({
     title: "",
-    subject: "Combined Mathematics",
-    grade: "Grade 12 & 13",
+    subject: teacherCourses[0]?.title || "",
+    grade: extractGradeFromCourse(teacherCourses[0]),
     day: "Tuesday",
     startTime: "07:00 PM",
     endTime: "09:00 PM",
@@ -202,7 +200,7 @@ export function LiveScheduleView() {
     meetingId: "",
     passcode: "",
     type: "Live Masterclass + Q&A",
-    enrolledCount: 142,
+    enrolledCount: 0,
     status: "scheduled",
     recordingUrl: "",
     courseId: "",
@@ -222,36 +220,19 @@ export function LiveScheduleView() {
   // In-App Video Replay Theater Modal State
   const [viewingReplaySlot, setViewingReplaySlot] = useState<LiveSlot | null>(null);
   const [replayActiveTab, setReplayActiveTab] = useState<"chapters" | "handout" | "qa">("chapters");
-  const [comments, setComments] = useState<{ id: string; author: string; time: string; text: string; likes: number; reply?: string }[]>([
-    { id: "c1", author: "Sathurjan K.", time: "1 day ago", text: "At 40:30, why did we multiply by the conjugate instead of standard expansion?", likes: 4, reply: "Good question! In the G.C.E. A/L exam scheme, algebraic conjugation is required for full step marks." },
-    { id: "c2", author: "Anuki Silva", time: "2 days ago", text: "The summary formula sheet in the handout is super helpful, thank you sir!", likes: 7 }
-  ]);
+  const [comments, setComments] = useState<{ id: string; author: string; time: string; text: string; likes: number; reply?: string }[]>([]);
   const [newCommentText, setNewCommentText] = useState("");
 
   // Attendance Roster Modal (for Teachers)
   const [attendanceSlot, setAttendanceSlot] = useState<LiveSlot | null>(null);
   const [attendanceSearch, setAttendanceSearch] = useState("");
 
-  const mockAttendance = [
-    { id: "att-1", studentName: "Sathurjan K.", indexNo: "AL-2026-4401", joinTime: "07:02 PM", duration: "1h 55m", status: "Present" },
-    { id: "att-2", studentName: "Kasun Bandara", indexNo: "AL-2026-4402", joinTime: "07:05 PM", duration: "1h 50m", status: "Present" },
-    { id: "att-3", studentName: "Anuki Silva", indexNo: "AL-2026-4403", joinTime: "07:01 PM", duration: "1h 58m", status: "Present" },
-    { id: "att-4", studentName: "Dineth Perera", indexNo: "AL-2026-4404", joinTime: "07:15 PM", duration: "1h 40m", status: "Late Arrival" },
-    { id: "att-5", studentName: "Tharushi Fernando", indexNo: "AL-2026-4405", joinTime: "07:04 PM", duration: "1h 52m", status: "Present" },
-    { id: "att-6", studentName: "Kavindu Wickramasinghe", indexNo: "AL-2026-4406", joinTime: "07:00 PM", duration: "2h 00m", status: "Present" },
-    { id: "att-7", studentName: "Praveen Jayawardena", indexNo: "AL-2026-4407", joinTime: "07:22 PM", duration: "1h 35m", status: "Late Arrival" }
-  ];
+  const sessionAttendance: { id: string; studentName: string; indexNo: string; joinTime: string; duration: string; status: string }[] = [];
 
-  const lectureChapters = [
-    { time: "00:00", title: "Introduction, Unit Outline & Standard Formula Review", duration: "12m" },
-    { time: "12:15", title: "Rigorous Proofs: Limit Theorems & Indeterminate Forms", duration: "28m" },
-    { time: "40:30", title: "Worked Problem Set: Trigonometric & Exponential Limits", duration: "35m" },
-    { time: "1:15:30", title: "A/L Past Paper 2024 Exam Question Discussion", duration: "25m" },
-    { time: "1:40:30", title: "Student Live Doubt Resolution & Practice Homework", duration: "19m" }
-  ];
+  const lectureChapters: { time: string; title: string; duration: string }[] = [];
 
   const getEmbedUrl = (url?: string) => {
-    if (!url) return "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1";
+    if (!url) return "";
     if (url.includes("watch?v=")) {
       const videoId = url.split("watch?v=")[1]?.split("&")[0];
       return `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1`;
@@ -265,7 +246,7 @@ export function LiveScheduleView() {
 
   const handleExportAttendanceCSV = (slot: LiveSlot) => {
     const csvHeader = "Index No,Student Name,Class,Join Time,Duration,Attendance Status\n";
-    const csvRows = mockAttendance.map((a) => `"${a.indexNo}","${a.studentName}","Grade 12 Physical Science","${a.joinTime}","${a.duration}","${a.status}"`).join("\n");
+    const csvRows = sessionAttendance.map((a) => `"${a.indexNo}","${a.studentName}","${slot.title.replace(/"/g, '""')}","${a.joinTime}","${a.duration}","${a.status}"`).join("\n");
     const blob = new Blob([csvHeader + csvRows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -302,12 +283,11 @@ export function LiveScheduleView() {
       let res: any = null;
       if (!isTeacher && api.students?.getMyLiveClasses) {
         res = await api.students.getMyLiveClasses();
-      }
-      if (!res || !res.success || !Array.isArray(res.data) || res.data.length === 0) {
+      } else {
         res = await api.liveClasses.getAll();
       }
 
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
         const mapped: LiveSlot[] = res.data.map((item: any) => {
           const startD = new Date(item.startTime);
           const daysOfWeek: LiveSlot["day"][] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -326,8 +306,8 @@ export function LiveScheduleView() {
           return {
             id: item.id,
             title: item.title,
-            subject: item.course?.title || item.package?.title || item.subject || "Combined Mathematics",
-            grade: "Grade 12 & 13",
+            subject: item.course?.title || item.package?.title || item.subject || "General",
+            grade: item.course?.grade || "All Grades",
             day: dayName,
             startTime: timeStr,
             endTime: "2 Hours",
@@ -336,18 +316,20 @@ export function LiveScheduleView() {
             meetingId: item.meetingId,
             passcode: item.passcode,
             type: item.topic || "Live Interactive Lecture",
-            enrolledCount: item.enrolledCount || item._count?.attendances || 142,
+            enrolledCount: item.enrolledCount || item._count?.attendances || 0,
             status: stat,
             recordingUrl: item.recordingUrl,
             courseId: item.courseId,
             packageId: item.packageId
           };
         });
-        const serverIds = new Set(mapped.map((m) => m.id));
-        setSlots([...mapped, ...INITIAL_SLOTS.filter((s) => !serverIds.has(s.id))]);
+        setSlots(mapped);
+      } else {
+        setSlots([]);
       }
     } catch (err) {
-      console.warn("Using local live class slots (Backend sync optional):", err);
+      console.warn("Could not fetch live classes:", err);
+      setSlots([]);
     }
   };
 
@@ -359,7 +341,16 @@ export function LiveScheduleView() {
       try {
         const res = await api.packages.getAll();
         if (res.success && Array.isArray(res.data)) {
-          setAvailablePackages(res.data);
+          const isGlobalAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
+          const pkgs = isGlobalAdmin
+            ? res.data
+            : res.data.filter(
+                (p: any) =>
+                  (p.teacherId && currentUser?.id && p.teacherId === currentUser.id) ||
+                  (p.teacher?.userId && currentUser?.id && p.teacher.userId === currentUser.id) ||
+                  (p.teacherName && currentUser?.name && p.teacherName.toLowerCase() === currentUser.name.toLowerCase())
+              );
+          setAvailablePackages(pkgs.length > 0 ? pkgs : res.data);
         }
       } catch (e) {
         console.warn("Could not fetch packages:", e);
@@ -376,8 +367,8 @@ export function LiveScheduleView() {
     const randomSlug = `limat-live-${Math.random().toString(36).substring(2, 8)}`;
     setFormData({
       title: "",
-      subject: contextCourses?.[0]?.title || "Combined Mathematics",
-      grade: "Grade 12 & 13",
+      subject: teacherCourses[0]?.title || "",
+      grade: extractGradeFromCourse(teacherCourses[0]),
       day: selectedDay !== "All Days" ? (selectedDay as LiveSlot["day"]) : "Tuesday",
       startTime: "07:00 PM",
       endTime: "09:00 PM",
@@ -386,10 +377,10 @@ export function LiveScheduleView() {
       meetingId: randomSlug,
       passcode: "MATH2026",
       type: "Live Masterclass + Q&A",
-      enrolledCount: 142,
+      enrolledCount: 0,
       status: "scheduled",
       recordingUrl: "",
-      courseId: contextCourses?.[0]?.id || "",
+      courseId: teacherCourses[0]?.id || "",
       packageId: availablePackages?.[0]?.id || "",
       handoutUrl: "https://example.com/handouts/calculus_mastery.pdf",
       handoutName: "Topic Revision Handout.pdf",
@@ -444,6 +435,9 @@ export function LiveScheduleView() {
     else if (formData.platform === "Zoom") finalPlatform = "ZOOM";
     else if (formData.platform === "Custom") finalPlatform = "CUSTOM";
 
+    const targetStartTime = calculateSlotStartDate(formData.day, formData.startTime);
+    const durationMinutes = parseDurationMinutes(formData.duration);
+
     try {
       if (editingSlotId) {
         setSlots((prev) =>
@@ -454,6 +448,8 @@ export function LiveScheduleView() {
           await api.liveClasses.update(editingSlotId, {
             title: formData.title,
             topic: formData.type,
+            startTime: targetStartTime.toISOString(),
+            durationMinutes,
             platform: finalPlatform,
             meetingUrl: formData.meetingUrl,
             meetingId: formData.meetingId,
@@ -477,12 +473,11 @@ export function LiveScheduleView() {
         setSlots((prev) => [newSlot, ...prev]);
 
         // Persist to backend
-        const now = new Date();
         const res = await api.liveClasses.create({
           title: formData.title,
           topic: formData.type,
-          startTime: now.toISOString(),
-          durationMinutes: 90,
+          startTime: targetStartTime.toISOString(),
+          durationMinutes,
           platform: finalPlatform,
           meetingUrl: formData.meetingUrl,
           meetingId: formData.meetingId,
@@ -779,10 +774,10 @@ export function LiveScheduleView() {
               {isTeacher && (
                 <Button
                   onClick={handleOpenAdd}
-                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-sm shadow-md px-5 py-5 rounded-2xl flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] h-12"
+                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-sm shadow-md px-5 py-2.5 rounded-2xl inline-flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] h-11"
                 >
-                  <Plus className="h-5 w-5" />
-                  <span>+ Schedule Live Class</span>
+                  <Plus className="h-4 w-4" />
+                  <span>Schedule Live Class</span>
                 </Button>
               )}
             </div>
@@ -822,12 +817,25 @@ export function LiveScheduleView() {
 
         <Card className="border-[#e6ece8] bg-white shadow-2xs">
           <CardContent className="p-5 flex items-center justify-between">
-            <div>
+            <div className="min-w-0 flex-1 pr-2">
               <p className="text-xs text-slate-500 font-semibold">Next Scheduled</p>
-              <p className="text-lg font-black text-slate-900 mt-1">Tuesday &bull; 7:00 PM</p>
-              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">Calculus &amp; Limits</p>
+              {nextScheduledSlot ? (
+                <>
+                  <p className="text-base sm:text-lg font-black text-slate-900 mt-1 truncate">
+                    {nextScheduledSlot.day} &bull; {nextScheduledSlot.startTime}
+                  </p>
+                  <p className="text-[10px] text-emerald-600 font-bold mt-0.5 truncate">
+                    {nextScheduledSlot.title || nextScheduledSlot.subject || "Live Session"}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-black text-slate-400 mt-1">None</p>
+                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">No upcoming sessions</p>
+                </>
+              )}
             </div>
-            <div className="h-11 w-11 rounded-xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center">
+            <div className="h-11 w-11 rounded-xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center shrink-0">
               <Clock className="h-5 w-5" />
             </div>
           </CardContent>
@@ -935,11 +943,13 @@ export function LiveScheduleView() {
           <div className="h-12 w-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
             <Video className="h-6 w-6" />
           </div>
-          <h3 className="font-bold text-slate-800 text-base">No live classes match your filter</h3>
+          <h3 className="font-bold text-slate-800 text-base">
+            {isTeacher ? "No live classes match your filter" : "No Enrolled Live Classes"}
+          </h3>
           <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
             {isTeacher
-              ? "Click '+ Schedule Live Class' to set up your interactive teaching session."
-              : "Check back later for newly scheduled live lectures."}
+              ? "Click 'Schedule Live Class' to set up your interactive teaching session."
+              : "You have not enrolled or subscribed to any teacher classes yet. Visit 'Find Teachers' to enroll and unlock live sessions."}
           </p>
         </Card>
       ) : selectedTab === "recordings" ? (
@@ -1015,7 +1025,7 @@ export function LiveScheduleView() {
                   <div className="p-4 space-y-2.5">
                     <div className="flex items-center gap-2">
                       <Badge className="bg-[#ecf8f5] text-[#0d5c4d] border-[#c4e9e0] text-[10px] font-bold">
-                        {slot.grade}
+                        {getSlotGrade(slot)}
                       </Badge>
                       <span className="text-[11px] text-slate-500 font-medium">{slot.type}</span>
                     </div>
@@ -1163,7 +1173,7 @@ export function LiveScheduleView() {
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Subject &amp; Grade</p>
                         <p className="font-bold text-slate-800 mt-0.5">{slot.subject}</p>
-                        <p className="text-[11px] text-slate-500">{slot.grade}</p>
+                        <p className="text-[11px] text-slate-500">{getSlotGrade(slot)}</p>
                       </div>
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase">Class Type</p>
@@ -1436,7 +1446,11 @@ export function LiveScheduleView() {
             <input
               type="text"
               required
-              placeholder="e.g. Pure Mathematics: Integration by Parts & Area Under Curves"
+              placeholder={
+                teacherCourses[0]?.title
+                  ? `e.g. ${teacherCourses[0].title} - Interactive Masterclass`
+                  : "e.g. Topic Revision & Interactive Masterclass"
+              }
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
@@ -1444,36 +1458,43 @@ export function LiveScheduleView() {
           </div>
 
           {/* Subject & Grade */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Course / Subject</label>
               <select
                 value={formData.subject}
                 onChange={(e) => {
-                  const selectedCourse = contextCourses?.find((c) => c.title === e.target.value);
+                  const selectedCourse = teacherCourses.find((c) => c.title === e.target.value);
                   setFormData({
                     ...formData,
                     subject: e.target.value,
-                    courseId: selectedCourse?.id || formData.courseId
+                    courseId: selectedCourse?.id || formData.courseId,
+                    grade: extractGradeFromCourse(selectedCourse, e.target.value)
                   });
                 }}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#0d5c4d]"
               >
-                {contextCourses && contextCourses.length > 0 ? (
-                  contextCourses.map((c) => (
+                {teacherCourses.length > 0 ? (
+                  teacherCourses.map((c) => (
                     <option key={c.id} value={c.title}>
                       {c.title} ({c.code})
                     </option>
                   ))
                 ) : (
-                  <>
-                    <option value="Combined Mathematics">Combined Mathematics</option>
-                    <option value="Physics">Physics</option>
-                    <option value="Chemistry">Chemistry</option>
-                    <option value="Information Technology">Information Technology</option>
-                  </>
+                  <option value="" disabled>No subjects/courses assigned to your account</option>
                 )}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Target Grade</label>
+              <input
+                type="text"
+                placeholder="e.g. Grade 8"
+                value={formData.grade}
+                onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-hidden focus:border-[#0d5c4d]"
+              />
             </div>
 
             <div>
@@ -1630,7 +1651,7 @@ export function LiveScheduleView() {
               </label>
               <input
                 type="text"
-                placeholder="e.g. Limits & Calculus Problem Set #04.pdf"
+                placeholder="e.g. Lesson Handout & Model Problem Set.pdf"
                 value={formData.handoutName || ""}
                 onChange={(e) => setFormData({ ...formData, handoutName: e.target.value })}
                 className="w-full p-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-hidden focus:border-[#0d5c4d]"
@@ -1826,7 +1847,7 @@ export function LiveScheduleView() {
                     </Badge>
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    {viewingReplaySlot.subject} &bull; {viewingReplaySlot.grade} &bull; Duration: {viewingReplaySlot.duration || "2h 00m"}
+                    {viewingReplaySlot.subject} &bull; {getSlotGrade(viewingReplaySlot)} &bull; Duration: {viewingReplaySlot.duration || "2h 00m"}
                   </p>
                 </div>
               </div>
@@ -1945,6 +1966,11 @@ export function LiveScheduleView() {
                           </span>
                         </div>
                       ))}
+                      {lectureChapters.length === 0 && (
+                        <p className="text-xs text-slate-400 py-6 text-center">
+                          No chapter timestamps available for this recording.
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2003,6 +2029,11 @@ export function LiveScheduleView() {
                           )}
                         </div>
                       ))}
+                      {comments.length === 0 && (
+                        <p className="text-xs text-slate-400 py-6 text-center">
+                          No questions or comments posted yet.
+                        </p>
+                      )}
                     </div>
 
                     <form onSubmit={handleAddComment} className="pt-3 border-t border-white/10 flex gap-2">
@@ -2094,7 +2125,7 @@ export function LiveScheduleView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {mockAttendance
+                  {sessionAttendance
                     .filter((st) =>
                       !attendanceSearch.trim() ||
                       st.studentName.toLowerCase().includes(attendanceSearch.toLowerCase()) ||
@@ -2119,6 +2150,13 @@ export function LiveScheduleView() {
                         </td>
                       </tr>
                     ))}
+                  {sessionAttendance.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-xs text-slate-400">
+                        No attendance records logged for this session.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

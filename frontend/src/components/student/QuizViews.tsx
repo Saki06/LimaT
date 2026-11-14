@@ -21,7 +21,7 @@ import { Modal } from "@/components/ui/modal";
 export function QuizViews() {
   const { quizzes, selectedQuizId, setSelectedQuizId, submitQuizAttempt, t } = useApp();
 
-  const currentQuiz = quizzes.find((q) => q.id === selectedQuizId) || quizzes[0];
+  const currentQuiz = quizzes.find((q) => q.id === selectedQuizId) || quizzes[0] || null;
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, any>>({});
@@ -31,6 +31,10 @@ export function QuizViews() {
     score: number;
     totalMarks: number;
   } | null>(null);
+
+  const questions = currentQuiz?.questions || [];
+  const activeQuestion = questions[currentQuestionIndex] || null;
+  const isLastQuestion = questions.length > 0 && currentQuestionIndex === questions.length - 1;
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -49,10 +53,11 @@ export function QuizViews() {
   }, [isPlaying, secondsRemaining]);
 
   const handleStartQuiz = () => {
+    if (!currentQuiz) return;
     setIsPlaying(true);
     setCurrentQuestionIndex(0);
     setSelectedAnswers({});
-    setSecondsRemaining(currentQuiz.durationMinutes * 60);
+    setSecondsRemaining((currentQuiz.durationMinutes || 10) * 60);
   };
 
   const handleToggleMultiOption = (questionId: string, optionIndex: number) => {
@@ -73,6 +78,7 @@ export function QuizViews() {
   };
 
   const handleAutoSubmit = () => {
+    if (!currentQuiz) return;
     setIsPlaying(false);
     const score = submitQuizAttempt(currentQuiz.id, selectedAnswers);
     setEvaluationResult({
@@ -87,9 +93,6 @@ export function QuizViews() {
     const secs = totalSeconds % 60;
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
-
-  const activeQuestion = currentQuiz.questions[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === currentQuiz.questions.length - 1;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -140,8 +143,14 @@ export function QuizViews() {
       )}
 
       {!currentQuiz ? (
-        <div className="p-8 text-center rounded-2xl bg-white border border-[#e6ece8]">
-          <p className="text-sm font-bold text-slate-700">No quizzes available at the moment.</p>
+        <div className="p-12 text-center rounded-3xl border border-dashed border-[#d6ede6] bg-[#fbfdfc] space-y-3">
+          <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-[#0d5c4d] flex items-center justify-center mx-auto">
+            <HelpCircle className="h-6 w-6" />
+          </div>
+          <h3 className="text-base font-extrabold text-[#0d2b26]">No Quizzes Available</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            There are no interactive quizzes published for your enrolled courses yet. Check back when your instructors release practice quizzes.
+          </p>
         </div>
       ) : !isPlaying ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -236,7 +245,7 @@ export function QuizViews() {
             <div>
               <p className="text-xs text-slate-500 font-semibold">{currentQuiz.title}</p>
               <p className="text-sm font-black text-[#0d2b26]">
-                Question {currentQuestionIndex + 1} of {currentQuiz.questions.length}
+                Question {currentQuestionIndex + 1} of {questions.length}
               </p>
             </div>
 
@@ -247,10 +256,12 @@ export function QuizViews() {
           </div>
 
           <Card className="border-[#e6ece8] bg-white shadow-md p-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <Badge variant="success" className="uppercase text-[10px]">
-                {activeQuestion.type.replace("_", " ")}
-              </Badge>
+            {activeQuestion ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <Badge variant="success" className="uppercase text-[10px]">
+                    {activeQuestion.type.replace("_", " ")}
+                  </Badge>
               <span className="text-xs font-bold text-slate-500">
                 {activeQuestion.marks} Marks
               </span>
@@ -401,18 +412,25 @@ export function QuizViews() {
                 </Button>
               )}
             </div>
-          </Card>
-        </div>
-      )}
+          </>
+        ) : (
+          <div className="p-8 text-center text-xs text-slate-500">
+            No active question available.
+          </div>
+        )}
+      </Card>
+    </div>
+  )}
 
-      {/* Quiz Evaluation & Solution Explanations Modal */}
-      <Modal
-        isOpen={isResultModalOpen}
-        onClose={() => setIsResultModalOpen(false)}
-        title="Examination Results & Score Sheet"
-        description={currentQuiz.title}
-        maxWidth="max-w-3xl"
-      >
+  {/* Quiz Evaluation & Solution Explanations Modal */}
+  {currentQuiz && (
+    <Modal
+      isOpen={isResultModalOpen}
+      onClose={() => setIsResultModalOpen(false)}
+      title="Examination Results & Score Sheet"
+      description={currentQuiz.title}
+      maxWidth="max-w-3xl"
+    >
         <div className="space-y-6">
           {/* Top Score Summary */}
           <div className="p-6 rounded-2xl bg-[#ecf8f5] border border-[#c4e9e0] text-center space-y-2">
@@ -546,6 +564,7 @@ export function QuizViews() {
           </div>
         </div>
       </Modal>
+  )}
     </div>
   );
 }

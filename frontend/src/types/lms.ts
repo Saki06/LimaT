@@ -92,8 +92,9 @@ export interface Lesson {
   contentType: 'rich_text' | 'slides' | 'video' | 'pdf';
   contentBody: string;
   videoUrl?: string;
+  videoDuration?: string;
   slidesCount?: number;
-  attachments?: { name: string; size: string; type: string }[];
+  attachments?: { name: string; size: string; type: string; url?: string }[];
   completedByStudentIds: string[];
 }
 
@@ -401,6 +402,8 @@ export interface LibraryResource {
   fileType: string; // "PDF", "EPUB", "DOCX"
   fileSize: string; // e.g. "4.2 MB"
   pageCount?: number;
+  fileUrl?: string; // URL (blob/remote) of the actual uploaded material file
+  fileName?: string; // original uploaded file name
   uploadedDate: string; // "2026-09-15"
   status: 'published' | 'draft' | 'unpublished';
   visibility: 'public' | 'class_only' | 'private' | 'subscribers_only';
@@ -546,6 +549,8 @@ export interface ConnectMessage {
 
 export interface ConnectPurchase {
   id: string;
+  packageId?: string;
+  packageName?: string;
   teacherId: string;
   teacherName: string;
   teacherInitials: string;
@@ -714,6 +719,8 @@ export interface TeacherProfileData {
   postalCode?: string;
   sltsRegNo?: string;
   mediums: string[];
+  dob?: string;
+  gender?: string;
   experienceYears: number;
   qualifications: TeacherQualification[];
   accreditations?: TeacherAccreditation[];
@@ -730,8 +737,10 @@ export interface TeacherProfileData {
   whatsappNumber?: string;
   websiteUrl?: string;
   coverImageUrl?: string;
+  avatarUrl?: string;
   rating?: number;
   isVerified?: boolean;
+  packages?: any[];
   user?: {
     id: string;
     email: string;

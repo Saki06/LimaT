@@ -106,22 +106,106 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     deleteLibraryResource,
     recordResourceView,
     recordResourceDownload,
-    fetchLibraryResources
+    fetchLibraryResources,
+    teacherProfile,
+    refreshTeacherProfile
   } = useApp();
+
+  // Make sure the tutor's own profile (with their subject specializations) is loaded
+  useEffect(() => {
+    if (!teacherProfile && currentUser?.role === "teacher") {
+      void refreshTeacherProfile();
+    }
+  }, [teacherProfile, currentUser?.role, refreshTeacherProfile]);
+
+  // Subjects this tutor teaches: profile specializations + subjects of their own courses
+  const teacherSubjectOptions: string[] = useMemo(() => {
+    const set = new Set<string>();
+    (teacherProfile?.specialization || "")
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter(Boolean)
+      .forEach((s: string) => set.add(s));
+    return Array.from(set);
+  }, [teacherProfile]);
 
   // Filter courses strictly for this individual Tutor's workspace
   const teacherCourses: Course[] = useMemo(() => {
-    const tutorCourses = courses.filter(
-      (c) => c.teacherName === currentUser?.name || c.id === "crs_math_12" || c.title.toLowerCase().includes("math")
+    const isGlobalAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
+    if (isGlobalAdmin) return courses;
+    return courses.filter(
+      (c) =>
+        (c.teacherId && currentUser?.id && c.teacherId === currentUser.id) ||
+        (c.teacherName && currentUser?.name && c.teacherName.toLowerCase() === currentUser.name.toLowerCase())
     );
-    return tutorCourses.length > 0 ? tutorCourses : courses.slice(0, 2);
   }, [courses, currentUser]);
+
+  // Tutor's study packages
+  const [tutorPackages, setTutorPackages] = useState<any[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.packages
+      .getMyPackages()
+      .then((res: any) => {
+        if (!isMounted) return;
+        const list = Array.isArray(res) ? res : res?.packages || res?.data || [];
+        if (Array.isArray(list) && list.length > 0) {
+          setTutorPackages(list);
+        } else {
+          api.packages.getAll().then((allRes: any) => {
+            if (!isMounted) return;
+            const allList = Array.isArray(allRes) ? allRes : allRes?.packages || allRes?.data || [];
+            setTutorPackages(Array.isArray(allList) ? allList : []);
+          }).catch(() => {});
+        }
+      })
+      .catch(() => {
+        api.packages.getAll().then((allRes: any) => {
+          if (!isMounted) return;
+          const allList = Array.isArray(allRes) ? allRes : allRes?.packages || allRes?.data || [];
+          setTutorPackages(Array.isArray(allList) ? allList : []);
+        }).catch(() => {});
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser]);
+
+  // Target Batch / Audience options for notices & announcements
+  const teacherBatchOptions = useMemo(() => {
+    const list: { label: string; value: string }[] = [
+      { label: "👥 All Enrolled Students (All Batches)", value: "All Enrolled Students" },
+    ];
+
+    teacherCourses.forEach((c) => {
+      const label = `📚 ${c.title}${c.code ? ` (${c.code})` : ""}`;
+      const value = c.title;
+      if (!list.some((item) => item.value === value)) {
+        list.push({ label, value });
+      }
+    });
+
+    tutorPackages.forEach((pkg: any) => {
+      const title = pkg.title || pkg.name;
+      if (title && !list.some((item) => item.value === title)) {
+        list.push({
+          label: `📦 ${title}${pkg.grade ? ` (${pkg.grade})` : ""}`,
+          value: title,
+        });
+      }
+    });
+
+    return list;
+  }, [teacherCourses, tutorPackages]);
 
   const [activeTab, setActiveTab] = useState<"home" | "grading" | "assignments" | "analytics">(
     currentView === "assignments" || currentView === "quizzes" || currentView === "resources" || currentView === "materials" || currentView === "library"
       ? "assignments"
       : currentView === "submissions"
       ? "grading"
+      : currentView === "analytics"
+      ? "analytics"
       : initialTab
   );
 
@@ -161,10 +245,13 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
       setCourseworkSubTab("resources");
     } else if (currentView === "submissions") {
       setActiveTab("grading");
+    } else if (currentView === "analytics") {
+      setActiveTab("analytics");
     } else if (currentView === "dashboard") {
       setActiveTab("home");
     }
   }, [currentView]);
+
 
   const [selectedSubId, setSelectedSubId] = useState<string>(submissions[0]?.id || "");
   const [subFilter, setSubFilter] = useState<"all" | "pending" | "marked" | "released">("pending");
@@ -238,7 +325,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [newDueDate, setNewDueDate] = useState("2026-10-18 23:59");
   const [newMaxMarks, setNewMaxMarks] = useState(100);
   const [newInstructions, setNewInstructions] = useState("");
-  const [newCourseId, setNewCourseId] = useState(courses[0]?.id || "");
+  const [newCourseId, setNewCourseId] = useState(teacherCourses[0]?.id || courses[0]?.id || "");
   const [asgPdfFile, setAsgPdfFile] = useState<{ name: string; size: string } | null>(null);
 
   // Edit assignment form state
@@ -254,7 +341,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [editAsgPdfFile, setEditAsgPdfFile] = useState<{ name: string; size: string } | null>(null);
 
   // Dynamically extract syllabus units & topics for the chosen assignment course
-  const currentAsgCourse = courses.find((c) => c.id === newCourseId) || courses[0];
+  const currentAsgCourse = teacherCourses.find((c) => c.id === newCourseId) || courses.find((c) => c.id === newCourseId) || teacherCourses[0] || courses[0];
   const asgAvailableTopics = useMemo(() => {
     if (!currentAsgCourse?.units || currentAsgCourse.units.length === 0) return [];
     return currentAsgCourse.units.flatMap((u) =>
@@ -331,7 +418,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   };
 
   // New lesson form state with full multi-format upload support
-  const [lessonCourseId, setLessonCourseId] = useState(courses[0]?.id || "crs_math_12");
+  const [lessonCourseId, setLessonCourseId] = useState(courses[0]?.id || "");
   const [lessonUnitId, setLessonUnitId] = useState("");
   const [lessonTopicId, setLessonTopicId] = useState("");
   const [lessonTitle, setLessonTitle] = useState("");
@@ -388,6 +475,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [annTitle, setAnnTitle] = useState("");
   const [annMessage, setAnnMessage] = useState("");
   const [annAudience, setAnnAudience] = useState("All Enrolled Students");
+  const [customAudience, setCustomAudience] = useState("");
   const [annPriority, setAnnPriority] = useState<"normal" | "high">("normal");
 
   // Edit announcement / notice state
@@ -396,6 +484,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [editAnnTitle, setEditAnnTitle] = useState("");
   const [editAnnMessage, setEditAnnMessage] = useState("");
   const [editAnnAudience, setEditAnnAudience] = useState("All Enrolled Students");
+  const [editCustomAudience, setEditCustomAudience] = useState("");
   const [editAnnPriority, setEditAnnPriority] = useState<"normal" | "high">("normal");
 
   // View announcement modal state
@@ -505,7 +594,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     const finalTopic = newTopic === "__custom__" ? customTopic || "General Topic" : newTopic;
     createAssignment({
       courseId: targetCourse?.id || courses[0]?.id,
-      subjectName: targetCourse?.title || "Combined Mathematics",
+      subjectName: targetCourse?.title || teacherCourses[0]?.title || "General",
       title: newTitle,
       topicName: finalTopic,
       dueDate: newDueDate,
@@ -587,24 +676,38 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const handleCreateAnnouncementSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!annTitle.trim()) return;
+    const resolvedAudience =
+      annAudience === "__custom__"
+        ? (customAudience.trim() || "All Enrolled Students")
+        : annAudience;
+
     createAnnouncement({
       title: annTitle.trim(),
       message: annMessage.trim(),
-      targetAudience: annAudience,
+      targetAudience: resolvedAudience,
       priority: annPriority,
-      authorName: activeTenant?.adminName || currentUser.name || "Dr. Samantha Perera",
+      authorName: currentUser.name || activeTenant?.adminName || "Tutor",
       authorRole: "Tutor"
     });
     setIsCreateAnnouncementModalOpen(false);
     setAnnTitle("");
     setAnnMessage("");
+    setCustomAudience("");
+    setAnnAudience("All Enrolled Students");
   };
 
   const handleOpenEditNotice = (notice: Announcement) => {
     setEditingNotice(notice);
     setEditAnnTitle(notice.title);
     setEditAnnMessage(notice.message);
-    setEditAnnAudience(notice.targetAudience);
+    const match = teacherBatchOptions.some((opt) => opt.value === notice.targetAudience);
+    if (match) {
+      setEditAnnAudience(notice.targetAudience);
+      setEditCustomAudience("");
+    } else {
+      setEditAnnAudience("__custom__");
+      setEditCustomAudience(notice.targetAudience);
+    }
     setEditAnnPriority(notice.priority === "urgent" ? "high" : (notice.priority as any) || "normal");
     setIsEditAnnouncementModalOpen(true);
   };
@@ -612,14 +715,20 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const handleEditAnnouncementSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingNotice || !editAnnTitle.trim()) return;
+    const resolvedAudience =
+      editAnnAudience === "__custom__"
+        ? (editCustomAudience.trim() || "All Enrolled Students")
+        : editAnnAudience;
+
     updateAnnouncement(editingNotice.id, {
       title: editAnnTitle.trim(),
       message: editAnnMessage.trim(),
-      targetAudience: editAnnAudience,
+      targetAudience: resolvedAudience,
       priority: editAnnPriority
     });
     setIsEditAnnouncementModalOpen(false);
     setEditingNotice(null);
+    setEditCustomAudience("");
   };
 
   const handleDeleteNotice = (id: string) => {
@@ -635,7 +744,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
           0
         ) / gradedSubmissions.length
       ).toFixed(1)
-    : "84.5";
+    : "0.0";
 
   // Today's Teaching Schedule (Timeline)
   interface ScheduleItem {
@@ -654,95 +763,110 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     passcode?: string;
   }
 
-  const todaySchedule: ScheduleItem[] = [
-    {
-      period: "Morning Batch",
-      time: "07:30 AM – 09:00 AM",
-      course: "Grade 12 Combined Mathematics",
-      courseId: "crs_math_12",
-      topic: "Unit 1: Quadratic Inequations & Interval Sign Analysis",
-      classRoom: "Virtual Studio Classroom · Stream #CM-12",
-      deliveryMode: "live_online",
-      meetingUrl: "https://meet.google.com/lms-math-12",
-      meetingId: "SOLO-MATH-12-AM",
-      passcode: "558291",
-      type: "Live Theory Lecture",
-      status: "completed",
-      studentsCount: 42
-    },
-    {
-      period: "Live Masterclass",
-      time: "09:30 AM – 11:00 AM",
-      course: "Grade 13 Applied Mathematics",
-      courseId: "crs_math_12",
-      topic: "Unit 2: Differential Calculus & Curve Sketching",
-      classRoom: "Tutor Live Studio · Room #MATH-A1",
-      deliveryMode: "live_online",
-      meetingUrl: "https://meet.google.com/lms-math-13",
-      meetingId: "SOLO-MATH-LIVE-992",
-      passcode: "774921",
-      type: "Live Interactive Masterclass",
-      status: "in_progress",
-      studentsCount: 38
-    },
-    {
-      period: "Afternoon Workshop",
-      time: "04:00 PM – 05:30 PM",
-      course: "Grade 12 Applied Mathematics Mechanics",
-      courseId: "crs_math_12",
-      topic: "Mechanics Intensive: Equilibrium Systems & Newton's Laws",
-      classRoom: "Tutor Live Studio · Room #MATH-MECH",
-      deliveryMode: "live_online",
-      meetingUrl: "https://meet.google.com/lms-math-mech",
-      meetingId: "SOLO-MATH-MECH-880",
-      passcode: "419082",
-      type: "Live Problem Workshop",
-      status: "upcoming",
-      studentsCount: 32
-    },
-    {
-      period: "Evening Clinic",
-      time: "07:30 PM – 09:00 PM",
-      course: "Grade 12 Combined Mathematics",
-      courseId: "crs_math_12",
-      topic: "Live Doubt Clearance & Past Paper Clinic",
-      classRoom: "Doubt Clearance Studio · Room #MATH-CLN",
-      deliveryMode: "live_online",
-      meetingUrl: "https://meet.google.com/lms-math-doubt",
-      meetingId: "SOLO-MATH-CLN-410",
-      passcode: "392011",
-      type: "Live Tutorial Clinic",
-      status: "upcoming",
-      studentsCount: 24
+  const todaySchedule: ScheduleItem[] = [];
+
+  // Sri Lanka G.C.E A/L Grade Distribution (Calculated from real submissions)
+  const gradeDistribution = useMemo(() => {
+    let a = 0, b = 0, c = 0, s = 0, w = 0;
+    submissions.forEach((sub) => {
+      if (sub.marksObtained != null) {
+        const score = (Number(sub.marksObtained) / (Number(sub.maxMarks) || 100)) * 100;
+        if (!isNaN(score)) {
+          if (score >= 75) a++;
+          else if (score >= 65) b++;
+          else if (score >= 55) c++;
+          else if (score >= 40) s++;
+          else w++;
+        }
+      }
+    });
+    return [
+      { grade: "A (75-100%)", count: a, fill: "#0d5c4d" },
+      { grade: "B (65-74%)", count: b, fill: "#158066" },
+      { grade: "C (55-64%)", count: c, fill: "#f3b738" },
+      { grade: "S (40-54%)", count: s, fill: "#e59f20" },
+      { grade: "W (<40%)", count: w, fill: "#e11d48" }
+    ];
+  }, [submissions]);
+
+  const studentRoster = useMemo(() => {
+    const studentMap = new Map<string, { name: string; index: string; class: string; submitted: number; totalScore: number; gradedCount: number }>();
+    submissions.forEach((sub) => {
+      const studentId = sub.studentId || sub.studentName || "student";
+      const existing = studentMap.get(studentId) || {
+        name: sub.studentName || "Student",
+        index: sub.studentId?.slice(-8).toUpperCase() || "STU-001",
+        class: sub.assignmentTitle || "Enrolled Course",
+        submitted: 0,
+        totalScore: 0,
+        gradedCount: 0,
+      };
+      existing.submitted += 1;
+      if (sub.marksObtained != null) {
+        const score = (Number(sub.marksObtained) / (Number(sub.maxMarks) || 100)) * 100;
+        if (!isNaN(score)) {
+          existing.totalScore += score;
+          existing.gradedCount += 1;
+        }
+      }
+      studentMap.set(studentId, existing);
+    });
+
+    return Array.from(studentMap.values()).map((st) => {
+      const avg = st.gradedCount > 0 ? Math.round(st.totalScore / st.gradedCount) : null;
+      let status = "Enrolled";
+      if (avg !== null) {
+        if (avg >= 75) status = "Distinction";
+        else if (avg >= 65) status = "Merit";
+        else if (avg >= 55) status = "Credit";
+        else status = "Pass";
+      }
+      return {
+        name: st.name,
+        index: st.index,
+        class: st.class,
+        submitted: st.submitted,
+        avg: avg !== null ? `${avg}%` : "Pending",
+        status,
+      };
+    });
+  }, [submissions]);
+
+  const benchmarkStats = useMemo(() => {
+    if (submissions.length === 0) {
+      return { classAvg: "N/A", onTimeRate: "N/A", needingSupport: 0 };
     }
-  ];
+    let totalScore = 0;
+    let gradedCount = 0;
+    let onTimeCount = 0;
+    let needingSupport = 0;
 
-  // Sri Lanka G.C.E A/L Grade Distribution
-  const gradeDistribution = [
-    { grade: "A (75-100%)", count: 18, fill: "#0d5c4d" },
-    { grade: "B (65-74%)", count: 12, fill: "#158066" },
-    { grade: "C (55-64%)", count: 6, fill: "#f3b738" },
-    { grade: "S (40-54%)", count: 3, fill: "#e59f20" },
-    { grade: "W (<40%)", count: 1, fill: "#e11d48" }
-  ];
+    submissions.forEach((s) => {
+      if (s.marksObtained != null) {
+        const score = (Number(s.marksObtained) / (Number(s.maxMarks) || 100)) * 100;
+        if (!isNaN(score)) {
+          totalScore += score;
+          gradedCount += 1;
+          if (score < 50) needingSupport += 1;
+        }
+      }
+      if (s.status !== "not_submitted") {
+        onTimeCount += 1;
+      }
+    });
 
-  const studentRoster = [
-    { name: "Sathurjan K.", index: "AL-2026-4401", class: "12-Physical Science", submitted: 2, avg: "94%", status: "Distinction" },
-    { name: "Kasun Bandara", index: "AL-2026-4402", class: "12-Physical Science", submitted: 1, avg: "Pending", status: "Review" },
-    { name: "Anuki Silva", index: "AL-2026-4403", class: "12-Physical Science", submitted: 2, avg: "88%", status: "Distinction" },
-    { name: "Dineth Perera", index: "AL-2026-4404", class: "12-Physical Science", submitted: 2, avg: "76%", status: "Merit" },
-    { name: "Tharushi Fernando", index: "AL-2026-4405", class: "12-Physical Science", submitted: 2, avg: "68%", status: "Credit" }
-  ];
+    const classAvg = gradedCount > 0 ? `${(totalScore / gradedCount).toFixed(1)}%` : "N/A";
+    const onTimeRate = `${((onTimeCount / submissions.length) * 100).toFixed(1)}%`;
+
+    return { classAvg, onTimeRate, needingSupport };
+  }, [submissions]);
 
   // Executive Overview KPIs (Powered by live cloud database)
-  const totalEnrolledStudents = dashboardData?.kpis?.totalEnrolledStudents ?? 136;
+  const totalEnrolledStudents = dashboardData?.kpis?.totalEnrolledStudents ?? 0;
   const activeBatchesCount = dashboardData?.kpis?.activeBatchesCount ?? teacherCourses.length;
   const pendingReviewsCount = dashboardData?.kpis?.pendingReviewsCount ?? submissions.filter((s) => s.status === "submitted").length;
 
-  const currentSchedule: ScheduleItem[] =
-    dashboardData?.todaySchedule && dashboardData.todaySchedule.length > 0
-      ? dashboardData.todaySchedule
-      : todaySchedule;
+  const currentSchedule: ScheduleItem[] = dashboardData?.todaySchedule || [];
 
   const liveSessionsTodayCount = dashboardData?.kpis?.liveSessionsTodayCount ?? currentSchedule.length;
   const liveNowSession = currentSchedule.find((s) => s.status === "in_progress");
@@ -804,7 +928,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                   Daily Cockpit
                 </span>
                 <span className="text-xs text-white/80 font-medium">
-                  Welcome back, {currentUser?.name || "Mr. Samantha Perera"}
+                  Welcome back, {currentUser?.name || "Teacher"}
                 </span>
               </div>
               <h2 className="text-lg font-black text-white mt-1">Teaching &amp; Assessment Control Center</h2>
@@ -861,7 +985,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       {totalEnrolledStudents}
                     </span>
                     <Badge variant="outline" className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border-emerald-200">
-                      +12 this term
+                      {totalEnrolledStudents > 0 ? "Active Enrolment" : "No Subscribers"}
                     </Badge>
                   </div>
                   <p className="text-[11px] text-[#0d5c4d] font-semibold flex items-center gap-1">
@@ -877,8 +1001,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
             {/* Card 2: Active Batches */}
             <Card 
               onClick={() => {
-                setSelectedCourseId(teacherCourses[0]?.id || "crs_math_12");
-                setCurrentView("course-detail");
+                if (teacherCourses[0]?.id) {
+                  setSelectedCourseId(teacherCourses[0].id);
+                  setCurrentView("course-detail");
+                }
               }}
               className="border-[#e6ece8] bg-white hover:border-[#a2dfd2] transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
             >
@@ -896,7 +1022,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                     </Badge>
                   </div>
                   <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                    Avg. 68% Syllabus covered <ChevronRight className="h-3 w-3 text-slate-400" />
+                    {teacherCourses.length > 0 ? `${teacherCourses.length} Active Batches` : "No Active Batches"} <ChevronRight className="h-3 w-3 text-slate-400" />
                   </p>
                 </div>
                 <div className="h-11 w-11 rounded-2xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
@@ -910,6 +1036,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
               onClick={() => {
                 setSubFilter("pending");
                 setActiveTab("grading");
+                setCurrentView("submissions");
               }}
               className="border-[#e6ece8] bg-white hover:border-amber-300 hover:bg-amber-50/20 transition-all duration-200 shadow-2xs hover:shadow-xs group cursor-pointer"
             >
@@ -1142,6 +1269,11 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       </div>
                     </div>
                   ))}
+                  {currentSchedule.length === 0 && (
+                    <div className="py-8 text-center text-xs text-slate-400">
+                      No live sessions or lectures scheduled for today.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1172,10 +1304,28 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 </CardHeader>
                 <CardContent className="p-5 space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {teacherCourses.map((course) => {
-                      const totalLessons = course.totalLessons || 12;
-                      const completedLessons = course.completedLessons || 6;
-                      const progressPct = Math.round((completedLessons / totalLessons) * 100);
+                    {teacherCourses.length === 0 ? (
+                      <div className="col-span-full p-8 rounded-xl border border-dashed border-slate-200 text-center bg-slate-50/50 space-y-3">
+                        <BookOpen className="h-10 w-10 text-slate-300 mx-auto" />
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-700">No Courses Created Yet</h4>
+                          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                            As an independent tutor, you can design and publish your own courses and masterclasses.
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => setCurrentView("syllabus")}
+                          className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold rounded-xl cursor-pointer"
+                        >
+                          + Go to Syllabus Builder to Create Course
+                        </Button>
+                      </div>
+                    ) : (
+                      teacherCourses.map((course) => {
+                      const totalLessons = course.totalLessons ?? 0;
+                      const completedLessons = course.completedLessons ?? 0;
+                      const progressPct = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
                       const courseAsgs = assignments.filter((a) => a.courseId === course.id);
 
                       return (
@@ -1214,7 +1364,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                           <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 text-xs">
                             <div>
                               <span className="text-slate-400 block text-[10px] uppercase font-bold">Units / Topics</span>
-                              <span className="font-bold text-slate-700">{course.units?.length || 2} Units Active</span>
+                              <span className="font-bold text-slate-700">{course.units?.length || 0} Units Active</span>
                             </div>
                             <div>
                               <span className="text-slate-400 block text-[10px] uppercase font-bold">Assignments</span>
@@ -1239,6 +1389,8 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                               variant="outline"
                               onClick={() => {
                                 setActiveTab("assignments");
+                                setCourseworkSubTab("assignments");
+                                setCurrentView("assignments");
                                 setAssignmentFilter(course.id);
                               }}
                               className="text-xs border-slate-200 text-slate-700 hover:bg-slate-50 font-medium"
@@ -1248,7 +1400,8 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                           </div>
                         </div>
                       );
-                    })}
+                    })
+                  )}
                   </div>
                 </CardContent>
               </Card>
@@ -1271,7 +1424,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                   </div>
                   <Button
                     size="sm"
-                    onClick={() => setActiveTab("grading")}
+                    onClick={() => {
+                      setActiveTab("grading");
+                      setCurrentView("submissions");
+                    }}
                     variant="outline"
                     className="border-[#c4e9e0] text-[#0d5c4d] font-bold text-xs hover:bg-[#ecf8f5]"
                   >
@@ -1325,6 +1481,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                                 setSelectedSubId(sub.id);
                                 setSubFilter("pending");
                                 setActiveTab("grading");
+                                setCurrentView("submissions");
                               }}
                               className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold shadow-2xs"
                             >
@@ -1333,7 +1490,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                           ) : (
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-black text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-[#c4e9e0]">
-                                {sub.marksObtained ?? 85}/{sub.maxMarks || 100}
+                                {sub.marksObtained != null ? sub.marksObtained : "-"}/{sub.maxMarks || 100}
                               </span>
                               <Button
                                 size="sm"
@@ -1341,6 +1498,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                                 onClick={() => {
                                   setSelectedSubId(sub.id);
                                   setActiveTab("grading");
+                                  setCurrentView("submissions");
                                 }}
                                 className="text-xs border-slate-200 text-slate-700 hover:bg-slate-50"
                               >
@@ -1483,6 +1641,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       onClick={() => {
                         setSubFilter("pending");
                         setActiveTab("grading");
+                        setCurrentView("submissions");
                       }}
                       className="w-full bg-[#b47a16] hover:bg-[#925f0e] text-white text-xs font-bold mt-1"
                     >
@@ -1505,6 +1664,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       onClick={() => {
                         setSubFilter("marked");
                         setActiveTab("grading");
+                        setCurrentView("submissions");
                       }}
                       className="w-full border-[#0d5c4d] text-[#0d5c4d] hover:bg-[#ecf8f5] text-xs font-bold mt-1"
                     >
@@ -2052,7 +2212,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
             <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200 shadow-2xs overflow-x-auto">
               <button
                 type="button"
-                onClick={() => setCourseworkSubTab("assignments")}
+                onClick={() => {
+                  setCourseworkSubTab("assignments");
+                  setCurrentView("assignments");
+                }}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   courseworkSubTab === "assignments"
                     ? "bg-[#0d5c4d] text-white shadow-xs"
@@ -2065,7 +2228,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
 
               <button
                 type="button"
-                onClick={() => setCourseworkSubTab("quizzes")}
+                onClick={() => {
+                  setCourseworkSubTab("quizzes");
+                  setCurrentView("quizzes");
+                }}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   courseworkSubTab === "quizzes"
                     ? "bg-[#0d5c4d] text-white shadow-xs"
@@ -2083,7 +2249,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
 
               <button
                 type="button"
-                onClick={() => setCourseworkSubTab("resources")}
+                onClick={() => {
+                  setCourseworkSubTab("resources");
+                  setCurrentView("library");
+                }}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   courseworkSubTab === "resources"
                     ? "bg-[#0d5c4d] text-white shadow-xs"
@@ -2181,6 +2350,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                   const pendingCount = submissions.filter(
                     (s) => s.assignmentId === asg.id && s.status === "submitted"
                   ).length;
+                  const enrolledCount = totalEnrolledStudents > 0 ? totalEnrolledStudents : 0;
+                  const progressPct = enrolledCount > 0
+                    ? Math.min(100, Math.round((submissionCount / enrolledCount) * 100))
+                    : (submissionCount > 0 ? 100 : 0);
 
                   return (
                     <Card key={asg.id} className="border-[#e6ece8] bg-white shadow-2xs hover:shadow-xs transition-shadow">
@@ -2188,7 +2361,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs font-black text-[#0d5c4d] bg-[#ecf8f5] border border-[#c4e9e0] px-2.5 py-0.5 rounded-full">
-                              📚 {asg.subjectName || "Combined Mathematics"}
+                              📚 {asg.subjectName || teacherCourses[0]?.title || "Course"}
                             </span>
                             <Badge variant="outline" className="text-[10px] font-bold text-slate-700 bg-slate-50 border-slate-200">
                               {asg.topicName}
@@ -2220,10 +2393,17 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                         <div className="p-3 rounded-xl bg-[#f8faf9] border border-[#e6ece8] space-y-2">
                           <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
                             <span>Submissions Progress</span>
-                            <span>{submissionCount} / 35 Enrolled (80%)</span>
+                            <span>
+                              {enrolledCount > 0
+                                ? `${submissionCount} / ${enrolledCount} Enrolled (${progressPct}%)`
+                                : `${submissionCount} Submissions (0 Enrolled)`}
+                            </span>
                           </div>
                           <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
-                            <div className="h-full bg-[#0d5c4d] rounded-full" style={{ width: "80%" }}></div>
+                            <div
+                              className="h-full bg-[#0d5c4d] rounded-full transition-all duration-300"
+                              style={{ width: `${progressPct}%` }}
+                            ></div>
                           </div>
                           <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
                             <span className="flex items-center gap-1 text-[#b47a16] font-bold">
@@ -2327,7 +2507,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                         <CardHeader className="p-5 pb-3">
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <span className="text-xs font-black text-[#0d5c4d] bg-[#ecf8f5] border border-[#c4e9e0] px-2.5 py-0.5 rounded-full">
-                              📚 {quiz.subjectName || "Combined Mathematics"}
+                              📚 {quiz.subjectName || teacherCourses[0]?.title || "Course"}
                             </span>
                             <div className="flex items-center gap-1.5">
                               <Badge
@@ -2770,7 +2950,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                             {/* Specs and stats pill */}
                             <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100">
                               <span className="font-mono text-slate-500 font-semibold">
-                                {res.fileType || "PDF"} &bull; {res.fileSize || "4.2 MB"} &bull; {res.pageCount || 20} Pages
+                                {res.fileType || "PDF"}{res.fileSize ? ` • ${res.fileSize}` : ""}{res.pageCount ? ` • ${res.pageCount} Pages` : ""}
                               </span>
                               <span className="flex items-center gap-2">
                                 <span className="flex items-center gap-0.5" title="Student Views">
@@ -2782,6 +2962,37 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                               </span>
                             </div>
                           </div>
+
+                          {/* Draft / Published status strip */}
+                          {res.status === "draft" || res.status === "unpublished" ? (
+                            <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-amber-50 border border-amber-200">
+                              <span className="text-[11px] font-bold text-amber-800">
+                                🟡 {res.status === "draft" ? "Draft" : "Unpublished"} — hidden from students
+                              </span>
+                              <Button
+                                size="sm"
+                                onClick={() => updateLibraryResource(res.id, { status: "published" })}
+                                className="h-6 text-[11px] font-bold bg-[#0d5c4d] hover:bg-[#083e34] text-white px-2.5 cursor-pointer"
+                                title="Publish this material to students"
+                              >
+                                Publish
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-emerald-50 border border-emerald-200">
+                              <span className="text-[11px] font-bold text-emerald-800">
+                                🟢 Published — visible to students
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => updateLibraryResource(res.id, { status: "unpublished" })}
+                                className="text-[11px] font-bold text-slate-600 hover:text-rose-600 underline cursor-pointer"
+                                title="Hide this material from students"
+                              >
+                                Unpublish
+                              </button>
+                            </div>
+                          )}
 
                           {/* Actions Footer */}
                           <div className="flex items-center justify-between gap-1.5 pt-3 border-t border-slate-100">
@@ -2867,10 +3078,10 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
             <Card className="lg:col-span-7 border-[#e6ece8] bg-white shadow-2xs">
               <CardHeader className="p-6 pb-2">
                 <CardTitle className="text-sm font-black text-[#0d2b26]">
-                  A/L Marks Grade Distribution (Grade 12 Physical Science)
+                  Marks Grade Distribution
                 </CardTitle>
                 <p className="text-xs text-slate-500">
-                  Breakdown of 40 enrolled candidates across benchmark bands.
+                  Breakdown of evaluated student submissions across benchmark bands.
                 </p>
               </CardHeader>
               <CardContent className="p-6 pt-2">
@@ -2907,25 +3118,29 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 <div className="p-3.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] flex items-center justify-between">
                   <div>
                     <p className="text-xs text-[#0d5c4d] font-bold">Class Average</p>
-                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">82.4%</p>
+                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">{benchmarkStats.classAvg}</p>
                   </div>
-                  <Badge variant="success">Above Target</Badge>
+                  <Badge variant={benchmarkStats.classAvg !== "N/A" ? "success" : "outline"}>
+                    {benchmarkStats.classAvg !== "N/A" ? "Live Calculated" : "No Data"}
+                  </Badge>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center justify-between">
                   <div>
                     <p className="text-xs text-slate-600 font-bold">On-Time Submission Rate</p>
-                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">94.3%</p>
+                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">{benchmarkStats.onTimeRate}</p>
                   </div>
-                  <Badge variant="outline">On Track</Badge>
+                  <Badge variant="outline">Submissions</Badge>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-[#fef7e6] border border-[#fde4af] flex items-center justify-between">
                   <div>
                     <p className="text-xs text-[#b47a16] font-bold">Students Needing Support</p>
-                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">2 Students</p>
+                    <p className="text-xl font-black text-[#0d2b26] mt-0.5">{benchmarkStats.needingSupport} Students</p>
                   </div>
-                  <Badge variant="warning">Follow-up</Badge>
+                  <Badge variant={benchmarkStats.needingSupport > 0 ? "warning" : "outline"}>
+                    {benchmarkStats.needingSupport > 0 ? "Follow-up" : "Normal"}
+                  </Badge>
                 </div>
               </CardContent>
             </Card>
@@ -2956,7 +3171,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       <td className="py-3 px-4 font-bold text-slate-900">{st.name}</td>
                       <td className="py-3 px-4 font-mono text-slate-500">{st.index}</td>
                       <td className="py-3 px-4 text-slate-600">{st.class}</td>
-                      <td className="py-3 px-4 text-slate-600">{st.submitted} / 2</td>
+                      <td className="py-3 px-4 text-slate-600">{st.submitted}</td>
                       <td className="py-3 px-4 font-mono font-bold text-[#0d5c4d]">{st.avg}</td>
                       <td className="py-3 px-4">
                         <Badge
@@ -2973,6 +3188,13 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       </td>
                     </tr>
                   ))}
+                  {studentRoster.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-xs text-slate-400">
+                        No student submission records available yet.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -3005,7 +3227,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 }}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                {courses.map((c) => (
+                {(teacherCourses.length > 0 ? teacherCourses : courses).map((c) => (
                   <option key={c.id} value={c.id}>
                     📚 {c.title} ({c.code || c.className || "A/L"})
                   </option>
@@ -3198,7 +3420,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 }}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs font-bold text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                {courses.map((c) => (
+                {(teacherCourses.length > 0 ? teacherCourses : courses).map((c) => (
                   <option key={c.id} value={c.id}>
                     📚 {c.title} ({c.code || c.className || "A/L"})
                   </option>
@@ -3396,7 +3618,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 }}
                 className="w-full h-9 px-2.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-none focus:border-[#0d5c4d]"
               >
-                {courses.map((c) => (
+                {(teacherCourses.length > 0 ? teacherCourses : courses).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.title} ({c.code})
                   </option>
@@ -3907,9 +4129,12 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 onChange={(e) => setAnnAudience(e.target.value)}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                <option value="All Enrolled Students">All Enrolled Students</option>
-                <option value="Target A/L Batch">Target A/L Batch</option>
-                <option value="Revision Batch">Revision Batch</option>
+                {teacherBatchOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+                <option value="__custom__">✏️ Other / Custom Batch Name...</option>
               </select>
             </div>
             <div>
@@ -3926,6 +4151,22 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
               </select>
             </div>
           </div>
+
+          {annAudience === "__custom__" && (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Custom Batch Name
+              </label>
+              <input
+                type="text"
+                required
+                value={customAudience}
+                onChange={(e) => setCustomAudience(e.target.value)}
+                placeholder="e.g. 2026 A/L Revision Batch, Saturday Group A"
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
@@ -3990,9 +4231,12 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 onChange={(e) => setEditAnnAudience(e.target.value)}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
-                <option value="All Enrolled Students">All Enrolled Students</option>
-                <option value="Target A/L Batch">Target A/L Batch</option>
-                <option value="Revision Batch">Revision Batch</option>
+                {teacherBatchOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+                <option value="__custom__">✏️ Other / Custom Batch Name...</option>
               </select>
             </div>
             <div>
@@ -4009,6 +4253,22 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
               </select>
             </div>
           </div>
+
+          {editAnnAudience === "__custom__" && (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Custom Batch Name
+              </label>
+              <input
+                type="text"
+                required
+                value={editCustomAudience}
+                onChange={(e) => setEditCustomAudience(e.target.value)}
+                placeholder="e.g. 2026 A/L Revision Batch, Saturday Group A"
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
@@ -4272,7 +4532,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
 
                 <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-slate-700">
                   <div><strong>Candidate Name:</strong> {activeSubmission?.studentName}</div>
-                  <div><strong>Subject:</strong> {assignments.find((a) => a.id === activeSubmission?.assignmentId)?.subjectName || "Combined Mathematics"}</div>
+                  <div><strong>Subject:</strong> {assignments.find((a) => a.id === activeSubmission?.assignmentId)?.subjectName || teacherCourses[0]?.title || "General"}</div>
                   <div><strong>Assignment:</strong> {activeSubmission?.assignmentTitle}</div>
                   <div><strong>Submitted At:</strong> {activeSubmission?.submittedAt}</div>
                 </div>
@@ -4578,6 +4838,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
         }}
         resourceToEdit={resourceToEdit}
         courses={teacherCourses}
+        subjectOptions={teacherSubjectOptions}
         onSave={(data, publish) => {
           if (resourceToEdit) {
             updateLibraryResource(resourceToEdit.id, {
@@ -4588,7 +4849,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
             createLibraryResource({
               ...data,
               status: publish ? "published" : "draft",
-              author: currentUser?.name || "Tutor Faculty",
+              author: currentUser?.name || "Tutor",
               teacherId: currentUser?.id
             });
           }
@@ -4620,96 +4881,130 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
         >
           <div className="space-y-4">
             {/* Toolbar: Sub-tabs (Document Reader vs Marking Scheme vs Table of Contents) */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-[#f8faf9] rounded-xl border border-slate-200">
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setResourceViewerTab("document")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                    resourceViewerTab === "document"
-                      ? "bg-[#0d5c4d] text-white"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
-                >
-                  📄 Document Pages
-                </button>
-
-                {inspectingResource.hasMarkingScheme && (
+            {(!inspectingResource.fileUrl || inspectingResource.hasMarkingScheme) && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-[#f8faf9] rounded-xl border border-slate-200">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => setResourceViewerTab("marking")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${
-                      resourceViewerTab === "marking"
+                    onClick={() => setResourceViewerTab("document")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      resourceViewerTab === "document"
                         ? "bg-[#0d5c4d] text-white"
                         : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                     }`}
                   >
-                    <span>📑 Marking Scheme &amp; Answers</span>
-                    <Badge variant="success" className="text-[9px] px-1 py-0">
-                      Verified
-                    </Badge>
+                    📄 Document
                   </button>
-                )}
 
-                <button
-                  type="button"
-                  onClick={() => setResourceViewerTab("toc")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                    resourceViewerTab === "toc"
-                      ? "bg-[#0d5c4d] text-white"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
-                >
-                  📑 Table of Contents
-                </button>
-              </div>
+                  {inspectingResource.hasMarkingScheme && (
+                    <button
+                      type="button"
+                      onClick={() => setResourceViewerTab("marking")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${
+                        resourceViewerTab === "marking"
+                          ? "bg-[#0d5c4d] text-white"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                      }`}
+                    >
+                      <span>📑 Marking Scheme &amp; Answers</span>
+                      <Badge variant="success" className="text-[9px] px-1 py-0">
+                        Verified
+                      </Badge>
+                    </button>
+                  )}
 
-              {/* Zoom & Page Stepper */}
-              {resourceViewerTab === "document" && (
-                <div className="flex items-center gap-2 self-end sm:self-auto text-xs">
-                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                  {!inspectingResource.fileUrl && (
                     <button
-                      onClick={() => setResourceViewerZoom((z) => Math.max(75, z - 10))}
-                      className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
-                      title="Zoom Out"
+                      type="button"
+                      onClick={() => setResourceViewerTab("toc")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                        resourceViewerTab === "toc"
+                          ? "bg-[#0d5c4d] text-white"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                      }`}
                     >
-                      <ZoomOut className="h-3.5 w-3.5" />
+                      📑 Table of Contents
                     </button>
-                    <span className="font-mono font-bold text-[11px] w-10 text-center">{resourceViewerZoom}%</span>
-                    <button
-                      onClick={() => setResourceViewerZoom((z) => Math.min(150, z + 10))}
-                      className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
-                      title="Zoom In"
-                    >
-                      <ZoomIn className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
-                    <button
-                      disabled={resourceViewerPage <= 1}
-                      onClick={() => setResourceViewerPage((p) => Math.max(1, p - 1))}
-                      className="p-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
-                    >
-                      ◀
-                    </button>
-                    <span className="font-mono text-[11px] font-bold">
-                      Page {resourceViewerPage} of {inspectingResource.pageCount || 20}
-                    </span>
-                    <button
-                      disabled={resourceViewerPage >= (inspectingResource.pageCount || 20)}
-                      onClick={() => setResourceViewerPage((p) => Math.min(inspectingResource.pageCount || 20, p + 1))}
-                      className="p-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
-                    >
-                      ▶
-                    </button>
-                  </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* TAB 1: Document Page Reader Preview */}
-            {resourceViewerTab === "document" && (
+                {/* Zoom & Page Stepper only for mock generated reader */}
+                {resourceViewerTab === "document" && !inspectingResource.fileUrl && (
+                  <div className="flex items-center gap-2 self-end sm:self-auto text-xs">
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                      <button
+                        onClick={() => setResourceViewerZoom((z) => Math.max(75, z - 10))}
+                        className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
+                        title="Zoom Out"
+                      >
+                        <ZoomOut className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="font-mono font-bold text-[11px] w-10 text-center">{resourceViewerZoom}%</span>
+                      <button
+                        onClick={() => setResourceViewerZoom((z) => Math.min(150, z + 10))}
+                        className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
+                        title="Zoom In"
+                      >
+                        <ZoomIn className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                      <button
+                        disabled={resourceViewerPage <= 1}
+                        onClick={() => setResourceViewerPage((p) => Math.max(1, p - 1))}
+                        className="p-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
+                      >
+                        ◀
+                      </button>
+                      <span className="font-mono text-[11px] font-bold">
+                        Page {resourceViewerPage} of {inspectingResource.pageCount || 20}
+                      </span>
+                      <button
+                        disabled={resourceViewerPage >= (inspectingResource.pageCount || 20)}
+                        onClick={() => setResourceViewerPage((p) => Math.min(inspectingResource.pageCount || 20, p + 1))}
+                        className="p-1 text-slate-500 hover:text-slate-900 disabled:opacity-30 cursor-pointer"
+                      >
+                        ▶
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 1 (real file): Uploaded material viewer */}
+            {resourceViewerTab === "document" && inspectingResource.fileUrl && (
+              <div className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-100">
+                {inspectingResource.fileType === "PDF" ? (
+                  <iframe
+                    src={inspectingResource.fileUrl}
+                    title={inspectingResource.fileName || inspectingResource.title}
+                    className="w-full h-[650px] bg-white border-0"
+                  />
+                ) : (
+                  <div className="p-8 flex flex-col items-center gap-3 text-center">
+                    <FileText className="h-10 w-10 text-[#0d5c4d]" />
+                    <p className="text-sm font-bold text-slate-900">
+                      {inspectingResource.fileName || inspectingResource.title}
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      {inspectingResource.fileType} • {inspectingResource.fileSize} — preview is available for PDF files only.
+                    </p>
+                    <a
+                      href={inspectingResource.fileUrl}
+                      download={inspectingResource.fileName || inspectingResource.title}
+                      className="px-4 py-2 rounded-xl bg-[#0d5c4d] text-white text-xs font-bold"
+                    >
+                      Download File
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 1: Document Page Reader Preview (sample, when no real file) */}
+            {resourceViewerTab === "document" && !inspectingResource.fileUrl && (
               <div className="p-4 bg-slate-100 rounded-2xl border border-slate-200 overflow-y-auto max-h-[500px] flex justify-center">
                 <div
                   className="bg-white rounded-xl shadow-md border border-slate-300 p-8 text-slate-900 transition-all font-serif"

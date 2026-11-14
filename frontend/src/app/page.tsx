@@ -35,8 +35,20 @@ import {
 } from "@/components/shared";
 
 export default function HomePage() {
-  const { currentRole, currentView, theme, isLanding, setIsLanding } = useApp();
+  const { currentRole, currentView, theme, isLanding, setIsLanding, isSessionLoaded } = useApp();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // While restoring session from localStorage/URL, show seamless loader to avoid flash
+  if (!isSessionLoaded) {
+    return (
+      <div className={`flex h-screen w-screen items-center justify-center ${theme === "dark" ? "dark bg-slate-950" : "bg-slate-50"}`}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#0d5c4d] border-t-transparent" />
+          <p className="text-xs font-semibold text-slate-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // If user requests landing page
   if (isLanding) {
@@ -81,6 +93,8 @@ export default function HomePage() {
         case "sports":
         case "sports_tournaments":
           return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_teams":
+          return <SportsView key="teams" initialTab="teams" />;
         case "sports_registration":
           return <SportsView key="registration" initialTab="registration" />;
         case "sports_check":
@@ -121,6 +135,9 @@ export default function HomePage() {
           return <TeacherViews initialTab="assignments" initialSubTab="quizzes" />;
         case "courses":
         case "syllabus":
+        case "course-detail":
+        case "course_detail":
+        case "syllabus_builder":
           return <SyllabusBuilderView />;
         case "past_papers":
         case "pastPapers":
@@ -134,9 +151,13 @@ export default function HomePage() {
           return <AnnouncementsView />;
         case "connect_admin":
           return <AdminViews initialTab="connect" />;
+        case "analytics":
+          return <TeacherViews initialTab="analytics" />;
         case "sports":
         case "sports_tournaments":
           return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_teams":
+          return <SportsView key="teams" initialTab="teams" />;
         case "sports_registration":
           return <SportsView key="registration" initialTab="registration" />;
         case "sports_check":
@@ -149,7 +170,7 @@ export default function HomePage() {
         case "sports_registrations":
           return <SportsView key="admin_reg" initialTab="admin_registrations" />;
         default:
-          return <TeacherViews initialTab="grading" />;
+          return <TeacherViews initialTab="home" />;
       }
     } else if (currentRole === "parent") {
       switch (currentView) {
@@ -159,6 +180,8 @@ export default function HomePage() {
         case "sports":
         case "sports_tournaments":
           return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_teams":
+          return <SportsView key="teams" initialTab="teams" />;
         case "sports_registration":
           return <SportsView key="registration" initialTab="registration" />;
         case "sports_check":
@@ -209,7 +232,7 @@ export default function HomePage() {
           return <AdminViews initialTab="staff" />;
         case "curriculum":
         case "subjects":
-          return <AdminViews initialTab="overview" />;
+          return <AdminViews initialTab="subjects" />;
         case "users":
           return <AdminViews initialTab="users" />;
         case "library":
@@ -226,6 +249,8 @@ export default function HomePage() {
         case "sports":
         case "sports_tournaments":
           return <SportsView key="tournaments" initialTab="tournaments" />;
+        case "sports_teams":
+          return <SportsView key="teams" initialTab="teams" />;
         case "sports_registration":
           return <SportsView key="registration" initialTab="registration" />;
         case "sports_check":

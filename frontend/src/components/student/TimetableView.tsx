@@ -245,7 +245,7 @@ export function TimetableView() {
     setIsEditorOpen(true);
   };
 
-  const saveEntry = (event: React.FormEvent<HTMLFormElement>) => {
+  const saveEntry = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (minutesFromTime(draft.endTime) <= minutesFromTime(draft.startTime)) {
       addToast({
@@ -300,9 +300,9 @@ export function TimetableView() {
     }
 
     if (editingEntry) {
-      updateTimetableEntry(editingEntry.id, proposedEntry);
+      await updateTimetableEntry(editingEntry.id, proposedEntry);
     } else {
-      createTimetableEntry(proposedEntry);
+      await createTimetableEntry(proposedEntry);
     }
     setIsEditorOpen(false);
   };

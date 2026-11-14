@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
+import { api } from "@/lib/api";
 import {
   Bell,
   CheckCircle2,
@@ -22,7 +23,6 @@ import {
   Megaphone,
   Radio,
   FileText,
-  Printer,
   ShieldCheck,
   Send,
   Lock,
@@ -50,7 +50,10 @@ export function getAudienceCategory(targetAudience: string): "all" | "teachers" 
     lower.includes("candidate") ||
     lower.includes("grade") ||
     lower.includes("player") ||
-    lower.includes("squad")
+    lower.includes("squad") ||
+    lower.includes("batch") ||
+    lower.includes("class") ||
+    lower.includes("masterclass")
   ) {
     return "students";
   }
@@ -76,7 +79,7 @@ export function getAnnouncementCategory(a: Announcement): "exam" | "holiday" | "
 }
 
 export function AnnouncementsView() {
-  const { announcements, t, currentRole, currentUser, createAnnouncement, updateAnnouncement, deleteAnnouncement } = useApp();
+  const { announcements, t, currentRole, currentUser, createAnnouncement, updateAnnouncement, deleteAnnouncement, fetchAnnouncements } = useApp();
   const isAdmin = currentRole === "admin";
   const isTeacher = currentRole === "teacher";
   const isStudent = currentRole === "student";
@@ -162,25 +165,97 @@ export function AnnouncementsView() {
     }));
   };
 
+  // Student enrolled courses for subscription & batch verification
+  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isStudent) {
+      api.students
+        .getMyCourses()
+        .then((res) => {
+          if (res.success && Array.isArray(res.data)) {
+            setEnrolledCourses(res.data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isStudent]);
+
+  // Student eligibility filter
+  const studentEligibleAnnouncements = useMemo(() => {
+    if (!isStudent) return announcements;
+    const studentGradeStr = String(
+      (currentUser as any)?.studentProfile?.gradeLevel ||
+      (currentUser as any)?.grade ||
+      ""
+    );
+    const studentGradeNum = studentGradeStr.match(/\d+/)?.[0];
+
+    return announcements.filter((ann) => {
+      const audienceCategory = getAudienceCategory(ann.targetAudience);
+      if (audienceCategory === "teachers") return false;
+
+      const audienceLower = (ann.targetAudience || "").toLowerCase();
+      const contentLower = `${ann.title} ${ann.message}`.toLowerCase();
+
+      // 1. Grade-level filtering: If target audience or title explicitly names a grade
+      const gradeMatchInAudience = audienceLower.match(/grade\s*(\d+)/i) || contentLower.match(/grade\s*(\d+)/i);
+      if (gradeMatchInAudience && studentGradeNum) {
+        const targetGradeNum = gradeMatchInAudience[1];
+        if (targetGradeNum !== studentGradeNum) {
+          return false;
+        }
+      }
+
+      // 2. Teacher notices filtering:
+      const authorRole = (ann.authorRole || "").toUpperCase();
+      const isFromTeacher =
+        authorRole === "TEACHER" ||
+        authorRole === "TUTOR" ||
+        authorRole.includes("TUTOR") ||
+        authorRole.includes("TEACHER");
+
+      if (isFromTeacher) {
+        const author = (ann.authorName || "").toLowerCase().trim();
+        const isStudentOfTeacher = enrolledCourses.some((c) => {
+          const tFirst = c.teacher?.user?.firstName?.toLowerCase() || "";
+          const tLast = c.teacher?.user?.lastName?.toLowerCase() || "";
+          const tFull = `${tFirst} ${tLast}`.trim();
+          return (tFirst && author.includes(tFirst)) || (tFull && author.includes(tFull));
+        });
+
+        const isEnrolledInBatch = enrolledCourses.some((c) => {
+          const cTitle = (c.title || "").toLowerCase();
+          const pkgName = (c.packageName || "").toLowerCase();
+          return (
+            (cTitle && (audienceLower.includes(cTitle) || cTitle.includes(audienceLower))) ||
+            (pkgName && (audienceLower.includes(pkgName) || pkgName.includes(audienceLower)))
+          );
+        });
+
+        // The student MUST be enrolled with this teacher or enrolled in this batch
+        if (!isStudentOfTeacher && !isEnrolledInBatch) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [announcements, isStudent, currentUser, enrolledCourses]);
+
   // Audience counts for admin metrics
-  const totalCount = announcements.length;
-  const urgentHighCount = announcements.filter(
+  const totalCount = studentEligibleAnnouncements.length;
+  const urgentHighCount = studentEligibleAnnouncements.filter(
     (a) => a.priority === "urgent" || a.priority === "high"
   ).length;
-  const wholeSchoolCount = announcements.filter((a) => getAudienceCategory(a.targetAudience) === "all").length;
-  const teachersCount = announcements.filter((a) => getAudienceCategory(a.targetAudience) === "teachers").length;
-  const studentsCount = announcements.filter((a) => getAudienceCategory(a.targetAudience) === "students").length;
+  const wholeSchoolCount = studentEligibleAnnouncements.filter((a) => getAudienceCategory(a.targetAudience) === "all").length;
+  const teachersCount = studentEligibleAnnouncements.filter((a) => getAudienceCategory(a.targetAudience) === "teachers").length;
+  const studentsCount = studentEligibleAnnouncements.filter((a) => getAudienceCategory(a.targetAudience) === "students").length;
 
   // Filtered announcements based on role permissions and filters
   const visibleAnnouncements = useMemo(() => {
-    return announcements.filter((ann) => {
+    return studentEligibleAnnouncements.filter((ann) => {
       const audienceCategory = getAudienceCategory(ann.targetAudience);
-
-      // Role-based visibility security:
-      // If student: strictly exclude announcements targeted exclusively to "Teachers Only"
-      if (isStudent && audienceCategory === "teachers") {
-        return false;
-      }
 
       // Category filter
       if (selectedCategory !== "all" && getAnnouncementCategory(ann) !== selectedCategory) {
@@ -213,7 +288,7 @@ export function AnnouncementsView() {
 
       return true;
     });
-  }, [announcements, isStudent, selectedCategory, filterPriority, filterAudience, searchQuery]);
+  }, [studentEligibleAnnouncements, selectedCategory, filterPriority, filterAudience, searchQuery]);
 
   // Category Badge Helper
   const renderCategoryBadge = (category: string) => {
@@ -401,18 +476,21 @@ export function AnnouncementsView() {
           <div>
             <h1 className="text-2xl font-black text-[#0d2b26] flex items-center gap-2">
               <Bell className="h-6 w-6 text-[#0d5c4d]" />
-              Official Notice Board &amp; School Circulars
+              Official Notice Board &amp; Circulars
             </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Live school announcements, exam schedules, holiday notices, and masterclass updates.
-            </p>
           </div>
 
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => {
+              onClick={async () => {
                 setIsRefreshing(true);
-                setTimeout(() => setIsRefreshing(false), 500);
+                try {
+                  if (fetchAnnouncements) {
+                    await fetchAnnouncements();
+                  }
+                } finally {
+                  setTimeout(() => setIsRefreshing(false), 400);
+                }
               }}
               variant="outline"
               className="h-9 px-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 gap-1.5 cursor-pointer shadow-2xs"
@@ -881,7 +959,7 @@ export function AnnouncementsView() {
                   Central Administration & Academic Operations Desk
                 </p>
                 <p className="text-[9px] text-slate-400 mt-0.5">
-                  Ref: EP/NOTICE/2026-{previewCircular.id.replace("ann_", "0")} &bull; Dispatched: {previewCircular.publishedAt}
+                  Ref: EP/NOTICE/2026-{previewCircular.id.replace("ann_", "").slice(0, 8).toUpperCase()} &bull; Dispatched: {previewCircular.publishedAt}
                 </p>
               </div>
 
@@ -923,39 +1001,28 @@ export function AnnouncementsView() {
             </div>
 
             {/* Modal Footer Controls */}
-            <div className="flex justify-between items-center pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="gap-2 text-xs font-bold"
-                onClick={() => window.print()}
-              >
-                <Printer className="h-4 w-4" /> Print / Save PDF
-              </Button>
-
-              <div className="flex gap-2">
-                {isAdmin && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="text-xs font-bold"
-                    onClick={() => {
-                      const cur = previewCircular;
-                      setPreviewCircular(null);
-                      openEdit(cur);
-                    }}
-                  >
-                    <Pencil className="h-3.5 w-3.5 mr-1" /> Edit Announcement
-                  </Button>
-                )}
+            <div className="flex justify-end items-center gap-2 pt-2">
+              {isAdmin && (
                 <Button
                   type="button"
-                  className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold"
-                  onClick={() => setPreviewCircular(null)}
+                  variant="outline"
+                  className="text-xs font-bold"
+                  onClick={() => {
+                    const cur = previewCircular;
+                    setPreviewCircular(null);
+                    openEdit(cur);
+                  }}
                 >
-                  Close
+                  <Pencil className="h-3.5 w-3.5 mr-1" /> Edit Announcement
                 </Button>
-              </div>
+              )}
+              <Button
+                type="button"
+                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold"
+                onClick={() => setPreviewCircular(null)}
+              >
+                Close
+              </Button>
             </div>
           </div>
         )}

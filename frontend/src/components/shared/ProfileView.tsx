@@ -53,7 +53,10 @@ import {
   Phone,
   MessageSquare,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  Mail,
+  FileText,
+  Loader2
 } from "lucide-react";
 import {
   TeacherQualification,
@@ -61,7 +64,6 @@ import {
   TeacherBankAccount,
   TeacherSocialChannel
 } from "@/types/lms";
-import { initialExams, initialExamTermResult } from "@/data/mockData";
 import { api } from "@/lib/api";
 
 type ProfileTab =
@@ -77,6 +79,33 @@ type ProfileTab =
   | "payout"
   | "social";
 
+const EDUCATOR_AVATARS = [
+  {
+    title: "Educator (Professional)",
+    url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
+  },
+  {
+    title: "Senior Lecturer",
+    url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80"
+  },
+  {
+    title: "Science Faculty",
+    url: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80"
+  },
+  {
+    title: "Mathematics Mentor",
+    url: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80"
+  },
+  {
+    title: "Academic Instructor",
+    url: "https://images.unsplash.com/photo-1580894732444-8ecded7900cd?w=400&auto=format&fit=crop&q=80"
+  },
+  {
+    title: "Languages Faculty",
+    url: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80"
+  }
+];
+
 export function ProfileView() {
   const {
     currentUser,
@@ -86,12 +115,239 @@ export function ProfileView() {
     courses,
     setSelectedCourseId,
     teacherProfile,
-    updateTeacherProfile
+    updateTeacherProfile,
+    refreshTeacherProfile,
+    updateAuthUser,
+    refreshSuperAdminAvatar,
+    timetable,
+    assignments,
+    submissions
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<ProfileTab>("personal");
   const [isEditing, setIsEditing] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+
+  useEffect(() => {
+    if (currentRole === "teacher") {
+      void refreshTeacherProfile();
+    }
+  }, [currentRole, refreshTeacherProfile]);
+
+  const [tenantStatistics, setTenantStatistics] = useState<{
+    totalTenants: number;
+    activeTenants: number;
+    suspendedTenants: number;
+    inactiveTenants: number;
+  } | null>(null);
+
+  const [tenantStatisticsLoading, setTenantStatisticsLoading] =
+    useState(false);
+
+  const [tenantStatisticsError, setTenantStatisticsError] =
+    useState<string | null>(null);
+
+  const [monthlyMrr, setMonthlyMrr] = useState<{
+    monthlyMrr: number;
+    currency: string;
+    activeSubscriptions: number;
+    calculatedAt: string;
+  } | null>(null);
+
+  const [monthlyMrrLoading, setMonthlyMrrLoading] = useState(false);
+
+  const [monthlyMrrError, setMonthlyMrrError] =
+    useState<string | null>(null);
+
+
+  const [studentStatistics, setStudentStatistics] = useState<{
+    totalStudents: number;
+  } | null>(null);
+
+  const [studentStatisticsLoading, setStudentStatisticsLoading] =
+    useState(false);
+
+  const [studentStatisticsError, setStudentStatisticsError] =
+    useState<string | null>(null);
+
+  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const [isLoadingEnrolledCourses, setIsLoadingEnrolledCourses] = useState(false);
+  const [sportsRegistrations, setSportsRegistrations] = useState<any[]>([]);
+  const [isLoadingSports, setIsLoadingSports] = useState(false);
+
+  // Real student learning progress computed from enrollments & submissions
+  const studentSubmissions = useMemo(() => {
+    return (submissions || []).filter(
+      (s: any) => s.studentId === currentUser?.id || s.studentName === currentUser?.name
+    );
+  }, [submissions, currentUser]);
+
+  const gradedSubmissions = useMemo(() => {
+    return studentSubmissions.filter(
+      (s: any) => typeof s.marksObtained === "number" && s.marksObtained > 0
+    );
+  }, [studentSubmissions]);
+
+  const averageQuizScore = useMemo(() => {
+    if (gradedSubmissions.length === 0) return 0;
+    const sum = gradedSubmissions.reduce((acc: number, s: any) => {
+      const max = s.maxMarks || 100;
+      return acc + ((s.marksObtained || 0) / max) * 100;
+    }, 0);
+    return Math.round(sum / gradedSubmissions.length);
+  }, [gradedSubmissions]);
+
+  const overallSyllabusProgress = useMemo(() => {
+    if (enrolledCourses.length === 0) return 0;
+    let total = 0;
+    let completed = 0;
+    enrolledCourses.forEach((c: any) => {
+      if (c.totalLessons) total += c.totalLessons;
+      if (c.completedLessons) completed += c.completedLessons;
+    });
+    return total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+  }, [enrolledCourses]);
+
+  const estimatedStudyHours = useMemo(() => {
+    let hours = 0;
+    enrolledCourses.forEach((c: any) => {
+      hours += (c.completedLessons || 0) * 1.5;
+    });
+    hours += studentSubmissions.length * 1.0;
+    return Math.round(hours * 10) / 10;
+  }, [enrolledCourses, studentSubmissions]);
+
+  useEffect(() => {
+    if (currentRole !== "super_admin") {
+      setTenantStatistics(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchTenantStatistics = async () => {
+      setTenantStatisticsLoading(true);
+      setTenantStatisticsError(null);
+
+      try {
+        const response =
+          await api.superAdminProfile.getTenantStatistics();
+
+        if (!cancelled) {
+          setTenantStatistics(response.data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setTenantStatistics(null);
+          setTenantStatisticsError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load tenant statistics"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setTenantStatisticsLoading(false);
+        }
+      }
+    };
+
+    void fetchTenantStatistics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
+
+  useEffect(() => {
+    if (currentRole !== "super_admin") {
+      setMonthlyMrr(null);
+      setMonthlyMrrError(null);
+      setMonthlyMrrLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchMonthlyMrr = async () => {
+      setMonthlyMrrLoading(true);
+      setMonthlyMrrError(null);
+      setMonthlyMrr(null);
+
+      try {
+        const response = await api.superAdminProfile.getMonthlySaasMrr();
+
+        if (!cancelled) {
+          setMonthlyMrr(response.data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setMonthlyMrr(null);
+          setMonthlyMrrError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load monthly SaaS MRR"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setMonthlyMrrLoading(false);
+        }
+      }
+    };
+
+    void fetchMonthlyMrr();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
+
+
+  useEffect(() => {
+    if (currentRole !== "super_admin") {
+      setStudentStatistics(null);
+      setStudentStatisticsError(null);
+      setStudentStatisticsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchStudentStatistics = async () => {
+      setStudentStatisticsLoading(true);
+      setStudentStatisticsError(null);
+      setStudentStatistics(null);
+
+      try {
+        const response =
+          await api.superAdminProfile.getStudentStatistics();
+
+        if (!cancelled) {
+          setStudentStatistics(response.data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setStudentStatistics(null);
+          setStudentStatisticsError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load student statistics"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setStudentStatisticsLoading(false);
+        }
+      }
+    };
+
+    void fetchStudentStatistics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
 
   const handleContinueCourse = (courseId: string) => {
     setSelectedCourseId(courseId);
@@ -107,63 +363,62 @@ export function ProfileView() {
   };
 
   const handleDownloadSportsCertificate = () => {
-    addToast({
-      type: "success",
-      title: "Sports Portfolio Downloaded",
-      message: "Official Athletic Achievement Record & College Colors Transcript (PDF) has been saved."
-    });
+    if (typeof window !== "undefined") {
+      window.print();
+    }
   };
 
   // Editable Profile State based on role
   const defaultProfile = useMemo(() => {
     if (currentRole === "teacher") {
-      const userFirstName = teacherProfile?.user?.firstName || currentUser.name?.split(" ")[0] || "Samantha";
-      const userLastName = teacherProfile?.user?.lastName || currentUser.name?.split(" ").slice(1).join(" ") || "Perera";
-      const userFullName = `${userFirstName} ${userLastName}`.trim();
+      const userFirstName = teacherProfile?.user?.firstName || (currentUser.name ? currentUser.name.split(" ")[0] : "");
+      const userLastName = teacherProfile?.user?.lastName || (currentUser.name && currentUser.name.includes(" ") ? currentUser.name.split(" ").slice(1).join(" ") : "");
+      const userFullName = `${userFirstName} ${userLastName}`.trim() || currentUser.name || "Educator";
 
       return {
-        name: currentUser.name || "Mr. Samantha Perera",
-        fullName: userFullName || "Samantha Priyantha Perera",
-        preferredName: userFirstName || "Samantha",
-        studentId: teacherProfile?.employeeNo || "TCH-2026-0042",
-        indexNumber: teacherProfile?.sltsRegNo || "SLTS-REG/2012/4482",
-        email: teacherProfile?.user?.email || currentUser.email || "samantha.p@school.lk",
-        phone: teacherProfile?.phone || "+94 77 456 7890",
-        altPhone: "+94 11 234 5678",
-        dob: "1984-06-18",
-        gender: "Male",
-        bloodGroup: "B+",
-        medium: (teacherProfile?.mediums && teacherProfile.mediums.length > 0) ? teacherProfile.mediums.join(", ") : "English, Sinhala & Tamil",
-        address: teacherProfile?.address || "No. 18, Havelock Road, Havelock Town",
-        city: teacherProfile?.city || "Colombo 05",
-        district: teacherProfile?.district || "Colombo",
-        province: teacherProfile?.province || "Western Province",
-        postalCode: teacherProfile?.postalCode || "00500",
-        bio: teacherProfile?.bio || "Lead Specialist Educator & Department Chair for Combined Mathematics (A/L). 14 years of teaching excellence preparing students for G.C.E. Advanced Level with distinction.",
-        schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
-        schoolCode: "LMT-COLOMBO",
+        name: userFullName,
+        fullName: userFullName,
+        preferredName: userFirstName || userFullName,
+        avatarUrl: teacherProfile?.user?.avatarUrl || teacherProfile?.avatarUrl || currentUser.avatar || (typeof window !== "undefined" ? localStorage.getItem(`lms_avatar_${currentUser.id || 'teacher'}`) || "" : ""),
+        studentId: teacherProfile?.employeeNo || "",
+        indexNumber: teacherProfile?.sltsRegNo || "",
+        email: teacherProfile?.user?.email || currentUser.email || "",
+        phone: teacherProfile?.phone || "",
+        altPhone: "",
+        dob: teacherProfile?.dob || (typeof window !== "undefined" ? localStorage.getItem(`lms_dob_${currentUser.id || 'teacher'}`) || "" : ""),
+        gender: teacherProfile?.gender || (typeof window !== "undefined" ? localStorage.getItem(`lms_gender_${currentUser.id || 'teacher'}`) || "" : ""),
+        bloodGroup: "",
+        medium: (teacherProfile?.mediums && teacherProfile.mediums.length > 0) ? teacherProfile.mediums.join(", ") : (typeof window !== "undefined" ? localStorage.getItem(`lms_medium_${currentUser.id || 'teacher'}`) || "English" : "English"),
+        address: teacherProfile?.address || "",
+        city: teacherProfile?.city || "",
+        district: teacherProfile?.district || "",
+        province: teacherProfile?.province || "",
+        postalCode: teacherProfile?.postalCode || "",
+        bio: teacherProfile?.bio || "",
+        schoolName: currentUser.schoolName || "",
+        schoolCode: "",
         gradeLevel: "Faculty",
-        grade: teacherProfile?.title || "A/L Faculty (Grade 12 & 13)",
-        classRoom: "Advanced Level Mathematics Faculty",
-        stream: teacherProfile?.specialization || "Combined Mathematics & Pure Sciences",
-        examYear: "2026",
-        academicYear: "Faculty Member (2012 - Present)",
-        house: "Lions Sports Academy Mentor",
-        classTeacher: "Head of Faculty (Mathematics)",
-        admittedDate: "September 2012",
-        attendanceRate: "99.1%",
-        gpa: `Faculty Rating ${teacherProfile?.rating ?? 4.9}/5.0`,
-        guardianName: "Mrs. Malini Perera",
-        guardianRelationship: "Spouse (Next of Kin)",
-        guardianPhone: "+94 77 987 6543",
-        guardianEmail: "malini.perera@gmail.com",
-        guardianOccupation: "Senior Banking Executive",
-        motherName: "M. Perera",
-        motherPhone: "+94 11 234 5678",
-        emergencyContact: "Faculty Support (+94 11 258 0042)",
-        transportMode: "Faculty Parking (Pass #FC-42)",
-        healthNotes: "Normal health clearance. First-aid certified.",
-        extracurricular: "Master-in-Charge Mathematics Olympiad, Senior Chess Club Patron"
+        grade: teacherProfile?.title || "Faculty Member",
+        classRoom: "Teacher Studio",
+        stream: teacherProfile?.specialization || "General",
+        examYear: "",
+        academicYear: "Active Faculty",
+        house: "",
+        classTeacher: "",
+        admittedDate: "",
+        attendanceRate: "100%",
+        gpa: teacherProfile?.rating ? `Faculty Rating ${teacherProfile.rating}/5.0` : "New Faculty",
+        guardianName: "",
+        guardianRelationship: "",
+        guardianPhone: "",
+        guardianEmail: "",
+        guardianOccupation: "",
+        motherName: "",
+        motherPhone: "",
+        emergencyContact: "",
+        transportMode: "",
+        healthNotes: "",
+        extracurricular: ""
       };
     }
 
@@ -196,7 +451,7 @@ export function ProfileView() {
         examYear: "2026",
         academicYear: "2024 - Present",
         house: "Lions Sports Academy Supporter",
-        classTeacher: "Dr. Samantha Perera & Eng. K. Thanushan",
+        classTeacher: "Academic Lead & Faculty Mentors",
         admittedDate: "January 2024",
         attendanceRate: "100% PTM Attendance",
         gpa: "Verified Guardian Status",
@@ -220,14 +475,14 @@ export function ProfileView() {
         fullName: "LimaT Platform Owner & Chief Director",
         preferredName: "Super Admin",
         studentId: "ROOT-SAAS-001",
-        indexNumber: "SAAS-ROOT/DIR-01",
+        indexNumber: "",
         email: currentUser.email || "director@limat.lk",
         phone: "+94 77 123 4567",
         altPhone: "+94 11 200 4455",
-        dob: "1982-01-01",
-        gender: "Male",
-        bloodGroup: "O+",
-        medium: "English, Sinhala & Tamil",
+        dob: "",
+        gender: "",
+        bloodGroup: "",
+        medium: "",
         address: "LimaT Headquarters, Colombo Technology Park",
         city: "Colombo 02",
         district: "Colombo",
@@ -261,196 +516,166 @@ export function ProfileView() {
       };
     }
 
+    const userFullName = currentUser.name || "Student";
+    const userFirstName = userFullName.split(" ")[0] || "Student";
+    const studentUserGrade = (currentUser as any)?.grade || (currentUser as any)?.studentProfile?.gradeLevel || "Grade 12";
+    const studentGradeNum = studentUserGrade.replace(/\D/g, "") || "12";
+    const studentUserSection = (currentUser as any)?.class || (currentUser as any)?.studentProfile?.section || "Physical Sciences & Technology";
+
     return {
-      name: currentUser.name || "Sathurjan K.",
-      fullName: "Sathurjan Kandasamy",
-      preferredName: "Sathu",
-      studentId: "STU-2026-0842",
-      indexNumber: "AL/2026/89421",
-      email: currentUser.email || "sathurjan@gmail.com",
-      phone: "+94 77 123 4567",
-      altPhone: "+94 11 234 5678",
-      dob: "2008-03-14",
-      gender: "Male",
-      bloodGroup: "O+",
-      medium: "English & Tamil",
-      address: "No. 42, Temple Road, Wellawatte",
-      city: "Colombo 06",
-      district: "Colombo",
-      province: "Western Province",
-      postalCode: "00600",
-      bio: "Passionate Advanced Level student preparing under leading private educators in Pure Maths, Quantum Physics, Chemistry and Software Architecture.",
-      schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
-      schoolCode: "LMT-COLOMBO",
-      gradeLevel: "12",
-      grade: (currentUser.grade && currentUser.grade !== "Grade 12") ? currentUser.grade : "Grade 12",
-      classRoom: (currentUser.class && currentUser.class !== "12-Physical Science") ? currentUser.class : "Physical Science A/L Masterclass Batch",
-      stream: "Physical Science",
-      examYear: "2026",
-      academicYear: "Batch 2026 - 2027",
-      house: "Lions Sports & Athletics Academy",
-      classTeacher: "Dr. Samantha Perera (Lead Combined Maths Specialist)",
+      name: userFullName,
+      fullName: userFullName,
+      preferredName: userFirstName,
+      studentId: (currentUser as any)?.studentIdNo || (currentUser as any)?.studentProfile?.studentIdNo || (currentUser?.id ? `STU-${currentUser.id.slice(0, 4).toUpperCase()}` : "STU-0001"),
+      indexNumber: (typeof window !== "undefined" ? localStorage.getItem(`lms_index_${currentUser.id || 'student'}`) || "" : "") || (currentUser as any)?.studentIdNo || (currentUser as any)?.studentProfile?.studentIdNo || "",
+      email: currentUser.email || "",
+      phone: (currentUser as any)?.phone || (typeof window !== "undefined" ? localStorage.getItem(`lms_phone_${currentUser.id || 'student'}`) || "" : ""),
+      altPhone: "",
+      dob: (typeof window !== "undefined" ? localStorage.getItem(`lms_dob_${currentUser.id || 'student'}`) || "" : ""),
+      gender: (typeof window !== "undefined" ? localStorage.getItem(`lms_gender_${currentUser.id || 'student'}`) || "Male" : "Male"),
+      bloodGroup: (typeof window !== "undefined" ? localStorage.getItem(`lms_blood_${currentUser.id || 'student'}`) || "" : ""),
+      medium: (typeof window !== "undefined" ? localStorage.getItem(`lms_medium_${currentUser.id || 'student'}`) || "English & Tamil" : "English & Tamil"),
+      address: (typeof window !== "undefined" ? localStorage.getItem(`lms_address_${currentUser.id || 'student'}`) || "" : ""),
+      city: (typeof window !== "undefined" ? localStorage.getItem(`lms_city_${currentUser.id || 'student'}`) || "" : ""),
+      district: (typeof window !== "undefined" ? localStorage.getItem(`lms_district_${currentUser.id || 'student'}`) || "" : ""),
+      province: (typeof window !== "undefined" ? localStorage.getItem(`lms_province_${currentUser.id || 'student'}`) || "" : ""),
+      postalCode: (typeof window !== "undefined" ? localStorage.getItem(`lms_postal_${currentUser.id || 'student'}`) || "" : ""),
+      bio: (typeof window !== "undefined" ? localStorage.getItem(`lms_bio_${currentUser.id || 'student'}`) || "" : "") || "Enrolled student preparing for academic examinations and masterclasses.",
+      schoolName: currentUser.schoolName || "",
+      schoolCode: "",
+      gradeLevel: studentGradeNum,
+      grade: studentUserGrade,
+      classRoom: studentUserSection,
+      stream: studentUserSection,
+      examYear: (typeof window !== "undefined" ? localStorage.getItem(`lms_exam_year_${currentUser.id || 'student'}`) || "2026" : "2026"),
+      academicYear: `Batch ${new Date().getFullYear()}`,
+      house: "",
+      classTeacher: "",
       admittedDate: "January 2024",
       attendanceRate: "96.4%",
-      gpa: "3.84 / 4.0",
-      guardianName: "K. Kandasamy",
-      guardianRelationship: "Father",
-      guardianPhone: "+94 71 888 4321",
-      guardianEmail: "kandasamy.k@gmail.com",
-      guardianOccupation: "Chartered Civil Engineer",
-      motherName: "S. Kandasamy",
-      motherPhone: "+94 77 555 8912",
-      emergencyContact: "K. Kandasamy (+94 71 888 4321)",
-      transportMode: "Independent Transport / Online Live Stream",
-      healthNotes: "No known allergies. Normal athletic health clearance.",
-      extracurricular: "Vice Captain Lions Cricket 1st XI, Senior Athletic Squad, Science Club"
+      gpa: "",
+      guardianName: (typeof window !== "undefined" ? localStorage.getItem(`lms_guardian_name_${currentUser.id || 'student'}`) || "" : ""),
+      guardianRelationship: (typeof window !== "undefined" ? localStorage.getItem(`lms_guardian_rel_${currentUser.id || 'student'}`) || "" : ""),
+      guardianPhone: (typeof window !== "undefined" ? localStorage.getItem(`lms_guardian_phone_${currentUser.id || 'student'}`) || "" : ""),
+      guardianEmail: (typeof window !== "undefined" ? localStorage.getItem(`lms_guardian_email_${currentUser.id || 'student'}`) || "" : ""),
+      guardianOccupation: (typeof window !== "undefined" ? localStorage.getItem(`lms_guardian_occ_${currentUser.id || 'student'}`) || "" : ""),
+      motherName: "",
+      motherPhone: "",
+      emergencyContact: (typeof window !== "undefined" ? localStorage.getItem(`lms_emergency_${currentUser.id || 'student'}`) || "" : ""),
+      transportMode: "Online LMS / Live Classroom",
+      healthNotes: "Normal athletic health clearance.",
+      extracurricular: ""
     };
-  }, [currentRole, currentUser]);
+  }, [currentRole, currentUser, teacherProfile]);
 
   const [profileData, setProfileData] = useState(defaultProfile);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [showPublicPreview, setShowPublicPreview] = useState(false);
 
   // Bank & Payout Details (Teacher)
-  const [bankName, setBankName] = useState("Commercial Bank of Ceylon");
-  const [bankAccountName, setBankAccountName] = useState("Samantha Priyantha Perera");
-  const [bankAccountNumber, setBankAccountNumber] = useState("8004561234");
-  const [bankBranch, setBankBranch] = useState("Havelock Town");
-  const [bankBranchCode, setBankBranchCode] = useState("042");
+  const [bankName, setBankName] = useState("");
+  const [bankAccountName, setBankAccountName] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankBranch, setBankBranch] = useState("");
+  const [bankBranchCode, setBankBranchCode] = useState("");
 
   // Public Studio & Social Ecosystem (Teacher)
-  const [publicSlug, setPublicSlug] = useState("prof-samantha-perera");
-  const [youtubeUrl, setYoutubeUrl] = useState("https://youtube.com/@SamanthaPereraMaths");
-  const [telegramUrl, setTelegramUrl] = useState("https://t.me/CombinedMaths2026LK");
-  const [whatsappNumber, setWhatsappNumber] = useState("+94774567890");
-  const [websiteUrl, setWebsiteUrl] = useState("https://samanthamaths.lk");
-  const [coverImageUrl, setCoverImageUrl] = useState("https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80");
+  const [publicSlug, setPublicSlug] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [telegramUrl, setTelegramUrl] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
 
   // Qualifications & Accreditations (Teacher)
-  const [qualificationsList, setQualificationsList] = useState<TeacherQualification[]>([
-    {
-      id: "deg-1",
-      degree: "Bachelor of Science (B.Sc. Special) in Mathematics",
-      institution: "University of Colombo, Sri Lanka",
-      honors: "First Class Honours (GPA: 3.92 / 4.0)",
-      year: "2008",
-      details: "Pure Mathematics, Real Analysis, Complex Variables, Abstract Algebra & Numerical Methods."
-    },
-    {
-      id: "deg-2",
-      degree: "Post Graduate Diploma in Education (PGDE)",
-      institution: "National Institute of Education (NIE), Maharagama",
-      honors: "Passed with Distinction",
-      year: "2014",
-      details: "Secondary & Collegiate STEM Pedagogy, Educational Psychology, Curriculum Formulation & Evaluation."
-    },
-    {
-      id: "deg-3",
-      degree: "Master of Science (M.Sc.) in Applied Mathematics",
-      institution: "University of Peradeniya",
-      honors: "Thesis Distinction",
-      year: "2018",
-      details: "Thesis: Numerical Modeling of Partial Differential Equations & Boundary Value Simulations."
+  const [qualificationsList, setQualificationsList] = useState<TeacherQualification[]>([]);
+  const [accreditationsList, setAccreditationsList] = useState<TeacherAccreditation[]>([]);
+  const [bankAccountsList, setBankAccountsList] = useState<TeacherBankAccount[]>([]);
+  const [socialChannelsList, setSocialChannelsList] = useState<TeacherSocialChannel[]>([]);
+  const [subjectsList, setSubjectsList] = useState<string[]>([]);
+
+  const [selectedMediums, setSelectedMediums] = useState<string[]>(["English"]);
+  const [experienceYears, setExperienceYears] = useState<number>(0);
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [customAvatarUrlInput, setCustomAvatarUrlInput] = useState("");
+
+  const handleTeacherAvatarFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      addToast({ type: "error", title: "Invalid Image", message: "Only JPG, PNG and WebP images are allowed." });
+      event.target.value = "";
+      return;
     }
-  ]);
 
-  const [accreditationsList, setAccreditationsList] = useState<TeacherAccreditation[]>([
-    {
-      id: "acc-1",
-      title: "Sri Lanka Teachers' Service (SLTS) Class 1 Senior Educator",
-      issuer: "Ministry of Education, Isurupaya, Battaramulla",
-      regNo: "SLTS-REG/2012/4482",
-      status: "Active & Permanent Pensionable Service · 14 Years Seniority",
-      badge: "SLTS Class 1",
-      badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200"
-    },
-    {
-      id: "acc-2",
-      title: "G.C.E. Advanced Level Chief Examiner & Paper Setter Accreditation",
-      issuer: "Department of Examinations, Pelawatte, Battaramulla",
-      regNo: "EXAM-AL/MTH-P03",
-      status: "Supervising Examiner · Combined Mathematics Paper Evaluation Panel 03",
-      badge: "Chief Examiner",
-      badgeColor: "bg-blue-50 text-blue-800 border-blue-200"
-    },
-    {
-      id: "acc-3",
-      title: "National STEM Pedagogical Master Trainer & Digital Lead",
-      issuer: "UNESCO & National Education Commission (NEC)",
-      regNo: "STEM-LK/2021/88",
-      status: "Accredited Master Facilitator for Advanced Collegiate Mathematics Instruction",
-      badge: "Master Trainer",
-      badgeColor: "bg-purple-50 text-purple-800 border-purple-200"
-    },
-    {
-      id: "acc-4",
-      title: "Provincial Teaching Excellence & Mentorship Award (2023)",
-      issuer: "Western Provincial Department of Education",
-      regNo: "WP-EDU/AWARD/2023",
-      status: "Awarded for 98% Distinction Rate in A/L Combined Mathematics Examination",
-      badge: "Provincial Award",
-      badgeColor: "bg-amber-50 text-amber-800 border-amber-200"
+    if (file.size > 5 * 1024 * 1024) {
+      addToast({ type: "error", title: "Image Too Large", message: "Profile picture must be 5 MB or smaller." });
+      event.target.value = "";
+      return;
     }
-  ]);
 
-  const [bankAccountsList, setBankAccountsList] = useState<TeacherBankAccount[]>([
-    {
-      id: "bank-1",
-      bankName: "Commercial Bank of Ceylon",
-      bankAccountName: "Samantha Priyantha Perera",
-      bankAccountNumber: "8004561234",
-      bankBranch: "Havelock Town",
-      bankBranchCode: "042",
-      isPrimary: true
-    },
-    {
-      id: "bank-2",
-      bankName: "Bank of Ceylon (BOC)",
-      bankAccountName: "Samantha Priyantha Perera",
-      bankAccountNumber: "0072938491",
-      bankBranch: "Kollupitiya Super Grade",
-      bankBranchCode: "001",
-      isPrimary: false
-    }
-  ]);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const size = Math.min(img.width, img.height);
+          const targetSize = 400;
+          canvas.width = targetSize;
+          canvas.height = targetSize;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            const offsetX = (img.width - size) / 2;
+            const offsetY = (img.height - size) / 2;
+            ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, targetSize, targetSize);
+            const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+            setProfileData((prev) => ({ ...prev, avatarUrl: compressedDataUrl }));
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, compressedDataUrl);
+              localStorage.setItem("lms_avatar_teacher", compressedDataUrl);
+            }
+            addToast({
+              type: "success",
+              title: "Profile Photo Selected",
+              message: "Click 'Save Details' to apply and persist your photo."
+            });
+          }
+        } catch {
+          const rawUrl = e.target?.result as string;
+          setProfileData((prev) => ({ ...prev, avatarUrl: rawUrl }));
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, rawUrl);
+            localStorage.setItem("lms_avatar_teacher", rawUrl);
+          }
+        }
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
 
-  const [socialChannelsList, setSocialChannelsList] = useState<TeacherSocialChannel[]>([
-    {
-      id: "soc-1",
-      platform: "youtube",
-      title: "YouTube Lecture Channel",
-      url: "https://youtube.com/@SamanthaPereraMaths"
-    },
-    {
-      id: "soc-2",
-      platform: "telegram",
-      title: "Telegram Student Discussion Group",
-      url: "https://t.me/CombinedMaths2026LK"
-    },
-    {
-      id: "soc-3",
-      platform: "whatsapp",
-      title: "Direct WhatsApp Mentorship Helpline",
-      url: "+94774567890"
-    },
-    {
-      id: "soc-4",
-      platform: "website",
-      title: "Personal Tutor Studio & Notes Portal",
-      url: "https://samanthamaths.lk"
-    }
-  ]);
-
-  const [subjectsList, setSubjectsList] = useState<string[]>([
-    "Combined Mathematics",
-    "Pure Mathematics",
-    "Applied Mathematics",
-    "Mechanics",
-    "Probability & Statistics"
-  ]);
-
-  const [selectedMediums, setSelectedMediums] = useState<string[]>(["English", "Sinhala", "Tamil"]);
-  const [experienceYears, setExperienceYears] = useState<number>(14);
+  const tutorProfileCompletion = useMemo(() => {
+    if (currentRole !== "teacher") return 100;
+    const checks = [
+      Boolean(profileData.avatarUrl),
+      Boolean(profileData.fullName?.trim()),
+      Boolean(profileData.name?.trim()),
+      Boolean(profileData.email?.trim()),
+      Boolean(profileData.phone?.trim()),
+      Boolean(profileData.dob?.trim()),
+      Boolean(profileData.gender?.trim()),
+      Boolean(profileData.address?.trim()),
+      Boolean(profileData.bio?.trim()),
+      subjectsList.length > 0,
+      selectedMediums.length > 0,
+    ];
+    const completedCount = checks.filter(Boolean).length;
+    return Math.round((completedCount / checks.length) * 100);
+  }, [currentRole, profileData, subjectsList, selectedMediums]);
 
   // Modal states for full CRUD workflows
   const [degreeModalState, setDegreeModalState] = useState<{
@@ -510,46 +735,51 @@ export function ProfileView() {
   // Sync with backend teacher profile when loaded
   useEffect(() => {
     if (teacherProfile && currentRole === "teacher") {
-      if (teacherProfile.bankName) setBankName(teacherProfile.bankName);
-      if (teacherProfile.bankAccountName) setBankAccountName(teacherProfile.bankAccountName);
-      if (teacherProfile.bankAccountNumber) setBankAccountNumber(teacherProfile.bankAccountNumber);
-      if (teacherProfile.bankBranch) setBankBranch(teacherProfile.bankBranch);
-      if (teacherProfile.bankBranchCode) setBankBranchCode(teacherProfile.bankBranchCode);
-      if (teacherProfile.publicSlug) setPublicSlug(teacherProfile.publicSlug);
-      if (teacherProfile.youtubeUrl) setYoutubeUrl(teacherProfile.youtubeUrl);
-      if (teacherProfile.telegramUrl) setTelegramUrl(teacherProfile.telegramUrl);
-      if (teacherProfile.whatsappNumber) setWhatsappNumber(teacherProfile.whatsappNumber);
-      if (teacherProfile.websiteUrl) setWebsiteUrl(teacherProfile.websiteUrl);
-      if (teacherProfile.coverImageUrl) setCoverImageUrl(teacherProfile.coverImageUrl);
-      if (teacherProfile.experienceYears) setExperienceYears(teacherProfile.experienceYears);
+      setBankName(teacherProfile.bankName || "");
+      setBankAccountName(teacherProfile.bankAccountName || profileData.fullName || "");
+      setBankAccountNumber(teacherProfile.bankAccountNumber || "");
+      setBankBranch(teacherProfile.bankBranch || "");
+      setBankBranchCode(teacherProfile.bankBranchCode || "");
+      setPublicSlug(teacherProfile.publicSlug || "");
+      setYoutubeUrl(teacherProfile.youtubeUrl || "");
+      setTelegramUrl(teacherProfile.telegramUrl || "");
+      setWhatsappNumber(teacherProfile.whatsappNumber || "");
+      setWebsiteUrl(teacherProfile.websiteUrl || "");
+      setCoverImageUrl(teacherProfile.coverImageUrl || "");
+      setExperienceYears(teacherProfile.experienceYears || 0);
       if (Array.isArray(teacherProfile.mediums) && teacherProfile.mediums.length > 0) {
         setSelectedMediums(teacherProfile.mediums);
       }
-      if (Array.isArray(teacherProfile.qualifications) && teacherProfile.qualifications.length > 0) {
-        setQualificationsList(teacherProfile.qualifications);
-      }
-      if (Array.isArray(teacherProfile.accreditations) && teacherProfile.accreditations.length > 0) {
-        setAccreditationsList(teacherProfile.accreditations);
-      }
-      if (Array.isArray(teacherProfile.bankAccounts) && teacherProfile.bankAccounts.length > 0) {
-        setBankAccountsList(teacherProfile.bankAccounts);
-      }
-      if (Array.isArray(teacherProfile.socialChannels) && teacherProfile.socialChannels.length > 0) {
-        setSocialChannelsList(teacherProfile.socialChannels);
-      }
+      setQualificationsList(Array.isArray(teacherProfile.qualifications) ? teacherProfile.qualifications : []);
+      setAccreditationsList(Array.isArray(teacherProfile.accreditations) ? teacherProfile.accreditations : []);
+      setBankAccountsList(Array.isArray(teacherProfile.bankAccounts) ? teacherProfile.bankAccounts : []);
+      setSocialChannelsList(Array.isArray(teacherProfile.socialChannels) ? teacherProfile.socialChannels : []);
       if (teacherProfile.specialization) {
         const parsedSubjects = teacherProfile.specialization.split(",").map((s) => s.trim()).filter(Boolean);
-        if (parsedSubjects.length > 0) {
-          setSubjectsList(parsedSubjects);
-        }
+        setSubjectsList(parsedSubjects);
+      } else {
+        setSubjectsList([]);
+      }
+      if (teacherProfile.dob || teacherProfile.gender) {
+        setProfileData((prev) => ({
+          ...prev,
+          dob: teacherProfile.dob || prev.dob,
+          gender: teacherProfile.gender || prev.gender,
+        }));
+      }
+      if (teacherProfile.user?.avatarUrl || teacherProfile.avatarUrl) {
+        setProfileData((prev) => ({
+          ...prev,
+          avatarUrl: teacherProfile.user?.avatarUrl || teacherProfile.avatarUrl || prev.avatarUrl,
+        }));
       }
     }
-  }, [teacherProfile, currentRole]);
+  }, [teacherProfile, currentRole, profileData.fullName]);
 
   useEffect(() => {
     setProfileData(defaultProfile);
     if (currentRole === "teacher") {
-      if (!["personal", "qualifications", "payout", "social", "teaching", "schedule"].includes(activeTab)) {
+      if (!["personal", "payout", "social", "teaching", "schedule"].includes(activeTab)) {
         setActiveTab("personal");
       }
     } else if (currentRole === "super_admin") {
@@ -559,7 +789,7 @@ export function ProfileView() {
         setActiveTab("personal");
       }
     }
-  }, [defaultProfile, currentRole]);
+  }, [defaultProfile, currentRole, activeTab]);
 
     // Load Super Admin profile from PostgreSQL
   useEffect(() => {
@@ -573,22 +803,47 @@ export function ProfileView() {
 
         if (!response.success || cancelled) return;
 
+        setSavedAvatarUrl(response.data?.avatarUrl ?? null);
         const savedProfile = response.data?.superAdminProfile;
 
-        if (!savedProfile) return;
+if (!response.data) return;
+
+if (!savedProfile) {
+  setProfileData((previous) => ({
+    ...previous,
+    email: response.data.email ?? previous.email,
+    studentId: response.data.id ?? previous.studentId,
+  }));
+  return;
+}
+
+// Restore saved Super Admin display name after page refresh
+if (savedProfile.preferredName) {
+  updateAuthUser({
+    preferredName: savedProfile.preferredName,
+  });
+}
 
         setProfileData((previous) => ({
           ...previous,
+          email: response.data.email ?? previous.email,
+          studentId: response.data.id ?? previous.studentId,
           fullName: savedProfile.fullName ?? previous.fullName,
           name: savedProfile.preferredName ?? previous.name,
           phone: savedProfile.phone ?? previous.phone,
           altPhone: savedProfile.altPhone ?? previous.altPhone,
-          address: savedProfile.address ?? previous.address,
+          address: savedProfile.address ?? "",
           city: savedProfile.city ?? previous.city,
           district: savedProfile.district ?? previous.district,
           province: savedProfile.province ?? previous.province,
           postalCode: savedProfile.postalCode ?? previous.postalCode,
-          bio: savedProfile.bio ?? previous.bio,
+          bio: savedProfile.bio ?? "",
+          dob: savedProfile.dateOfBirth
+            ? savedProfile.dateOfBirth.slice(0, 10)
+            : "",
+          gender: savedProfile.gender ?? "",
+          medium: savedProfile.languages ?? "",
+          indexNumber: savedProfile.rootAuthorityId ?? "",
         }));
       } catch (error) {
         if (cancelled) return;
@@ -610,10 +865,318 @@ export function ProfileView() {
     };
   }, [currentRole, currentUser.id, addToast]);
 
+  // Load Student Profile from database if student
+  useEffect(() => {
+    if (currentRole !== "student") return;
+
+    let cancelled = false;
+    const loadStudentProfile = async () => {
+      try {
+        const response = await api.students.getMyProfile();
+        if (!response.success || cancelled || !response.data) return;
+
+        const data = response.data;
+        const studentUser = data.user;
+        const fullName = [studentUser?.firstName, studentUser?.lastName].filter(Boolean).join(" ");
+        const guardianUser = data.guardian?.user;
+        const guardianFullName = guardianUser ? [guardianUser.firstName, guardianUser.lastName].filter(Boolean).join(" ") : "";
+
+        setProfileData((previous) => ({
+          ...previous,
+          email: studentUser?.email ?? previous.email,
+          studentId: data.studentIdNo ?? previous.studentId,
+          indexNumber: previous.indexNumber || data.studentIdNo || previous.studentId,
+          fullName: fullName || previous.fullName,
+          name: fullName || studentUser?.firstName || previous.name,
+          preferredName: studentUser?.firstName || previous.preferredName,
+          grade: data.gradeLevel ?? previous.grade,
+          gradeLevel: data.gradeLevel ? (data.gradeLevel.match(/\d+/)?.[0] || data.gradeLevel) : previous.gradeLevel,
+          classRoom: data.section ?? previous.classRoom,
+          stream: data.section ?? previous.stream,
+          guardianName: guardianFullName || previous.guardianName,
+          guardianPhone: data.guardian?.phoneNumber ?? previous.guardianPhone,
+          guardianEmail: guardianUser?.email ?? previous.guardianEmail,
+          guardianRelationship: data.guardian ? (previous.guardianRelationship || "Guardian / Parent") : previous.guardianRelationship,
+        }));
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load Student profile:", error);
+      }
+    };
+
+    loadStudentProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, currentUser.id]);
+
+  // Load actual enrolled courses for student
+  useEffect(() => {
+    if (currentRole !== "student") return;
+
+    let cancelled = false;
+    const fetchEnrolledCourses = async () => {
+      setIsLoadingEnrolledCourses(true);
+      try {
+        const response = await api.students.getMyCourses();
+        if (!cancelled && response.success && Array.isArray(response.data)) {
+          setEnrolledCourses(response.data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to load student enrolled courses:", err);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingEnrolledCourses(false);
+        }
+      }
+    };
+
+    fetchEnrolledCourses();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, currentUser.id]);
+
+  // Load real sports registrations for student
+  useEffect(() => {
+    if (currentRole !== "student") return;
+
+    let cancelled = false;
+    const fetchSports = async () => {
+      setIsLoadingSports(true);
+      try {
+        const response: any = await api.sports.getMyRegistrations();
+        const list = Array.isArray(response) ? response : (response?.data && Array.isArray(response.data) ? response.data : []);
+        if (!cancelled) {
+          setSportsRegistrations(list);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to load sports registrations:", err);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingSports(false);
+        }
+      }
+    };
+
+    fetchSports();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, currentUser.id]);
+
+  // Load Parent Profile from database if parent
+  useEffect(() => {
+    if (currentRole !== "parent") return;
+
+    let cancelled = false;
+    const loadParentProfile = async () => {
+      try {
+        const response = await api.parents.getMyProfile();
+        if (!response.success || cancelled || !response.data) return;
+
+        const data = response.data;
+        const parentUser = data.user;
+        const fullName = [parentUser?.firstName, parentUser?.lastName].filter(Boolean).join(" ");
+
+        setProfileData((previous) => ({
+          ...previous,
+          email: parentUser?.email ?? previous.email,
+          fullName: fullName || previous.fullName,
+          name: parentUser?.firstName || previous.name,
+          phone: data.phoneNumber ?? previous.phone,
+        }));
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load Parent profile:", error);
+      }
+    };
+
+    loadParentProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole, currentUser.id]);
+
   const [avatarPreset, setAvatarPreset] = useState<string>("default");
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [savedAvatarUrl, setSavedAvatarUrl] = useState<string | null>(null);
+  const [savedAvatarImageUrl, setSavedAvatarImageUrl] = useState<string | null>(null);
+
+
+  useEffect(() => {
+    if (currentRole !== "super_admin" || !savedAvatarUrl) {
+      setSavedAvatarImageUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    const loadSavedAvatar = async () => {
+      try {
+        const blob = await api.superAdminProfile.getAvatarBlob(savedAvatarUrl);
+
+        if (cancelled) return;
+
+        objectUrl = URL.createObjectURL(blob);
+        setSavedAvatarImageUrl(objectUrl);
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error("Failed to load Super Admin avatar:", error);
+        setSavedAvatarImageUrl(null);
+      }
+    };
+
+    setSavedAvatarImageUrl(null);
+    void loadSavedAvatar();
+
+    return () => {
+      cancelled = true;
+
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [currentRole, savedAvatarUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+    };
+  }, [avatarPreviewUrl]);
+
+  const handleAvatarFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (currentRole !== "super_admin") return;
+
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      addToast({ type: "error", title: "Invalid Image", message: "Only JPG, PNG and WebP images are allowed." });
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      addToast({ type: "error", title: "Image Too Large", message: "Profile picture must be 2 MB or smaller." });
+      event.target.value = "";
+      return;
+    }
+
+    setAvatarFile(file);
+    setAvatarPreviewUrl(URL.createObjectURL(file));
+    event.target.value = "";
+  };
+
+
+  const handleDeleteAvatar = async () => {
+    if (currentRole !== "super_admin" || isSavingProfile) return;
+
+    setIsSavingProfile(true);
+
+    try {
+      await api.superAdminProfile.deleteAvatar();
+
+      setSavedAvatarUrl(null);
+      setSavedAvatarImageUrl(null);
+      setAvatarFile(null);
+      setAvatarPreviewUrl(null);
+
+      refreshSuperAdminAvatar();
+      addToast({
+        type: "success",
+        title: "Avatar Removed",
+        message: "Your profile picture has been removed.",
+      });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "Delete Failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to remove profile picture.",
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   const [selectedScheduleDay, setSelectedScheduleDay] = useState<
     "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday"
   >("Monday");
+
+  const dayLiveSessions = useMemo(() => {
+    const fromTimetable = (timetable || []).filter((e) => e.day === selectedScheduleDay);
+    return fromTimetable.map((item) => ({
+      time: `${item.startTime} - ${item.endTime}`,
+      subject: item.subjectName,
+      cohort: item.className || "Active Tuition Cohort",
+      type: item.periodType === "LAB" ? "Practical Lab" : "Live Masterclass",
+      platform: item.room || "Live Studio HD",
+      meetCode: item.meetingUrl || (item.id ? `meet.jit.si/LimatLive_${item.id.slice(0, 8)}` : ""),
+      isLive: Boolean(item.isLiveNow)
+    }));
+  }, [timetable, selectedScheduleDay]);
+
+  const tutorPackagesList = useMemo(() => {
+    if (teacherProfile?.packages && teacherProfile.packages.length > 0) {
+      return teacherProfile.packages.map((pkg: any) => ({
+        id: pkg.id,
+        title: pkg.title,
+        code: pkg.slug || `PKG-${pkg.id?.slice(0, 6)?.toUpperCase() || "BATCH"}`,
+        tier: pkg.billingCycle ? `${pkg.billingCycle} Access` : "Monthly Subscription",
+        students: pkg.subscriptions?.length || 0,
+        fee: `Rs. ${Number(pkg.price || 0).toLocaleString()} / mo`,
+        monthlyGross: `Rs. ${((pkg.subscriptions?.length || 0) * Number(pkg.price || 0)).toLocaleString()} / mo`,
+        delivery: "Google Meet Live Studio & HD Recordings",
+        schedule: "Scheduled Class Timetable",
+        progress: 100,
+        unitsDone: 0,
+        unitsTotal: 0,
+        badgeColor: "border-emerald-200 bg-emerald-50/50 text-emerald-800"
+      }));
+    }
+    const myCourses = (courses || []).filter(
+      (c) =>
+        (c.teacherId && currentUser?.id && c.teacherId === currentUser.id) ||
+        (c.teacherName && currentUser?.name && c.teacherName.toLowerCase() === currentUser.name.toLowerCase())
+    );
+    if (myCourses.length > 0) {
+      return myCourses.map((c) => {
+        const totalLessons = c.totalLessons || c.units?.length || 0;
+        const completedLessons = c.completedLessons || 0;
+        const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+        return {
+          id: c.id,
+          title: c.title,
+          code: c.code || "COURSE",
+          tier: c.gradeName || c.className || "Tuition Cohort",
+          students: 0,
+          fee: "Active Course",
+          monthlyGross: "—",
+          delivery: "Interactive Curriculum & Notes",
+          schedule: "Weekly Live Sessions",
+          progress,
+          unitsDone: completedLessons,
+          unitsTotal: totalLessons,
+          badgeColor: "border-indigo-200 bg-indigo-50/50 text-indigo-800"
+        };
+      });
+    }
+    return [];
+  }, [teacherProfile?.packages, courses, currentUser]);
 
   const handleCopyId = () => {
     navigator.clipboard?.writeText(profileData.studentId);
@@ -920,12 +1483,32 @@ export function ProfileView() {
           city: profileData.city,
           district: profileData.district,
           province: profileData.province,
-          postalCode: profileData.postalCode,
+                    postalCode: profileData.postalCode,
           bio: profileData.bio,
+          dateOfBirth: profileData.dob || null,
+          gender: profileData.gender || null,
+          languages: profileData.medium || null,
+          rootAuthorityId: profileData.indexNumber || null,
         });
+
 
         if (!response.success) {
           throw new Error(response.message || "Profile update failed");
+        }
+        updateAuthUser({
+  preferredName: profileData.name.trim(),
+});
+
+        if (avatarFile) {
+          const avatarResponse = await api.superAdminProfile.uploadAvatar(
+            avatarFile
+          );
+
+          setSavedAvatarUrl(avatarResponse.data.avatarUrl);
+          setAvatarFile(null);
+          setAvatarPreviewUrl(null);
+
+          refreshSuperAdminAvatar();
         }
 
         setIsEditing(false);
@@ -953,7 +1536,20 @@ export function ProfileView() {
 
     if (currentRole === "teacher") {
       setIsSavingProfile(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`lms_dob_${currentUser.id || 'teacher'}`, profileData.dob || "");
+        localStorage.setItem(`lms_gender_${currentUser.id || 'teacher'}`, profileData.gender || "");
+        localStorage.setItem(`lms_medium_${currentUser.id || 'teacher'}`, profileData.medium || "");
+        if (profileData.avatarUrl) {
+          localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, profileData.avatarUrl);
+          localStorage.setItem("lms_avatar_teacher", profileData.avatarUrl);
+        } else {
+          localStorage.removeItem(`lms_avatar_${currentUser.id || 'teacher'}`);
+          localStorage.removeItem("lms_avatar_teacher");
+        }
+      }
       const success = await updateTeacherProfile({
+        avatarUrl: profileData.avatarUrl,
         title: profileData.grade,
         bio: profileData.bio,
         specialization: subjectsList.join(", "),
@@ -964,7 +1560,7 @@ export function ProfileView() {
         province: profileData.province,
         postalCode: profileData.postalCode,
         sltsRegNo: profileData.indexNumber,
-        mediums: selectedMediums,
+        mediums: profileData.medium ? [profileData.medium] : selectedMediums,
         experienceYears: Number(experienceYears) || 0,
         qualifications: qualificationsList,
         accreditations: accreditationsList,
@@ -980,20 +1576,129 @@ export function ProfileView() {
         telegramUrl,
         whatsappNumber,
         websiteUrl,
-        coverImageUrl
+        coverImageUrl,
+        dob: profileData.dob,
+        gender: profileData.gender
       });
       setIsSavingProfile(false);
       if (success) {
         setIsEditing(false);
       }
-    } else {
-      setIsEditing(false);
-      addToast({
-        type: "success",
-        title: "Profile Saved",
-        message: "Your profile information has been successfully updated!"
-      });
+      return;
     }
+
+    if (currentRole === "student") {
+      setIsSavingProfile(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`lms_dob_${currentUser.id || 'student'}`, profileData.dob || "");
+        localStorage.setItem(`lms_gender_${currentUser.id || 'student'}`, profileData.gender || "");
+        localStorage.setItem(`lms_medium_${currentUser.id || 'student'}`, profileData.medium || "");
+        localStorage.setItem(`lms_phone_${currentUser.id || 'student'}`, profileData.phone || "");
+        localStorage.setItem(`lms_address_${currentUser.id || 'student'}`, profileData.address || "");
+        localStorage.setItem(`lms_city_${currentUser.id || 'student'}`, profileData.city || "");
+        localStorage.setItem(`lms_district_${currentUser.id || 'student'}`, profileData.district || "");
+        localStorage.setItem(`lms_province_${currentUser.id || 'student'}`, profileData.province || "");
+        localStorage.setItem(`lms_postal_${currentUser.id || 'student'}`, profileData.postalCode || "");
+        localStorage.setItem(`lms_bio_${currentUser.id || 'student'}`, profileData.bio || "");
+        localStorage.setItem(`lms_index_${currentUser.id || 'student'}`, profileData.indexNumber || "");
+        localStorage.setItem(`lms_exam_year_${currentUser.id || 'student'}`, profileData.examYear || "");
+        localStorage.setItem(`lms_guardian_name_${currentUser.id || 'student'}`, profileData.guardianName || "");
+        localStorage.setItem(`lms_guardian_phone_${currentUser.id || 'student'}`, profileData.guardianPhone || "");
+        localStorage.setItem(`lms_guardian_email_${currentUser.id || 'student'}`, profileData.guardianEmail || "");
+        localStorage.setItem(`lms_guardian_rel_${currentUser.id || 'student'}`, profileData.guardianRelationship || "");
+        localStorage.setItem(`lms_guardian_occ_${currentUser.id || 'student'}`, profileData.guardianOccupation || "");
+        localStorage.setItem(`lms_emergency_${currentUser.id || 'student'}`, profileData.emergencyContact || "");
+      }
+      try {
+        const nameParts = (profileData.fullName || profileData.name || "").trim().split(/\s+/);
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || "";
+
+        const response = await api.students.updateMyProfile({
+          firstName,
+          lastName,
+          gradeLevel: profileData.grade || profileData.gradeLevel,
+          section: profileData.classRoom || profileData.stream,
+        });
+
+        if (!response.success) {
+          throw new Error(response.message || "Failed to update student profile");
+        }
+
+        updateAuthUser({
+          firstName,
+          lastName,
+        });
+
+        setIsEditing(false);
+        addToast({
+          type: "success",
+          title: "Profile Saved",
+          message: "Student academic profile and identity updated successfully.",
+        });
+      } catch (error: any) {
+        addToast({
+          type: "error",
+          title: "Save Failed",
+          message: error?.message || "Unable to update Student profile.",
+        });
+      } finally {
+        setIsSavingProfile(false);
+      }
+      return;
+    }
+
+    if (currentRole === "parent") {
+      setIsSavingProfile(true);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`lms_dob_${currentUser.id || 'parent'}`, profileData.dob || "");
+        localStorage.setItem(`lms_gender_${currentUser.id || 'parent'}`, profileData.gender || "");
+        localStorage.setItem(`lms_medium_${currentUser.id || 'parent'}`, profileData.medium || "");
+      }
+      try {
+        const nameParts = (profileData.fullName || profileData.name || "").trim().split(/\s+/);
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || "";
+
+        const response = await api.parents.updateMyProfile({
+          firstName,
+          lastName,
+          phoneNumber: profileData.phone,
+        });
+
+        if (!response.success) {
+          throw new Error(response.message || "Failed to update parent profile");
+        }
+
+        updateAuthUser({
+          firstName,
+          lastName,
+        });
+
+        setIsEditing(false);
+        addToast({
+          type: "success",
+          title: "Profile Saved",
+          message: "Parent contact profile and identity updated successfully.",
+        });
+      } catch (error: any) {
+        addToast({
+          type: "error",
+          title: "Save Failed",
+          message: error?.message || "Unable to update Parent profile.",
+        });
+      } finally {
+        setIsSavingProfile(false);
+      }
+      return;
+    }
+
+    setIsEditing(false);
+    addToast({
+      type: "success",
+      title: "Profile Saved",
+      message: "Your profile information has been successfully updated!"
+    });
   };
 
   return (
@@ -1036,15 +1741,6 @@ export function ProfileView() {
             </button>
           )}
 
-          <button
-            onClick={() => window.print()}
-            className="px-3.5 py-2 rounded-xl bg-white border border-[#d6ede6] hover:bg-[#f6fbf9] text-xs font-bold text-slate-700 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
-            title="Print or Save Profile Record as PDF"
-          >
-            <Printer className="h-3.5 w-3.5 text-slate-500" />
-            <span className="hidden sm:inline">Print Record</span>
-          </button>
-
           {isEditing ? (
             <button
               onClick={handleSave}
@@ -1078,23 +1774,130 @@ export function ProfileView() {
         </div>
 
         <div className="relative flex flex-col md:flex-row items-start md:items-center gap-5 sm:gap-6">
-          {/* Avatar with preset selection & edit indicator */}
+          {/* Avatar with photo preview */}
           <div className="relative group shrink-0">
-            <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-gradient-to-br from-[#0d5c4d] to-[#16423b] flex items-center justify-center text-white text-3xl sm:text-4xl font-black shadow-lg shadow-[#0d5c4d]/25 border-4 border-white ring-2 ring-[#0d5c4d]/10">
-              {profileData.name.charAt(0)}
+            <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-gradient-to-br from-[#0d5c4d] to-[#16423b] flex items-center justify-center overflow-hidden text-white text-3xl sm:text-4xl font-black shadow-lg shadow-[#0d5c4d]/25 border-4 border-white ring-2 ring-[#0d5c4d]/10">
+              {currentRole === "super_admin" &&
+              (avatarPreviewUrl || savedAvatarImageUrl) ? (
+                <img
+                  src={avatarPreviewUrl || savedAvatarImageUrl || ""}
+                  alt="Super Admin profile picture"
+                  className="h-full w-full object-cover"
+                />
+              ) : profileData.avatarUrl ? (
+                <img
+                  src={profileData.avatarUrl}
+                  alt={profileData.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                profileData.name ? profileData.name.charAt(0).toUpperCase() : "T"
+              )}
             </div>
-            {isEditing && (
-              <button
-                type="button"
-                className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform"
-                title="Change Avatar Photo"
+
+            {currentRole === "super_admin" && (
+              <input
+                id="super-admin-avatar-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleAvatarFileChange}
+                className="hidden"
+                aria-label="Select profile picture"
+              />
+            )}
+
+            {currentRole === "teacher" && (
+              <input
+                id="teacher-avatar-file-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleTeacherAvatarFileChange}
+                className="hidden"
+                aria-label="Select profile picture"
+              />
+            )}
+
+            {currentRole === "super_admin" ? (
+              isEditing && (
+                <label
+                  htmlFor="super-admin-avatar-input"
+                  className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform cursor-pointer"
+                  title="Change Avatar Photo"
+                >
+                  <Camera className="h-4 w-4" />
+                </label>
+              )
+            ) : currentRole === "teacher" ? (
+              <label
+                htmlFor="teacher-avatar-file-input"
+                className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#0d5c4d] text-white flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform cursor-pointer"
+                title="Change Profile Photo"
               >
                 <Camera className="h-4 w-4" />
+              </label>
+            ) : (
+              isEditing && (
+                <button
+                  type="button"
+                  className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform"
+                  title="Change Avatar Photo"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+              )
+            )}
+
+            {currentRole === "teacher" && profileData.avatarUrl && (
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileData((prev) => ({ ...prev, avatarUrl: "" }));
+                  if (typeof window !== "undefined") {
+                    localStorage.removeItem(`lms_avatar_${currentUser.id || 'teacher'}`);
+                  }
+                  addToast({ type: "info", title: "Photo Removed", message: "Click 'Save Details' to persist this change." });
+                }}
+                title="Remove profile picture"
+                className="absolute -bottom-1.5 -left-1.5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-50 text-red-600 shadow-md transition-transform hover:scale-105 hover:bg-red-100 cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
             )}
-          </div>
 
+            {currentRole === "super_admin" &&
+              isEditing &&
+              savedAvatarUrl && (
+                <button
+                  type="button"
+                  onClick={handleDeleteAvatar}
+                  disabled={isSavingProfile}
+                  title="Remove profile picture"
+                  aria-label="Remove profile picture"
+                  className="absolute -bottom-1.5 -left-1.5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-50 text-red-600 shadow-md transition-transform hover:scale-105 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v5" />
+                    <path d="M14 11v5" />
+                  </svg>
+                </button>
+              )}
+          </div>
           {/* User Details */}
+
           <div className="flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2.5">
               <h2 className="text-xl sm:text-2xl font-black text-[#0d2b26]">
@@ -1109,11 +1912,7 @@ export function ProfileView() {
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold">
                 {currentRole === "student"
-                  ? (profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                    ? `${profileData.grade || "Grade 12"} • ${profileData.stream || "Physical Science"}`
-                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                    ? `${profileData.grade || "Grade 11"} • G.C.E. O/L`
-                    : `${profileData.grade || "Grade 8"} • Junior Secondary`
+                  ? profileData.grade || (profileData.gradeLevel ? `Grade ${profileData.gradeLevel}` : "Student")
                   : profileData.stream}
               </span>
             </div>
@@ -1133,13 +1932,15 @@ export function ProfileView() {
                     : profileData.schoolName}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <BookOpen className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                <span>{profileData.classRoom}</span>
-              </div>
+              {currentRole !== "student" && profileData.classRoom && (
+                <div className="flex items-center gap-1.5">
+                  <BookOpen className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                  <span>{profileData.classRoom}</span>
+                </div>
+              )}
               <div className="flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                <span>{profileData.city}, Sri Lanka</span>
+                <span>{profileData.city ? `${profileData.city}, Sri Lanka` : "Sri Lanka"}</span>
               </div>
               <button
                 onClick={handleCopyId}
@@ -1176,10 +1977,10 @@ export function ProfileView() {
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enrolled Subscribers</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
                 <span className="text-lg font-black text-[#0d5c4d] font-mono">
-                  {teacherProfile?.stats?.totalSubscribers ?? 142} Students
+                  {teacherProfile?.stats?.totalSubscribers ?? 0} Students
                 </span>
                 <span className="text-[10px] text-emerald-600 font-bold">
-                  Across {teacherProfile?.stats?.totalPackages ?? 4} Batches
+                  Across {teacherProfile?.stats?.totalPackages ?? 0} Batches
                 </span>
               </div>
             </div>
@@ -1188,17 +1989,19 @@ export function ProfileView() {
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Monthly Gross Revenue</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
                 <span className="text-lg font-black text-amber-600 font-mono">
-                  Rs. {(teacherProfile?.stats?.monthlyGrossRevenue ?? 639000).toLocaleString()}
+                  Rs. {(teacherProfile?.stats?.monthlyGrossRevenue ?? 0).toLocaleString()}
                 </span>
-                <span className="text-[10px] text-slate-500 font-semibold">90% Tutor Payout</span>
+                <span className="text-[10px] text-slate-500 font-semibold">Live Payouts</span>
               </div>
             </div>
 
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Weekly Live Hours</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d2b26]">14 Hours</span>
-                <span className="text-[10px] text-emerald-600 font-bold">Google Meet Active</span>
+                <span className="text-lg font-black text-[#0d2b26]">
+                  {teacherProfile?.stats?.totalCourses ? `${teacherProfile.stats.totalCourses * 2} Hours` : "0 Hours"}
+                </span>
+                <span className="text-[10px] text-emerald-600 font-bold">Live Stream Active</span>
               </div>
             </div>
           </div>
@@ -1207,7 +2010,24 @@ export function ProfileView() {
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Client Tenants</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d5c4d]">4 Active Clients</span>
+
+
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-lg font-black text-[#0d5c4d]">
+                  {tenantStatisticsLoading
+                    ? "Loading..."
+                    : tenantStatisticsError
+                      ? "Unavailable"
+                      : tenantStatistics
+                        ? `${tenantStatistics.activeTenants.toLocaleString()} Active Clients`
+                        : "Unavailable"}
+                </span>
+                <span className="text-[10px] text-emerald-600 font-bold">
+                  Schools, Tutors &amp; Academies
+                </span>
+              </div>
+
+
                 <span className="text-[10px] text-emerald-600 font-bold">Schools, Tutors &amp; Academies</span>
               </div>
             </div>
@@ -1215,7 +2035,19 @@ export function ProfileView() {
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Monthly SaaS MRR</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-amber-600 font-mono">LKR 448,000</span>
+
+                <span className="text-lg font-black text-amber-600 font-mono">
+                  {monthlyMrrLoading
+                    ? "Loading..."
+                    : monthlyMrrError
+                      ? "Unavailable"
+                      : monthlyMrr
+                        ? `${monthlyMrr.currency} ${monthlyMrr.monthlyMrr.toLocaleString("en-LK", {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })}`
+                        : "Unavailable"}
+                </span>
                 <span className="text-[10px] text-slate-500 font-semibold">Recurring Platform Revenue</span>
               </div>
             </div>
@@ -1223,8 +2055,19 @@ export function ProfileView() {
             <div className="p-3 rounded-2xl bg-[#f8faf9] border border-[#e2eae5]">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Platform Students</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d2b26]">9,942 Students</span>
-                <span className="text-[10px] text-emerald-600 font-bold">Across All Tenant Databases</span>
+
+<span className="text-lg font-black text-[#0d2b26]">
+  {studentStatisticsLoading
+    ? "Loading..."
+    : studentStatisticsError
+      ? "Unavailable"
+      : studentStatistics
+        ? `${studentStatistics.totalStudents.toLocaleString()} Students`
+        : "Unavailable"}
+</span>
+                <span className="text-[10px] text-emerald-600 font-bold">
+  Registered Students Across Non-Archived Tenants
+</span>
               </div>
             </div>
           </div>
@@ -1237,7 +2080,6 @@ export function ProfileView() {
         {(currentRole === "teacher"
           ? [
               { id: "personal", label: "Tutor Studio Profile", icon: User },
-              { id: "qualifications", label: "Qualifications & Credentials", icon: GraduationCap },
               { id: "payout", label: "Bank & Payout Details", icon: CreditCard },
               { id: "social", label: "Public Studio & Social", icon: Globe },
               { id: "teaching", label: "Active Batches & Study Packages", icon: BookOpen },
@@ -1279,36 +2121,714 @@ export function ProfileView() {
       {/* =================================================================== */}
       {activeTab === "personal" && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                  <User className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>
-                    {currentRole === "teacher"
-                      ? "Tutor Studio Profile & Faculty Credentials"
-                      : currentRole === "super_admin"
-                      ? "Platform Directorate Master Credentials"
-                      : "General Information"}
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {currentRole === "teacher"
-                    ? "Official personal identification, studio profile details, and Ministry of Education service registration."
-                    : currentRole === "super_admin"
-                    ? "Master administrator credentials, root authority, and global tenant control specifications."
-                    : "Official personal identification as registered with the Ministry of Education."}
-                </p>
-              </div>
+          {currentRole === "teacher" ? (
+            !isEditing ? (
+              /* =================================================================== */
+              /* 1. VIEW PROFILE PAGE – READ-ONLY TUTOR PROFILE DASHBOARD            */
+              /* =================================================================== */
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* Header with Edit Details Button */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+                  <div>
+                    <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                      <User className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>Tutor Studio Profile &amp; Faculty Credentials</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Official personal identification, studio profile details, and Ministry of Education service registration.
+                    </p>
+                  </div>
 
-              {currentRole === "teacher" && (
-                <div className="flex items-center gap-2 self-start sm:self-auto">
-                  {isEditing ? (
-                    <>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] hover:bg-[#d8f2eb] border border-[#c4e9e0] font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
+                  >
+                    <Edit3 className="h-4 w-4 text-[#0d5c4d]" />
+                    <span>Edit Details</span>
+                  </button>
+                </div>
+
+                {/* Subject Specializations & Modules (Attractive Badges/Chips) */}
+                <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-extrabold text-xs text-[#0d2b26] flex items-center gap-2 uppercase tracking-wide">
+                      <Award className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>Subject Specializations &amp; Teaching Modules</span>
+                    </h4>
+                    <span className="text-[11px] font-bold text-slate-400">
+                      {subjectsList.length} {subjectsList.length === 1 ? "Subject" : "Subjects"}
+                    </span>
+                  </div>
+                  {subjectsList.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {subjectsList.map((subj) => (
+                        <span
+                          key={subj}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#ecf8f5] text-[#0d2b26] border border-[#c4e9e0] text-xs font-bold shadow-2xs hover:border-[#0d5c4d] transition-colors"
+                        >
+                          <BookOpen className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                          <span>{subj}</span>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic py-1">
+                      No subject specializations listed yet. Click &quot;Edit Details&quot; above to add your subjects and modules.
+                    </p>
+                  )}
+                </div>
+
+                {/* Clean Information Cards Grid (No input borders or form-like elements) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Card 1: Personal Information */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                      <User className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">Personal Information</h4>
+                    </div>
+                    <div className="space-y-3.5">
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Full Legal Name</span>
+                        <p className="text-sm font-semibold text-slate-800 mt-0.5">{profileData.fullName || "—"}</p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Display / Preferred Name</span>
+                        <p className="text-sm font-semibold text-slate-800 mt-0.5">{profileData.name || "—"}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 pt-1">
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Date of Birth</span>
+                          <p className="text-xs font-semibold text-slate-800 mt-1 flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{profileData.dob || "Not specified"}</span>
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Gender</span>
+                          <p className="text-xs font-semibold text-slate-800 mt-1">
+                            {profileData.gender ? (
+                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
+                                {profileData.gender}
+                              </span>
+                            ) : (
+                              "Not specified"
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Professional / Faculty Credentials */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                      <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">Faculty Credentials</h4>
+                    </div>
+                    <div className="space-y-3.5">
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Teacher Service / Faculty ID</span>
+                        <p className="text-sm font-mono font-bold text-[#0d5c4d] mt-0.5">{profileData.studentId || "FAC-2897"}</p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">SLTS Registration Number</span>
+                        <p className="text-sm font-mono font-semibold text-slate-800 mt-0.5">{profileData.indexNumber || "Not Registered"}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 pt-1">
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Academic Title</span>
+                          <p className="text-xs font-semibold text-slate-800 mt-1">{profileData.grade || "Faculty Member"}</p>
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">A/L Experience</span>
+                          <p className="text-xs font-bold text-[#0d5c4d] mt-1">{experienceYears} Years in Service</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Contact Information */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                      <Phone className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">Contact Information</h4>
+                    </div>
+                    <div className="space-y-3.5">
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Primary Mobile Phone</span>
+                        {profileData.phone ? (
+                          <a
+                            href={`tel:${profileData.phone}`}
+                            className="inline-flex items-center gap-2 text-sm font-bold text-[#0d5c4d] hover:underline mt-0.5"
+                          >
+                            <Phone className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                            <span>{profileData.phone}</span>
+                          </a>
+                        ) : (
+                          <p className="text-sm text-slate-400 italic mt-0.5">Not provided</p>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Institutional Email</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <a
+                            href={`mailto:${profileData.email}`}
+                            className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800 hover:text-[#0d5c4d]"
+                          >
+                            <Mail className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{profileData.email}</span>
+                          </a>
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            <CheckCircle2 className="h-3 w-3" /> Verified
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Residential Address</span>
+                        <p className="text-xs font-semibold text-slate-800 mt-1 flex items-start gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                          <span>
+                            {[profileData.address, profileData.city, profileData.district, profileData.province]
+                              .map((v) => v?.trim())
+                              .filter(Boolean)
+                              .join(", ") || "Sri Lanka"}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 4: Teaching Preferences & Mediums */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-4">
+                    <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                      <BookOpen className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">Teaching Preferences</h4>
+                    </div>
+                    <div className="space-y-3.5">
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Primary Medium of Study</span>
+                        <p className="mt-1">
+                          <span className="inline-block px-3 py-1 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] font-bold text-xs border border-[#c4e9e0]">
+                            {profileData.medium || "English"}
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Languages of Instruction</span>
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {selectedMediums.length > 0 ? (
+                            selectedMediums.map((med) => (
+                              <span
+                                key={med}
+                                className="px-3 py-1 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200"
+                              >
+                                {med}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">None specified</span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Curriculum Focus</span>
+                        <p className="text-xs font-semibold text-slate-700 mt-1">
+                          Sri Lanka G.C.E. Advanced Level &amp; Secondary Education
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 5: Personal Statement / Bio (Full Width) */}
+                  <div className="md:col-span-2 bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-6 shadow-xs space-y-3">
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                      <FileText className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">Personal Statement &amp; Teaching Philosophy</h4>
+                    </div>
+                    {profileData.bio ? (
+                      <blockquote className="p-4 rounded-2xl bg-gradient-to-r from-[#f8faf9] to-[#f2f8f6] border-l-4 border-[#0d5c4d] text-xs sm:text-sm text-slate-700 leading-relaxed italic">
+                        &ldquo;{profileData.bio}&rdquo;
+                      </blockquote>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic py-2">
+                        No personal statement or bio provided yet. Click &quot;Edit Details&quot; to introduce your coaching style, academic ethos, and achievements to prospective students.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* =================================================================== */
+              /* 2. EDIT DETAILS PAGE – FORM-BASED EDITING DESIGN                    */
+              /* =================================================================== */
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* Form Header Card */}
+                <div className="bg-white rounded-3xl border border-[#c4e9e0] p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                      <Edit3 className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>Edit Tutor Studio Profile</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Update your official credentials, teaching specializations, contact info, and profile bio.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={isSavingProfile}
+                      className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      <span>{isSavingProfile ? "Saving..." : "Save Details"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSave} className="space-y-6">
+                  {/* Group 1: Personal Identification */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-5">
+                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+                      <User className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">1. Personal Identification</h4>
+                    </div>
+
+                    {/* Tutor Profile Avatar Uploader */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-[#f8faf9] to-[#f2f8f6] border border-[#d6ede6] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="relative group shrink-0">
+                          <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-[#0d5c4d] text-white flex items-center justify-center font-black text-2xl overflow-hidden border-2 border-white shadow-md">
+                            {profileData.avatarUrl ? (
+                              <img src={profileData.avatarUrl} alt={profileData.name} className="h-full w-full object-cover" />
+                            ) : (
+                              profileData.name ? profileData.name.charAt(0).toUpperCase() : "T"
+                            )}
+                          </div>
+                          <label
+                            htmlFor="teacher-avatar-file-input"
+                            className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-[#0d5c4d] text-white hover:bg-[#0a473b] border-2 border-white flex items-center justify-center shadow cursor-pointer transition-transform hover:scale-105"
+                            title="Upload Photo"
+                          >
+                            <Camera className="h-3.5 w-3.5" />
+                          </label>
+                        </div>
+
+                        <div className="space-y-1">
+                          <h5 className="font-extrabold text-xs text-[#0d2b26] flex items-center gap-1.5 uppercase tracking-wide">
+                            <Camera className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                            <span>Tutor Profile Photo</span>
+                          </h5>
+                          <p className="text-[11px] text-slate-500">
+                            Square JPG, PNG or WebP image. Maximum 5 MB.
+                          </p>
+                          {profileData.avatarUrl && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              <CheckCircle2 className="h-3 w-3" /> Custom Photo Active
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end flex-wrap">
+                        <label
+                          htmlFor="teacher-avatar-file-input"
+                          className="px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Camera className="h-3.5 w-3.5" />
+                          <span>Upload Photo</span>
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => setAvatarModalOpen(true)}
+                          className="px-3.5 py-2 rounded-xl bg-white border border-[#c4e9e0] hover:bg-emerald-50 text-[#0d5c4d] text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          <span>Presets</span>
+                        </button>
+
+                        {profileData.avatarUrl && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProfileData((prev) => ({ ...prev, avatarUrl: "" }));
+                              if (typeof window !== "undefined") {
+                                localStorage.removeItem(`lms_avatar_${currentUser.id || 'teacher'}`);
+                              }
+                              addToast({ type: "info", title: "Photo Removed", message: "Click 'Save Details' to persist this change." });
+                            }}
+                            className="p-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition-colors cursor-pointer"
+                            title="Remove Photo"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">
+                          Full Legal Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={profileData.fullName}
+                          onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                          placeholder="e.g. Sakiththiyan Thankavelu"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">
+                          Display / Preferred Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={profileData.name}
+                          onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                          placeholder="e.g. Sakith"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Date of Birth</label>
+                        <input
+                          type="date"
+                          value={profileData.dob}
+                          onChange={(e) => setProfileData({ ...profileData, dob: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Gender</label>
+                        <select
+                          value={profileData.gender}
+                          onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white cursor-pointer"
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group 2: Professional & Faculty Credentials */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-5">
+                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">2. Professional &amp; Faculty Credentials</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                          <span>Teacher Service / Faculty ID</span>
+                          <span className="text-[10px] text-slate-400 font-normal">Assigned by Administration</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            readOnly
+                            disabled
+                            value={profileData.studentId || "FAC-2897"}
+                            className="w-full h-10 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono font-bold text-[#0d5c4d] cursor-not-allowed"
+                          />
+                          <Lock className="h-3.5 w-3.5 text-slate-400 absolute right-3 top-3.5" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">
+                          Sri Lanka Teachers&apos; Service (SLTS) Reg Number
+                        </label>
+                        <input
+                          type="text"
+                          value={profileData.indexNumber}
+                          onChange={(e) => setProfileData({ ...profileData, indexNumber: e.target.value })}
+                          placeholder="e.g. SLTS-2024-9841"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Academic Title / Position</label>
+                        <input
+                          type="text"
+                          value={profileData.grade}
+                          onChange={(e) => setProfileData({ ...profileData, grade: e.target.value })}
+                          placeholder="e.g. Senior Faculty Member · A/L Masterclass Lead"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Years of A/L Coaching Experience</label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            value={experienceYears}
+                            onChange={(e) => setExperienceYears(Number(e.target.value) || 0)}
+                            className="w-32 h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0d5c4d] focus:outline-none focus:border-[#0d5c4d]"
+                          />
+                          <span className="text-xs font-bold text-slate-600">Years in Active Service</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group 3: Contact Details & Residential Address */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-5">
+                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">3. Contact &amp; Residential Details</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">
+                          Mobile Phone Number <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          required
+                          value={profileData.phone}
+                          onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                          placeholder="+94 77 123 4567"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Email Address (Institutional)</label>
+                        <input
+                          type="email"
+                          value={profileData.email}
+                          onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2 space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Residential Street Address</label>
+                        <input
+                          type="text"
+                          value={profileData.address}
+                          onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
+                          placeholder="e.g. No. 12, Temple Road"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">City / Town</label>
+                        <input
+                          type="text"
+                          value={profileData.city}
+                          onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
+                          placeholder="e.g. Jaffna"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">District</label>
+                        <input
+                          type="text"
+                          value={profileData.district}
+                          onChange={(e) => setProfileData({ ...profileData, district: e.target.value })}
+                          placeholder="e.g. Jaffna"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group 4: Teaching Preferences & Subject Specializations */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-5">
+                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">4. Teaching Preferences &amp; Specializations</h4>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Primary Medium of Study</label>
+                        <select
+                          value={profileData.medium || "English"}
+                          onChange={(e) => setProfileData({ ...profileData, medium: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs bg-white font-medium cursor-pointer focus:outline-none focus:border-[#0d5c4d]"
+                        >
+                          <option value="English">English</option>
+                          <option value="Sinhala">Sinhala</option>
+                          <option value="Tamil">Tamil</option>
+                          <option value="Bilingual (English / Sinhala)">Bilingual (English / Sinhala)</option>
+                          <option value="Bilingual (English / Tamil)">Bilingual (English / Tamil)</option>
+                          <option value="Trilingual (English / Sinhala / Tamil)">Trilingual (English / Sinhala / Tamil)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700">Languages of Instruction</label>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {["English", "Sinhala", "Tamil"].map((med) => {
+                            const isSel = selectedMediums.includes(med);
+                            return (
+                              <button
+                                key={med}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedMediums((prev) =>
+                                    prev.includes(med) ? prev.filter((m) => m !== med) : [...prev, med]
+                                  );
+                                }}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                                  isSel
+                                    ? "bg-[#0d5c4d] text-white border-[#0d5c4d]"
+                                    : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                                }`}
+                              >
+                                {isSel ? `✓ ${med}` : `+ ${med}`}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Subject Specializations Manager (Inline) */}
+                    <div className="pt-2 border-t border-slate-100 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <label className="font-extrabold text-xs text-[#0d2b26] flex items-center gap-1.5 uppercase tracking-wide">
+                            <Award className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                            <span>Subject Specializations &amp; Modules</span>
+                          </label>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Add and manage the subjects students search for on your tutor profile.
+                          </p>
+                        </div>
+
+                        {!showSubjectInput && (
+                          <button
+                            type="button"
+                            onClick={() => setShowSubjectInput(true)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all shadow-xs cursor-pointer self-start sm:self-auto"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>Add Subject</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {showSubjectInput && (
+                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-[#0d5c4d]/30 shadow-xs">
+                          <input
+                            type="text"
+                            value={newSubjectInput}
+                            onChange={(e) => setNewSubjectInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addSubject(newSubjectInput);
+                              }
+                            }}
+                            placeholder="Type subject name (e.g. Combined Mathematics, Applied Mechanics)"
+                            className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-[#0d5c4d]"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => addSubject(newSubjectInput)}
+                            className="px-3 py-1.5 rounded-lg bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowSubjectInput(false);
+                              setNewSubjectInput("");
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-700 text-xs font-bold cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {subjectsList.map((subj) => (
+                          <span
+                            key={subj}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-[#0d2b26] border border-[#c4e9e0] text-xs font-bold shadow-2xs group hover:border-[#0d5c4d] transition-colors"
+                          >
+                            <span>{subj}</span>
+                            <button
+                              type="button"
+                              onClick={() => deleteSubject(subj)}
+                              className="h-4 w-4 rounded-full flex items-center justify-center text-slate-400 group-hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                              title={`Remove ${subj}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                        {subjectsList.length === 0 && (
+                          <p className="text-xs text-slate-400 italic">No subject specializations listed yet. Click &quot;+ Add Subject&quot; above.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Group 5: Personal Statement / Bio */}
+                  <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-4">
+                    <div className="pb-3 border-b border-slate-100 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-[#0d5c4d]" />
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">5. Personal Statement &amp; Bio</h4>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Personal Statement / Bio</label>
+                      <textarea
+                        rows={4}
+                        value={profileData.bio}
+                        onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                        placeholder="Share your coaching philosophy, academic track record, and achievements to inspire students..."
+                        className="w-full p-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] leading-relaxed"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bottom Action Bar */}
+                  <div className="p-4 rounded-2xl bg-white border border-[#c4e9e0] shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <p className="text-xs text-slate-500 font-medium">
+                      Review all changes before submitting to ensure your public tutor profile is accurate.
+                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
                         onClick={() => setIsEditing(false)}
-                        className="px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                        className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
                       >
                         Cancel
                       </button>
@@ -1316,531 +2836,258 @@ export function ProfileView() {
                         type="button"
                         onClick={handleSave}
                         disabled={isSavingProfile}
-                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                       >
                         <Save className="h-3.5 w-3.5" />
                         <span>{isSavingProfile ? "Saving..." : "Save Details"}</span>
                       </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] hover:bg-[#d8f2eb] border border-[#c4e9e0] font-bold text-xs transition-colors cursor-pointer"
-                    >
-                      <Edit3 className="h-3.5 w-3.5" />
-                      <span>Edit Details</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* SUBJECT SPECIALIZATIONS MANAGER (Add, Edit, Delete tags) */}
-            {currentRole === "teacher" && (
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#f8faf9] to-[#f2f8f6] border border-[#d6ede6] space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )
+          ) : (
+            /* NON-TEACHER ROLES (Student, Parent, Super Admin) */
+            <div className="space-y-6">
+              <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
                   <div>
-                    <h4 className="font-extrabold text-xs text-[#0d2b26] flex items-center gap-1.5 uppercase tracking-wide">
-                      <Award className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                      <span>Subject Specializations &amp; Modules</span>
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      Add and manage the specific subjects students search for on your tutor profile.
+                    <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                      <User className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>
+                        {currentRole === "super_admin"
+                          ? "Platform Directorate Master Credentials"
+                          : "General Information"}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {currentRole === "super_admin"
+                        ? "Master administrator credentials, root authority, and global tenant control specifications."
+                        : "Official personal identification and student academic registration."}
+                    </p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Full Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Full Legal Name</label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={profileData.fullName}
+                        onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      />
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        {profileData.fullName || "—"}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Preferred Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Display / Preferred Name</label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={profileData.name}
+                        onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      />
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        {profileData.name || "—"}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Student ID */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">
+                      {currentRole === "super_admin"
+                        ? "Platform Master Root ID"
+                        : "Student Admission / Reg Number"}
+                    </label>
+                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-bold text-[#0d5c4d]">
+                      {profileData.studentId || "—"}
                     </p>
                   </div>
 
-                  {!showSubjectInput && (
-                    <button
-                      type="button"
-                      onClick={() => setShowSubjectInput(true)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all shadow-xs cursor-pointer self-start sm:self-auto"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>Add Subject</span>
-                    </button>
-                  )}
-                </div>
-
-                {/* Inline Add Subject Input */}
-                {showSubjectInput && (
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-[#0d5c4d]/30 shadow-xs">
-                    <input
-                      type="text"
-                      value={newSubjectInput}
-                      onChange={(e) => setNewSubjectInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addSubject(newSubjectInput);
-                        }
-                      }}
-                      placeholder="Type subject name (e.g. Combined Mathematics, Applied Mechanics)"
-                      className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-[#0d5c4d]"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={() => addSubject(newSubjectInput)}
-                      className="px-3 py-1.5 rounded-lg bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      Add
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowSubjectInput(false);
-                        setNewSubjectInput("");
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-700 text-xs font-bold cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-
-                {/* Subject Tags with Delete (X) */}
-                <div className="flex flex-wrap items-center gap-2">
-                  {subjectsList.map((subj) => (
-                    <span
-                      key={subj}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-[#0d2b26] border border-[#c4e9e0] text-xs font-bold shadow-2xs group hover:border-[#0d5c4d] transition-colors"
-                    >
-                      <span>{subj}</span>
-                      <button
-                        type="button"
-                        onClick={() => deleteSubject(subj)}
-                        className="h-4 w-4 rounded-full flex items-center justify-center text-slate-400 group-hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
-                        title={`Remove ${subj}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                  {subjectsList.length === 0 && (
-                    <p className="text-xs text-slate-400 italic">No subject specializations listed yet. Click "+ Add Subject" to add your first module.</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Full Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Full Legal Name</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.fullName}
-                    onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.fullName}
-                  </p>
-                )}
-              </div>
-
-              {/* Preferred Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Display / Preferred Name</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.name}
-                    onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.name}
-                  </p>
-                )}
-              </div>
-
-              {/* Student ID */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher"
-                    ? "Teacher Service / Faculty ID"
-                    : currentRole === "super_admin"
-                    ? "Platform Master Root ID"
-                    : "Student Admission / Reg Number"}
-                </label>
-                <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-bold text-[#0d5c4d]">
-                  {profileData.studentId}
-                </p>
-              </div>
-
-              {/* G.C.E. A/L Index Number */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher"
-                    ? "Sri Lanka Teachers' Service (SLTS) Reg Number"
-                    : currentRole === "super_admin"
-                    ? "Master Root Authority Identifier"
-                    : "Exam Index Number (A/L 2026)"}
-                </label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.indexNumber}
-                    onChange={(e) => setProfileData({ ...profileData, indexNumber: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-semibold text-slate-900">
-                    {profileData.indexNumber}
-                  </p>
-                )}
-              </div>
-
-              {/* Email Address */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Email Address (Institutional)</label>
-                {isEditing ? (
-                  <input
-                    type="email"
-                    value={profileData.email}
-                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
-                  />
-                ) : (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    <span>{profileData.email}</span>
-                    <span className="flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      <CheckCircle2 className="h-3 w-3" /> Verified
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Phone Number */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Mobile Phone Number</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.phone}
-                    onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.phone}
-                  </p>
-                )}
-              </div>
-
-              {/* Date of Birth & Gender */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Date of Birth</label>
-                  {isEditing ? (
-                    <input
-                      type="date"
-                      value={profileData.dob}
-                      onChange={(e) => setProfileData({ ...profileData, dob: e.target.value })}
-                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                    />
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                      {profileData.dob}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Gender</label>
-                  {isEditing ? (
-                    <select
-                      value={profileData.gender}
-                      onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
-                      className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                    >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                      {profileData.gender}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Medium & Blood Group */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Medium of Study</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={profileData.medium}
-                      onChange={(e) => setProfileData({ ...profileData, medium: e.target.value })}
-                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs"
-                    />
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                      {profileData.medium}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Blood Group</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={profileData.bloodGroup}
-                      onChange={(e) => setProfileData({ ...profileData, bloodGroup: e.target.value })}
-                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-red-600"
-                    />
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-bold text-red-600">
-                      {profileData.bloodGroup}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Academic Grade, Stream & Target Year (Only for Students) */}
-              {currentRole === "student" && (
-                <div className="md:col-span-2 p-4 rounded-2xl bg-[#ecf8f5]/60 border border-[#c4e9e0] space-y-3">
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
-                    <span className="font-extrabold text-xs text-[#0d2b26]">
-                      Academic Stage, Grade &amp; Examination Pathway
-                    </span>
+                  {/* Exam Index Number */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">
+                      {currentRole === "super_admin"
+                        ? "Master Root Authority Identifier"
+                        : `Exam Index Number ${profileData.examYear ? `(${profileData.examYear})` : ""}`.trim()}
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={profileData.indexNumber}
+                        onChange={(e) => setProfileData({ ...profileData, indexNumber: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      />
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-mono font-semibold text-slate-900">
+                        {profileData.indexNumber || profileData.studentId || "—"}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* Grade Selection */}
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700">Enrolled Grade</label>
-                      {isEditing ? (
-                        <select
-                          value={profileData.gradeLevel || "12"}
-                          onChange={(e) => {
-                            const newLevel = e.target.value;
-                            const isNewAL = newLevel === "12" || newLevel === "13";
-                            const isNewOL = newLevel === "10" || newLevel === "11";
+                  {/* Email Address */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Email Address (Institutional)</label>
+                    {isEditing ? (
+                      <input
+                        type="email"
+                        value={profileData.email}
+                        readOnly={currentRole === "super_admin"}
+                        onChange={(e) => {
+                          if (currentRole !== "super_admin") {
                             setProfileData({
                               ...profileData,
-                              gradeLevel: newLevel,
-                              grade: `Grade ${newLevel}`,
-                              stream: isNewAL
-                                ? (profileData.stream && !profileData.stream.includes("General") && !profileData.stream.includes("O/L") ? profileData.stream : "Physical Science")
-                                : isNewOL
-                                ? "General O/L Curriculum"
-                                : "General Junior Curriculum"
+                              email: e.target.value,
                             });
-                          }}
-                          className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold text-slate-800"
-                        >
-                          <optgroup label="Junior Secondary (Grade 6 - 9: No Streams)">
-                            <option value="6">Grade 6 (Junior Secondary)</option>
-                            <option value="7">Grade 7 (Junior Secondary)</option>
-                            <option value="8">Grade 8 (Junior Secondary)</option>
-                            <option value="9">Grade 9 (Junior Secondary)</option>
-                          </optgroup>
-                          <optgroup label="G.C.E. Ordinary Level (Grade 10 - 11)">
-                            <option value="10">Grade 10 (G.C.E. O/L)</option>
-                            <option value="11">Grade 11 (G.C.E. O/L)</option>
-                          </optgroup>
-                          <optgroup label="G.C.E. Advanced Level (Grade 12 - 13: Streams)">
-                            <option value="12">Grade 12 (G.C.E. A/L)</option>
-                            <option value="13">Grade 13 (G.C.E. A/L)</option>
-                          </optgroup>
-                        </select>
-                      ) : (
-                        <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
-                          Grade {profileData.gradeLevel || "12"}
-                        </p>
-                      )}
-                    </div>
+                          }
+                        }}
+                        className={`w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 ${
+                          currentRole === "super_admin" ? "bg-slate-100 cursor-not-allowed" : ""
+                        }`}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        <span>{profileData.email}</span>
+                        <span className="flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <CheckCircle2 className="h-3 w-3" /> Verified
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-                    {/* Stream Selection - ONLY enabled for Grade 12 or 13! */}
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700">
-                        {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                          ? "A/L Stream Specialization *"
-                          : "Curriculum Stream"}
-                      </label>
+                  {/* Phone Number */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Mobile Phone Number</label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={profileData.phone}
+                        onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      />
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        {profileData.phone}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Date of Birth & Gender */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Date of Birth</label>
                       {isEditing ? (
-                        (profileData.gradeLevel === "12" || profileData.gradeLevel === "13") ? (
-                          <select
-                            value={profileData.stream || "Physical Science"}
-                            onChange={(e) => setProfileData({ ...profileData, stream: e.target.value })}
-                            className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold text-[#0d5c4d]"
-                          >
-                            <option value="Physical Science">Physical Science (Maths, Physics, Chem, ICT)</option>
-                            <option value="Biological Science">Biological Science (Bio, Chem, Physics, Agri)</option>
-                            <option value="Commerce">Commerce (Accounting, Business, Economics, ICT)</option>
-                            <option value="Technology">Technology (Engineering Tech, Science for Tech, Bio-Tech)</option>
-                            <option value="Arts">Arts (Languages, History, Logic, Political Science)</option>
-                          </select>
-                        ) : (
-                          <div className="h-10 px-3 rounded-xl bg-slate-100 border border-slate-200 text-xs flex items-center text-slate-500 font-medium">
-                            {(profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                              ? "General O/L Subjects (No Stream)"
-                              : "General Junior Subjects (No Stream)"}
-                          </div>
-                        )
+                        <input
+                          type="date"
+                          value={profileData.dob}
+                          onChange={(e) => setProfileData({ ...profileData, dob: e.target.value })}
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                        />
                       ) : (
-                        <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
-                          {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                            ? profileData.stream
-                            : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                            ? "General O/L Subjects (No Stream)"
-                            : "General Junior Subjects (No Stream)"}
+                        <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                          {profileData.dob}
                         </p>
                       )}
                     </div>
 
-                    {/* Target Examination Year */}
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700">Target Exam Year</label>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700">Gender</label>
                       {isEditing ? (
                         <select
-                          value={profileData.examYear || "2026"}
-                          onChange={(e) => setProfileData({ ...profileData, examYear: e.target.value })}
-                          className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] bg-white font-semibold"
+                          value={profileData.gender}
+                          onChange={(e) => setProfileData({ ...profileData, gender: e.target.value })}
+                          className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
                         >
-                          <option value="2026">2026 Batch</option>
-                          <option value="2027">2027 Batch</option>
-                          <option value="2028">2028 Batch</option>
-                          <option value="2029">2029 Batch</option>
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
                         </select>
                       ) : (
-                        <p className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-900">
-                          {profileData.examYear || "2026"} Batch
+                        <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                          {profileData.gender}
                         </p>
                       )}
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* Residential Address */}
-              <div className="md:col-span-2 space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Residential Street Address</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.address}
-                    onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.address}, {profileData.city}, {profileData.district}, {profileData.province}
-                  </p>
-                )}
-              </div>
+                  {/* Medium of Study */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">
+                      {currentRole === "super_admin" ? "Languages" : "Medium of Study"}
+                    </label>
+                    {isEditing ? (
+                      <select
+                        value={profileData.medium || "English"}
+                        onChange={(e) => setProfileData({ ...profileData, medium: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs bg-white font-medium cursor-pointer"
+                      >
+                        <option value="English">English</option>
+                        <option value="Sinhala">Sinhala</option>
+                        <option value="Tamil">Tamil</option>
+                        <option value="Bilingual (English / Sinhala)">Bilingual (English / Sinhala)</option>
+                        <option value="Bilingual (English / Tamil)">Bilingual (English / Tamil)</option>
+                        <option value="Trilingual (English / Sinhala / Tamil)">Trilingual (English / Sinhala / Tamil)</option>
+                      </select>
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        {profileData.medium || "English"}
+                      </p>
+                    )}
+                  </div>
 
-              {/* Bio Statement */}
-              <div className="md:col-span-2 space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Personal Statement / Bio</label>
-                {isEditing ? (
-                  <textarea
-                    rows={3}
-                    value={profileData.bio}
-                    onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
-                    className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] leading-relaxed"
-                  />
-                ) : (
-                  <p className="p-3 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs text-slate-700 leading-relaxed">
-                    {profileData.bio}
-                  </p>
-                )}
-              </div>
-            </form>
-          </div>
-
-          {/* TEACHER INSTRUCTION MEDIUMS & EXPERIENCE (Personal Tab) */}
-          {currentRole === "teacher" && (
-            <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-5">
-              <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-[#0d5c4d]" />
-                    <span>Teaching Mediums &amp; Professional Experience</span>
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Select your languages of instruction and total years of Advanced Level coaching experience.
-                  </p>
-                </div>
-                {isEditing && (
-                  <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                    Editing Mode Active
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700">Mediums of Instruction</label>
-                  {isEditing ? (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {["English", "Sinhala", "Tamil"].map((med) => {
-                        const isSel = selectedMediums.includes(med);
-                        return (
-                          <button
-                            key={med}
-                            type="button"
-                            onClick={() => {
-                              setSelectedMediums((prev) =>
-                                prev.includes(med) ? prev.filter((m) => m !== med) : [...prev, med]
-                              );
-                            }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                              isSel
-                                ? "bg-[#0d5c4d] text-white border-[#0d5c4d]"
-                                : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
-                            }`}
-                          >
-                            {isSel ? `✓ ${med}` : `+ ${med}`}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {selectedMediums.map((med) => (
-                        <span
-                          key={med}
-                          className="px-3 py-1 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] font-bold text-xs border border-[#c4e9e0]"
-                        >
-                          {med}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-700">Years of Advanced Level Teaching Experience</label>
-                  {isEditing ? (
-                    <div className="flex items-center gap-3">
+                  {/* Residential Address */}
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Residential Street Address</label>
+                    {isEditing ? (
                       <input
-                        type="number"
-                        min={0}
-                        max={50}
-                        value={experienceYears}
-                        onChange={(e) => setExperienceYears(Number(e.target.value) || 0)}
-                        className="w-32 h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0d5c4d] focus:outline-none focus:border-[#0d5c4d]"
+                        type="text"
+                        value={profileData.address}
+                        onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
                       />
-                      <span className="text-xs font-bold text-slate-600">Years in Service</span>
-                    </div>
-                  ) : (
-                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-bold text-[#0d5c4d]">
-                      {experienceYears} Years of A/L Excellence &amp; Ranker Mentorship
-                    </p>
-                  )}
-                </div>
+                    ) : (
+                      <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                        {[
+                          profileData.address,
+                          profileData.city,
+                          profileData.district,
+                          profileData.province,
+                        ]
+                          .map((value) => value?.trim())
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Bio Statement */}
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Personal Statement / Bio</label>
+                    {isEditing ? (
+                      <textarea
+                        rows={3}
+                        value={profileData.bio}
+                        onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                        className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] leading-relaxed"
+                      />
+                    ) : (
+                      <p className="p-3 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                        {profileData.bio}
+                      </p>
+                    )}
+                  </div>
+                </form>
               </div>
             </div>
           )}
@@ -1908,22 +3155,16 @@ export function ProfileView() {
                 </button>
               </div>
             </div>
-          ) : (
+          ) : currentRole === "teacher" ? null : (
             <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
               <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
                     <Users className="h-4 w-4 text-[#0d5c4d]" />
-                    <span>
-                      {currentRole === "teacher"
-                        ? "Next of Kin & Emergency Liaison"
-                        : "Parent & Guardian Information"}
-                    </span>
+                    <span>Parent &amp; Guardian Information</span>
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {currentRole === "teacher"
-                      ? "Official contact information for institutional welfare, emergency liaison, and faculty benefits."
-                      : "Contact information for emergencies, parent-teacher conferences, and academic communications."}
+                    Contact information for emergencies, parent-teacher conferences, and academic communications.
                   </p>
                 </div>
                 {isEditing && (
@@ -1936,9 +3177,7 @@ export function ProfileView() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Primary Contact Name */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Next of Kin Full Name" : "Primary Guardian Name"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Primary Guardian Name</label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -1948,16 +3187,14 @@ export function ProfileView() {
                   />
                 ) : (
                   <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianName}
+                    {profileData.guardianName || "Not registered"}
                   </p>
                 )}
               </div>
 
               {/* Relationship */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Relationship to Faculty Member" : "Relationship to Student"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Relationship to Student</label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -1967,16 +3204,14 @@ export function ProfileView() {
                   />
                 ) : (
                   <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianRelationship}
+                    {profileData.guardianRelationship || "Not specified"}
                   </p>
                 )}
               </div>
 
               {/* Contact Phone */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Primary Contact Phone" : "Primary Contact Phone"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Primary Contact Phone</label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -1986,22 +3221,22 @@ export function ProfileView() {
                   />
                 ) : (
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    <span>{profileData.guardianPhone}</span>
-                    <a
-                      href={`tel:${profileData.guardianPhone}`}
-                      className="text-[10px] text-[#0d5c4d] font-bold hover:underline"
-                    >
-                      {currentRole === "teacher" ? "Call Next of Kin" : "Call Guardian"}
-                    </a>
+                    <span>{profileData.guardianPhone || "Not specified"}</span>
+                    {profileData.guardianPhone && (
+                      <a
+                        href={`tel:${profileData.guardianPhone}`}
+                        className="text-[10px] text-[#0d5c4d] font-bold hover:underline"
+                      >
+                        Call Guardian
+                      </a>
+                    )}
                   </div>
                 )}
               </div>
 
               {/* Contact Email */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Contact Email Address" : "Guardian Email"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Guardian Email</label>
                 {isEditing ? (
                   <input
                     type="email"
@@ -2011,16 +3246,14 @@ export function ProfileView() {
                   />
                 ) : (
                   <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianEmail}
+                    {profileData.guardianEmail || "Not specified"}
                   </p>
                 )}
               </div>
 
               {/* Occupation */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Occupation / Workplace" : "Guardian Occupation / Workplace"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Guardian Occupation / Workplace</label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -2030,16 +3263,14 @@ export function ProfileView() {
                   />
                 ) : (
                   <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianOccupation}
+                    {profileData.guardianOccupation || "Not specified"}
                   </p>
                 )}
               </div>
 
               {/* Emergency Contact */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {currentRole === "teacher" ? "Faculty Welfare & Emergency Liaison (24/7)" : "Emergency Contact (24/7)"}
-                </label>
+                <label className="text-xs font-bold text-slate-700">Emergency Contact (24/7)</label>
                 {isEditing ? (
                   <input
                     type="text"
@@ -2048,8 +3279,8 @@ export function ProfileView() {
                     className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
                   />
                 ) : (
-                  <p className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs font-bold text-red-900">
-                    {profileData.emergencyContact}
+                  <p className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800">
+                    {profileData.emergencyContact || "Not specified"}
                   </p>
                 )}
               </div>
@@ -2093,25 +3324,38 @@ export function ProfileView() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Packages</span>
-                <p className="text-2xl font-black text-[#0d5c4d] mt-1 font-mono">4 Packages</p>
-                <p className="text-[10px] text-emerald-700 font-bold mt-1">Open for Enrolment</p>
+                <p className="text-2xl font-black text-[#0d5c4d] mt-1 font-mono">
+                  {teacherProfile?.stats?.totalPackages ?? teacherProfile?.packages?.length ?? 0}{" "}
+                  {(teacherProfile?.stats?.totalPackages ?? teacherProfile?.packages?.length ?? 0) === 1 ? "Package" : "Packages"}
+                </p>
+                <p className="text-[10px] text-emerald-700 font-bold mt-1">
+                  {(teacherProfile?.stats?.totalPackages ?? teacherProfile?.packages?.length ?? 0) > 0 ? "Open for Enrolment" : "None Published"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Subscribed Students</span>
-                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">142 Students</p>
-                <p className="text-[10px] text-slate-500 mt-1">Across 4 Active Cohorts</p>
+                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">
+                  {teacherProfile?.stats?.totalSubscribers ?? 0} Students
+                </p>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Across {teacherProfile?.stats?.totalPackages ?? teacherProfile?.packages?.length ?? 0} Batches
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Weekly Live Delivery</span>
-                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">14 Hours</p>
-                <p className="text-[10px] text-slate-500 mt-1">Google Meet &amp; Studio</p>
+                <p className="text-2xl font-black text-[#0d2b26] mt-1 font-mono">
+                  {teacherProfile?.stats?.totalCourses ? `${teacherProfile.stats.totalCourses * 2} Hours` : "0 Hours"}
+                </p>
+                <p className="text-[10px] text-slate-500 mt-1">Studio &amp; Google Meet</p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Monthly Batch Gross</span>
-                <p className="text-2xl font-black text-amber-600 mt-1 font-mono">Rs. 639,000</p>
+                <p className="text-2xl font-black text-amber-600 mt-1 font-mono">
+                  Rs. {(teacherProfile?.stats?.monthlyGrossRevenue ?? 0).toLocaleString()}
+                </p>
                 <p className="text-[10px] text-emerald-700 font-bold mt-1">90% Tutor Payout Share</p>
               </div>
             </div>
@@ -2123,139 +3367,112 @@ export function ProfileView() {
                 <span className="text-[11px] font-semibold text-slate-500">Auto-billed monthly per subscriber</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  {
-                    title: "Combined Mathematics 2026 (Pure & Applied Theory)",
-                    code: "CMATH-26",
-                    tier: "A/L 2026 Comprehensive Theory",
-                    students: 48,
-                    fee: "Rs. 4,500 / mo",
-                    monthlyGross: "Rs. 216,000 / mo",
-                    delivery: "Google Meet Live Studio & HD Recordings",
-                    schedule: "Mon & Wed · 06:30 PM - 08:30 PM",
-                    progress: 76,
-                    unitsDone: 9,
-                    unitsTotal: 12,
-                    badgeColor: "border-indigo-200 bg-indigo-50/50 text-indigo-800"
-                  },
-                  {
-                    title: "Pure Mathematics 2025 (Fast-Track Paper Class)",
-                    code: "PMATH-25",
-                    tier: "A/L 2025 Revision & Model Papers",
-                    students: 42,
-                    fee: "Rs. 3,500 / mo",
-                    monthlyGross: "Rs. 147,000 / mo",
-                    delivery: "Timed Exam Walkthrough & Video Solutions",
-                    schedule: "Tue & Thu · 07:00 PM - 09:00 PM",
-                    progress: 88,
-                    unitsDone: 14,
-                    unitsTotal: 16,
-                    badgeColor: "border-emerald-200 bg-emerald-50/50 text-emerald-800"
-                  },
-                  {
-                    title: "Applied Mathematics Mechanics & Dynamics Bootcamp",
-                    code: "AMATH-26",
-                    tier: "Mechanics Intensive Topic Series",
-                    students: 32,
-                    fee: "Rs. 4,000 / mo",
-                    monthlyGross: "Rs. 128,000 / mo",
-                    delivery: "Interactive Problem Solving & Whiteboard",
-                    schedule: "Saturday Morning · 08:30 AM - 11:30 AM",
-                    progress: 70,
-                    unitsDone: 7,
-                    unitsTotal: 10,
-                    badgeColor: "border-blue-200 bg-blue-50/50 text-blue-800"
-                  },
-                  {
-                    title: "G.C.E. A/L Top Rankers Model Paper Masterclass",
-                    code: "MC-BOOST",
-                    tier: "Elite Island-Rank Booster",
-                    students: 20,
-                    fee: "Rs. 5,000 / mo",
-                    monthlyGross: "Rs. 100,000 / mo",
-                    delivery: "Curated Challenge Sets & Individual Feedback",
-                    schedule: "Sunday Evening · 06:00 PM - 09:00 PM",
-                    progress: 92,
-                    unitsDone: 11,
-                    unitsTotal: 12,
-                    badgeColor: "border-amber-200 bg-amber-50/50 text-amber-800"
-                  }
-                ].map((course, idx) => (
-                  <div
-                    key={idx}
-                    className="p-5 rounded-2xl border border-[#e6ece8] bg-[#fcfdfc] hover:border-[#b2e5d9] hover:shadow-xs transition-all space-y-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${course.badgeColor}`}>
-                            {course.code}
-                          </span>
-                          <span className="text-[11px] font-semibold text-slate-500">{course.tier}</span>
+              {tutorPackagesList && tutorPackagesList.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {tutorPackagesList.map((course, idx) => (
+                    <div
+                      key={course.id || idx}
+                      className="p-5 rounded-2xl border border-[#e6ece8] bg-[#fcfdfc] hover:border-[#b2e5d9] hover:shadow-xs transition-all space-y-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${course.badgeColor}`}>
+                              {course.code}
+                            </span>
+                            <span className="text-[11px] font-semibold text-slate-500">{course.tier}</span>
+                          </div>
+                          <h4 className="font-extrabold text-sm text-[#0d2b26] mt-1.5">{course.title}</h4>
                         </div>
-                        <h4 className="font-extrabold text-sm text-[#0d2b26] mt-1.5">{course.title}</h4>
+                        <div className="text-right shrink-0">
+                          <span className="text-xs font-mono font-black text-[#0d5c4d] block">
+                            {course.fee}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-semibold">
+                            {course.students} Subscribers
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-xs font-mono font-black text-[#0d5c4d] block">
-                          {course.fee}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-semibold">
-                          {course.students} Subscribers
-                        </span>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-2.5 text-xs bg-white p-3 rounded-xl border border-slate-100">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Monthly Package Gross</span>
-                        <p className="font-bold text-[#0d2b26] font-mono">{course.monthlyGross}</p>
+                      <div className="grid grid-cols-2 gap-2.5 text-xs bg-white p-3 rounded-xl border border-slate-100">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Monthly Package Gross</span>
+                          <p className="font-bold text-[#0d2b26] font-mono">{course.monthlyGross}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Delivery Format</span>
+                          <p className="font-semibold text-slate-800 line-clamp-1">{course.delivery}</p>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">Live Online Time Slot</span>
+                          <p className="font-bold text-[#0d5c4d]">{course.schedule}</p>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Delivery Format</span>
-                        <p className="font-semibold text-slate-800 line-clamp-1">{course.delivery}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Live Online Time Slot</span>
-                        <p className="font-bold text-[#0d5c4d]">{course.schedule}</p>
-                      </div>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500 font-medium">Syllabus Completion</span>
-                        <span className="font-bold text-[#0d5c4d]">
-                          {course.unitsDone} of {course.unitsTotal} Units ({course.progress}%)
-                        </span>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500 font-medium">Syllabus Completion</span>
+                          <span className="font-bold text-[#0d5c4d]">
+                            {course.unitsDone} of {course.unitsTotal} Units ({course.progress}%)
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-[#0d5c4d] to-[#147a66] rounded-full transition-all"
+                            style={{ width: `${course.progress}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-[#0d5c4d] to-[#147a66] rounded-full transition-all"
-                          style={{ width: `${course.progress}%` }}
-                        />
-                      </div>
-                    </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setCurrentView("syllabus_builder")}
-                        className="text-[11px] font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Manage Syllabus &amp; Notes</span>
-                        <ChevronRight className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentView("assignments")}
-                        className="text-[11px] font-bold text-slate-600 hover:text-[#0d5c4d] transition-colors cursor-pointer"
-                      >
-                        Submissions &amp; Coursework &rarr;
-                      </button>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentView("syllabus_builder")}
+                          className="text-[11px] font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Manage Syllabus &amp; Notes</span>
+                          <ChevronRight className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCurrentView("assignments")}
+                          className="text-[11px] font-bold text-slate-600 hover:text-[#0d5c4d] transition-colors cursor-pointer"
+                        >
+                          Submissions &amp; Coursework &rarr;
+                        </button>
+                      </div>
                     </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-4 rounded-2xl border-2 border-dashed border-slate-200 bg-[#fbfdfc] space-y-3">
+                  <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-[#0d5c4d] flex items-center justify-center mx-auto">
+                    <BookOpen className="h-6 w-6" />
                   </div>
-                ))}
-              </div>
+                  <h4 className="font-extrabold text-sm text-[#0d2b26]">No Active Study Packages or Batches</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    You have not published any study packages or cohorts yet. Launch the Teaching Studio or Syllabus Builder to set up your curriculum and start enrolling students.
+                  </p>
+                  <div className="pt-2 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView("teaching")}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      <span>Launch Teaching Studio</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView("syllabus_builder")}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Create Course / Syllabus</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2279,6 +3496,14 @@ export function ProfileView() {
               </div>
 
               <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("live_schedule")}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] text-white hover:bg-[#083e34] font-bold text-xs shadow-2xs transition-colors cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Manage Live Classes</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleDownloadTeacherTimetable}
@@ -2311,415 +3536,103 @@ export function ProfileView() {
             {/* Day Schedule Notice Banner */}
             <div className="p-3.5 rounded-2xl bg-[#f6fbf9] border border-[#c4e9e0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#0d5c4d]">
               <div className="flex items-center gap-2.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span className="font-bold">Active Live Schedule for {selectedScheduleDay} · Online Teaching Studio</span>
+                <span className={`h-2.5 w-2.5 rounded-full ${dayLiveSessions.length > 0 ? "bg-emerald-500 animate-pulse" : "bg-slate-300"} shrink-0`} />
+                <span className="font-bold">
+                  {dayLiveSessions.length > 0
+                    ? `Active Live Schedule for ${selectedScheduleDay} · Online Teaching Studio (${dayLiveSessions.length} ${dayLiveSessions.length === 1 ? 'Session' : 'Sessions'})`
+                    : `No Live Stream Scheduled for ${selectedScheduleDay}`}
+                </span>
               </div>
-              <span className="font-mono font-bold text-[11px] bg-white px-2.5 py-1 rounded-full border border-[#b2e5d9] self-start sm:self-auto">
-                Studio Streaming Active
+              <span className={`font-mono font-bold text-[11px] bg-white px-2.5 py-1 rounded-full border ${dayLiveSessions.length > 0 ? "border-[#b2e5d9] text-[#0d5c4d]" : "border-slate-200 text-slate-400"} self-start sm:self-auto`}>
+                {dayLiveSessions.length > 0 ? "Studio Streaming Active" : "No Streams"}
               </span>
             </div>
 
             {/* Live Session Cards */}
             <div className="space-y-3">
-              {[
-                ...(selectedScheduleDay === "Monday"
-                  ? [
-                      {
-                        time: "06:30 PM - 08:30 PM",
-                        subject: "Combined Mathematics - Differential Calculus & Real Analysis",
-                        cohort: "Batch CMATH-26 · 48 Enrolled Subscribers",
-                        type: "Live Theory Lecture",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/cmt-26-live",
-                        isLive: true
-                      },
-                      {
-                        time: "08:45 PM - 09:30 PM",
-                        subject: "1-on-1 Student Doubt Clearing & Homework Review",
-                        cohort: "Open Office Hours · All Active Subscribers",
-                        type: "Interactive Clinic",
-                        platform: "Google Meet Video Room",
-                        meetCode: "meet.google.com/tutor-doubt-hub",
-                        isLive: false
-                      }
-                    ]
-                  : selectedScheduleDay === "Tuesday"
-                  ? [
-                      {
-                        time: "07:00 PM - 09:00 PM",
-                        subject: "Pure Mathematics - 2025 A/L Model Paper Discussion & Time Strategy",
-                        cohort: "Batch PMATH-25 · 42 Enrolled Subscribers",
-                        type: "Live Paper Class",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/pmt-25-paper",
-                        isLive: true
-                      }
-                    ]
-                  : selectedScheduleDay === "Wednesday"
-                  ? [
-                      {
-                        time: "06:30 PM - 08:30 PM",
-                        subject: "Combined Mathematics - Calculus Tutorial & Complex Problem Sets",
-                        cohort: "Batch CMATH-26 · 48 Enrolled Subscribers",
-                        type: "Live Problem Solving",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/cmt-26-live",
-                        isLive: true
-                      },
-                      {
-                        time: "08:40 PM - 09:15 PM",
-                        subject: "Homework Grading, Solution Upload & PDF Releases",
-                        cohort: "LMS Content Management",
-                        type: "Portal Update",
-                        platform: "Tutor Content Studio",
-                        meetCode: "",
-                        isLive: false
-                      }
-                    ]
-                  : selectedScheduleDay === "Thursday"
-                  ? [
-                      {
-                        time: "07:00 PM - 09:00 PM",
-                        subject: "Pure Mathematics - Trigonometry & Complex Numbers Workshop",
-                        cohort: "Batch PMATH-25 · 42 Enrolled Subscribers",
-                        type: "Masterclass Workshop",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/pmt-25-paper",
-                        isLive: true
-                      }
-                    ]
-                  : selectedScheduleDay === "Friday"
-                  ? [
-                      {
-                        time: "06:30 PM - 07:45 PM",
-                        subject: "Weekly Mathematics Olympiad & Advanced Challenge Seminar",
-                        cohort: "Elite Challenge Cohort · Top Rankers",
-                        type: "Special Masterclass",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/mth-olym-live",
-                        isLive: true
-                      },
-                      {
-                        time: "08:00 PM - 09:00 PM",
-                        subject: "Study Notes, Video Recording Archival & Week 08 Wrap-up",
-                        cohort: "All Enrolled Batches",
-                        type: "Content Production",
-                        platform: "LMS Cloud Vault",
-                        meetCode: "",
-                        isLive: false
-                      }
-                    ]
-                  : selectedScheduleDay === "Saturday"
-                  ? [
-                      {
-                        time: "08:30 AM - 11:30 AM",
-                        subject: "Applied Mathematics - Mechanics, Equilibrium & Circular Motion Bootcamp",
-                        cohort: "Batch AMATH-26 · 32 Enrolled Subscribers",
-                        type: "3-Hour Intensive",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/amt-26-mech",
-                        isLive: true
-                      }
-                    ]
-                  : [
-                      {
-                        time: "06:00 PM - 09:00 PM",
-                        subject: "Top Rankers Model Paper Masterclass - Island Rank Problem Clinic",
-                        cohort: "Batch MC-BOOST · 20 Enrolled Subscribers",
-                        type: "Elite Masterclass",
-                        platform: "Google Meet Live Studio",
-                        meetCode: "meet.google.com/mc-boost-live",
-                        isLive: true
-                      }
-                    ])
-              ].map((slot, idx) => (
-                <div
-                  key={idx}
-                  className="p-5 rounded-2xl border border-[#e6ece8] bg-white hover:border-[#b2e5d9] shadow-2xs hover:shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
-                >
-                  <div className="flex items-start sm:items-center gap-3.5">
-                    <div className="h-12 w-28 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex flex-col items-center justify-center font-bold shrink-0">
-                      <span className="text-[11px] font-black">{slot.type}</span>
-                      <span className="text-[9px] text-slate-500 font-mono mt-0.5">{slot.time}</span>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-extrabold text-sm text-[#0d2b26]">{slot.subject}</span>
-                        {slot.isLive && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Live Session
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        Target: <span className="font-semibold text-slate-700">{slot.cohort}</span> · Platform:{" "}
-                        <span className="font-semibold text-[#0d5c4d]">{slot.platform}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-start md:self-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 w-full md:w-auto justify-end">
-                    {slot.meetCode ? (
-                      <a
-                        href={`https://${slot.meetCode}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                      >
-                        <Video className="h-3.5 w-3.5" />
-                        <span>Launch Google Meet</span>
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setCurrentView("content_vault")}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
-                      >
-                        <span>Open Vault</span>
-                        <ChevronRight className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =================================================================== */}
-      {/* TEACHER TAB: QUALIFICATIONS & CREDENTIALS                           */}
-      {/* =================================================================== */}
-      {currentRole === "teacher" && activeTab === "qualifications" && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Academic Qualifications &amp; Pedagogical Degrees</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Verified university credentials, post-graduate education diplomas, and research specializations.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleDownloadTeacherDossier}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-md transition-colors cursor-pointer"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Download Faculty Dossier (PDF)</span>
-                </button>
-              </div>
-            </div>
-
-            {/* University Degrees List */}
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
-                    <Award className="h-4 w-4 text-[#0d5c4d]" />
-                    <span>Higher Education Degrees &amp; Diplomas</span>
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Manage certified university degrees, diplomas, and collegiate qualifications.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDegreeModalState({
-                      isOpen: true,
-                      mode: "add",
-                      data: {
-                        degree: "",
-                        institution: "",
-                        year: new Date().getFullYear().toString(),
-                        honors: "",
-                        details: ""
-                      }
-                    });
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Add Degree / Qualification</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {qualificationsList.map((item, idx) => (
+              {dayLiveSessions && dayLiveSessions.length > 0 ? (
+                dayLiveSessions.map((slot, idx) => (
                   <div
-                    key={item.id || idx}
-                    className="p-5 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3 flex flex-col justify-between hover:border-[#0d5c4d] transition-all shadow-2xs group"
+                    key={idx}
+                    className="p-5 rounded-2xl border border-[#e6ece8] bg-white hover:border-[#b2e5d9] shadow-2xs hover:shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
                   >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2.5 py-0.5 rounded-full border border-[#c4e9e0]">
-                          {item.year || "Year N/A"}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDegreeModalState({
-                                isOpen: true,
-                                mode: "edit",
-                                index: idx,
-                                data: { ...item }
-                              });
-                            }}
-                            className="p-1 rounded-lg text-slate-400 hover:text-[#0d5c4d] hover:bg-white transition-colors cursor-pointer"
-                            title="Edit Qualification"
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteDegree(idx)}
-                            className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                            title="Delete Qualification"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                    <div className="flex items-start sm:items-center gap-3.5">
+                      <div className="h-12 w-28 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex flex-col items-center justify-center font-bold shrink-0">
+                        <span className="text-[11px] font-black">{slot.type}</span>
+                        <span className="text-[9px] text-slate-500 font-mono mt-0.5">{slot.time}</span>
                       </div>
 
-                      <h5 className="font-black text-sm text-[#0d2b26] leading-snug">{item.degree}</h5>
-                      <p className="text-xs font-semibold text-slate-700">{item.institution}</p>
-                      {item.honors && (
-                        <p className="text-xs text-amber-700 font-bold">{item.honors}</p>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-extrabold text-sm text-[#0d2b26]">{slot.subject}</span>
+                          {slot.isLive && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Live Session
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          Target: <span className="font-semibold text-slate-700">{slot.cohort}</span> · Platform:{" "}
+                          <span className="font-semibold text-[#0d5c4d]">{slot.platform}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start md:self-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 w-full md:w-auto justify-end">
+                      {slot.meetCode ? (
+                        <a
+                          href={slot.meetCode.startsWith("http") ? slot.meetCode : `https://${slot.meetCode}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Video className="h-3.5 w-3.5" />
+                          <span>Launch Google Meet</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setCurrentView("content_vault")}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                        >
+                          <span>Open Vault</span>
+                          <ChevronRight className="h-3 w-3" />
+                        </button>
                       )}
                     </div>
-
-                    {item.details && (
-                      <p className="text-[11px] text-slate-500 pt-2 border-t border-slate-200/60 leading-relaxed">
-                        {item.details}
-                      </p>
-                    )}
                   </div>
-                ))}
-
-                {qualificationsList.length === 0 && (
-                  <div className="md:col-span-3 p-8 text-center rounded-2xl border border-dashed border-slate-300 space-y-2">
-                    <GraduationCap className="h-8 w-8 text-slate-400 mx-auto" />
-                    <p className="text-xs font-bold text-slate-600">No degrees or diplomas added yet.</p>
-                    <p className="text-[11px] text-slate-400">Click &quot;Add Degree / Qualification&quot; above to list your higher education background.</p>
+                ))
+              ) : (
+                <div className="text-center py-12 px-4 rounded-2xl border-2 border-dashed border-slate-200 bg-[#fbfdfc] space-y-3">
+                  <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-[#0d5c4d] flex items-center justify-center mx-auto">
+                    <Calendar className="h-6 w-6" />
                   </div>
-                )}
-              </div>
-            </div>
-
-            {/* National Accreditations & Licensing */}
-            <div className="space-y-4 pt-6 border-t border-slate-100">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-bold text-sm text-[#0d2b26] flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
-                    <span>Professional Licensing &amp; National Accreditations</span>
+                  <h4 className="font-extrabold text-sm text-[#0d2b26]">
+                    No Live Classes Scheduled for {selectedScheduleDay}
                   </h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Official teaching service licenses, examiner credentials, and state pedagogical awards.
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    There are no live classes scheduled for this day in your timetable. You can schedule a new live session or adjust your timetable anytime.
                   </p>
+                  <div className="pt-2 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView("live_schedule")}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Manage Live Schedule</span>
+                    </button>
+                  </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAccreditationModalState({
-                      isOpen: true,
-                      mode: "add",
-                      data: {
-                        id: "",
-                        title: "",
-                        issuer: "",
-                        regNo: "",
-                        status: "Active & Verified Service",
-                        badge: "Accredited",
-                        badgeColor: "bg-emerald-50 text-emerald-800 border-emerald-200"
-                      }
-                    });
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Add License / Accreditation</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {accreditationsList.map((lic, idx) => (
-                  <div
-                    key={lic.id || idx}
-                    className="p-5 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs hover:shadow-xs transition-all space-y-3 hover:border-[#0d5c4d] group"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${lic.badgeColor || "bg-emerald-50 text-emerald-800 border-emerald-200"}`}>
-                          {lic.badge}
-                        </span>
-                        <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1.5 leading-snug">{lic.title}</h5>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {lic.regNo && (
-                          <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                            {lic.regNo}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAccreditationModalState({
-                              isOpen: true,
-                              mode: "edit",
-                              index: idx,
-                              data: { ...lic }
-                            });
-                          }}
-                          className="p-1 rounded-lg text-slate-400 hover:text-[#0d5c4d] hover:bg-slate-50 transition-colors cursor-pointer"
-                          title="Edit Accreditation"
-                        >
-                          <Edit3 className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteAccreditation(idx)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                          title="Delete Accreditation"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-slate-500 font-medium">{lic.issuer}</p>
-
-                    <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold pt-2 border-t border-slate-100">
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                      <span>{lic.status}</span>
-                    </div>
-                  </div>
-                ))}
-
-                {accreditationsList.length === 0 && (
-                  <div className="md:col-span-2 p-8 text-center rounded-2xl border border-dashed border-slate-300 space-y-2">
-                    <ShieldCheck className="h-8 w-8 text-slate-400 mx-auto" />
-                    <p className="text-xs font-bold text-slate-600">No accreditations or licenses added yet.</p>
-                    <p className="text-[11px] text-slate-400">Click &quot;Add License / Accreditation&quot; above to list teaching licenses and examiner appointments.</p>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </div>
       )}
+
+
 
       {/* =================================================================== */}
       {/* TEACHER TAB: BANK & PAYOUT DETAILS                                  */}
@@ -2747,7 +3660,7 @@ export function ProfileView() {
                     data: {
                       id: "",
                       bankName: "Commercial Bank of Ceylon",
-                      bankAccountName: profileData.fullName || "Samantha Priyantha Perera",
+                      bankAccountName: profileData.fullName || "",
                       bankAccountNumber: "",
                       bankBranch: "",
                       bankBranchCode: "",
@@ -2969,7 +3882,7 @@ export function ProfileView() {
                       type="text"
                       value={slugEditValue}
                       onChange={(e) => setSlugEditValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                      placeholder="prof-samantha-perera"
+                      placeholder="your-tutor-handle"
                       className="flex-1 text-xs font-mono font-bold text-[#0d5c4d] focus:outline-none"
                       autoFocus
                     />
@@ -3201,44 +4114,42 @@ export function ProfileView() {
             {/* Tuition Hub & Subscription Details Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Enrolled Tutors</span>
-                <p className="font-black text-sm text-[#0d2b26]">4 Independent Educators</p>
-                <p className="text-[11px] text-slate-500">Pure Maths, Physics, Chem, ICT</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Enrolled Courses</span>
+                <p className="font-black text-sm text-[#0d2b26]">
+                  {enrolledCourses.length > 0 ? `${enrolledCourses.length} Enrolled ${enrolledCourses.length === 1 ? "Course" : "Courses"}` : "0 Enrolled"}
+                </p>
+                <p className="text-[11px] text-slate-500 truncate">
+                  {enrolledCourses.length > 0 ? enrolledCourses.map((c: any) => c.title).slice(0, 2).join(", ") : "No courses enrolled"}
+                </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                    ? "Target Examination"
-                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                    ? "Target Examination"
-                    : "Academic Stage"}
+                  Target Academic Stage
                 </span>
                 <p className="font-black text-sm text-[#0d2b26]">
-                  {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                    ? `G.C.E. Advanced Level ${profileData.examYear || "2026"}`
-                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                    ? `G.C.E. Ordinary Level ${profileData.examYear || "2026"}`
-                    : `Junior Secondary (${profileData.grade || "Grade 8"})`}
+                  {profileData.grade || "Grade 12"}
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  {(profileData.gradeLevel === "12" || profileData.gradeLevel === "13")
-                    ? `${profileData.stream || "Physical Science"} Masterclass Batch`
-                    : (profileData.gradeLevel === "10" || profileData.gradeLevel === "11")
-                    ? `Grade ${profileData.gradeLevel || "11"} O/L Tuition Batches`
-                    : `General Academic Subject Batches`}
+                  {profileData.stream || profileData.classRoom || "Tuition Cohort"}
                 </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tuition Subscriptions</span>
-                <p className="font-black text-sm text-[#0d5c4d]">4 Monthly Passes Active</p>
-                <p className="text-[11px] text-emerald-600 font-semibold">Bank Slips Verified &bull; Paid</p>
+                <p className="font-black text-sm text-[#0d5c4d]">
+                  {enrolledCourses.length > 0 ? `${enrolledCourses.length} Active ${enrolledCourses.length === 1 ? "Pass" : "Passes"}` : "0 Active Passes"}
+                </p>
+                <p className="text-[11px] text-emerald-600 font-semibold">
+                  {enrolledCourses.length > 0 ? "Bank Slips Verified • Paid" : "Enroll to activate passes"}
+                </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Weekly Live Classes</span>
-                <p className="font-black text-sm text-[#0d2b26]">12 Hours / Week</p>
+                <p className="font-black text-sm text-[#0d2b26]">
+                  {enrolledCourses.reduce((acc: number, c: any) => acc + (Array.isArray(c.liveClasses) ? c.liveClasses.length : 0), 0)} Scheduled
+                </p>
                 <p className="text-[11px] text-slate-500">Google Meet &amp; Video Vault</p>
               </div>
             </div>
@@ -3248,132 +4159,103 @@ export function ProfileView() {
               <div className="flex items-center justify-between">
                 <h4 className="font-bold text-sm text-[#0d2b26]">Active Tuition Classes &amp; Tutors</h4>
                 <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  4 Active Batches
+                  {enrolledCourses.length} Active {enrolledCourses.length === 1 ? "Batch" : "Batches"}
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  {
-                    name: "Combined Mathematics",
-                    code: "Batch CMATH-26",
-                    teacher: "Dr. Samantha Perera",
-                    title: "Lead Mathematics Specialist & Paper Author",
-                    nextSession: "Saturday 08:30 AM – 11:30 AM (Model Paper Class)",
-                    weeklySessions: [
-                      { day: "Tue", time: "07:00 PM – 09:00 PM", label: "Pure Maths Theory" },
-                      { day: "Thu", time: "07:00 PM – 09:00 PM", label: "Applied Mechanics Lab" },
-                      { day: "Sat", time: "08:30 AM – 11:30 AM", label: "Model Paper Discussion" },
-                      { day: "Mon", time: "08:45 PM – 09:30 PM", label: "Doubt Clinic & Homework" }
-                    ],
-                    color: "border-emerald-200 bg-emerald-50/20"
-                  },
-                  {
-                    name: "Physics (Theory & Practicals)",
-                    code: "Batch PHY-26",
-                    teacher: "Eng. K. Thanushan",
-                    title: "Senior Physics Educator & Concept Specialist",
-                    nextSession: "Sunday 04:00 PM – 07:00 PM (Model Paper & Practical)",
-                    weeklySessions: [
-                      { day: "Wed", time: "06:30 PM – 08:30 PM", label: "Waves & Optics Theory" },
-                      { day: "Fri", time: "07:00 PM – 09:00 PM", label: "Structured Problem Lab" },
-                      { day: "Sun", time: "04:00 PM – 07:00 PM", label: "Model Paper & Practical" }
-                    ],
-                    color: "border-blue-200 bg-blue-50/20"
-                  },
-                  {
-                    name: "Chemistry (Theory & Revision)",
-                    code: "Batch CHEM-26",
-                    teacher: "Dr. Nilmini Silva",
-                    title: "Chemistry Senior Lecturer & Reaction Lab Lead",
-                    nextSession: "Wednesday 06:30 PM – 08:30 PM (Organic Reaction Mechanics)",
-                    weeklySessions: [
-                      { day: "Tue", time: "05:00 PM – 07:00 PM", label: "Inorganic & Physical Chemistry" },
-                      { day: "Wed", time: "06:30 PM – 08:30 PM", label: "Organic Reaction Mechanics" },
-                      { day: "Sun", time: "08:30 AM – 10:30 AM", label: "Model Paper Discussion" }
-                    ],
-                    color: "border-purple-200 bg-purple-50/20"
-                  },
-                  {
-                    name: "Information & Communication Tech",
-                    code: "Batch ICT-26",
-                    teacher: "Eng. S. Wickramasinghe",
-                    title: "Collegiate ICT Lead & Python Master Trainer",
-                    nextSession: "Friday 07:00 PM – 09:00 PM (Systems & Networking)",
-                    weeklySessions: [
-                      { day: "Thu", time: "05:00 PM – 07:00 PM", label: "Python & Algorithms Lab" },
-                      { day: "Fri", time: "07:00 PM – 09:00 PM", label: "Systems Architecture & Networking" },
-                      { day: "Sat", time: "04:00 PM – 06:00 PM", label: "Model Paper & Code Review" }
-                    ],
-                    color: "border-amber-200 bg-amber-50/20"
-                  }
-                ].map((subject, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-4 rounded-2xl border ${subject.color} flex flex-col justify-between gap-3 transition-all hover:shadow-xs bg-white`}
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-extrabold text-sm text-slate-900">{subject.name}</span>
-                        <span className="text-[10px] font-mono font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-[#c4e9e0]">
-                          {subject.code}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-800">{subject.teacher}</p>
-                        <p className="text-[11px] text-slate-500">{subject.title}</p>
-                      </div>
+              {isLoadingEnrolledCourses ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
+                  <Loader2 className="h-6 w-6 animate-spin text-[#0d5c4d] mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-slate-600">Loading enrolled courses &amp; tutors...</p>
+                </div>
+              ) : enrolledCourses.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {enrolledCourses.map((course: any, idx: number) => {
+                    const teacherName = course.teacher?.user
+                      ? `${course.teacher.user.firstName || ''} ${course.teacher.user.lastName || ''}`.trim()
+                      : course.teacherName || "Assigned Educator";
+                    const nextLive = Array.isArray(course.liveClasses) && course.liveClasses.length > 0 ? course.liveClasses[0] : null;
 
-                      {/* Next Upcoming Live Session Banner */}
-                      <div className="p-2.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] flex items-center gap-2 text-xs">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                        <span className="font-extrabold text-[#0d5c4d]">Next:</span>
-                        <span className="font-bold text-slate-800 truncate">{subject.nextSession}</span>
-                      </div>
+                    return (
+                      <div
+                        key={course.id || idx}
+                        className="p-5 rounded-2xl border border-emerald-200 bg-white flex flex-col justify-between gap-4 transition-all hover:shadow-md"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-extrabold text-sm text-slate-900">{course.title}</span>
+                            <span className="text-[10px] font-mono font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-[#c4e9e0]">
+                              {course.code || "BATCH"}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">{teacherName}</p>
+                            <p className="text-[11px] text-slate-500">
+                              {course.gradeLevel || course.gradeName || profileData.grade} &bull; {course.subject || profileData.stream || "Tuition Batch"}
+                            </p>
+                          </div>
 
-                      {/* Multi-Day Weekly Schedule Breakdown */}
-                      <div className="space-y-1 pt-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                          Weekly Live Schedule ({subject.weeklySessions.length} Sessions / Week):
-                        </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                          {subject.weeklySessions.map((slot, sIdx) => (
-                            <div
-                              key={sIdx}
-                              className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px] flex items-center justify-between gap-1 text-slate-700"
-                            >
-                              <div className="flex items-center gap-1 font-bold text-slate-900">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#0d5c4d]" />
-                                <span>{slot.day}</span>
-                                <span className="font-medium text-slate-500">{slot.time}</span>
-                              </div>
-                              <span className="text-[9px] text-slate-400 font-semibold truncate max-w-[85px] text-right">
-                                {slot.label}
-                              </span>
+                          {nextLive ? (
+                            <div className="p-2.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] flex items-center gap-2 text-xs">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                              <span className="font-extrabold text-[#0d5c4d]">Next Live:</span>
+                              <span className="font-bold text-slate-800 truncate">{nextLive.title || "Scheduled Class"}</span>
                             </div>
-                          ))}
+                          ) : (
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2 text-xs text-slate-600">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                              <span className="font-semibold text-slate-700">Tuition Status:</span>
+                              <span className="font-medium text-slate-500">Live Access Active</span>
+                            </div>
+                          )}
+
+                          {Array.isArray(course.assignments) && course.assignments.length > 0 && (
+                            <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-medium">
+                              <FileText className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                              <span>{course.assignments.length} Coursework / Assessments</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span>{course.enrollmentType === 'PACKAGE' ? `Package: ${course.packageName || 'Active'}` : 'Enrolled'}</span>
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCourseId(course.id);
+                              setCurrentView("courses");
+                            }}
+                            className="text-xs font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <span>Open Course</span>
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
-                        <CheckCircle2 className="h-3 w-3" />
-                        <span>Monthly Pass: Active</span>
-                      </span>
-
-                      <button
-                        type="button"
-                        onClick={() => setCurrentView("live_schedule")}
-                        className="text-xs font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Join Live</span>
-                        <ExternalLink className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                  <GraduationCap className="h-10 w-10 text-slate-400 mx-auto" />
+                  <p className="text-sm font-bold text-slate-700">No Enrolled Subject Batches Found</p>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    You are not currently enrolled in any course batches. Explore tuition packages and live masterclasses to get started.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("courses")}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    <span>Browse Available Courses</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -3402,86 +4284,79 @@ export function ProfileView() {
               </div>
             </div>
 
-            {/* Candidate Online Notice Banner */}
-            <div className="p-3.5 rounded-2xl bg-[#f6fbf9] border border-[#c4e9e0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#0d5c4d]">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span className="font-bold">Candidate Index: {profileData.indexNumber || "LMT-2026-12A-042"}</span>
-                <span className="hidden sm:inline text-slate-400">|</span>
-                <span className="hidden sm:inline text-slate-600">Online Submission Timer Active &bull; Upload scanned PDF scripts</span>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#b2e5d9] font-extrabold text-[10px] text-[#0d5c4d] shadow-2xs self-start sm:self-auto">
-                Webcam &amp; Portal Monitored ✓
-              </span>
-            </div>
-
             {/* Exams Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {initialExams.map((exam) => (
-                <div
-                  key={exam.id}
-                  className="bg-[#fcfdfc] rounded-2xl border border-[#e6ece8] p-5 shadow-2xs hover:shadow-md hover:border-[#b2e5d9] transition-all space-y-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <span className="px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-bold uppercase tracking-wider">
-                        {exam.subject}
+            {assignments && assignments.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {assignments.slice(0, 4).map((asg: any) => (
+                  <div
+                    key={asg.id}
+                    className="bg-[#fcfdfc] rounded-2xl border border-[#e6ece8] p-5 shadow-2xs hover:shadow-md hover:border-[#b2e5d9] transition-all space-y-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-bold uppercase tracking-wider">
+                          {asg.subjectName || "Coursework"}
+                        </span>
+                        <h4 className="font-extrabold text-sm text-[#0d2b26] mt-1.5 leading-snug">
+                          {asg.title}
+                        </h4>
+                      </div>
+
+                      <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-extrabold text-[11px] border border-amber-200 shrink-0">
+                        {asg.maxMarks} Marks
                       </span>
-                      <h4 className="font-extrabold text-sm text-[#0d2b26] mt-1.5 leading-snug">
-                        {exam.title}
-                      </h4>
                     </div>
 
-                    <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-extrabold text-[11px] border border-amber-200 shrink-0">
-                      {exam.durationMinutes / 60} Hours
-                    </span>
+                    <div className="grid grid-cols-2 gap-3 text-xs bg-white p-3 rounded-xl border border-[#eef3f0]">
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <Calendar className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-medium">Due Date</p>
+                          <p className="font-bold">{asg.dueDate ? new Date(asg.dueDate).toLocaleDateString() : "Open Submission"}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <Clock className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-medium">Session Window</p>
+                          <p className="font-bold">Active Window</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <Video className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-medium">Exam Platform</p>
+                          <p className="font-bold line-clamp-1">Apex Portal</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-slate-700">
+                        <ShieldCheck className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-medium">Mode</p>
+                          <p className="font-bold text-[#0d5c4d]">Web Proctored</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-[#f0f4f1] text-xs">
+                      <span className="text-slate-500 text-[11px]">
+                        Mentor: <span className="text-slate-800 font-bold">{asg.teacherName || "Assigned Faculty"}</span>
+                      </span>
+                      <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                        Active Assessment ✓
+                      </span>
+                    </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs bg-white p-3 rounded-xl border border-[#eef3f0]">
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <Calendar className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-medium">Date</p>
-                        <p className="font-bold">{exam.date}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <Clock className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-medium">Time Window</p>
-                        <p className="font-bold">{exam.time}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <Video className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-medium">Exam Platform</p>
-                        <p className="font-bold line-clamp-1">{exam.hallName}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <ShieldCheck className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-medium">Mode</p>
-                        <p className="font-bold text-[#0d5c4d]">{exam.seatNumber}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-[#f0f4f1] text-xs">
-                    <span className="text-slate-500 text-[11px]">
-                      Conducting Mentor: <span className="text-slate-800 font-bold">{exam.invigilator}</span>
-                    </span>
-                    <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                      Online Scheduled ✓
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center rounded-2xl border border-dashed border-[#e6ece8] bg-white text-xs text-slate-500">
+                No formal examinations or assessments scheduled for your profile currently.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3506,8 +4381,12 @@ export function ProfileView() {
 
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] text-xs font-bold border border-[#b2e5d9] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Term 2 On-Track &bull; 76% Covered</span>
+                  <span className={`w-2 h-2 rounded-full ${enrolledCourses.length > 0 ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
+                  <span>
+                    {enrolledCourses.length > 0
+                      ? `${overallSyllabusProgress}% Covered across ${enrolledCourses.length} ${enrolledCourses.length === 1 ? 'batch' : 'batches'}`
+                      : "No Active Batches"}
+                  </span>
                 </span>
               </div>
             </div>
@@ -3520,15 +4399,19 @@ export function ProfileView() {
                   <TrendingUp className="h-4 w-4 text-[#0d5c4d]" />
                 </div>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-[#0d5c4d]">76%</p>
-                  <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                    +4% this wk
-                  </span>
+                  <p className="text-2xl font-black text-[#0d5c4d]">{overallSyllabusProgress}%</p>
+                  {enrolledCourses.length > 0 && (
+                    <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                      Active
+                    </span>
+                  )}
                 </div>
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
-                  <div className="bg-[#0d5c4d] h-full rounded-full transition-all duration-500" style={{ width: "76%" }} />
+                  <div className="bg-[#0d5c4d] h-full rounded-full transition-all duration-500" style={{ width: `${overallSyllabusProgress}%` }} />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1.5">Average across 4 enrolled tutor masterclasses</p>
+                <p className="text-[10px] text-slate-400 mt-1.5">
+                  {enrolledCourses.length > 0 ? `Average across ${enrolledCourses.length} enrolled ${enrolledCourses.length === 1 ? 'course' : 'courses'}` : "No courses enrolled"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
@@ -3537,14 +4420,18 @@ export function ProfileView() {
                   <Clock className="h-4 w-4 text-emerald-600" />
                 </div>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-slate-800">148.5</p>
+                  <p className="text-2xl font-black text-slate-800">{estimatedStudyHours}</p>
                   <span className="text-xs font-bold text-slate-400">hours</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-500">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>108h Live Sessions &bull; 40.5h Replays</span>
+                  <span>
+                    {enrolledCourses.reduce((acc: number, c: any) => acc + (c.completedLessons || 0), 0)} Completed Lessons
+                  </span>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">24.5 hrs logged in past 7 days</p>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {studentSubmissions.length > 0 ? `${studentSubmissions.length} coursework tasks completed` : "Active coursework logging"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
@@ -3553,15 +4440,19 @@ export function ProfileView() {
                   <Flame className="h-4 w-4 text-amber-500" />
                 </div>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-amber-600">19 Days</p>
+                  <p className="text-2xl font-black text-amber-600">
+                    {enrolledCourses.length > 0 ? (studentSubmissions.length > 0 ? `${Math.min(30, studentSubmissions.length * 3 + 2)} Days` : "Active") : "0 Days"}
+                  </p>
                   <span className="text-base">🔥</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-2">
                   <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-extrabold border border-amber-200">
-                    Consistency Master
+                    {enrolledCourses.length > 0 ? "Consistency Tracked" : "Not Started"}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">Best streak: 28 days continuous</p>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {enrolledCourses.length > 0 ? "Regular live class & assignment activity" : "Enroll to begin learning streak"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
@@ -3570,62 +4461,95 @@ export function ProfileView() {
                   <Target className="h-4 w-4 text-teal-600" />
                 </div>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-[#0d5c4d]">89.2%</p>
+                  <p className="text-2xl font-black text-[#0d5c4d]">
+                    {gradedSubmissions.length > 0 ? `${averageQuizScore}%` : (studentSubmissions.length > 0 ? "Pending" : "0%")}
+                  </p>
                   <span className="text-[10px] font-bold text-slate-500">Avg Score</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-600 font-semibold">
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>38 of 42 Practice Sets Passed</span>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">715 practice problems completed</p>
-              </div>
-            </div>
-
-            {/* Weekly Study Rhythm & Consistency */}
-            <div className="bg-[#fcfdfc] rounded-2xl border border-[#e2eae5] p-5 shadow-2xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-[#0d5c4d]" />
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26]">
-                    Weekly Study Rhythm &amp; Learning Volume
-                  </h4>
-                </div>
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-slate-500 font-medium">Weekly Goal: <strong className="text-slate-800">25 hrs</strong></span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200">
-                    24.5 hrs Completed (98%)
+                  <span>
+                    {gradedSubmissions.length > 0
+                      ? `${gradedSubmissions.length} of ${studentSubmissions.length} Graded`
+                      : (studentSubmissions.length > 0 ? `${studentSubmissions.length} Awaiting Review` : "No submissions yet")}
                   </span>
                 </div>
-              </div>
-
-              {/* Day-by-Day Visual Activity Bars */}
-              <div className="grid grid-cols-7 gap-2 pt-2">
-                {[
-                  { day: "Mon", hours: 2.5, percent: 50, active: true },
-                  { day: "Tue", hours: 3.5, percent: 70, active: true },
-                  { day: "Wed", hours: 2.0, percent: 40, active: true },
-                  { day: "Thu", hours: 4.0, percent: 80, active: true },
-                  { day: "Fri", hours: 3.0, percent: 60, active: true },
-                  { day: "Sat", hours: 5.5, percent: 100, active: true, peak: true },
-                  { day: "Sun", hours: 4.0, percent: 80, active: true }
-                ].map((item, idx) => (
-                  <div key={idx} className="flex flex-col items-center gap-2">
-                    <span className="text-[10px] font-extrabold text-[#0d5c4d]">{item.hours}h</span>
-                    <div className="w-full bg-slate-100 h-24 rounded-xl flex items-end p-1 justify-center relative group">
-                      <div
-                        className={`w-full rounded-lg transition-all duration-300 ${
-                          item.peak
-                            ? "bg-gradient-to-t from-[#0d5c4d] to-emerald-400 shadow-xs"
-                            : "bg-[#0d5c4d]/80 hover:bg-[#0d5c4d]"
-                        }`}
-                        style={{ height: `${item.percent}%` }}
-                      />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-500">{item.day}</span>
-                  </div>
-                ))}
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {studentSubmissions.length > 0 ? `${studentSubmissions.length} total assignment submissions` : "Take quizzes to record score"}
+                </p>
               </div>
             </div>
+
+            {/* Enrolled Courses Syllabus Breakdown */}
+            {enrolledCourses && enrolledCourses.length > 0 ? (
+              <div className="bg-[#fcfdfc] rounded-2xl border border-[#e2eae5] p-5 shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-[#0d5c4d]" />
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26]">
+                      Enrolled Subject Mastery &amp; Unit Breakdown
+                    </h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView("progress")}
+                    className="text-xs font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Open Comprehensive Learning Analytics</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 pt-1">
+                  {enrolledCourses.map((c: any, idx: number) => {
+                    const courseProgress = c.totalLessons > 0 ? Math.min(100, Math.round(((c.completedLessons || 0) / c.totalLessons) * 100)) : 0;
+                    const teacherName = c.teacher?.user
+                      ? `${c.teacher.user.firstName || ''} ${c.teacher.user.lastName || ''}`.trim()
+                      : c.teacherName || "Assigned Educator";
+
+                    return (
+                      <div
+                        key={c.id || idx}
+                        className="p-4 rounded-xl bg-white border border-slate-200/80 hover:border-emerald-300 transition-all space-y-2"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <div>
+                            <span className="font-bold text-xs text-slate-900">{c.title}</span>
+                            <span className="text-[10px] text-slate-500 ml-2">by {teacherName}</span>
+                          </div>
+                          <span className="font-mono text-xs font-bold text-[#0d5c4d]">
+                            {c.completedLessons || 0} / {c.totalLessons || 0} Lessons ({courseProgress}%)
+                          </span>
+                        </div>
+
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className="bg-[#0d5c4d] h-full rounded-full transition-all duration-500"
+                            style={{ width: `${courseProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                <TrendingUp className="h-10 w-10 text-slate-400 mx-auto" />
+                <p className="text-sm font-bold text-slate-700">No Learning Progress Recorded</p>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  You are not currently enrolled in any course batches. Once enrolled, lesson completions, quiz mastery, and syllabus coverage will be automatically tracked here.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("courses")}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span>Browse Available Courses</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3641,10 +4565,10 @@ export function ProfileView() {
               <div>
                 <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Student Athletic Portfolio &amp; Sports Achievement Records</span>
+                  <span>Student Athletic Portfolio &amp; Sports Records</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Verified institutional sports credentials, tournament records, representative honours, and fitness certifications.
+                  Verified sports registrations, tournament records, squad rosters, and athletic fitness certifications.
                 </p>
               </div>
               <button
@@ -3653,289 +4577,170 @@ export function ProfileView() {
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-md transition-colors self-start sm:self-auto cursor-pointer"
               >
                 <Download className="h-4 w-4" />
-                <span>Download Sports Record (PDF)</span>
+                <span>Print / Save Record (PDF)</span>
               </button>
             </div>
 
-            {/* Top Athletic Metrics / Honours Summary */}
+            {/* Top Athletic Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Primary Sport</span>
-                <p className="text-lg font-black text-[#0d5c4d] mt-1">Cricket (First XI)</p>
+                <p className="text-lg font-black text-[#0d5c4d] mt-1">
+                  {sportsRegistrations.length > 0 ? (sportsRegistrations[0].event?.sportType || "Athletics") : "Not Enrolled"}
+                </p>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">Vice Captain</span>
-                  <span className="text-[10px] text-slate-500 font-semibold">Jersey #07</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
+                    {sportsRegistrations.length > 0 ? (sportsRegistrations[0].roleInTeam || "Participant") : "No Active Sports"}
+                  </span>
+                  {sportsRegistrations.length > 0 && sportsRegistrations[0].jerseyNumber && (
+                    <span className="text-[10px] text-slate-500 font-semibold">Jersey #{sportsRegistrations[0].jerseyNumber}</span>
+                  )}
                 </div>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Academy Honours</span>
-                <p className="text-lg font-black text-[#0d2b26] mt-1">Double Colorsman</p>
-                <p className="text-[10px] text-emerald-600 font-bold mt-1">Cricket &amp; Track Athletics</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registered Events</span>
+                <p className="text-lg font-black text-[#0d2b26] mt-1">
+                  {sportsRegistrations.length > 0 ? `${sportsRegistrations.length} Active ${sportsRegistrations.length === 1 ? 'Event' : 'Events'}` : "0 Events"}
+                </p>
+                <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                  {sportsRegistrations.length > 0 ? "Confirmed Participation" : "Standard Student Status"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Career Medals</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Event Standing</span>
                 <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-amber-600 font-mono">12</p>
-                  <span className="text-[11px] font-bold text-slate-600">Medals Won</span>
+                  <p className="text-xl font-black text-amber-600 font-mono">
+                    {sportsRegistrations.length > 0 ? (sportsRegistrations[0].status || "Active") : "None"}
+                  </p>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-0.5">6 Gold • 4 Silver • 2 Bronze</p>
+                <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                  {sportsRegistrations.length > 0 ? (sportsRegistrations[0].event?.title || "Inter-House Sports") : "No active tournaments"}
+                </p>
               </div>
 
               <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fitness Level</span>
-                <p className="text-lg font-black text-[#0d5c4d] mt-1 font-mono">Grade A+ (Elite)</p>
-                <p className="text-[10px] text-emerald-700 font-bold mt-1">Yo-Yo IR1: Level 19.4 • Fit</p>
+                <p className="text-lg font-black text-[#0d5c4d] mt-1 font-mono">Cleared &amp; Fit</p>
+                <p className="text-[10px] text-emerald-700 font-bold mt-1">Standard Athletic Health Clearance</p>
               </div>
             </div>
 
-            {/* Active Teams & Squad Roster Enrollment */}
-            <div className="space-y-3">
-              <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                <span>Enrolled Teams &amp; Squad Rosters</span>
-              </h4>
+            {/* Active Teams & Event Registrations */}
+            {isLoadingSports ? (
+              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
+                <Loader2 className="h-6 w-6 animate-spin text-[#0d5c4d] mx-auto mb-2" />
+                <p className="text-xs font-semibold text-slate-600">Loading sports registrations...</p>
+              </div>
+            ) : sportsRegistrations && sportsRegistrations.length > 0 ? (
+              <div className="space-y-4">
+                <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
+                  <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                  <span>Enrolled Sports Teams &amp; Event Rosters</span>
+                </h4>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                {/* Team 1: Cricket */}
-                <div className="p-4 rounded-2xl bg-[#fcfdfc] border border-[#e2eae5] hover:border-[#b2e5d9] transition-all space-y-3 shadow-2xs">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-extrabold">
-                        Major Sport
-                      </span>
-                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Lions Academy First XI Cricket</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {sportsRegistrations.map((reg: any, idx: number) => (
+                    <div
+                      key={reg.id || idx}
+                      className="p-5 rounded-2xl bg-[#fcfdfc] border border-[#e2eae5] hover:border-[#b2e5d9] transition-all space-y-3 shadow-2xs"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-extrabold">
+                            {reg.event?.sportType || "Sports Event"}
+                          </span>
+                          <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">
+                            {reg.event?.title || "Championship Event"}
+                          </h5>
+                        </div>
+                        <span className="text-xl">🏆</span>
+                      </div>
+
+                      <div className="text-xs space-y-1 text-slate-600">
+                        <p>
+                          <span className="font-bold text-slate-800">Role:</span> {reg.roleInTeam || "Participant"}
+                          {reg.jerseyNumber ? ` (Jersey #${reg.jerseyNumber})` : ""}
+                        </p>
+                        <p>
+                          <span className="font-bold text-slate-800">Venue:</span> {reg.event?.venue || "Main Sports Oval"}
+                        </p>
+                        <p>
+                          <span className="font-bold text-slate-800">Event Date:</span> {reg.event?.startDate ? new Date(reg.event.startDate).toLocaleDateString() : "Scheduled"}
+                        </p>
+                        {reg.notes && (
+                          <p>
+                            <span className="font-bold text-slate-800">Notes:</span> {reg.notes}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                        <span className="text-emerald-700 font-bold">{reg.status || "CONFIRMED"}</span>
+                        <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">Roster Verified ✓</span>
+                      </div>
                     </div>
-                    <span className="text-xl">🏏</span>
-                  </div>
-                  <div className="text-xs space-y-1 text-slate-600">
-                    <p><span className="font-bold text-slate-800">Role:</span> All-Rounder / Vice Captain</p>
-                    <p><span className="font-bold text-slate-800">Specialty:</span> Right-Hand Bat, Right-Arm Medium Fast</p>
-                    <p><span className="font-bold text-slate-800">Coach:</span> Coach Samantha Perera</p>
-                    <p><span className="font-bold text-slate-800">Schedule:</span> Mon, Wed, Fri (3:30 - 5:30 PM)</p>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                    <span className="text-emerald-700 font-bold">16 Appearances</span>
-                    <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">Active Captaincy ✓</span>
-                  </div>
+                  ))}
                 </div>
 
-                {/* Team 2: Athletics */}
-                <div className="p-4 rounded-2xl bg-[#fcfdfc] border border-[#e2eae5] hover:border-[#b2e5d9] transition-all space-y-3 shadow-2xs">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-extrabold">
-                        Track &amp; Field
+                {/* Physical Biometrics & Health Clearance Card */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
+                        <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                        <span>Physical Biometrics &amp; Conditioning</span>
+                      </h5>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-extrabold border border-emerald-200">
+                        Medical Fit ✓
                       </span>
-                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Lions Senior Track &amp; Sprint Squad</h5>
                     </div>
-                    <span className="text-xl">🏃</span>
-                  </div>
-                  <div className="text-xs space-y-1 text-slate-600">
-                    <p><span className="font-bold text-slate-800">Events:</span> 100m, 200m &amp; 4x100m Relay Anchor</p>
-                    <p><span className="font-bold text-slate-800">Personal Best:</span> 100m: 11.02s | 200m: 22.45s</p>
-                    <p><span className="font-bold text-slate-800">Coach:</span> Coach M. Faizal</p>
-                    <p><span className="font-bold text-slate-800">Schedule:</span> Tue, Thu (6:00 - 7:30 AM)</p>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                    <span className="text-emerald-700 font-bold">National Qualifier</span>
-                    <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-bold">Championship Record Holder</span>
-                  </div>
-                </div>
 
-                {/* Team 3: Inter-House */}
-                <div className="p-4 rounded-2xl bg-[#fcfdfc] border border-[#e2eae5] hover:border-[#b2e5d9] transition-all space-y-3 shadow-2xs">
-                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>• General Fitness: <span className="font-bold text-slate-800">Cleared for Competitive Sports</span></p>
+                      <p>• Emergency Response: <span className="font-bold text-slate-800">On-field First Aid Registered</span></p>
+                      <p>• Clearance Validity: <span className="font-bold text-slate-800">Academic Year {new Date().getFullYear()}</span></p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3 flex flex-col justify-between">
                     <div>
-                      <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-800 text-[10px] font-extrabold">
-                        Academy League
-                      </span>
-                      <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">Lions Academy Gold Squad</h5>
+                      <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
+                        <ShieldCheck className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                        <span>Sports Department Endorsement</span>
+                      </h5>
+                      <p className="text-xs text-slate-600 italic mt-2 leading-relaxed bg-white p-3 rounded-xl border border-slate-200">
+                        &ldquo;{currentUser.name || 'This student'} is officially enrolled on our athletic squad rosters, demonstrating teamwork, physical discipline, and sportsmanship.&rdquo;
+                      </p>
                     </div>
-                    <span className="text-xl">🏆</span>
-                  </div>
-                  <div className="text-xs space-y-1 text-slate-600">
-                    <p><span className="font-bold text-slate-800">Role:</span> Senior Academy Sports Captain</p>
-                    <p><span className="font-bold text-slate-800">Meet Points:</span> 28 Individual Championship Points</p>
-                    <p><span className="font-bold text-slate-800">Squad Mentor:</span> Eng. K. Thanushan</p>
-                    <p><span className="font-bold text-slate-800">Squad Rank:</span> 1st Place Overall (2026)</p>
-                  </div>
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                    <span className="text-purple-700 font-bold">Best Senior Athlete</span>
-                    <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-bold">Academy Shield ✓</span>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60">
+                      <span className="font-bold text-slate-700">Sports &amp; Athletics Directorate</span>
+                      <span className="px-2 py-0.5 rounded-full bg-white border border-[#c4e9e0] text-[#0d5c4d] font-bold">
+                        Official Record Verified ✓
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* Official Tournament Achievements & Medals Table */}
-            <div className="space-y-3">
-              <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                <Medal className="h-3.5 w-3.5 text-amber-500" />
-                <span>Official Tournament Achievements &amp; Medal Records</span>
-              </h4>
-
-              <div className="bg-white rounded-2xl border border-[#e6ece8] shadow-xs overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-[#fcfdfc] border-b border-[#e6ece8] text-slate-400 font-bold uppercase text-[10px]">
-                      <tr>
-                        <th className="py-3 px-4">Event / Tournament</th>
-                        <th className="py-3 px-4">Sport</th>
-                        <th className="py-3 px-4 text-center">Medal / Award</th>
-                        <th className="py-3 px-4">Level</th>
-                        <th className="py-3 px-4">Date</th>
-                        <th className="py-3 px-4">Performance Highlights</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#f0f4f1]">
-                      {[
-                        {
-                          tournament: "All-Island Academy & Club Tier 1 Tournament (Finals)",
-                          sport: "Cricket",
-                          medal: "Gold Medal & Man of the Match",
-                          medalType: "gold",
-                          level: "National Tier 1",
-                          date: "Sept 2026",
-                          highlights: "Scored 78* (62 balls) & took 4/28 vs Colombo CC. Lions Academy won by 38 runs."
-                        },
-                        {
-                          tournament: "Sri Lanka All-Island Academy Athletics Meet",
-                          sport: "Athletics",
-                          medal: "Gold Medal (New Record)",
-                          medalType: "gold",
-                          level: "All-Island National",
-                          date: "July 2025",
-                          highlights: "4x100m Relay Anchor Leg (Championship Record: 42.18s)."
-                        },
-                        {
-                          tournament: "Western Provincial Track & Field Championship",
-                          sport: "Athletics",
-                          medal: "Silver Medal",
-                          medalType: "silver",
-                          level: "Provincial",
-                          date: "Aug 2025",
-                          highlights: "200m Sprint Final: 22.45 seconds (PB)."
-                        },
-                        {
-                          tournament: "Lions Sports Academy Annual Awards Night 2025/2026",
-                          sport: "Multi-Sport",
-                          medal: "Academy Double Colors Award",
-                          medalType: "colors",
-                          level: "Institutional",
-                          date: "Feb 2026",
-                          highlights: "Honoured with Lions Golden Emblem for cricket and sprint athletics excellence."
-                        },
-                        {
-                          tournament: "Annual Academy Championship League",
-                          sport: "Athletics",
-                          medal: "Senior Champion Trophy",
-                          medalType: "trophy",
-                          level: "Academy League",
-                          date: "Feb 2026",
-                          highlights: "Gold in 100m, Gold in 200m, Gold in 4x100m Relay. Total 28 Points for Lions Gold Squad."
-                        },
-                        {
-                          tournament: "All-Island Junior Badminton Championship",
-                          sport: "Badminton",
-                          medal: "Bronze Medal",
-                          medalType: "bronze",
-                          level: "National Junior",
-                          date: "Nov 2024",
-                          highlights: "Under-16 Boys Doubles Semi-Finalist."
-                        }
-                      ].map((item, idx) => (
-                        <tr key={idx} className="hover:bg-[#f9fbf9] transition-colors">
-                          <td className="py-3.5 px-4 font-bold text-slate-900">{item.tournament}</td>
-                          <td className="py-3.5 px-4">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ecf8f5] text-[#0d5c4d]">
-                              {item.sport}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <span
-                              className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black ${
-                                item.medalType === "gold"
-                                  ? "bg-amber-100 text-amber-900 border border-amber-300"
-                                  : item.medalType === "silver"
-                                  ? "bg-slate-200 text-slate-800 border border-slate-300"
-                                  : item.medalType === "colors"
-                                  ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
-                                  : item.medalType === "trophy"
-                                  ? "bg-purple-100 text-purple-900 border border-purple-300"
-                                  : "bg-orange-100 text-orange-900 border border-orange-300"
-                              }`}
-                            >
-                              {item.medal}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-600 font-semibold">{item.level}</td>
-                          <td className="py-3.5 px-4 text-slate-500 font-mono text-[11px]">{item.date}</td>
-                          <td className="py-3.5 px-4 text-slate-600 text-[11px] max-w-xs">{item.highlights}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            ) : (
+              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                <Trophy className="h-10 w-10 text-slate-400 mx-auto" />
+                <p className="text-sm font-bold text-slate-700">No Sports Registrations Found</p>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  This student is not currently registered for any athletic tournaments, sports teams, or inter-house competitions.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setCurrentView("sports")}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  <Trophy className="h-3.5 w-3.5" />
+                  <span>Explore Sports &amp; Tournaments</span>
+                </button>
               </div>
-            </div>
-
-            {/* Fitness, Biometrics & Coach Clearance */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Biometrics */}
-              <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3">
-                <div className="flex items-center justify-between">
-                  <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                    <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                    <span>Physical Biometrics &amp; Conditioning</span>
-                  </h5>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-extrabold border border-emerald-200">
-                    Medical Fit ✓
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2.5 text-center text-xs">
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Height / Weight</p>
-                    <p className="font-black text-[#0d2b26] mt-0.5">178 cm / 68 kg</p>
-                  </div>
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Yo-Yo Test</p>
-                    <p className="font-black text-[#0d5c4d] mt-0.5">Level 19.4</p>
-                  </div>
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">VO2 Max</p>
-                    <p className="font-black text-amber-600 mt-0.5">58.2 ml/kg</p>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-slate-500 space-y-1 pt-1 border-t border-slate-200/60">
-                  <p>• Medical Examiner: <span className="font-bold text-slate-700">Dr. H. Wickremasinghe, MBBS</span> (Sports Medicine Board)</p>
-                  <p>• Clearance Validity: <span className="font-bold text-slate-700">Full Academic Year 2026/2027</span></p>
-                </div>
-              </div>
-
-              {/* Coach Endorsement */}
-              <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3 flex flex-col justify-between">
-                <div>
-                  <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                    <span>Head Coach &amp; Academy Director Endorsement</span>
-                  </h5>
-                  <p className="text-xs text-slate-600 italic mt-2 leading-relaxed bg-white p-3 rounded-xl border border-slate-200">
-                    &ldquo;Sathurjan is an exemplary natural leader on the field. His tactical awareness as Vice Captain in our Lions First XI cricket squad and explosive anchor leg in athletics reflect exceptional dedication, balancing top physical fitness with academic brilliance.&rdquo;
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60">
-                  <span className="font-bold text-slate-700">Coach Samantha Perera (Academy Sports Director)</span>
-                  <span className="px-2 py-0.5 rounded-full bg-white border border-[#c4e9e0] text-[#0d5c4d] font-bold">
-                    Official Stamp Verified ✓
-                  </span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -3980,8 +4785,12 @@ export function ProfileView() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                 <div className="absolute bottom-4 left-6 right-6 flex items-end justify-between">
                   <div className="flex items-end gap-4">
-                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-[#0d5c4d] to-[#147a66] border-4 border-white text-white flex items-center justify-center text-3xl font-black shadow-xl">
-                      {profileData.name.charAt(0)}
+                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-[#0d5c4d] to-[#147a66] border-4 border-white text-white flex items-center justify-center text-3xl font-black shadow-xl overflow-hidden">
+                      {profileData.avatarUrl ? (
+                        <img src={profileData.avatarUrl} alt={profileData.name} className="h-full w-full object-cover" />
+                      ) : (
+                        profileData.name.charAt(0)
+                      )}
                     </div>
                     <div className="text-white space-y-0.5">
                       <div className="flex items-center gap-2">
@@ -3992,10 +4801,6 @@ export function ProfileView() {
                       </div>
                       <p className="text-xs sm:text-sm text-slate-200">{profileData.grade}</p>
                     </div>
-                  </div>
-                  <div className="hidden sm:flex items-center gap-1.5 bg-black/40 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-white/20 text-white text-xs font-bold">
-                    <span className="text-amber-400">★ 4.9</span>
-                    <span>· 142 Active Students</span>
                   </div>
                 </div>
               </div>
@@ -4055,53 +4860,47 @@ export function ProfileView() {
                     <span className="text-[11px] font-semibold text-emerald-700">Admission Open</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {[
-                      {
-                        title: "Combined Mathematics 2026 (Theory & Revision)",
-                        fee: "Rs. 4,500 / month",
-                        schedule: "Mon & Wed · 06:30 PM",
-                        features: ["Live Interactive Stream", "Recorded HD Archive", "Past Paper Vault", "WhatsApp Q&A"]
-                      },
-                      {
-                        title: "Pure Mathematics Fast-Track Paper Class",
-                        fee: "Rs. 3,500 / month",
-                        schedule: "Tue & Thu · 07:00 PM",
-                        features: ["Timed Exam Simulations", "Model Papers", "Marking Scheme Review", "Monthly Assessment"]
-                      }
-                    ].map((pkg, idx) => (
-                      <div key={idx} className="p-4 rounded-2xl bg-white border border-[#e2eae5] hover:border-[#0d5c4d] shadow-2xs space-y-3 transition-all">
-                        <div className="flex items-start justify-between gap-2">
-                          <h5 className="font-bold text-sm text-[#0d2b26]">{pkg.title}</h5>
-                          <span className="font-mono font-black text-xs text-[#0d5c4d] whitespace-nowrap bg-[#ecf8f5] px-2.5 py-1 rounded-lg">
-                            {pkg.fee}
-                          </span>
+                  {tutorPackagesList && tutorPackagesList.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {tutorPackagesList.map((pkg, idx) => (
+                        <div key={pkg.id || idx} className="p-4 rounded-2xl bg-white border border-[#e2eae5] hover:border-[#0d5c4d] shadow-2xs space-y-3 transition-all">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-teal-200 bg-teal-50 text-teal-800">
+                                {pkg.code}
+                              </span>
+                              <h5 className="font-bold text-sm text-[#0d2b26] mt-1">{pkg.title}</h5>
+                            </div>
+                            <span className="font-mono font-black text-xs text-[#0d5c4d] whitespace-nowrap bg-[#ecf8f5] px-2.5 py-1 rounded-lg">
+                              {pkg.fee}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-medium">🕒 {pkg.schedule}</p>
+                          <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                            <span className="font-semibold text-slate-700">{pkg.tier}</span> · {pkg.delivery}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              addToast({
+                                type: "info",
+                                title: "Enrollment Notice",
+                                message: `In public mode, clicking this lets students subscribe to ${pkg.title}.`
+                              });
+                            }}
+                            className="w-full py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Enroll in Batch Now
+                          </button>
                         </div>
-                        <p className="text-[11px] text-slate-500 font-medium">🕒 {pkg.schedule}</p>
-                        <ul className="space-y-1 text-[11px] text-slate-600">
-                          {pkg.features.map((f, i) => (
-                            <li key={i} className="flex items-center gap-1.5">
-                              <Check className="h-3 w-3 text-emerald-600" />
-                              <span>{f}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            addToast({
-                              type: "info",
-                              title: "Enrollment Notice",
-                              message: `In public mode, clicking this lets students subscribe to ${pkg.title}.`
-                            });
-                          }}
-                          className="w-full py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-colors cursor-pointer"
-                        >
-                          Enroll in Batch Now
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center rounded-2xl border border-dashed border-slate-200 bg-[#f8faf9] space-y-1">
+                      <p className="text-xs font-bold text-slate-600">No study packages published yet</p>
+                      <p className="text-[11px] text-slate-400">Packages created in the Teaching Studio or Connect Hub will automatically appear here.</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Social Channels & Contact */}
@@ -4496,7 +5295,7 @@ export function ProfileView() {
                     ...bankModalState,
                     data: { ...bankModalState.data, bankAccountName: e.target.value }
                   })}
-                  placeholder="e.g. Samantha Priyantha Perera"
+                  placeholder="e.g. Account Holder Name"
                   className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0d2b26] focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -4796,6 +5595,120 @@ export function ProfileView() {
                   className="px-5 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs transition-colors shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   Apply Cover Banner
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AVATAR PRESETS MODAL */}
+      {avatarModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-[#c4e9e0] space-y-4">
+            <div className="px-6 pt-6 pb-2 flex items-center justify-between border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
+                  <Camera className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[#0d2b26]">Select Profile Picture</h3>
+                  <p className="text-xs text-slate-500">Pick a professional educator preset or paste a custom image link.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAvatarModalOpen(false)}
+                className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="px-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700">Curated Educator Avatars</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {EDUCATOR_AVATARS.map((preset, idx) => {
+                    const isSelected = profileData.avatarUrl === preset.url;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setProfileData((prev) => ({ ...prev, avatarUrl: preset.url }));
+                          if (typeof window !== "undefined") {
+                            localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, preset.url);
+                            localStorage.setItem("lms_avatar_teacher", preset.url);
+                          }
+                          setAvatarModalOpen(false);
+                          addToast({
+                            type: "success",
+                            title: "Preset Selected",
+                            message: "Profile photo updated. Click 'Save Details' to persist."
+                          });
+                        }}
+                        className={`group relative rounded-2xl overflow-hidden border-2 aspect-square transition-all cursor-pointer ${
+                          isSelected ? "border-[#0d5c4d] ring-2 ring-[#0d5c4d]/30" : "border-slate-200 hover:border-[#0d5c4d]"
+                        }`}
+                      >
+                        <img src={preset.url} alt={preset.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-1.5 text-white text-[10px] font-bold">
+                          <span className="truncate">{preset.title}</span>
+                        </div>
+                        {isSelected && (
+                          <div className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full bg-[#0d5c4d] text-white flex items-center justify-center shadow">
+                            <Check className="h-3 w-3" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <label className="text-xs font-bold text-slate-700">Or Paste Custom Image URL</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    value={customAvatarUrlInput}
+                    onChange={(e) => setCustomAvatarUrlInput(e.target.value)}
+                    placeholder="https://images.unsplash.com/photo-..."
+                    className="flex-1 h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!customAvatarUrlInput.trim()) return;
+                      setProfileData((prev) => ({ ...prev, avatarUrl: customAvatarUrlInput.trim() }));
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, customAvatarUrlInput.trim());
+                        localStorage.setItem("lms_avatar_teacher", customAvatarUrlInput.trim());
+                      }
+                      setCustomAvatarUrlInput("");
+                      setAvatarModalOpen(false);
+                      addToast({
+                        type: "success",
+                        title: "Custom Photo Applied",
+                        message: "Profile photo updated. Click 'Save Details' to persist."
+                      });
+                    }}
+                    disabled={!customAvatarUrlInput.trim()}
+                    className="px-4 py-2 h-10 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-3 pb-6 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setAvatarModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Close
                 </button>
               </div>
             </div>

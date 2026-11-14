@@ -12,13 +12,6 @@ import {
   TutorPackage
 } from "@/types/lms";
 import {
-  initialConnectTeachers,
-  initialConnectStudents,
-  initialConnectStudyGroups,
-  initialConnectPurchases,
-  initialTutorPackages
-} from "@/data/connectMockData";
-import {
   Users,
   GraduationCap,
   Users2,
@@ -77,9 +70,6 @@ export function ConnectView() {
   const isStudyGroupsTabEnabled = isFeatureEnabled("sub_connect_study_groups");
   const hasAnyTabEnabled = isFindTeachersTabEnabled || isSubscriptionsTabEnabled || isStudyGroupsTabEnabled;
 
-  // Quick Controls Drawer state
-  const [showFeatureControls, setShowFeatureControls] = useState<boolean>(false);
-
   // Active sub-tab
   const [activeTab, setActiveTab] = useState<ConnectTab>("teachers");
 
@@ -97,75 +87,148 @@ export function ConnectView() {
     }
   }, [activeTab, isFindTeachersTabEnabled, isSubscriptionsTabEnabled, isStudyGroupsTabEnabled]);
 
-  // State management
-  const [teachers, setTeachers] = useState<ConnectTeacher[]>(initialConnectTeachers);
-  const [packages, setPackages] = useState<TutorPackage[]>(initialTutorPackages);
-  const [students, setStudents] = useState<ConnectStudent[]>(initialConnectStudents);
-  const [studyGroups, setStudyGroups] = useState<ConnectStudyGroup[]>(initialConnectStudyGroups);
-  const [purchases, setPurchases] = useState<ConnectPurchase[]>(initialConnectPurchases);
+  // State management (strictly live data from DB - no mock)
+  const [teachers, setTeachers] = useState<ConnectTeacher[]>([]);
+  const [packages, setPackages] = useState<TutorPackage[]>([]);
+  const [students, setStudents] = useState<ConnectStudent[]>([]);
+  const [studyGroups, setStudyGroups] = useState<ConnectStudyGroup[]>([]);
+  const [purchases, setPurchases] = useState<ConnectPurchase[]>([]);
+  const [isLoadingMarketplace, setIsLoadingMarketplace] = useState<boolean>(true);
 
   // Load live tutors and packages from backend Marketplace API
   useEffect(() => {
-    async function loadMarketplace() {
+    let isMounted = true;
+    setIsLoadingMarketplace(true);
+
+    async function loadData() {
       try {
-        const res = await api.teachers.getMarketplace();
-        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
-          const mappedTutors: ConnectTeacher[] = res.data.map((t: any) => {
-            const nameParts = (t.name || "Tutor").split(" ");
+        const [teachersRes, packagesRes] = await Promise.all([
+          api.teachers.getMarketplace(),
+          api.packages.getAll().catch(() => ({ success: false, data: [] }))
+        ]);
+
+        if (!isMounted) return;
+
+        if (teachersRes?.success && Array.isArray(teachersRes.data)) {
+          const mappedTutors: ConnectTeacher[] = teachersRes.data.map((t: any) => {
+            const nameParts = (t.name || "Tutor").trim().split(" ");
             const initials = nameParts.length > 1
-              ? `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase()
-              : nameParts[0].substring(0, 2).toUpperCase();
+              ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
+              : (nameParts[0] || "TU").substring(0, 2).toUpperCase();
+
+            // Find fee from teacher's own packages if available
+            const teacherPackages = Array.isArray(t.packages) ? t.packages : [];
+            const primaryPackage = teacherPackages[0];
+            const fee = primaryPackage?.price || t.monthlyFeeLkr || 0;
 
             return {
               id: t.id,
-              name: t.name,
+              name: t.name || "Tutor",
               initials,
               avatarColor: "bg-[#0d5c4d]",
               verified: Boolean(t.isVerified),
               title: t.title || "Specialist Educator",
-              subject: t.specialization || "Combined Mathematics",
-              studentsCount: 142,
-              lessonsCount: t.coursesCount || 18,
-              liveClassesCount: 4,
-              monthlyFee: t.monthlyFeeLkr || 3500,
+              subject: t.specialization || "General Subjects",
+              studentsCount: t.studentsCount || 0,
+              lessonsCount: t.coursesCount || (Array.isArray(t.courses) ? t.courses.length : 0),
+              liveClassesCount: t.liveClassesCount || 0,
+              monthlyFee: fee,
               currency: "LKR",
-              rating: t.rating || 4.9,
-              tags: Array.isArray(t.mediums) && t.mediums.length > 0 ? t.mediums : ["A/L", "Provincial"],
-              meetUrl: t.websiteUrl || "https://meet.google.com/limat-math-master",
-              bio: t.bio || "Specialist educator with extensive curriculum experience.",
+              rating: typeof t.rating === "number" && t.rating > 0 ? t.rating : undefined,
+              tags: Array.isArray(t.mediums) && t.mediums.length > 0
+                ? t.mediums
+                : [t.specialization || "Tuition"],
+              meetUrl: t.websiteUrl || "",
+              bio: t.bio || "Registered specialist educator on Newtoz.",
               qualifications: Array.isArray(t.qualifications) && t.qualifications.length > 0
-                ? t.qualifications.map((q: any) => `${q.degree || q.title || 'Degree'} (${q.institution || 'University'})`).join(", ")
-                : "B.Sc (Hons), PGDE",
-              sampleVideoTitle: "Introductory Masterclass: Core Fundamentals"
-            };
+                ? t.qualifications
+                    .map((q: any) => `${q.degree || q.title || 'Degree'} (${q.institution || 'University'})`)
+                    .join(", ")
+                : (typeof t.qualifications === "string" ? t.qualifications : ""),
+              sampleVideoTitle: t.youtubeUrl ? "Sample Lesson / Masterclass" : "",
+              bankName: t.bankName || "",
+              bankAccountName: t.bankAccountName || "",
+              bankAccountNumber: t.bankAccountNumber || "",
+              bankBranch: t.bankBranch || ""
+            } as any;
           });
 
-          // Merge live tutors with mock tutors without duplicating
-          setTeachers((prev) => {
-            const liveIds = new Set(mappedTutors.map((m) => m.id));
-            return [...mappedTutors, ...prev.filter((p) => !liveIds.has(p.id))];
+          setTeachers(mappedTutors);
+        } else {
+          setTeachers([]);
+        }
+
+        if (packagesRes?.success && Array.isArray(packagesRes.data)) {
+          const mappedPackages: TutorPackage[] = packagesRes.data.map((pkg: any) => {
+            const fee = Number(pkg.price) || 0;
+            return {
+              id: pkg.id,
+              teacherId: pkg.teacherId,
+              title: pkg.title,
+              subject: pkg.teacher?.specialization || "General",
+              grade: pkg.courses?.[0]?.course?.title || "All Grades",
+              monthlyFeeLkr: fee,
+              monthlyFee: fee,
+              currency: "LKR",
+              description: pkg.description || "Comprehensive tuition program.",
+              features: Array.isArray(pkg.features)
+                ? pkg.features
+                : typeof pkg.features === "string"
+                ? pkg.features.split("\n").filter(Boolean)
+                : [],
+              billingCycle: pkg.billingCycle === "MONTHLY" ? "Monthly" : (pkg.billingCycle || "Monthly"),
+              liveClassesPerWeek: 2,
+              status: "active",
+              enrolledCount: pkg._count?.subscriptions || 0,
+              badge: "Popular",
+              createdAt: pkg.createdAt || new Date().toISOString(),
+              teacher: pkg.teacher
+            } as any;
           });
+          setPackages(mappedPackages);
+        } else {
+          setPackages([]);
         }
       } catch (err) {
-        console.warn("Could not load backend tutors marketplace:", err);
+        console.warn("Could not load backend marketplace data:", err);
+        if (isMounted) {
+          setTeachers([]);
+          setPackages([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingMarketplace(false);
+        }
       }
     }
-    loadMarketplace();
+
+    loadData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Load student's real purchases and active subscriptions from backend
   useEffect(() => {
+    let isMounted = true;
     async function loadStudentPurchases() {
       try {
         const res = await api.students.getMyPurchases();
-        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (!isMounted) return;
+        if (res?.success && Array.isArray(res.data)) {
           setPurchases(res.data);
+        } else {
+          setPurchases([]);
         }
       } catch (err) {
         console.warn("Could not load student purchases:", err);
+        if (isMounted) setPurchases([]);
       }
     }
     loadStudentPurchases();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Filters for Teachers tab
@@ -176,24 +239,128 @@ export function ConnectView() {
   // Modals
   const [selectedTeacherForSubscribe, setSelectedTeacherForSubscribe] = useState<ConnectTeacher | null>(null);
   const [selectedPackageForSubscribe, setSelectedPackageForSubscribe] = useState<TutorPackage | null>(null);
-  const [selectedTeacherForPreview, setSelectedTeacherForPreview] = useState<ConnectTeacher | null>(null);
   const [selectedPurchaseForReceipt, setSelectedPurchaseForReceipt] = useState<ConnectPurchase | null>(null);
   const [paymentSuccessToast, setPaymentSuccessToast] = useState<string | null>(null);
 
-  // Checkout modal form state
+  // Checkout modal form state (strictly clean - no hardcoded/mock payment data)
   const [paymentMethod, setPaymentMethod] = useState<"card" | "bank_slip">("card");
-  const [cardNumber, setCardNumber] = useState<string>("4242 •••• •••• 4242");
-  const [cardExpiry, setCardExpiry] = useState<string>("08/28");
-  const [cardCvc, setCardCvc] = useState<string>("892");
-  const [bankRefNo, setBankRefNo] = useState<string>("BOC-TXN-882190");
-  const [uploadedSlipName, setUploadedSlipName] = useState<string>("commercial_bank_deposit_slip.pdf");
+  const [cardNumber, setCardNumber] = useState<string>("");
+  const [cardExpiry, setCardExpiry] = useState<string>("");
+  const [cardCvc, setCardCvc] = useState<string>("");
+  const [bankRefNo, setBankRefNo] = useState<string>("");
+  const [uploadedSlipName, setUploadedSlipName] = useState<string>("");
   const [uploadedSlipDataUrl, setUploadedSlipDataUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  // Filtered teachers
+  const resetCheckoutModal = () => {
+    setSelectedTeacherForSubscribe(null);
+    setSelectedPackageForSubscribe(null);
+    setCardNumber("");
+    setCardExpiry("");
+    setCardCvc("");
+    setBankRefNo("");
+    setUploadedSlipName("");
+    setUploadedSlipDataUrl(null);
+    setCheckoutError(null);
+    setIsProcessing(false);
+  };
+
+  const handleCardNumberChange = (val: string) => {
+    const raw = val.replace(/\D/g, "").slice(0, 16);
+    const formatted = raw.match(/.{1,4}/g)?.join(" ") || raw;
+    setCardNumber(formatted);
+    if (checkoutError) setCheckoutError(null);
+  };
+
+  const handleExpiryChange = (val: string) => {
+    let clean = val.replace(/\D/g, "").slice(0, 4);
+    if (clean.length >= 3) {
+      clean = `${clean.slice(0, 2)}/${clean.slice(2)}`;
+    }
+    setCardExpiry(clean);
+    if (checkoutError) setCheckoutError(null);
+  };
+
+  const handleCvcChange = (val: string) => {
+    const clean = val.replace(/\D/g, "").slice(0, 4);
+    setCardCvc(clean);
+    if (checkoutError) setCheckoutError(null);
+  };
+
+  const isFormValid = useMemo(() => {
+    if (paymentMethod === "card") {
+      const rawCard = cardNumber.replace(/\s+/g, "");
+      const isCardValid = rawCard.length >= 15 && rawCard.length <= 19;
+      const isExpiryValid = /^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry.trim());
+      const isCvcValid = cardCvc.trim().length >= 3 && cardCvc.trim().length <= 4;
+      return isCardValid && isExpiryValid && isCvcValid;
+    }
+    if (paymentMethod === "bank_slip") {
+      return Boolean(uploadedSlipName || uploadedSlipDataUrl);
+    }
+    return false;
+  }, [paymentMethod, cardNumber, cardExpiry, cardCvc, uploadedSlipName, uploadedSlipDataUrl]);
+
+  const activeBankDetails = useMemo(() => {
+    if (selectedTeacherForSubscribe) {
+      return {
+        bankName: (selectedTeacherForSubscribe as any).bankName,
+        accountName: (selectedTeacherForSubscribe as any).bankAccountName,
+        accountNumber: (selectedTeacherForSubscribe as any).bankAccountNumber,
+        branch: (selectedTeacherForSubscribe as any).bankBranch,
+      };
+    }
+    if (selectedPackageForSubscribe) {
+      const pkgTeacher = (selectedPackageForSubscribe as any).teacher;
+      const matchedTeacher = teachers.find((t) => t.id === selectedPackageForSubscribe.teacherId);
+      return {
+        bankName: pkgTeacher?.bankName || (matchedTeacher as any)?.bankName,
+        accountName: pkgTeacher?.bankAccountName || (matchedTeacher as any)?.bankAccountName,
+        accountNumber: pkgTeacher?.bankAccountNumber || (matchedTeacher as any)?.bankAccountNumber,
+        branch: pkgTeacher?.bankBranch || (matchedTeacher as any)?.bankBranch,
+      };
+    }
+    return null;
+  }, [selectedTeacherForSubscribe, selectedPackageForSubscribe, teachers]);
+
+  // Enrollment filter for Find Teachers ("all" | "enrolled" | "unenrolled")
+  const [enrollmentStatusFilter, setEnrollmentStatusFilter] = useState<"all" | "enrolled" | "unenrolled">("all");
+
+  // Helper to reliably check if a teacher is enrolled/subscribed
+  const isTeacherSubscribed = (t: ConnectTeacher) => {
+    if (t.isSubscribed) return true;
+    return purchases.some((p) => {
+      if (p.status !== "active") return false;
+      if (p.teacherId && (p.teacherId === t.id || p.teacherId === (t as any).userId)) return true;
+      const tPlans = packages.filter((pkg) => pkg.teacherId === t.id);
+      return tPlans.some((pkg) => pkg.id === p.packageId);
+    });
+  };
+
+  const enrolledTeachersCount = useMemo(() => {
+    return teachers.filter((t) => isTeacherSubscribed(t)).length;
+  }, [teachers, purchases, packages]);
+
+  // Dynamic subjects list from active teachers
+  const availableSubjects = useMemo(() => {
+    const set = new Set<string>();
+    teachers.forEach((t) => {
+      if (t.subject && t.subject.trim()) {
+        set.add(t.subject.trim());
+      }
+    });
+    return Array.from(set);
+  }, [teachers]);
+
+  // Filtered teachers (respects subject, search query, and enrollment filter)
   const filteredTeachers = useMemo(() => {
     return teachers.filter((t) => {
+      const isSub = isTeacherSubscribed(t);
+      if (enrollmentStatusFilter === "enrolled" && !isSub) return false;
+      if (enrollmentStatusFilter === "unenrolled" && isSub) return false;
+
       const matchSubject =
         selectedSubject === "all" ||
         t.subject.toLowerCase().includes(selectedSubject.toLowerCase()) ||
@@ -205,10 +372,38 @@ export function ConnectView() {
         t.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchSubject && matchQuery;
     });
-  }, [teachers, selectedSubject, searchQuery]);
+  }, [teachers, purchases, packages, selectedSubject, searchQuery, enrollmentStatusFilter]);
 
   // Handle Subscribe Completion via Live Supabase API
   const handleConfirmSubscribe = async () => {
+    setCheckoutError(null);
+
+    // Strict validation: Do not allow proceeding without proper payment details
+    if (paymentMethod === "card") {
+      const rawCard = cardNumber.replace(/\s+/g, "");
+      if (!rawCard) {
+        setCheckoutError("Please enter your 16-digit card number.");
+        return;
+      }
+      if (rawCard.length < 15 || rawCard.length > 19) {
+        setCheckoutError("Card number must be 16 digits.");
+        return;
+      }
+      if (!cardExpiry || !/^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry.trim())) {
+        setCheckoutError("Please enter a valid card expiry date (MM/YY).");
+        return;
+      }
+      if (!cardCvc || cardCvc.trim().length < 3) {
+        setCheckoutError("Please enter a valid 3 or 4-digit CVC code.");
+        return;
+      }
+    } else if (paymentMethod === "bank_slip") {
+      if (!uploadedSlipName && !uploadedSlipDataUrl) {
+        setCheckoutError("Please upload your bank deposit slip or transfer receipt screenshot.");
+        return;
+      }
+    }
+
     const isTeacher = !!selectedTeacherForSubscribe;
     const item = selectedTeacherForSubscribe
       ? {
@@ -243,7 +438,10 @@ export function ConnectView() {
       const targetPackageId = item.packageId || item.id;
       const res = await api.students.checkoutPackage(targetPackageId, {
         paymentMethod: paymentMethod === 'card' ? 'CARD' : 'BANK_SLIP',
-        bankRefNo: paymentMethod === 'bank_slip' ? bankRefNo : `TXN-CARD-${Date.now().toString().slice(-6)}`,
+        cardNumber: paymentMethod === 'card' ? cardNumber : undefined,
+        cardExpiry: paymentMethod === 'card' ? cardExpiry : undefined,
+        cardCvc: paymentMethod === 'card' ? cardCvc : undefined,
+        bankRefNo: paymentMethod === 'bank_slip' ? (bankRefNo || undefined) : `TXN-CARD-${Date.now().toString().slice(-6)}`,
         slipFileName: paymentMethod === 'bank_slip' ? uploadedSlipName : undefined,
         slipUrl: paymentMethod === 'bank_slip' ? (uploadedSlipDataUrl || undefined) : undefined,
       });
@@ -262,7 +460,7 @@ export function ConnectView() {
           date: d.date || new Date().toISOString().split('T')[0],
           validUntil: d.validUntil || '2026-12-01',
           status: 'active',
-          paymentMethod: d.paymentMethod || (paymentMethod === "card" ? "Card (Visa/Mastercard)" : "Bank Deposit (Commercial Bank)"),
+          paymentMethod: d.paymentMethod || (paymentMethod === "card" ? "Card (Visa/Mastercard)" : "Bank Deposit"),
           receiptNo: d.receiptNo,
           meetUrl: d.meetUrl || item.meetUrl,
         };
@@ -276,7 +474,7 @@ export function ConnectView() {
                 ? {
                     ...t,
                     isSubscribed: true,
-                    subscribedDate: d.date || "2026-11-01"
+                    subscribedDate: d.date || new Date().toISOString().split('T')[0]
                   }
                 : t
             )
@@ -284,52 +482,17 @@ export function ConnectView() {
         }
 
         setPaymentSuccessToast(`Payment Successful! Receipt #${d.receiptNo} issued. Classes & materials unlocked.`);
+        resetCheckoutModal();
+        setTimeout(() => setPaymentSuccessToast(null), 6000);
       } else {
-        // Fallback local subscription
-        const newPurchase: ConnectPurchase = {
-          id: `pur_${Date.now()}`,
-          teacherId: item.id,
-          teacherName: item.name,
-          teacherInitials: item.initials,
-          teacherColor: item.avatarColor,
-          subject: item.subject,
-          amount: item.amount,
-          currency: item.currency,
-          date: new Date().toISOString().split('T')[0],
-          validUntil: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-          status: "active",
-          paymentMethod: paymentMethod === "card" ? "Card (Visa/Mastercard)" : "Bank Deposit (Commercial Bank)",
-          receiptNo: `REC-2026-${Math.floor(100000 + Math.random() * 900000)}`,
-          meetUrl: item.meetUrl
-        };
-        setPurchases((prev) => [newPurchase, ...prev]);
-        setPaymentSuccessToast(`Enrolled in ${item.name}! Receipt #${newPurchase.receiptNo} issued.`);
+        setCheckoutError(res?.message || "Failed to process enrollment. Please check your payment details.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Checkout error:", err);
-      const newPurchase: ConnectPurchase = {
-        id: `pur_${Date.now()}`,
-        teacherId: item.id,
-        teacherName: item.name,
-        teacherInitials: item.initials,
-        teacherColor: item.avatarColor,
-        subject: item.subject,
-        amount: item.amount,
-        currency: item.currency,
-        date: new Date().toISOString().split('T')[0],
-        validUntil: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-        status: "active",
-        paymentMethod: paymentMethod === "card" ? "Card (Visa/Mastercard)" : "Bank Deposit (Commercial Bank)",
-        receiptNo: `REC-2026-${Math.floor(100000 + Math.random() * 900000)}`,
-        meetUrl: item.meetUrl
-      };
-      setPurchases((prev) => [newPurchase, ...prev]);
-      setPaymentSuccessToast(`Enrolled in ${item.name}! Receipt #${newPurchase.receiptNo} issued.`);
+      const errMsg = err?.response?.data?.message || err?.message || "Payment verification failed. Please check payment details and try again.";
+      setCheckoutError(errMsg);
     } finally {
       setIsProcessing(false);
-      setSelectedTeacherForSubscribe(null);
-      setSelectedPackageForSubscribe(null);
-      setTimeout(() => setPaymentSuccessToast(null), 6000);
     }
   };
 
@@ -564,180 +727,7 @@ export function ConnectView() {
               </span>
             )}
           </div>
-
-          {/* Quick Toggle Controller Button */}
-          <button
-            onClick={() => setShowFeatureControls((prev) => !prev)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer shrink-0 ${
-              showFeatureControls
-                ? "bg-[#0d5c4d] text-white border-[#0d5c4d] shadow-xs"
-                : "bg-white text-slate-700 border-[#c4e9e0] hover:bg-slate-50 shadow-2xs"
-            }`}
-          >
-            <Sliders className="h-3.5 w-3.5" />
-            <span>Configure Options</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
-              showFeatureControls ? "bg-white/20 text-white" : "bg-amber-100 text-amber-900 border border-amber-200"
-            }`}>
-              4 Switches
-            </span>
-          </button>
         </div>
-
-        {/* Feature Controls Dropdown Panel */}
-        {showFeatureControls && (
-          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-[#0d2b26] text-white shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-2 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-700/80 mb-3">
-              <div className="flex items-center gap-2">
-                <Sliders className="h-4 w-4 text-[#a5f3df]" />
-                <h4 className="text-xs font-black uppercase tracking-wider text-white">
-                  Student Workspace: Find Teachers &amp; Sub-Options Feature Controls
-                </h4>
-              </div>
-              <span className="text-[11px] text-slate-300 font-medium">
-                Workspace: <strong>{activeTenant?.name || "Active Workspace"}</strong>
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* Main Sidebar Toggle */}
-              <div className={`p-3 rounded-xl border transition-all ${
-                isConnectModuleEnabled ? "bg-slate-800/80 border-emerald-500/50" : "bg-slate-900/60 border-slate-700 opacity-70"
-              }`}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-extrabold text-white flex items-center gap-1.5">
-                    <GraduationCap className="h-3.5 w-3.5 text-emerald-400" />
-                    <span>Find Teachers Menu</span>
-                  </span>
-                  <button
-                    onClick={() => handleToggleFeature("find_teachers", isConnectModuleEnabled, "Find Teachers Sidebar Menu")}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                      isConnectModuleEnabled ? "bg-emerald-500" : "bg-slate-600"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                        isConnectModuleEnabled ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1 leading-snug">
-                  Student Sidebar navigation menu item
-                </p>
-                <div className="mt-2 text-[10px] font-bold">
-                  {isConnectModuleEnabled ? (
-                    <span className="text-emerald-400">● Visible in Student Sidebar</span>
-                  ) : (
-                    <span className="text-rose-400">○ Hidden from Sidebar</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Option 1: Find Teachers Tab */}
-              <div className={`p-3 rounded-xl border transition-all ${
-                isFindTeachersTabEnabled ? "bg-slate-800/80 border-emerald-500/50" : "bg-slate-900/60 border-slate-700 opacity-70"
-              }`}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-extrabold text-white flex items-center gap-1.5">
-                    <Star className="h-3.5 w-3.5 text-amber-400" />
-                    <span>Option 1: Tutors Tab</span>
-                  </span>
-                  <button
-                    onClick={() => handleToggleFeature("sub_connect_find_teachers", isFindTeachersTabEnabled, "Option 1: Find Teachers Tab")}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                      isFindTeachersTabEnabled ? "bg-emerald-500" : "bg-slate-600"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                        isFindTeachersTabEnabled ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1 leading-snug">
-                  Tutor profiles, subjects &amp; lesson packages
-                </p>
-                <div className="mt-2 text-[10px] font-bold">
-                  {isFindTeachersTabEnabled ? (
-                    <span className="text-emerald-400">● Enabled</span>
-                  ) : (
-                    <span className="text-rose-400">○ Disabled</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Option 2: Subscriptions Tab */}
-              <div className={`p-3 rounded-xl border transition-all ${
-                isSubscriptionsTabEnabled ? "bg-slate-800/80 border-emerald-500/50" : "bg-slate-900/60 border-slate-700 opacity-70"
-              }`}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-extrabold text-white flex items-center gap-1.5">
-                    <Receipt className="h-3.5 w-3.5 text-blue-400" />
-                    <span>Option 2: Invoices Tab</span>
-                  </span>
-                  <button
-                    onClick={() => handleToggleFeature("sub_connect_subscriptions", isSubscriptionsTabEnabled, "Option 2: Subscriptions & Invoices Tab")}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                      isSubscriptionsTabEnabled ? "bg-emerald-500" : "bg-slate-600"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                        isSubscriptionsTabEnabled ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1 leading-snug">
-                  Active paid plans &amp; official receipt downloads
-                </p>
-                <div className="mt-2 text-[10px] font-bold">
-                  {isSubscriptionsTabEnabled ? (
-                    <span className="text-emerald-400">● Enabled</span>
-                  ) : (
-                    <span className="text-rose-400">○ Disabled</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Option 3: Study Groups Tab */}
-              <div className={`p-3 rounded-xl border transition-all ${
-                isStudyGroupsTabEnabled ? "bg-slate-800/80 border-emerald-500/50" : "bg-slate-900/60 border-slate-700 opacity-70"
-              }`}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-extrabold text-white flex items-center gap-1.5">
-                    <Users2 className="h-3.5 w-3.5 text-purple-400" />
-                    <span>Option 3: Study Circles</span>
-                  </span>
-                  <button
-                    onClick={() => handleToggleFeature("sub_connect_study_groups", isStudyGroupsTabEnabled, "Option 3: Peer Study Groups Tab")}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                      isStudyGroupsTabEnabled ? "bg-emerald-500" : "bg-slate-600"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                        isStudyGroupsTabEnabled ? "translate-x-4" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1 leading-snug">
-                  Peer study rooms &amp; Google Meet discussions
-                </p>
-                <div className="mt-2 text-[10px] font-bold">
-                  {isStudyGroupsTabEnabled ? (
-                    <span className="text-emerald-400">● Enabled</span>
-                  ) : (
-                    <span className="text-rose-400">○ Disabled</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* When none of the 3 tabs are enabled */}
         {!hasAnyTabEnabled && (
@@ -794,18 +784,56 @@ export function ConnectView() {
             </div>
 
             {/* Filter controls */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* Enrollment filter pills */}
+              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setEnrollmentStatusFilter("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    enrollmentStatusFilter === "all"
+                      ? "bg-white text-[#0d2b26] shadow-xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  All ({teachers.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEnrollmentStatusFilter("enrolled")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    enrollmentStatusFilter === "enrolled"
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "text-emerald-800 hover:bg-emerald-50"
+                  }`}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Enrolled ({enrolledTeachersCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEnrollmentStatusFilter("unenrolled")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    enrollmentStatusFilter === "unenrolled"
+                      ? "bg-white text-[#0d2b26] shadow-xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Available ({Math.max(0, teachers.length - enrolledTeachersCount)})
+                </button>
+              </div>
+
               <select
                 value={selectedSubject}
                 onChange={(e) => setSelectedSubject(e.target.value)}
-                className="px-3.5 py-2 rounded-xl border border-[#c4e9e0] bg-white text-xs font-semibold text-slate-700 shadow-2xs focus:ring-2 focus:ring-[#0d5c4d]/20"
+                className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 shadow-2xs focus:ring-2 focus:ring-[#0d5c4d]/20"
               >
-                <option value="all">All Subjects</option>
-                <option value="Combined Mathematics">Mathematics</option>
-                <option value="Physics">Physics</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="Information & Communication Technology">ICT</option>
-                <option value="Biology">Biology</option>
+                <option value="all">All Subjects ({teachers.length})</option>
+                {availableSubjects.map((sub) => (
+                  <option key={sub} value={sub}>
+                    {sub}
+                  </option>
+                ))}
               </select>
 
               <div className="relative">
@@ -815,7 +843,7 @@ export function ConnectView() {
                   placeholder="Search teachers or topics..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3.5 py-2 rounded-xl border border-[#c4e9e0] bg-white text-xs text-slate-700 placeholder-slate-400 shadow-2xs focus:ring-2 focus:ring-[#0d5c4d]/20 w-44 sm:w-56"
+                  className="pl-8 pr-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 placeholder-slate-400 shadow-2xs focus:ring-2 focus:ring-[#0d5c4d]/20 w-44 sm:w-56"
                 />
               </div>
             </div>
@@ -828,18 +856,26 @@ export function ConnectView() {
       {/* =================================================================== */}
       {activeTab === "teachers" && (
         <div className="space-y-5">
-          {filteredTeachers.map((teacher) => {
-            const isSubscribed = teacher.isSubscribed;
-            const teacherPlans = packages.filter(
-              (p) =>
-                p.teacherId === teacher.id ||
-                p.subject.toLowerCase().includes(teacher.subject.toLowerCase())
-            );
+          {isLoadingMarketplace ? (
+            <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 shadow-xs space-y-3">
+              <div className="h-7 w-7 border-2 border-[#0d5c4d] border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-xs font-bold text-slate-600">Loading verified teachers from database...</p>
+            </div>
+          ) : filteredTeachers.length > 0 ? (
+            filteredTeachers.map((teacher) => {
+              const isSubscribed = isTeacherSubscribed(teacher);
+              const teacherPlans = packages.filter(
+                (p) =>
+                  p.teacherId === teacher.id ||
+                  p.subject.toLowerCase().includes(teacher.subject.toLowerCase())
+              );
 
             return (
               <div
                 key={teacher.id}
-                className="bg-white rounded-3xl border border-[#c4e9e0] shadow-sm hover:shadow-md transition-all overflow-hidden"
+                className={`bg-white rounded-3xl transition-all overflow-hidden border border-slate-200 shadow-xs hover:shadow-sm ${
+                  isSubscribed ? "border-l-4 border-l-[#0d5c4d]" : ""
+                }`}
               >
                 {/* Teacher Profile Card Header */}
                 <div className="p-6 pb-4">
@@ -860,9 +896,15 @@ export function ConnectView() {
                             {teacher.name}
                           </h3>
                           {teacher.verified && (
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold tracking-wider uppercase flex items-center gap-1">
-                              <CheckCircle2 className="h-3 w-3" />
+                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold tracking-wider uppercase flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3 text-[#0d5c4d]" />
                               VERIFIED
+                            </span>
+                          )}
+                          {isSubscribed && (
+                            <span className="px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#a5f3df] text-[10px] font-bold tracking-wider uppercase flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3 text-[#0d5c4d]" />
+                              ENROLLED
                             </span>
                           )}
                         </div>
@@ -886,17 +928,19 @@ export function ConnectView() {
                           </span>
                           <span className="text-slate-300">•</span>
                           <span className="font-black text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md">
-                            From LKR {teacher.monthlyFee.toLocaleString()}/month
+                            From LKR {(teacher.monthlyFee ?? 0).toLocaleString()}/month
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Right: Rating Pill */}
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black shrink-0 self-start">
-                      <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                      <span>{teacher.rating.toFixed(1)}</span>
-                    </div>
+                    {/* Right: Rating Pill (Only displayed if genuine student ratings exist) */}
+                    {typeof teacher.rating === "number" && teacher.rating > 0 ? (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black shrink-0 self-start">
+                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                        <span>{teacher.rating.toFixed(1)}</span>
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Bio & Tags */}
@@ -932,36 +976,48 @@ export function ConnectView() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                        {teacherPlans.map((plan) => (
+                        {teacherPlans.map((plan) => {
+                          const isPlanEnrolled = purchases.some(
+                            (p) => p.packageId === plan.id && p.status === "active"
+                          );
+                          return (
                           <div
                             key={plan.id}
-                            className="rounded-2xl border border-[#c4e9e0] bg-[#f8faf9] p-4 flex flex-col justify-between space-y-3 hover:border-[#0d5c4d]/50 hover:bg-white hover:shadow-xs transition-all"
+                            className={`rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-all ${
+                              isPlanEnrolled
+                                ? "border border-slate-300 bg-white shadow-xs"
+                                : "border border-slate-200 bg-[#f8faf9] hover:border-slate-300 hover:bg-white hover:shadow-xs"
+                            }`}
                           >
                             <div className="space-y-2">
                               <div className="flex items-start justify-between gap-2">
                                 <h5 className="font-black text-xs text-[#0d2b26] leading-snug">
                                   {plan.title}
                                 </h5>
-                                {plan.badge && (
+                                {isPlanEnrolled ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-300 text-[9px] font-bold uppercase shrink-0">
+                                    Enrolled ✓
+                                  </span>
+                                ) : plan.badge ? (
                                   <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-extrabold uppercase shrink-0">
                                     {plan.badge}
                                   </span>
-                                )}
+                                ) : null}
                               </div>
 
                               <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
                                 {plan.description}
                               </p>
 
-                              <div className="p-2.5 rounded-xl bg-white border border-[#c4e9e0]/80 flex items-baseline justify-between">
+                              <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-baseline justify-between">
                                 <div>
                                   <span className="text-base font-black text-[#0d5c4d]">
-                                    LKR {plan.monthlyFeeLkr.toLocaleString()}
+                                    LKR {(plan.monthlyFeeLkr ?? (plan as any).monthlyFee ?? 0).toLocaleString()}
                                   </span>
-                                  <span className="text-[10px] text-slate-500 font-semibold"> / {plan.billingCycle.toLowerCase()}</span>
+                                  <span className="text-[10px] text-slate-500 font-semibold"> / {(plan.billingCycle || "Monthly").toLowerCase()}</span>
                                 </div>
-                                <span className="text-[10px] font-bold text-emerald-800 bg-[#ecf8f5] px-2 py-0.5 rounded-md">
-                                  {plan.liveClassesPerWeek} Meets / wk
+                                <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                                  {(plan.liveClassesPerWeek ?? 2)} Meets / wk
                                 </span>
                               </div>
 
@@ -969,51 +1025,54 @@ export function ConnectView() {
                               <div className="space-y-1 pt-1">
                                 {plan.features.slice(0, 3).map((feat, idx) => (
                                   <div key={idx} className="flex items-center gap-1.5 text-[10px] text-slate-600">
-                                    <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                                    <CheckCircle2 className="h-3 w-3 text-[#0d5c4d] shrink-0" />
                                     <span className="truncate">{feat}</span>
                                   </div>
                                 ))}
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => setSelectedPackageForSubscribe(plan)}
-                              className="w-full py-2.5 px-3 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-extrabold text-xs shadow-2xs transition-all hover:scale-[1.01] flex items-center justify-center gap-1.5 cursor-pointer"
-                            >
-                              <CreditCard className="h-3.5 w-3.5 text-[#f3b738]" />
-                              <span>{currentRole === "parent" ? "Enroll Child in Plan" : "Enroll in Plan"}</span>
-                            </button>
+                            {isPlanEnrolled ? (
+                              <div className="w-full py-2.5 px-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5">
+                                <CheckCircle2 className="h-4 w-4 text-[#0d5c4d]" />
+                                <span>Active Plan Enrollment</span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedPackageForSubscribe(plan)}
+                                className="w-full py-2.5 px-3 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-extrabold text-xs shadow-2xs transition-all hover:scale-[1.01] flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <CreditCard className="h-3.5 w-3.5 text-[#f3b738]" />
+                                <span>{currentRole === "parent" ? "Enroll Child in Plan" : "Enroll in Plan"}</span>
+                              </button>
+                            )}
                           </div>
-                        ))}
+                        );
+                        })}
                       </div>
                     </div>
                   )}
 
                   {/* Actions Row */}
-                  <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-100 mt-4">
-                    <button
-                      onClick={() => setSelectedTeacherForPreview(teacher)}
-                      className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      Preview Demo Lesson &amp; Bio
-                    </button>
-
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
                     {isSubscribed ? (
-                      <div className="flex items-center gap-2">
-                        <span className="px-3.5 py-2 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1.5 border border-emerald-300">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs flex items-center gap-1.5 border border-slate-200">
+                          <CheckCircle2 className="h-4 w-4 text-[#0d5c4d]" />
                           Subscribed ✓
                         </span>
-                        <a
-                          href={teacher.meetUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:scale-[1.02]"
-                        >
-                          <Video className="h-4 w-4" />
-                          Join Live Class
-                        </a>
+                        {teacher.meetUrl ? (
+                          <a
+                            href={teacher.meetUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:scale-[1.02]"
+                          >
+                            <Video className="h-4 w-4" />
+                            Join Live Class
+                          </a>
+                        ) : null}
                       </div>
                     ) : (
                       <button
@@ -1021,70 +1080,25 @@ export function ConnectView() {
                         className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black flex items-center gap-2 shadow-sm transition-all hover:scale-[1.02] cursor-pointer"
                       >
                         <CreditCard className="h-3.5 w-3.5 text-amber-300" />
-                        <span>Quick Monthly Pass — LKR {teacher.monthlyFee.toLocaleString()}/mo</span>
+                        <span>Quick Monthly Pass — LKR {(teacher.monthlyFee ?? 0).toLocaleString()}/mo</span>
                       </button>
                     )}
                   </div>
                 </div>
-
-                {/* Content Paywall / Unlocked Container */}
-                {isSubscribed && (
-                  <div className="p-4 sm:p-5 bg-gradient-to-b from-[#f8faf9] to-[#f0f5f3] border-t border-[#c4e9e0]">
-                    <div className="rounded-2xl bg-white border border-[#a5f3df] p-5 shadow-xs space-y-4 animate-in fade-in duration-200">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2 text-[#0d5c4d]">
-                          <Unlock className="h-5 w-5 text-emerald-600" />
-                          <h4 className="font-extrabold text-sm text-[#0d2b26]">
-                            Full Content Unlocked &amp; Ready
-                          </h4>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                            Active Subscription
-                          </span>
-                        </div>
-                        <span className="text-xs text-slate-500 font-semibold">
-                          Renews: Nov 01, 2026
-                        </span>
-                      </div>
-
-                      {/* Unlocked Resources Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                        <a
-                          href={teacher.meetUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-3 rounded-xl bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 flex items-center gap-3 transition-colors group"
-                        >
-                          <div className="h-9 w-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                            <Video className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="font-extrabold text-xs text-emerald-950 group-hover:text-emerald-700 flex items-center gap-1">
-                              Google Meet Live Class <ExternalLink className="h-3 w-3" />
-                            </p>
-                            <p className="text-[10px] text-emerald-700 font-mono truncate max-w-[140px]">
-                              {teacher.meetUrl.replace("https://", "")}
-                            </p>
-                          </div>
-                        </a>
-
-                        <div className="p-3 rounded-xl bg-white border border-slate-200 flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
-                            <BookOpen className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="font-extrabold text-xs text-slate-900">
-                              {teacher.lessonsCount} Lesson Archive
-                            </p>
-                            <p className="text-[10px] text-slate-500">HD Recordings &amp; Tutes Unlocked</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             );
-          })}
+          })
+        ) : (
+          <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 shadow-xs space-y-3">
+            <Users className="h-10 w-10 text-slate-300 mx-auto" />
+            <h4 className="text-sm font-black text-[#0d2b26]">No teachers found</h4>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              {searchQuery || selectedSubject !== "all"
+                ? "Try adjusting your search query or subject filter to find available educators."
+                : "No registered teachers are currently available in the marketplace."}
+            </p>
+          </div>
+        )}
         </div>
       )}
 
@@ -1104,66 +1118,76 @@ export function ConnectView() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {students.map((student) => (
-              <div
-                key={student.id}
-                className="bg-white rounded-2xl border border-[#c4e9e0] p-5 shadow-xs flex items-center justify-between gap-4"
-              >
-                <div className="flex items-center gap-3.5">
-                  <div
-                    className={`h-12 w-12 rounded-xl ${student.avatarColor} text-white font-extrabold text-base flex items-center justify-center shrink-0 shadow-2xs relative`}
-                  >
-                    {student.initials}
-                    <span
-                      className={`absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-white ${
-                        student.status === "online"
-                          ? "bg-emerald-500"
-                          : student.status === "in_study"
-                          ? "bg-amber-500"
-                          : "bg-slate-300"
+            {students.length > 0 ? (
+              students.map((student) => (
+                <div
+                  key={student.id}
+                  className="bg-white rounded-2xl border border-[#c4e9e0] p-5 shadow-xs flex items-center justify-between gap-4"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div
+                      className={`h-12 w-12 rounded-xl ${student.avatarColor} text-white font-extrabold text-base flex items-center justify-center shrink-0 shadow-2xs relative`}
+                    >
+                      {student.initials}
+                      <span
+                        className={`absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-white ${
+                          student.status === "online"
+                            ? "bg-emerald-500"
+                            : student.status === "in_study"
+                            ? "bg-amber-500"
+                            : "bg-slate-300"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-extrabold text-sm text-[#0d2b26]">{student.name}</h4>
+                        {student.isBuddy && (
+                          <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Buddy ✓
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        {student.grade} • {student.stream} ({student.school})
+                      </p>
+                      <div className="flex items-center gap-1.5 pt-1">
+                        {student.subjects.map((sub) => (
+                          <span
+                            key={sub}
+                            className="px-2 py-0.5 rounded text-[10px] bg-slate-100 font-semibold text-slate-600"
+                          >
+                            {sub}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleToggleBuddy(student.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                        student.isBuddy
+                          ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          : "bg-[#0d5c4d] text-white hover:bg-[#0a473b]"
                       }`}
-                    />
-                  </div>
-
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-extrabold text-sm text-[#0d2b26]">{student.name}</h4>
-                      {student.isBuddy && (
-                        <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          Buddy ✓
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      {student.grade} • {student.stream} ({student.school})
-                    </p>
-                    <div className="flex items-center gap-1.5 pt-1">
-                      {student.subjects.map((sub) => (
-                        <span
-                          key={sub}
-                          className="px-2 py-0.5 rounded text-[10px] bg-slate-100 font-semibold text-slate-600"
-                        >
-                          {sub}
-                        </span>
-                      ))}
-                    </div>
+                    >
+                      {student.isBuddy ? "Connected" : "+ Connect"}
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => handleToggleBuddy(student.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
-                      student.isBuddy
-                        ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        : "bg-[#0d5c4d] text-white hover:bg-[#0a473b]"
-                    }`}
-                  >
-                    {student.isBuddy ? "Connected" : "+ Connect"}
-                  </button>
-                </div>
+              ))
+            ) : (
+              <div className="col-span-full p-12 text-center bg-white rounded-3xl border border-dashed border-[#c4e9e0] shadow-xs space-y-3">
+                <GraduationCap className="h-10 w-10 text-slate-300 mx-auto" />
+                <h4 className="text-sm font-black text-[#0d2b26]">No Study Buddies Found</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Enrolled peers sharing your courses will appear here.
+                </p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
@@ -1213,15 +1237,16 @@ export function ConnectView() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {studyGroups
-              .filter((group) => {
-                if (groupFilter !== "enrolled") return true;
-                const isSubscribedToTeacher =
-                  teachers.some((t) => t.id === group.teacherId && t.isSubscribed) ||
-                  purchases.some((p) => p.teacherId === group.teacherId && p.status === "active");
-                return isSubscribedToTeacher;
-              })
-              .map((group) => {
+            {studyGroups.length > 0 ? (
+              studyGroups
+                .filter((group) => {
+                  if (groupFilter !== "enrolled") return true;
+                  const isSubscribedToTeacher =
+                    teachers.some((t) => t.id === group.teacherId && t.isSubscribed) ||
+                    purchases.some((p) => p.teacherId === group.teacherId && p.status === "active");
+                  return isSubscribedToTeacher;
+                })
+                .map((group) => {
                 const targetTeacher = teachers.find((t) => t.id === group.teacherId);
                 const isSubscribedToTeacher =
                   teachers.some((t) => t.id === group.teacherId && t.isSubscribed) ||
@@ -1351,7 +1376,16 @@ export function ConnectView() {
                     </div>
                   </div>
                 );
-              })}
+              })
+            ) : (
+              <div className="col-span-full p-12 text-center bg-white rounded-3xl border border-dashed border-[#c4e9e0] shadow-xs space-y-3">
+                <Users2 className="h-10 w-10 text-slate-300 mx-auto" />
+                <h4 className="text-sm font-black text-[#0d2b26]">No Study Circles Available</h4>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Study circles created by your enrolled tutors will appear here for group discussions and peer revision.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1409,7 +1443,7 @@ export function ConnectView() {
                   <div className="flex items-center gap-3">
                     <div className="text-right sm:border-r border-slate-200 sm:pr-4">
                       <p className="font-black text-sm text-[#0d5c4d]">
-                        LKR {purchase.amount.toLocaleString()} / mo
+                        LKR {(purchase.amount ?? 0).toLocaleString()} / mo
                       </p>
                       <p className="text-[10px] text-slate-400">Next renewal: {purchase.validUntil}</p>
                     </div>
@@ -1478,10 +1512,7 @@ export function ConnectView() {
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    setSelectedTeacherForSubscribe(null);
-                    setSelectedPackageForSubscribe(null);
-                  }}
+                  onClick={resetCheckoutModal}
                   className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="h-5 w-5" />
@@ -1510,7 +1541,7 @@ export function ConnectView() {
                       Total Due Today
                     </p>
                     <p className="text-2xl font-black text-[#0d2b26]">
-                      LKR {activeSubTarget.fee.toLocaleString()}
+                      LKR {(activeSubTarget.fee ?? 0).toLocaleString()}
                       <span className="text-xs font-normal text-slate-500"> / month</span>
                     </p>
                   </div>
@@ -1527,7 +1558,10 @@ export function ConnectView() {
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => setPaymentMethod("card")}
+                      onClick={() => {
+                        setPaymentMethod("card");
+                        setCheckoutError(null);
+                      }}
                       className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${
                         paymentMethod === "card"
                           ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
@@ -1543,7 +1577,10 @@ export function ConnectView() {
 
                     <button
                       type="button"
-                      onClick={() => setPaymentMethod("bank_slip")}
+                      onClick={() => {
+                        setPaymentMethod("bank_slip");
+                        setCheckoutError(null);
+                      }}
                       className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${
                         paymentMethod === "bank_slip"
                           ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
@@ -1563,12 +1600,17 @@ export function ConnectView() {
                 {paymentMethod === "card" ? (
                   <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                     <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700">Card Number</label>
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span>Card Number</span>
+                        <span className="text-[10px] font-semibold text-slate-400">16 digits</span>
+                      </label>
                       <input
                         type="text"
                         value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-xs font-semibold"
+                        placeholder="4242 •••• •••• 4242"
+                        maxLength={19}
+                        onChange={(e) => handleCardNumberChange(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-xs font-semibold focus:outline-none focus:border-[#0d5c4d]"
                       />
                     </div>
 
@@ -1578,49 +1620,87 @@ export function ConnectView() {
                         <input
                           type="text"
                           value={cardExpiry}
-                          onChange={(e) => setCardExpiry(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-center"
+                          placeholder="MM/YY"
+                          maxLength={5}
+                          onChange={(e) => handleExpiryChange(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-center focus:outline-none focus:border-[#0d5c4d]"
                         />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[11px] font-bold text-slate-700">CVC / CVV</label>
                         <input
-                          type="text"
+                          type="password"
                           value={cardCvc}
-                          onChange={(e) => setCardCvc(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-center"
+                          placeholder="CVC"
+                          maxLength={4}
+                          onChange={(e) => handleCvcChange(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-center focus:outline-none focus:border-[#0d5c4d]"
                         />
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-3 p-4 rounded-2xl bg-amber-50/50 border border-amber-200 text-xs">
-                    <div className="p-3 rounded-xl bg-white border border-amber-200 space-y-1">
-                      <p className="font-extrabold text-[#0d2b26]">Direct Bank Deposit Details</p>
-                      <p className="text-slate-600 font-mono text-[11px]">
-                        Bank: <span className="font-bold">Commercial Bank of Ceylon</span>
-                      </p>
-                      <p className="text-slate-600 font-mono text-[11px]">
-                        Account: <span className="font-bold">80019284019</span> (LimaT Smart Book)
-                      </p>
-                      <p className="text-slate-600 font-mono text-[11px]">
-                        Branch: <span className="font-bold">Colombo City Center</span>
-                      </p>
+                    <div className="p-3.5 rounded-xl bg-white border border-amber-200 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <p className="font-extrabold text-[#0d2b26]">Direct Bank Deposit Details</p>
+                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">Tutor Account</span>
+                      </div>
+                      {activeBankDetails?.accountNumber ? (
+                        <>
+                          <p className="text-slate-600 font-mono text-xs">
+                            Bank: <span className="font-bold text-slate-800">{activeBankDetails.bankName || "Commercial Bank"}</span>
+                          </p>
+                          <p className="text-slate-600 font-mono text-xs">
+                            Account: <span className="font-bold text-slate-800">{activeBankDetails.accountNumber}</span>
+                            {activeBankDetails.accountName ? ` (${activeBankDetails.accountName})` : ""}
+                          </p>
+                          {activeBankDetails.branch ? (
+                            <p className="text-slate-600 font-mono text-xs">
+                              Branch: <span className="font-bold text-slate-800">{activeBankDetails.branch}</span>
+                            </p>
+                          ) : null}
+                        </>
+                      ) : (
+                        <p className="text-slate-500 italic text-xs py-1">
+                          Direct deposit account info will be provided by the tutor. Please upload your deposit slip or transaction reference below once paid.
+                        </p>
+                      )}
                     </div>
 
                     <div className="space-y-1">
-                      <label className="font-bold text-slate-700 text-[11px]">Deposit Reference No.</label>
+                      <label className="font-bold text-slate-700 text-[11px]">Deposit Reference No. (Optional)</label>
                       <input
                         type="text"
                         value={bankRefNo}
-                        onChange={(e) => setBankRefNo(e.target.value)}
+                        onChange={(e) => {
+                          setBankRefNo(e.target.value);
+                          if (checkoutError) setCheckoutError(null);
+                        }}
                         placeholder="e.g. BOC-TXN-882190"
-                        className="w-full px-3 py-2 rounded-xl border border-amber-200 bg-white font-mono text-xs"
+                        className="w-full px-3 py-2 rounded-xl border border-amber-200 bg-white font-mono text-xs focus:outline-none focus:border-[#0d5c4d]"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="font-bold text-slate-700 text-[11px]">Upload Bank Deposit Slip / Transfer Screenshot</label>
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-slate-700 text-[11px]">
+                          Upload Bank Deposit Slip / Receipt <span className="text-rose-500">*</span>
+                        </label>
+                        {uploadedSlipName && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUploadedSlipName("");
+                              setUploadedSlipDataUrl(null);
+                              if (fileInputRef.current) fileInputRef.current.value = "";
+                            }}
+                            className="text-[10px] text-rose-600 hover:underline font-bold"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
                       <input
                         ref={fileInputRef}
                         type="file"
@@ -1630,6 +1710,7 @@ export function ConnectView() {
                           const file = e.target.files?.[0];
                           if (file) {
                             setUploadedSlipName(file.name);
+                            setCheckoutError(null);
                             const reader = new FileReader();
                             reader.onload = () => {
                               setUploadedSlipDataUrl(reader.result as string);
@@ -1640,15 +1721,29 @@ export function ConnectView() {
                       />
                       <div
                         onClick={() => fileInputRef.current?.click()}
-                        className="border-2 border-dashed border-emerald-400 hover:border-emerald-600 bg-white hover:bg-emerald-50/40 rounded-xl p-3.5 text-center flex items-center justify-center gap-2.5 text-emerald-800 font-bold cursor-pointer transition-all shadow-2xs"
+                        className={`border-2 border-dashed rounded-xl p-3.5 text-center flex items-center justify-center gap-2.5 font-bold cursor-pointer transition-all shadow-2xs ${
+                          uploadedSlipName
+                            ? "border-emerald-500 bg-emerald-50/70 text-emerald-900"
+                            : "border-slate-300 hover:border-emerald-600 bg-white hover:bg-emerald-50/40 text-slate-700"
+                        }`}
                       >
-                        <FileCheck className="h-5 w-5 text-emerald-600 shrink-0" />
-                        <div className="text-left">
-                          <p className="text-xs font-black text-emerald-900">{uploadedSlipName || "Attach Bank Slip"}</p>
-                          <p className="text-[10px] text-slate-400 font-normal">Click to upload deposit receipt image or PDF</p>
+                        <FileCheck className={`h-5 w-5 shrink-0 ${uploadedSlipName ? "text-emerald-600" : "text-slate-400"}`} />
+                        <div className="text-left flex-1 min-w-0">
+                          <p className="text-xs font-black truncate">{uploadedSlipName || "Attach Bank Slip (Required)"}</p>
+                          <p className="text-[10px] text-slate-400 font-normal">
+                            {uploadedSlipName ? "Click to change attached file" : "Upload JPEG, PNG receipt or PDF"}
+                          </p>
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* Validation error banner */}
+                {checkoutError && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-150">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    <span>{checkoutError}</span>
                   </div>
                 )}
 
@@ -1661,10 +1756,7 @@ export function ConnectView() {
               <div className="p-6 border-t border-slate-100 bg-[#fbfcfb] flex items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedTeacherForSubscribe(null);
-                    setSelectedPackageForSubscribe(null);
-                  }}
+                  onClick={resetCheckoutModal}
                   className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition-colors"
                 >
                   Cancel
@@ -1672,15 +1764,19 @@ export function ConnectView() {
 
                 <button
                   type="button"
-                  disabled={isProcessing}
+                  disabled={!isFormValid || isProcessing}
                   onClick={handleConfirmSubscribe}
-                  className="px-5 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-black text-xs shadow-md transition-all hover:scale-[1.02] flex items-center gap-2"
+                  className={`px-5 py-2.5 rounded-xl font-black text-xs shadow-md transition-all flex items-center gap-2 ${
+                    !isFormValid || isProcessing
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                      : "bg-[#0d5c4d] hover:bg-[#0a473b] text-white hover:scale-[1.02]"
+                  }`}
                 >
                   {isProcessing ? (
                     <span>Activating Subscription...</span>
                   ) : (
                     <>
-                      <span>Confirm &amp; Pay LKR {activeSubTarget.fee.toLocaleString()}</span>
+                      <span>Confirm &amp; Pay LKR {(activeSubTarget.fee ?? 0).toLocaleString()}</span>
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
@@ -1690,73 +1786,6 @@ export function ConnectView() {
           </div>
         );
       })()}
-
-      {/* =================================================================== */}
-      {/* TEACHER PREVIEW MODAL                                               */}
-      {/* =================================================================== */}
-      {selectedTeacherForPreview && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden my-6">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-[#fbfcfb]">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`h-11 w-11 rounded-xl ${selectedTeacherForPreview.avatarColor} text-white font-black text-base flex items-center justify-center`}
-                >
-                  {selectedTeacherForPreview.initials}
-                </div>
-                <div>
-                  <h3 className="font-black text-base text-[#0d2b26]">
-                    {selectedTeacherForPreview.name}
-                  </h3>
-                  <p className="text-xs text-slate-500">{selectedTeacherForPreview.title}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedTeacherForPreview(null)}
-                className="p-2 rounded-full hover:bg-slate-100 text-slate-400"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4 text-xs">
-              <div className="space-y-1">
-                <p className="font-extrabold text-slate-800">Teacher Biography</p>
-                <p className="text-slate-600 leading-relaxed">{selectedTeacherForPreview.bio}</p>
-              </div>
-
-              <div className="space-y-1">
-                <p className="font-extrabold text-slate-800">Qualifications & Honours</p>
-                <p className="text-slate-600">{selectedTeacherForPreview.qualifications}</p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                <p className="font-extrabold text-slate-800 flex items-center gap-1.5">
-                  <Video className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Free Demo Lesson Preview</span>
-                </p>
-                <p className="text-slate-600 font-semibold">{selectedTeacherForPreview.sampleVideoTitle}</p>
-                <div className="aspect-video rounded-xl bg-slate-800 text-white flex items-center justify-center font-bold text-xs cursor-pointer hover:bg-slate-700 transition-colors">
-                  ▶ Play 5-Min Concept Preview
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-slate-100 bg-[#fbfcfb] flex items-center justify-end gap-3">
-              <button
-                onClick={() => {
-                  const teacher = selectedTeacherForPreview;
-                  setSelectedTeacherForPreview(null);
-                  setSelectedTeacherForSubscribe(teacher);
-                }}
-                className="px-5 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-black shadow-sm"
-              >
-                Subscribe — LKR {selectedTeacherForPreview.monthlyFee.toLocaleString()}/mo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* =================================================================== */}
       {/* OFFICIAL RECEIPT & INVOICE MODAL                                    */}
@@ -1826,7 +1855,7 @@ export function ConnectView() {
                     <p className="font-mono text-xs text-slate-500">Tuition Package Fee (Monthly)</p>
                   </div>
                   <span className="text-lg font-black text-[#0d5c4d]">
-                    {selectedPurchaseForReceipt.currency} {selectedPurchaseForReceipt.amount.toLocaleString()}
+                    {selectedPurchaseForReceipt.currency} {(selectedPurchaseForReceipt.amount ?? 0).toLocaleString()}
                   </span>
                 </div>
 

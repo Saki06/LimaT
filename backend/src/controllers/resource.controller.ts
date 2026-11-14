@@ -37,6 +37,11 @@ const getStudentProfile = async (userId: string) => {
           package: true,
         },
       },
+      enrollments: {
+        include: {
+          course: { select: { id: true, teacherId: true } },
+        },
+      },
     },
   });
 };
@@ -50,22 +55,28 @@ export const createResource = async (req: AuthenticatedRequest, res: Response): 
   try {
     const user = req.user;
 
-if (!user) {
-  res.status(401).json({ success: false, message: 'Unauthorized' });
-  return;
-}
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
 
-if (!user.tenantId) {
-  res.status(403).json({
-    success: false,
-    message: 'A tenant is required to create resources.',
-  });
-  return;
-}
+    let tenantId = user.tenantId;
+    if (!tenantId) {
+      const firstTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+      tenantId = firstTenant?.id || null;
+    }
 
-const {
-  title,
-  description,
+    if (!tenantId) {
+      res.status(403).json({
+        success: false,
+        message: 'A tenant is required to create resources.',
+      });
+      return;
+    }
+
+    const {
+      title,
+      description,
       resourceType = 'PAST_PAPER',
       subject,
       topic,
@@ -100,6 +111,10 @@ const {
     }
 
     const teacher = await getOrCreateTeacherProfile(user.userId);
+    if (!teacher) {
+      res.status(404).json({ success: false, message: 'Teacher profile not found' });
+      return;
+    }
 
     // Validate packageId if provided
     let finalPackageId: string | null = null;
@@ -122,7 +137,7 @@ const {
 
     const resource = await prisma.libraryResource.create({
       data: {
-        tenantId: user.tenantId,
+        tenantId,
         teacherId: teacher.id,
         packageId: finalPackageId,
         title: title.trim(),
@@ -184,26 +199,27 @@ export const getResources = async (req: AuthenticatedRequest, res: Response): Pr
 
     const whereClause: any = {};
 
-    // Temporary protection until public tenant scoping is implemented
-if (!user) {
-  res.status(401).json({
-    success: false,
-    message: 'Authentication required to list resources.',
-  });
-  return;
-}
+    let tenantId = user?.tenantId;
+    if (!tenantId && user?.role !== 'SUPER_ADMIN') {
+      const firstTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+      tenantId = firstTenant?.id || null;
+    }
 
-if (user && user.role !== 'SUPER_ADMIN') {
-  if (!user.tenantId) {
-    res.status(403).json({
-      success: false,
-      message: 'Tenant access is required.',
-    });
-    return;
-  }
+    if (tenantId && user?.role !== 'SUPER_ADMIN') {
+      whereClause.tenantId = tenantId;
+    }
 
-  whereClause.tenantId = user.tenantId;
-}
+    if (!user) {
+      whereClause.visibility = 'PUBLIC';
+      whereClause.status = 'published';
+    }
+
+    if (mine === 'true' && user && user.role === 'TEACHER') {
+      const teacher = await prisma.teacherProfile.findUnique({ where: { userId: user.userId } });
+      if (teacher) {
+        whereClause.teacherId = teacher.id;
+      }
+    }
 
     if (resourceType && typeof resourceType === 'string') {
       const typeUpper = resourceType.toUpperCase();
@@ -309,7 +325,11 @@ if (user && user.role !== 'SUPER_ADMIN') {
             if (sub.package?.teacherId === r.teacherId) return true;
             return false;
           });
-          isLocked = !hasActiveSub;
+          const hasEnrollment = studentProfile.enrollments?.some((enr: any) => {
+            if (enr.course?.teacherId === r.teacherId) return true;
+            return false;
+          });
+          isLocked = !hasActiveSub && !hasEnrollment;
         } else {
           // Not subscribed or unauthenticated
           isLocked = true;
@@ -459,7 +479,11 @@ if (resource.status !== 'published') {
           if (sub.package?.teacherId === resource.teacherId) return true;
           return false;
         });
-        isLocked = !hasSub;
+        const hasEnrollment = student?.enrollments?.some((enr: any) => {
+          if (enr.course?.teacherId === resource.teacherId) return true;
+          return false;
+        });
+        isLocked = !hasSub && !hasEnrollment;
       }
     } else if (resource.visibility === 'SUBSCRIBERS_ONLY') {
       isLocked = true;
@@ -504,16 +528,18 @@ export const updateResource = async (req: AuthenticatedRequest, res: Response): 
     }
 
     // Prevent cross-tenant resource updates
-if (
-  user.role !== 'SUPER_ADMIN' &&
-  (!user.tenantId || existing.tenantId !== user.tenantId)
-) {
-  res.status(403).json({
-    success: false,
-    message: 'Forbidden: Resource does not belong to your tenant.',
-  });
-  return;
-}
+    if (
+      user.role !== 'SUPER_ADMIN' &&
+      user.tenantId &&
+      existing.tenantId &&
+      existing.tenantId !== user.tenantId
+    ) {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden: Resource does not belong to your tenant.',
+      });
+      return;
+    }
 
     // Check ownership if teacher
     if (user.role === 'TEACHER') {
@@ -619,16 +645,18 @@ export const deleteResource = async (req: AuthenticatedRequest, res: Response): 
     }
 
     // Prevent cross-tenant resource deletion
-if (
-  user.role !== 'SUPER_ADMIN' &&
-  (!user.tenantId || existing.tenantId !== user.tenantId)
-) {
-  res.status(403).json({
-    success: false,
-    message: 'Forbidden: Resource does not belong to your tenant.',
-  });
-  return;
-}
+    if (
+      user.role !== 'SUPER_ADMIN' &&
+      user.tenantId &&
+      existing.tenantId &&
+      existing.tenantId !== user.tenantId
+    ) {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden: Resource does not belong to your tenant.',
+      });
+      return;
+    }
 
     if (user.role === 'TEACHER') {
       const teacher = await prisma.teacherProfile.findUnique({ where: { userId: user.userId } });

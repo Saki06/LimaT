@@ -7,7 +7,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useApp } from "@/context/AppContext";
 import { useAdmin, useCreateStaff, useHubFlags, useHubSettings, useSetStaffStatus, useStaff, useSubscriptions, useTeacherHubs, useUpdateStaff } from "@/context/AdminContext";
 import { AdminRecordStatus, AdminStaffRecord, StaffInput, ConnectTeacher, TutorPackage } from "@/types/lms";
-import { initialConnectTeachers, initialTutorPackages } from "@/data/connectMockData";
 import {
   Building2,
   Users,
@@ -44,12 +43,27 @@ import {
   DollarSign,
   Check,
   Sparkles,
-  Filter
+  Filter,
+  RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
+import { api } from "@/lib/api";
+
+export interface PlatformUser {
+  id: string;
+  name: string;
+  email: string;
+  role: "student" | "teacher" | "admin";
+  school: string;
+  grade: string;
+  status: string;
+  lastLogin: string;
+  enrolledTutors: string[];
+  subscriptionStatus: string;
+}
 
 interface AdminViewsProps {
   initialTab?: "overview" | "schools" | "classes" | "subjects" | "users" | "settings" | "staff" | "connect";
@@ -72,6 +86,8 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     currentView,
     createSchool,
     createClass,
+    updateClass,
+    deleteClass,
     createSubject,
     updateSubject,
     deleteSubject,
@@ -84,7 +100,18 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   const subscriptions = useSubscriptions();
   const hubFlags = useHubFlags();
   const hubSettings = useHubSettings();
-  const { setHubStatus, actOnHubFlag, removeSubscription, updateHubSettings } = useAdmin();
+  const {
+    setHubStatus,
+    actOnHubFlag,
+    removeSubscription,
+    updateHubSettings,
+    overviewData,
+    directory,
+    refreshAdminData,
+    isLoading: isAdminLoading,
+    schoolSettings,
+    saveSchoolSettings,
+  } = useAdmin();
   const createStaff = useCreateStaff();
   const updateStaff = useUpdateStaff();
   const setStaffStatus = useSetStaffStatus();
@@ -112,6 +139,45 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   const [className, setClassName] = useState("");
   const [gradeId, setGradeId] = useState("grd_12");
   const [classTeacher, setClassTeacher] = useState("Mr. Samantha Perera");
+
+  // Class edit / delete states
+  const [isEditClassModalOpen, setIsEditClassModalOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState<import("@/types/lms").SchoolClass | null>(null);
+  const [editClassName, setEditClassName] = useState("");
+  const [editClassGradeId, setEditClassGradeId] = useState("grd_12");
+  const [editClassTeacher, setEditClassTeacher] = useState("");
+  const [editClassStudentCount, setEditClassStudentCount] = useState(35);
+  const [deletingClass, setDeletingClass] = useState<import("@/types/lms").SchoolClass | null>(null);
+
+  const handleOpenEditClass = (cls: import("@/types/lms").SchoolClass) => {
+    setEditingClass(cls);
+    setEditClassName(cls.name);
+    setEditClassGradeId(cls.gradeId || "grd_12");
+    setEditClassTeacher(cls.classTeacherName || "");
+    setEditClassStudentCount(cls.studentCount || 35);
+    setIsEditClassModalOpen(true);
+  };
+
+  const handleSaveEditClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingClass) return;
+    const g = grades.find((gr) => gr.id === editClassGradeId);
+    await updateClass(editingClass.id, {
+      name: editClassName,
+      gradeId: editClassGradeId,
+      gradeName: g?.name || "Grade 12 (A/L)",
+      classTeacherName: editClassTeacher,
+      studentCount: Number(editClassStudentCount) || 35
+    });
+    setIsEditClassModalOpen(false);
+    setEditingClass(null);
+  };
+
+  const handleConfirmDeleteClass = async () => {
+    if (!deletingClass) return;
+    await deleteClass(deletingClass.id);
+    setDeletingClass(null);
+  };
 
   // Subject modal state
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
@@ -227,110 +293,64 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   const [minPackagePrice, setMinPackagePrice] = useState<number>(1000);
   const [maxPackagePrice, setMaxPackagePrice] = useState<number>(50000);
 
-  // Platform user directory state & mock records
-  const [platformUsers, setPlatformUsers] = useState([
-    {
-      id: "usr_admin_01",
-      name: "Dr. K. Rajasingham",
-      email: "principal@school.lk",
-      role: "admin",
-      school: "St. Michael High School",
-      grade: "Administration Staff",
-      status: "Active",
-      lastLogin: "2026-10-01 08:15",
-      enrolledTutors: [] as string[],
-      subscriptionStatus: "Platform Admin"
-    },
-    {
-      id: "usr_student_01",
-      name: "Sathurjan K.",
-      email: "sathurjan@school.lk",
-      role: "student",
-      school: "Colombo Hindu College",
-      grade: "Grade 12 - Physical Science",
-      status: "Active",
-      lastLogin: "2026-10-01 06:50",
-      enrolledTutors: ["Ms. Kavitha Rajan (Combined Maths)", "Mr. Thuvaragan S. (Physics)"],
-      subscriptionStatus: "Active Paid (2 Tutors)"
-    },
-    {
-      id: "usr_student_02",
-      name: "Kasun Bandara",
-      email: "kasun.b@school.lk",
-      role: "student",
-      school: "St. Michael High School",
-      grade: "Grade 12 - Physical Science",
-      status: "Active",
-      lastLogin: "2026-09-30 18:05",
-      enrolledTutors: ["Ms. Kavitha Rajan (Combined Maths)"],
-      subscriptionStatus: "Active Paid (1 Tutor)"
-    },
-    {
-      id: "usr_student_03",
-      name: "Anuki Silva",
-      email: "anuki.s@school.lk",
-      role: "student",
-      school: "Royal Academy Colombo",
-      grade: "Grade 13 - Biological Science",
-      status: "Active",
-      lastLogin: "2026-10-01 07:12",
-      enrolledTutors: ["Dr. Sarath Perera (Chemistry)", "Mrs. Shanthi Mohan (Biology)"],
-      subscriptionStatus: "Active Paid (2 Tutors)"
-    },
-    {
-      id: "usr_student_04",
-      name: "Dineth Perera",
-      email: "dineth.p@school.lk",
-      role: "student",
-      school: "Trinity Central College",
-      grade: "Grade 12 - Technology & ICT",
-      status: "Active",
-      lastLogin: "2026-09-28 16:30",
-      enrolledTutors: ["Mr. Ketheesan K. (ICT & Computing)"],
-      subscriptionStatus: "Active Paid (1 Tutor)"
-    },
-    {
-      id: "usr_student_05",
-      name: "Tharushi Fernando",
-      email: "tharushi.f@school.lk",
-      role: "student",
-      school: "Hillwood Central College",
-      grade: "Grade 11 - G.C.E. O/L",
-      status: "Active",
-      lastLogin: "2026-09-30 14:10",
-      enrolledTutors: [] as string[],
-      subscriptionStatus: "Free Student"
-    },
-    {
-      id: "usr_teacher_01",
-      name: "Ms. Kavitha Rajan",
-      email: "kavitha.rajan@limat.lk",
-      role: "teacher",
-      school: "Independent Tutor Studio",
-      grade: "Faculty - Combined Mathematics",
-      status: "Active",
-      lastLogin: "2026-10-01 07:30",
-      enrolledTutors: [] as string[],
-      subscriptionStatus: "Tutor (284 Students)"
-    },
-    {
-      id: "usr_teacher_02",
-      name: "Mr. Thuvaragan S.",
-      email: "thuvaragan.s@limat.lk",
-      role: "teacher",
-      school: "Independent Tutor Studio",
-      grade: "Faculty - Physics",
-      status: "Active",
-      lastLogin: "2026-09-30 15:20",
-      enrolledTutors: [] as string[],
-      subscriptionStatus: "Tutor (197 Students)"
+  // Platform user directory state & records
+  const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([]);
+
+  // Synchronize live student & staff directory from PostgreSQL database
+  React.useEffect(() => {
+    if (directory && directory.length > 0) {
+      const directoryMapped: PlatformUser[] = directory.map((d) => ({
+        id: d.id,
+        name: d.name,
+        email: d.email,
+        role: (d.role === "student" ? "student" : d.role === "teacher" ? "teacher" : "admin") as "student" | "teacher" | "admin",
+        school: overviewData?.school.name || "Apex Academy Global",
+        grade: d.grade ? `${d.grade} (${d.className || 'General'})` : "Enrolled Student",
+        status: d.status === "active" ? "Active" : "Inactive",
+        lastLogin: "Active Today",
+        enrolledTutors: [],
+        subscriptionStatus: d.role === "student" ? "Enrolled Student" : "Staff Member",
+      }));
+      setPlatformUsers(directoryMapped);
+    } else {
+      setPlatformUsers([]);
     }
-  ]);
+  }, [directory, overviewData?.school.name]);
 
   // Tutors Management State
-  const [soloTutors, setSoloTutors] = useState<ConnectTeacher[]>(initialConnectTeachers);
-  const [tutorPackages, setTutorPackages] = useState<TutorPackage[]>(initialTutorPackages);
+  const [soloTutors, setSoloTutors] = useState<ConnectTeacher[]>([]);
+  const [tutorPackages, setTutorPackages] = useState<TutorPackage[]>([]);
   const [staffSubTab, setStaffSubTab] = useState<"solo_tutors" | "coaches">("solo_tutors");
+
+  // Synchronize live teacher staff with solo tutors desk
+  React.useEffect(() => {
+    if (staff && staff.length > 0) {
+      const staffTeachers: ConnectTeacher[] = staff
+        .filter((s) => s.role === "teacher")
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          initials: s.name.split(" ").map((w) => w[0]).join("").toUpperCase().substring(0, 2),
+          avatarColor: "bg-[#0d5c4d]",
+          verified: true,
+          title: s.qualification || "Senior Master Teacher & Subject Specialist",
+          subject: s.subjects?.[0] || "General Curriculum",
+          studentsCount: s.workload || 45,
+          lessonsCount: 16,
+          liveClassesCount: 4,
+          monthlyFee: 3500,
+          currency: "LKR",
+          rating: 5.0,
+          tags: s.subjects || ["Theory", "Revision"],
+          meetUrl: "https://meet.google.com/live-stream",
+          bio: `${s.name} is a certified educator handling ${s.medium || "English"} medium instruction.`,
+          qualifications: s.qualification || "B.Sc. / B.Ed."
+        }));
+      setSoloTutors(staffTeachers);
+    } else {
+      setSoloTutors([]);
+    }
+  }, [staff]);
   const [tutorSearch, setTutorSearch] = useState("");
   const [tutorSubjectFilter, setTutorSubjectFilter] = useState("all");
   const [tutorStatusFilter, setTutorStatusFilter] = useState<"all" | "active" | "suspended">("all");
@@ -352,8 +372,8 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   const [newTutorForm, setNewTutorForm] = useState(initialNewTutorForm);
 
   // Student Dossier & Manual Enroll states
-  const [selectedStudentForDossier, setSelectedStudentForDossier] = useState<typeof platformUsers[0] | null>(null);
-  const [selectedStudentForEnroll, setSelectedStudentForEnroll] = useState<typeof platformUsers[0] | null>(null);
+  const [selectedStudentForDossier, setSelectedStudentForDossier] = useState<PlatformUser | null>(null);
+  const [selectedStudentForEnroll, setSelectedStudentForEnroll] = useState<PlatformUser | null>(null);
   const [manualEnrollTutorName, setManualEnrollTutorName] = useState("Ms. Kavitha Rajan (Combined Maths)");
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
   const [newStudentForm, setNewStudentForm] = useState({
@@ -429,6 +449,26 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     setIsAddTutorModalOpen(false);
     setNewTutorForm(initialNewTutorForm);
     addToast({ type: "success", title: "Tutor Registered!", message: `${newTutor.name} is now enrolled in the LMS.` });
+
+    // Persist to backend database via createStaff
+    const tutorEmail = `${newTutorForm.name.trim().toLowerCase().replace(/[^a-z0-9]/g, '.')}@limat-academy.lk`;
+    createStaff({
+      name: newTutorForm.name.trim(),
+      email: tutorEmail,
+      role: "teacher",
+      staffId: `TCH-${Math.floor(1000 + Math.random() * 9000)}`,
+      phone: "+94 77 123 4567",
+      gender: "male",
+      dateOfBirth: "1988-05-15",
+      joiningDate: new Date().toISOString().split("T")[0],
+      qualification: newTutorForm.qualifications,
+      subjects: [newTutorForm.subject],
+      classes: ["Grade 12", "Grade 13"],
+      sports: [],
+      teams: [],
+      medium: "english",
+      status: "active",
+    });
   };
 
   const handleConfirmDeleteTutor = () => {
@@ -490,20 +530,33 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       enrolledTutor: "Ms. Kavitha Rajan (Combined Maths)"
     });
     addToast({ type: "success", title: "Student Registered", message: `${newStud.name} added to student directory!` });
+
+    // Persist to backend database
+    api.admin.createStudent({
+      name: newStud.name,
+      email: newStud.email,
+      grade: newStud.grade,
+    }).then((created: any) => {
+      if (created?.id) {
+        setPlatformUsers((prev) => prev.map((u) => u.id === newStud.id ? { ...u, id: created.id } : u));
+      }
+    }).catch((err: any) => {
+      console.warn("Backend student creation skipped:", err);
+    });
   };
 
   // User 3-dot menu and action states
   const [openUserMenuId, setOpenUserMenuId] = useState<string | null>(null);
-  const [viewingUser, setViewingUser] = useState<typeof platformUsers[0] | null>(null);
-  const [editingUser, setEditingUser] = useState<typeof platformUsers[0] | null>(null);
+  const [viewingUser, setViewingUser] = useState<PlatformUser | null>(null);
+  const [editingUser, setEditingUser] = useState<PlatformUser | null>(null);
   const [editUserName, setEditUserName] = useState("");
   const [editUserEmail, setEditUserEmail] = useState("");
   const [editUserRole, setEditUserRole] = useState<"student" | "teacher" | "admin">("student");
   const [editUserSchool, setEditUserSchool] = useState("");
   const [editUserStatus, setEditUserStatus] = useState("Active");
-  const [deletingUser, setDeletingUser] = useState<typeof platformUsers[0] | null>(null);
+  const [deletingUser, setDeletingUser] = useState<PlatformUser | null>(null);
 
-  const handleOpenEditUser = (user: typeof platformUsers[0]) => {
+  const handleOpenEditUser = (user: PlatformUser) => {
     setEditingUser(user);
     setEditUserName(user.name);
     setEditUserEmail(user.email);
@@ -535,9 +588,14 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
 
   const handleConfirmDeleteUser = () => {
     if (!deletingUser) return;
-    setPlatformUsers((prev) => prev.filter((u) => u.id !== deletingUser.id));
+    const userToDelete = deletingUser;
+    setPlatformUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
     setDeletingUser(null);
     addToast({ type: "info", title: "User Account Removed Successfully" });
+
+    api.admin.deleteUser(userToDelete.id).catch((err: any) => {
+      console.warn("Backend user deletion skipped:", err);
+    });
   };
 
   const filteredUsers = platformUsers.filter((u) => {
@@ -671,7 +729,18 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             Configure schools, academic curricula, grade streams, faculty allocations, and system permissions.
           </p>
         </div>
-
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => refreshAdminData()}
+            disabled={isAdminLoading}
+            className="border-[#0d5c4d]/30 text-[#0d5c4d] hover:bg-[#0d5c4d]/5 font-semibold text-xs"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isAdminLoading ? 'animate-spin' : ''}`} />
+            Sync Cloud Data
+          </Button>
+        </div>
       </div>}
 
       {/* TAB: Dashboard Overview */}
@@ -692,7 +761,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 </div>
                 <div>
                   <p className="text-2xl font-black text-[#0d2b26]">{soloTutors.length}</p>
-                  <p className="text-xs font-bold text-[#0d5c4d] mt-0.5">Tutors Hub (தனிப்பட்ட ஆசிரியர்கள்)</p>
+                  <p className="text-xs font-bold text-[#0d5c4d] mt-0.5">Tutors Hub (Individual Tutors)</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Manage tutor verification, fee packages, Google Meet classroom links, and subscriber counts.
                   </p>
@@ -727,7 +796,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   <p className="text-2xl font-black text-[#0d2b26]">
                     {platformUsers.filter((u) => u.role === "student").length}
                   </p>
-                  <p className="text-xs font-bold text-[#b47a16] mt-0.5">Student Directory (மாணவர்கள் & சந்தா)</p>
+                  <p className="text-xs font-bold text-[#b47a16] mt-0.5">Student Directory (Students & Subscriptions)</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Oversee student tutor enrollments, activate/suspend access, and manage subscriptions.
                   </p>
@@ -760,7 +829,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 </div>
                 <div>
                   <p className="text-2xl font-black text-[#0d2b26]">Sports Hub</p>
-                  <p className="text-xs font-bold text-[#1d6fa5] mt-0.5">Tournaments & Scores (விளையாட்டு)</p>
+                  <p className="text-xs font-bold text-[#1d6fa5] mt-0.5">Tournaments & Scores (Sports Hub)</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Create inter-school tournaments, fixtures, record live match scores, and track standings.
                   </p>
@@ -786,7 +855,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-slate-500 font-semibold">Active Classes</p>
-                  <p className="text-2xl font-black text-[#0d5c4d] mt-1">{classes.length}</p>
+                  <p className="text-2xl font-black text-[#0d5c4d] mt-1">{overviewData?.kpis.totalClasses ?? classes.length}</p>
                   <p className="text-[10px] text-slate-400 font-bold mt-0.5">Across {grades.length} grade levels</p>
                 </div>
                 <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
@@ -799,7 +868,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-slate-500 font-semibold">Total Students</p>
-                  <p className="text-2xl font-black text-[#b47a16] mt-1">{totalStudents}</p>
+                  <p className="text-2xl font-black text-[#b47a16] mt-1">{overviewData?.kpis.totalStudents ?? totalStudents}</p>
                   <p className="text-[10px] text-[#b47a16] font-bold mt-0.5">Enrolled across all streams</p>
                 </div>
                 <div className="h-11 w-11 rounded-xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center">
@@ -811,9 +880,9 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             <Card className="border-[#e6ece8] bg-white shadow-2xs">
               <CardContent className="p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500 font-semibold">Tutors</p>
-                  <p className="text-2xl font-black text-[#0d5c4d] mt-1">{soloTutors.length}</p>
-                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">{soloTutors.filter((t) => t.verified).length} verified instructors</p>
+                  <p className="text-xs text-slate-500 font-semibold">Tutors & Faculty</p>
+                  <p className="text-2xl font-black text-[#0d5c4d] mt-1">{overviewData?.kpis.totalTeachers ?? soloTutors.length}</p>
+                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">Active teaching faculty in database</p>
                 </div>
                 <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
                   <UserCheck className="h-5 w-5" />
@@ -1079,9 +1148,103 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                         <Badge variant="success" className="text-[10px]">Active</Badge>
                       </td>
                       <td className="p-4 text-right">
-                        <Button variant="outline" size="sm" className="h-7 text-xs font-bold">
-                          <Edit className="h-3 w-3 mr-1" /> Edit
-                        </Button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditClass(cls)}
+                            className="h-7 text-xs font-bold"
+                          >
+                            <Edit className="h-3 w-3 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeletingClass(cls)}
+                            className="h-7 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* TAB: Curriculum & Academic Subjects */}
+      {activeAdminTab === "subjects" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-extrabold text-[#0d2b26] flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-[#0d5c4d]" />
+                Curriculum & Academic Subjects
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Manage academic subjects, syllabus codes, grade streams, and course allocations with real database persistence.
+              </p>
+            </div>
+            <Button
+              onClick={() => setIsSubjectModalOpen(true)}
+              className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold gap-2 text-xs shadow-xs"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Subject
+            </Button>
+          </div>
+
+          {/* Subjects Table */}
+          <Card className="border-[#e6ece8] bg-white shadow-2xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#e6ece8] bg-[#f8faf9] text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                    <th className="p-4">Subject Name</th>
+                    <th className="p-4">Subject Code</th>
+                    <th className="p-4">Grade Stream</th>
+                    <th className="p-4">Theme / Color</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#e6ece8] text-slate-700">
+                  {subjects.map((sub) => (
+                    <tr key={sub.id} className="hover:bg-[#fbfcfb] transition-colors">
+                      <td className="p-4 font-bold text-[#0d2b26]">{sub.name}</td>
+                      <td className="p-4">
+                        <Badge variant="outline" className="text-[10px] font-mono text-[#0d5c4d] bg-[#ecf8f5] border-[#c4e9e0]">
+                          {sub.code}
+                        </Badge>
+                      </td>
+                      <td className="p-4 font-semibold text-slate-600">{sub.gradeName || "Grade 12 (A/L)"}</td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`h-4 w-4 rounded-full bg-linear-to-r ${sub.color || "from-blue-600 to-indigo-700"} inline-block shadow-xs`} />
+                          <span className="text-[11px] font-mono text-slate-400">Active</span>
+                        </div>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditSubject(sub)}
+                            className="h-7 text-xs font-bold"
+                          >
+                            <Edit className="h-3 w-3 mr-1" /> Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeletingSubject(sub)}
+                            className="h-7 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1101,7 +1264,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 {staffSubTab === "solo_tutors" ? "LimaT Independent Tutor Network" : "LimaT Athletics & Sports Coaching"}
               </p>
               <h2 className="mt-1 text-2xl font-black text-[#0d2b26]">
-                {staffSubTab === "solo_tutors" ? "Tutors Management (தனிப்பட்ட ஆசிரியர்கள்)" : "Sports Coaches Management (விளையாட்டு பயிற்றுநர்கள்)"}
+                {staffSubTab === "solo_tutors" ? "Tutors Management (Individual Tutors)" : "Sports Coaches Management (Athletic Coaches)"}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
                 {staffSubTab === "solo_tutors"
@@ -2528,6 +2691,275 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
         </form>
       </Modal>
 
+      {/* Modal: Edit Class */}
+      <Modal
+        isOpen={isEditClassModalOpen}
+        onClose={() => {
+          setIsEditClassModalOpen(false);
+          setEditingClass(null);
+        }}
+        title="Edit Class Stream"
+        description="Update class details and stream allocations."
+      >
+        <form onSubmit={handleSaveEditClass} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Class Name
+            </label>
+            <input
+              type="text"
+              required
+              value={editClassName}
+              onChange={(e) => setEditClassName(e.target.value)}
+              placeholder="e.g. 12-Commerce"
+              className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Grade Level
+              </label>
+              <select
+                value={editClassGradeId}
+                onChange={(e) => setEditClassGradeId(e.target.value)}
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              >
+                {grades.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Class Teacher
+              </label>
+              <input
+                type="text"
+                value={editClassTeacher}
+                onChange={(e) => setEditClassTeacher(e.target.value)}
+                placeholder="Teacher name"
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Enrolled Students Count
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={editClassStudentCount}
+              onChange={(e) => setEditClassStudentCount(Number(e.target.value))}
+              className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsEditClassModalOpen(false);
+                setEditingClass(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold">
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Delete Class Confirmation */}
+      <Modal
+        isOpen={Boolean(deletingClass)}
+        onClose={() => setDeletingClass(null)}
+        title="Delete Class Stream"
+        description="Are you sure you want to delete this class? This action cannot be undone."
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700">
+            You are about to remove <span className="font-bold text-[#0d2b26]">{deletingClass?.name}</span>.
+          </p>
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button variant="outline" onClick={() => setDeletingClass(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDeleteClass}>
+              Delete Class
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Create Subject */}
+      <Modal
+        isOpen={isSubjectModalOpen}
+        onClose={() => setIsSubjectModalOpen(false)}
+        title="Add Academic Subject"
+        description="Add a new subject to the school curriculum."
+      >
+        <form onSubmit={handleCreateSubjectSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Subject Name
+            </label>
+            <input
+              type="text"
+              required
+              value={subjectName}
+              onChange={(e) => setSubjectName(e.target.value)}
+              placeholder="e.g. Combined Mathematics"
+              className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Subject Code
+              </label>
+              <input
+                type="text"
+                required
+                value={subjectCode}
+                onChange={(e) => setSubjectCode(e.target.value)}
+                placeholder="e.g. CMATH-12"
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Grade Stream
+              </label>
+              <select
+                value={subjectGradeId}
+                onChange={(e) => setSubjectGradeId(e.target.value)}
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              >
+                {grades.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button type="button" variant="outline" onClick={() => setIsSubjectModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold">
+              Save Subject
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Edit Subject */}
+      <Modal
+        isOpen={isEditSubjectModalOpen}
+        onClose={() => {
+          setIsEditSubjectModalOpen(false);
+          setEditingSubject(null);
+        }}
+        title="Edit Subject"
+        description="Update curriculum subject details."
+      >
+        <form onSubmit={handleSaveEditSubject} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Subject Name
+            </label>
+            <input
+              type="text"
+              required
+              value={editSubjectName}
+              onChange={(e) => setEditSubjectName(e.target.value)}
+              className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Subject Code
+              </label>
+              <input
+                type="text"
+                required
+                value={editSubjectCode}
+                onChange={(e) => setEditSubjectCode(e.target.value)}
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Grade Stream
+              </label>
+              <select
+                value={editSubjectGradeId}
+                onChange={(e) => setEditSubjectGradeId(e.target.value)}
+                className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+              >
+                {grades.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsEditSubjectModalOpen(false);
+                setEditingSubject(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold">
+              Save Changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Delete Subject Confirmation */}
+      <Modal
+        isOpen={Boolean(deletingSubject)}
+        onClose={() => setDeletingSubject(null)}
+        title="Delete Subject"
+        description="Are you sure you want to remove this subject from the curriculum?"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-700">
+            You are about to remove <span className="font-bold text-[#0d2b26]">{deletingSubject?.name}</span> ({deletingSubject?.code}).
+          </p>
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button variant="outline" onClick={() => setDeletingSubject(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDeleteSubject}>
+              Delete Subject
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal isOpen={isStaffModalOpen} onClose={() => setIsStaffModalOpen(false)} title={`${editingStaff ? "Edit" : "Add"} ${staffRoleFilter === "coach" ? "Coach" : "Teacher"}`} description="Keep staff records accurate for your school." maxWidth="max-w-3xl">
         <form onSubmit={staffForm.handleSubmit(submitStaffForm)} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -2968,7 +3400,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 className="h-4 w-4 accent-[#0d5c4d] rounded cursor-pointer"
               />
               <label htmlFor="verifiedCheck" className="text-xs font-bold text-[#0d5c4d] cursor-pointer">
-                Grant Verified Badge (சரிபார்க்கப்பட்ட ஆசிரியர் பேட்ஜ்)
+                Grant Verified Badge (Official Tutor Badge)
               </label>
             </div>
           </div>

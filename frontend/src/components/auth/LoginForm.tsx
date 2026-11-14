@@ -308,7 +308,7 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
                       ? "Admin Desk"
                       : selectedRole === "super_admin"
                       ? "Super Admin Console"
-                      : "Tutor Cockpit"}
+                      : "Teacher Portal"}
                   </span>
                 </>
               )}

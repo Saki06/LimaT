@@ -62,19 +62,30 @@ export const createLiveClass = async (req: AuthenticatedRequest, res: Response):
       return;
     }
 
-    const tenantId = user.tenantId;
+    let candidateTenantId = user.tenantId;
+    if (!candidateTenantId) {
+      const activeTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+      candidateTenantId = activeTenant?.id ?? null;
+    }
 
-if (!tenantId) {
-  res.status(403).json({
-    success: false,
-    message: 'A tenant is required to create live classes.',
-  });
-  return;
-}
+    if (!candidateTenantId) {
+      res.status(403).json({
+        success: false,
+        message: 'A tenant is required to create live classes.',
+      });
+      return;
+    }
+    const tenantId: string = candidateTenantId;
 
-const teacherProfile = await getOrCreateTeacherProfile(user.userId);
+    let targetTeacherId: string;
+    if (req.body.teacherId && typeof req.body.teacherId === 'string') {
+      targetTeacherId = req.body.teacherId;
+    } else {
+      const teacherProfile = await getOrCreateTeacherProfile(user.userId);
+      targetTeacherId = teacherProfile.id;
+    }
 
-// Generate room identifier if JITSI and no URL is provided
+    // Generate room identifier if JITSI and no URL is provided
     let finalMeetingUrl = meetingUrl;
     let finalMeetingId = meetingId;
     if (platform === 'JITSI') {
@@ -89,7 +100,7 @@ const teacherProfile = await getOrCreateTeacherProfile(user.userId);
     const liveSession = await prisma.liveClassSession.create({
       data: {
         tenantId,
-        teacherId: teacherProfile.id,
+        teacherId: targetTeacherId,
         courseId: courseId || null,
         packageId: packageId || null,
         title,
@@ -164,12 +175,15 @@ export const getLiveClasses = async (req: AuthenticatedRequest, res: Response): 
       return;
     }
 
-    const tenantId = user.tenantId;
+    let candidateTenantId = user.tenantId;
+    if (!candidateTenantId) {
+      const activeTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+      candidateTenantId = activeTenant?.id ?? null;
+    }
+
     const { status, courseId, packageId } = req.query;
 
-    const whereClause: any = {
-      tenantId,
-    };
+    const whereClause: any = candidateTenantId ? { tenantId: candidateTenantId } : {};
 
     if (status) {
       whereClause.status = status as string;
@@ -189,9 +203,45 @@ export const getLiveClasses = async (req: AuthenticatedRequest, res: Response): 
       if (teacherProfile) {
         whereClause.teacherId = teacherProfile.id;
       }
+    } else if (user.role === 'STUDENT') {
+      const studentProfile = await prisma.studentProfile.findUnique({
+        where: { userId: user.userId },
+      });
+
+      if (!studentProfile) {
+        res.status(200).json({ success: true, data: [] });
+        return;
+      }
+
+      const enrollments = await prisma.enrollment.findMany({
+        where: { studentId: studentProfile.id },
+        select: { courseId: true },
+      });
+      const enrolledCourseIds = enrollments.map((e) => e.courseId);
+
+      const subscriptions = await prisma.packageSubscription.findMany({
+        where: {
+          studentId: studentProfile.id,
+          status: 'ACTIVE',
+          endDate: { gte: new Date() },
+        },
+        select: { packageId: true },
+      });
+      const subscribedPackageIds = subscriptions.map((s) => s.packageId);
+
+      // If student has not enrolled in any course or subscribed to any package, return empty
+      if (enrolledCourseIds.length === 0 && subscribedPackageIds.length === 0) {
+        res.status(200).json({ success: true, data: [] });
+        return;
+      }
+
+      whereClause.OR = [
+        ...(enrolledCourseIds.length > 0 ? [{ courseId: { in: enrolledCourseIds } }] : []),
+        ...(subscribedPackageIds.length > 0 ? [{ packageId: { in: subscribedPackageIds } }] : []),
+      ];
     }
 
-    const liveClasses = await prisma.liveClassSession.findMany({
+    let liveClasses = await prisma.liveClassSession.findMany({
       where: whereClause,
       include: {
         teacher: {

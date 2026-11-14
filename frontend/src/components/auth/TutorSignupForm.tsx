@@ -10,7 +10,7 @@ interface TutorSignupFormProps {
 }
 
 export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
-  const { setCurrentRole, addToast } = useApp();
+  const { addToast, registerUser } = useApp();
 
   const [signupName, setSignupName] = useState("");
   const [signupPhone, setSignupPhone] = useState("");
@@ -45,22 +45,21 @@ export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
 
     setIsLoading(true);
     try {
-      const res = await api.auth.registerTutor({
-        firstName: signupName.trim(),
+      const nameParts = signupName.trim().split(" ");
+      const firstName = nameParts[0] || "Educator";
+      const lastName = nameParts.slice(1).join(" ");
+
+      const res = await registerUser({
+        role: "teacher",
+        firstName,
+        lastName,
         email: signupEmail.trim(),
         password: signupPassword,
+        phoneNumber: signupPhone.trim(),
         specialization: subjectSpecialization,
       });
 
-      if (res.success && res.token && res.user) {
-        api.token.set(res.token);
-        api.user.set(res.user);
-        setCurrentRole("teacher");
-        addToast({
-          type: "success",
-          title: "Tutor Profile Initialized!",
-          message: `Welcome, ${signupName || "Educator"}! Your Tutor Cockpit & Course Creator Desk is ready.`
-        });
+      if (res.success) {
         onSuccess();
       } else {
         addToast({
@@ -73,7 +72,7 @@ export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
       addToast({
         type: "error",
         title: "Connection Error",
-        message: err.message || "Could not reach registration server."
+        message: err.message || "Could not complete tutor registration."
       });
     } finally {
       setIsLoading(false);
@@ -91,7 +90,7 @@ export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
             required
             value={signupName}
             onChange={(e) => setSignupName(e.target.value)}
-            placeholder="e.g. Dr. Samantha Perera"
+            placeholder="e.g. Dr. K. Arulnesan / Eng. Thanushan"
             className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#b47a16] transition-all font-medium"
           />
         </div>
@@ -218,12 +217,12 @@ export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
         {isLoading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Launching Tutor Cockpit...</span>
+            <span>Launching Teacher Portal...</span>
           </>
         ) : (
           <>
             <Sparkles className="h-4 w-4" />
-            <span>Register &amp; Launch Tutor Cockpit</span>
+            <span>Register &amp; Launch Teacher Portal</span>
           </>
         )}
       </button>

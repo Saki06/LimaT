@@ -130,6 +130,7 @@ export const listSportsEvents = async (
     const tenantId = requireSportsTenant(req, res);
     if (!tenantId) return;
     const user = req.user;
+    const where = user?.tenantId ? { tenantId: user.tenantId } : {};
 
     const events = await prisma.sportsEvent.findMany({
       where: { tenantId },

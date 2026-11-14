@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import {
   cancelSportsRegistration,
   createSportsDiscipline,
@@ -140,6 +140,7 @@ router.get('/fixtures/completed', authenticateToken, getRecentlyCompletedFixture
 router.get('/fixtures/date-range', authenticateToken, getFixturesByDateRange);
 router.get('/fixtures/:fixtureId', authenticateToken, getFixtureById);
 router.patch('/fixtures/:fixtureId', authenticateToken, updateFixture);
+router.delete('/fixtures/:id', authenticateToken, deleteSportsFixture);
 router.post('/fixtures/:fixtureId/live-score', authenticateToken, updateLiveScore);
 router.get('/fixtures/:fixtureId/live-updates', authenticateToken, getLiveUpdates);
 router.post('/fixtures/:fixtureId/complete', authenticateToken, completeFixture);

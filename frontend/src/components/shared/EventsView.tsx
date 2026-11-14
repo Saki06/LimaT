@@ -11,7 +11,9 @@ import {
   CheckCircle2,
   Search,
   Plus,
-  Pencil
+  Pencil,
+  Trash2,
+  Loader2
 } from "lucide-react";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,11 +21,12 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 
 export function EventsView() {
-  const { events, registerEvent, createEvent, updateEvent, currentRole } = useApp();
+  const { events, registerEvent, createEvent, updateEvent, deleteEvent, currentRole } = useApp();
   const isAdmin = currentRole === "admin";
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAudience, setSelectedAudience] = useState<string>("all");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingEvent, setEditingEvent] = useState<SchoolEvent | null>(null);
   const [eventDraft, setEventDraft] = useState({
     title: "",
@@ -66,14 +69,19 @@ export function EventsView() {
     setIsEditorOpen(true);
   };
 
-  const saveEvent = (formEvent: React.FormEvent<HTMLFormElement>) => {
+  const saveEvent = async (formEvent: React.FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
-    if (editingEvent) {
-      updateEvent(editingEvent.id, eventDraft);
-    } else {
-      createEvent(eventDraft);
+    setIsSubmitting(true);
+    try {
+      if (editingEvent) {
+        await updateEvent(editingEvent.id, eventDraft);
+      } else {
+        await createEvent(eventDraft);
+      }
+      setIsEditorOpen(false);
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsEditorOpen(false);
   };
 
   const filteredEvents = events.filter((evt) => {
@@ -185,9 +193,33 @@ export function EventsView() {
                       {evt.audience.replace("_", " ")}
                     </Badge>
                     {isAdmin && (
-                      <Button type="button" variant="outline" size="icon" title="Edit event" aria-label={`Edit ${evt.title}`} onClick={() => openEditEvent(evt)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          title="Edit event"
+                          aria-label={`Edit ${evt.title}`}
+                          onClick={() => openEditEvent(evt)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          title="Delete event"
+                          aria-label={`Delete ${evt.title}`}
+                          className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+                          onClick={() => {
+                            if (window.confirm(`Are you sure you want to permanently delete "${evt.title}"?`)) {
+                              deleteEvent(evt.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -305,8 +337,13 @@ export function EventsView() {
             </label>
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={() => setIsEditorOpen(false)}>Cancel</Button>
-            <Button type="submit">{editingEvent ? "Save Changes" : "Create Event"}</Button>
+            <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => setIsEditorOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting} className="gap-2">
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              <span>{editingEvent ? "Save Changes" : "Create Event"}</span>
+            </Button>
           </div>
         </form>
       </Modal>

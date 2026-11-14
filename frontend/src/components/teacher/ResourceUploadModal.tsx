@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   BookOpen,
   FileText,
@@ -8,13 +8,13 @@ import {
   CheckCircle2,
   Lock,
   Globe,
-  Sparkles,
   Layers,
   Save,
   X,
   FileCheck,
   Paperclip,
-  Check
+  Check,
+  ImagePlus
 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,8 @@ interface ResourceUploadModalProps {
   onClose: () => void;
   resourceToEdit?: LibraryResource | null;
   courses: Course[];
+  /** Subjects the signed-in tutor teaches (from their profile specializations). */
+  subjectOptions?: string[];
   onSave: (data: Partial<LibraryResource>, publish: boolean) => void;
 }
 
@@ -58,22 +60,107 @@ export function ResourceUploadModal({
   onClose,
   resourceToEdit,
   courses,
+  subjectOptions = [],
   onSave
 }: ResourceUploadModalProps) {
   const { currentUser } = useApp();
   const isEditing = Boolean(resourceToEdit);
 
+  // Subjects this tutor teaches: profile specializations + their own course titles
+  const allSubjects = useMemo(() => {
+    const set = new Set<string>();
+    subjectOptions.forEach((s) => s && set.add(s));
+    courses.forEach((c) => c.title && set.add(c.title));
+    return Array.from(set);
+  }, [subjectOptions, courses]);
+  const coverImageInputRef = useRef<HTMLInputElement>(null);
+
   const [title, setTitle] = useState("");
   const [resourceType, setResourceType] = useState<LibraryResourceType>("tute");
-  const [subject, setSubject] = useState("Combined Mathematics");
-  const [topic, setTopic] = useState("Integration & Calculus");
+  const [subject, setSubject] = useState("");
+  const [topic, setTopic] = useState("");
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<"public" | "subscribers_only">("public");
   const [coverImage, setCoverImage] = useState(COVER_PRESETS[0].url);
+  const [customCoverPreview, setCustomCoverPreview] = useState<string | null>(null);
   const [fileType, setFileType] = useState("PDF");
   const [fileSize, setFileSize] = useState("4.2 MB");
   const [pageCount, setPageCount] = useState(24);
   const [allowDownload, setAllowDownload] = useState(true);
+
+  // Actual material file (tute / past paper / study guide / book)
+  const materialFileInputRef = useRef<HTMLInputElement>(null);
+  const [materialFileUrl, setMaterialFileUrl] = useState<string | undefined>(undefined);
+  const [materialFileName, setMaterialFileName] = useState<string>("");
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+
+  const MATERIAL_ACCEPT = ".pdf,.doc,.docx,.ppt,.pptx,.epub,.zip";
+  const MAX_MATERIAL_MB = 50;
+
+  const formatBytes = (bytes: number) =>
+    bytes >= 1024 * 1024
+      ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+      : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+  const processMaterialFile = async (file: File) => {
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    if (!["pdf", "doc", "docx", "ppt", "pptx", "epub", "zip"].includes(ext)) {
+      setErrorMsg("Unsupported file type. Please upload PDF, DOC/DOCX, PPT/PPTX, EPUB or ZIP.");
+      return;
+    }
+    if (file.size > MAX_MATERIAL_MB * 1024 * 1024) {
+      setErrorMsg(`File is too large. Maximum allowed size is ${MAX_MATERIAL_MB} MB.`);
+      return;
+    }
+    setErrorMsg(null);
+    if (materialFileUrl && materialFileUrl.startsWith("blob:")) URL.revokeObjectURL(materialFileUrl);
+
+    setMaterialFileUrl(URL.createObjectURL(file));
+    setMaterialFileName(file.name);
+    setFileType(ext.toUpperCase());
+    setFileSize(formatBytes(file.size));
+
+    // Best-effort page count for PDFs
+    if (ext === "pdf") {
+      try {
+        const text = await file.text();
+        const matches = text.match(/\/Type\s*\/Page[^s]/g);
+        if (matches && matches.length > 0) setPageCount(matches.length);
+      } catch {
+        /* keep existing page count */
+      }
+    }
+  };
+
+  const handleMaterialFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) void processMaterialFile(file);
+    e.target.value = "";
+  };
+
+  const handleMaterialDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDraggingFile(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) void processMaterialFile(file);
+  };
+
+  const removeMaterialFile = () => {
+    if (materialFileUrl && materialFileUrl.startsWith("blob:")) URL.revokeObjectURL(materialFileUrl);
+    setMaterialFileUrl(undefined);
+    setMaterialFileName("");
+  };
+  const handleCustomCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setCustomCoverPreview(dataUrl);
+      setCoverImage(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Past Paper / Model Exam specifics
   const [year, setYear] = useState<number>(2025);
@@ -90,6 +177,12 @@ export function ResourceUploadModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
+
+    setCustomCoverPreview(null);
+    setMaterialFileUrl(resourceToEdit?.fileUrl);
+    setMaterialFileName(resourceToEdit?.fileName || "");
+
     if (resourceToEdit) {
       setTitle(resourceToEdit.title);
       setResourceType(resourceToEdit.resourceType);
@@ -112,14 +205,14 @@ export function ResourceUploadModal({
     } else {
       setTitle("");
       setResourceType("tute");
-      setSubject(courses[0]?.title || "Combined Mathematics");
-      setTopic("Pure Maths: Quadratic Equations & Roots");
-      setDescription("Comprehensive theory notes, solved A/L problems, and homework exercises.");
+      setSubject(allSubjects[0] || "");
+      setTopic("");
+      setDescription("");
       setVisibility("public");
       setCoverImage(COVER_PRESETS[0].url);
       setFileType("PDF");
-      setFileSize("3.8 MB");
-      setPageCount(18);
+      setFileSize("");
+      setPageCount(0);
       setAllowDownload(true);
       setYear(2025);
       setMedium("Tamil");
@@ -129,41 +222,15 @@ export function ResourceUploadModal({
       setMarkingSchemeNotes("Official marking rubrics with step-by-step mark allocations.");
     }
     setErrorMsg(null);
-  }, [resourceToEdit, isOpen, courses]);
+  }, [resourceToEdit, isOpen]);
 
-  // Load sample tute
-  const handleLoadSampleTute = () => {
-    setTitle("Combined Mathematics: Definite Integration Master Tute");
-    setResourceType("tute");
-    setSubject("Combined Mathematics");
-    setTopic("Integration by Parts & Substitution");
-    setDescription("Full lecture handouts containing 50 model problems, theory proofs, and past examination problems.");
-    setVisibility("subscribers_only");
-    setCoverImage(COVER_PRESETS[0].url);
-    setFileType("PDF");
-    setFileSize("5.2 MB");
-    setPageCount(28);
-    setAllowDownload(true);
-  };
-
-  // Load sample past paper
-  const handleLoadSampleModelPaper = () => {
-    setTitle("2025 A/L Combined Mathematics Model Examination Paper");
-    setResourceType("past_paper");
-    setSubject("Combined Mathematics");
-    setYear(2025);
-    setMedium("Tamil");
-    setExamType("G.C.E. Advanced Level");
-    setPaperPart("Complete Set (Paper I + II)");
-    setHasMarkingScheme(true);
-    setMarkingSchemeNotes("Includes complete structured answer scheme with step-by-step method marks.");
-    setDescription("Full standard 3-hour model examination paper strictly matching the Department of Examinations syllabus.");
-    setVisibility("public");
-    setCoverImage(COVER_PRESETS[0].url);
-    setFileSize("4.6 MB");
-    setPageCount(16);
-    setAllowDownload(true);
-  };
+  // When subjects load late (profile fetched async), auto-select the first one for new uploads
+  useEffect(() => {
+    if (!isOpen || resourceToEdit) return;
+    if (allSubjects.length > 0 && !allSubjects.includes(subject)) {
+      setSubject(allSubjects[0]);
+    }
+  }, [allSubjects, isOpen, resourceToEdit, subject]);
 
   const handleSubmit = (publish: boolean) => {
     if (!title.trim()) {
@@ -172,6 +239,11 @@ export function ResourceUploadModal({
     }
     if (!subject.trim()) {
       setErrorMsg("Please specify the subject.");
+      return;
+    }
+
+    if (!materialFileUrl && !isEditing) {
+      setErrorMsg("Please upload the material file (PDF, DOC, PPT, EPUB or ZIP) before saving.");
       return;
     }
 
@@ -185,10 +257,12 @@ export function ResourceUploadModal({
       coverImage,
       fileType,
       fileSize,
-      pageCount: Number(pageCount) || 15,
+      pageCount: Number(pageCount) || undefined,
+      fileUrl: materialFileUrl,
+      fileName: materialFileName || undefined,
       allowDownload,
       status: publish ? "published" : "draft",
-      author: currentUser?.name || "Tutor Faculty",
+      author: currentUser?.name || "Tutor",
       year: resourceType === "past_paper" ? Number(year) : undefined,
       medium: resourceType === "past_paper" ? medium : undefined,
       examType: resourceType === "past_paper" ? examType : undefined,
@@ -229,36 +303,6 @@ export function ResourceUploadModal({
           </div>
         )}
 
-        {/* Quick Template Presets */}
-        <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-[#f8faf9] border border-[#e6ece8]">
-          <div className="flex items-center gap-2">
-            <Badge variant="success" className="text-xs font-bold gap-1 px-3 py-1">
-              <FileCheck className="h-3.5 w-3.5" /> Direct PDF & Material Hub
-            </Badge>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleLoadSampleTute}
-              className="text-xs font-bold border-[#c4e9e0] text-[#0d5c4d] hover:bg-[#ecf8f5] cursor-pointer"
-            >
-              <Sparkles className="h-3.5 w-3.5 mr-1" /> Load Sample Tute
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleLoadSampleModelPaper}
-              className="text-xs font-bold border-amber-300 text-amber-800 hover:bg-amber-50 cursor-pointer"
-            >
-              <Sparkles className="h-3.5 w-3.5 mr-1 text-amber-600" /> Load Model Paper
-            </Button>
-          </div>
-        </div>
-
         {/* SECTION 1: MATERIAL CLASSIFICATION */}
         <div className="p-4 rounded-2xl bg-white border border-[#e6ece8] space-y-4 shadow-2xs">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -282,15 +326,20 @@ export function ResourceUploadModal({
                 onChange={(e) => setSubject(e.target.value)}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0d5c4d] bg-white font-semibold text-slate-800"
               >
-                {courses.map((c) => (
-                  <option key={c.id} value={c.title}>
-                    📚 {c.title}
+                {allSubjects.length > 0 ? (
+                  allSubjects.map((s) => (
+                    <option key={s} value={s}>
+                      📚 {s}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>No subjects found — add them in your Profile</option>
+                )}
+                {resourceToEdit?.subject && !allSubjects.includes(resourceToEdit.subject) && (
+                  <option value={resourceToEdit.subject}>
+                    📚 {resourceToEdit.subject}
                   </option>
-                ))}
-                <option value="Combined Mathematics">Combined Mathematics</option>
-                <option value="Physics">Physics</option>
-                <option value="Chemistry">Chemistry</option>
-                <option value="Information Technology">Information Technology</option>
+                )}
               </select>
             </div>
 
@@ -316,7 +365,11 @@ export function ResourceUploadModal({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Combined Mathematics: Integration by Parts & Differential Equations Master Tute"
+              placeholder={
+                courses[0]?.title
+                  ? `e.g. ${courses[0].title} - Lesson 01 Handout & Revision Guide`
+                  : "e.g. Course Handout & Revision Guide"
+              }
               className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0d5c4d] font-semibold text-slate-800"
             />
           </div>
@@ -328,7 +381,7 @@ export function ResourceUploadModal({
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder="e.g. Pure Mathematics • Unit 07: Calculus"
+                placeholder="e.g. Unit 01: Introduction & Fundamentals"
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0d5c4d] text-slate-800"
               />
             </div>
@@ -430,42 +483,79 @@ export function ResourceUploadModal({
 
         {/* SECTION 3: FILE ATTACHMENT & COVER PRESET */}
         <div className="p-4 rounded-2xl bg-white border border-[#e6ece8] space-y-4 shadow-2xs">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">Format</label>
-              <select
-                value={fileType}
-                onChange={(e) => setFileType(e.target.value)}
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-300 bg-white"
+          {/* Material file upload */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-700">
+              {resourceType === "past_paper"
+                ? "Past Paper / Model Paper File"
+                : resourceType === "book"
+                ? "Study Guide / Book File"
+                : "Tute / Lecture Handout File"}{" "}
+              <span className="text-rose-500">*</span>
+            </label>
+            <input
+              ref={materialFileInputRef}
+              type="file"
+              accept={MATERIAL_ACCEPT}
+              onChange={handleMaterialFileChange}
+              className="hidden"
+            />
+            {materialFileUrl ? (
+              <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-lg bg-white text-[#0d5c4d] border border-[#c4e9e0]">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-900 truncate">
+                      {materialFileName || "Uploaded file"}
+                    </p>
+                    <p className="text-[11px] text-slate-600 font-mono">
+                      {fileType}
+                      {fileSize ? ` • ${fileSize}` : ""}
+                      {pageCount > 0 && fileType === "PDF" ? ` • ${pageCount} pages` : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => materialFileInputRef.current?.click()}
+                    className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-[#0d5c4d] text-[#0d5c4d] bg-white hover:bg-[#f0faf7] cursor-pointer"
+                  >
+                    Replace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removeMaterialFile}
+                    className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
+                    title="Remove file"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => materialFileInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
+                onDragLeave={() => setIsDraggingFile(false)}
+                onDrop={handleMaterialDrop}
+                className={`flex flex-col items-center justify-center gap-1.5 p-6 rounded-xl border-2 border-dashed cursor-pointer transition-colors text-center ${
+                  isDraggingFile
+                    ? "border-[#0d5c4d] bg-[#ecf8f5]"
+                    : "border-slate-300 bg-[#f8faf9] hover:bg-[#f0faf7] hover:border-[#0d5c4d]"
+                }`}
               >
-                <option value="PDF">PDF Document (.pdf)</option>
-                <option value="DOCX">Word Document (.docx)</option>
-                <option value="ZIP">Archive Bundle (.zip)</option>
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">File Size</label>
-              <input
-                type="text"
-                value={fileSize}
-                onChange={(e) => setFileSize(e.target.value)}
-                placeholder="e.g. 4.2 MB"
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-300 font-mono"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">Estimated Pages</label>
-              <input
-                type="number"
-                min={1}
-                max={500}
-                value={pageCount}
-                onChange={(e) => setPageCount(Math.max(1, Number(e.target.value)))}
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-300 font-mono"
-              />
-            </div>
+                <UploadCloud className="h-7 w-7 text-[#0d5c4d]" />
+                <p className="text-xs font-bold text-slate-800">
+                  Click to upload or drag &amp; drop your file here
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  PDF, DOC/DOCX, PPT/PPTX, EPUB or ZIP • up to {MAX_MATERIAL_MB} MB
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-xl bg-[#f8faf9] border border-slate-200">
@@ -485,8 +575,15 @@ export function ResourceUploadModal({
           </div>
 
           {/* Cover image preview & quick presets */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-700">Cover Thumbnail Preset</label>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700">Cover Thumbnail</label>
+              {coverImage && (
+                <img src={coverImage} alt="Selected cover" className="h-8 w-12 rounded-lg object-cover border border-slate-200 shadow-sm" />
+              )}
+            </div>
+
+            {/* Preset thumbnails */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
               {COVER_PRESETS.map((preset) => {
                 const isSelected = coverImage === preset.url;
@@ -494,7 +591,7 @@ export function ResourceUploadModal({
                   <button
                     key={preset.label}
                     type="button"
-                    onClick={() => setCoverImage(preset.url)}
+                    onClick={() => { setCoverImage(preset.url); setCustomCoverPreview(null); }}
                     className={`flex items-center gap-2 p-1.5 rounded-xl border text-[11px] font-bold shrink-0 cursor-pointer transition-all ${
                       isSelected
                         ? "bg-[#ecf8f5] border-[#0d5c4d] text-[#0d5c4d] ring-1 ring-[#0d5c4d]"
@@ -506,6 +603,38 @@ export function ResourceUploadModal({
                   </button>
                 );
               })}
+            </div>
+
+            {/* Custom image upload */}
+            <div>
+              <input
+                ref={coverImageInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleCustomCoverUpload}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => coverImageInputRef.current?.click()}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold cursor-pointer transition-all w-full justify-center ${
+                  customCoverPreview
+                    ? "bg-[#ecf8f5] border-[#0d5c4d] text-[#0d5c4d] ring-1 ring-[#0d5c4d]"
+                    : "bg-white border-dashed border-slate-300 text-slate-500 hover:bg-slate-50 hover:border-slate-400"
+                }`}
+              >
+                {customCoverPreview ? (
+                  <>
+                    <img src={customCoverPreview} alt="Custom cover" className="h-6 w-8 rounded object-cover" />
+                    <span>Custom Image Selected ✓ — Click to Change</span>
+                  </>
+                ) : (
+                  <>
+                    <ImagePlus className="h-4 w-4" />
+                    <span>Upload Custom Cover Image</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

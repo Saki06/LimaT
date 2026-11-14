@@ -65,7 +65,7 @@ interface NavItem {
 }
 
 export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
-  const { currentRole, currentView, setCurrentView, t, submissions, isFeatureEnabled } = useApp();
+  const { currentRole, currentView, setCurrentView, t, submissions, isFeatureEnabled, setIsLanding, setLandingPortal } = useApp();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     my_learning: true,
@@ -122,20 +122,11 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
         ]
       : []),
     {
-      id: "timetable",
-      label: "Weekly Timetable",
-      icon: Calendar,
-      badge: "Schedule",
-      badgeVariant: "gold" as const,
-      group: "Core Learning"
-    },
-    {
       id: "my_learning",
       label: t.nav.myLearning || "My Learning",
       icon: BookOpen,
       group: "Core Learning",
       children: [
-        { id: "timetable", label: "Weekly Timetable", icon: Calendar },
         ...(isFeatureEnabled("syllabus_builder")
           ? [{ id: "courses", label: "Syllabus & Lessons", icon: BookOpen }]
           : []),
@@ -175,14 +166,14 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
         ]
       : []),
 
-    // School Life & Notice Board
+    // Notice Board & Circulars
     {
       id: "announcements",
       label: "Notice Board & Circulars",
       icon: Bell,
       badge: "Notices",
       badgeVariant: "default" as const,
-      group: "School Life"
+      group: "Notices & Updates"
     },
 
     // Sports & Tournaments with Sub-headings
@@ -292,23 +283,9 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
     ...(isFeatureEnabled("batch_management")
       ? [
           {
-            id: "classes",
-            label: "Batches & Attendance",
-            icon: Users,
-            badge: "Active",
-            badgeVariant: "gold" as const,
-            group: "Tutor Operations"
-          },
-          {
             id: "announcements",
             label: "Class Notices & Alerts",
             icon: Bell,
-            group: "Tutor Operations"
-          },
-          {
-            id: "timetable",
-            label: "Class Timetable",
-            icon: Calendar,
             group: "Tutor Operations"
           }
         ]
@@ -810,7 +787,14 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                   )
                 ) : (
                   <>
-                    <div className="flex items-center gap-2">
+                    <div
+                      onClick={() => {
+                        setIsLanding(true);
+                        setLandingPortal("gateway");
+                      }}
+                      className="flex items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity"
+                      title="Return to All Portals (Landing Page)"
+                    >
                       <img
                         src="/images/tozy_icon.jpg"
                         alt="Tozy"

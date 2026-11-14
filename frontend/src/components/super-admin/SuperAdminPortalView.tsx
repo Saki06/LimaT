@@ -12,7 +12,8 @@ import {
   Sparkles,
   Sliders,
   DollarSign,
-  X
+  X,
+  RefreshCw
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TenantSchools } from "./TenantSchools";
@@ -92,6 +93,23 @@ const [archivedTenants, setArchivedTenants] = useState<Tenant[]>([]);
 const [isLoadingArchived, setIsLoadingArchived] = useState(false);
 
 const [isRestoring, setIsRestoring] = useState(false);
+const [isReloadingTenants, setIsReloadingTenants] = useState(false);
+
+const handleReloadTenants = async () => {
+  setIsReloadingTenants(true);
+  try {
+    const res = await api.tenants.getAll();
+    if (res?.data && Array.isArray(res.data)) {
+      const mapped = res.data.map(mapBackendTenant);
+      mapped.forEach((t: Tenant) => addTenant(t));
+      showToast("Live tenants reloaded from database.");
+    }
+  } catch (e: any) {
+    showToast(e.message || "Failed to reload tenants");
+  } finally {
+    setIsReloadingTenants(false);
+  }
+};
 
 
 const loadArchivedTenants = async () => {
@@ -382,6 +400,15 @@ const saveTenantFeatures = (
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={handleReloadTenants}
+            disabled={isReloadingTenants}
+            className="p-2 rounded-xl border border-slate-200 hover:border-[#0d5c4d] bg-white text-slate-700 hover:text-[#0d5c4d] transition-all cursor-pointer flex items-center justify-center shrink-0"
+            title="Reload Tenants from Database"
+          >
+            <RefreshCw className={`h-4 w-4 ${isReloadingTenants ? "animate-spin text-[#0d5c4d]" : ""}`} />
+          </button>
         </div>
       </div>
 

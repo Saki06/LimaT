@@ -1,18 +1,30 @@
 "use client";
 
 import React, { useState } from "react";
-import { User as UserIcon, Phone, Mail, Lock, UserPlus, GraduationCap, Loader2 } from "lucide-react";
+import { User as UserIcon, Phone, Mail, Lock, UserPlus, GraduationCap, Loader2, ChevronDown } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/lib/api";
+
+const GRADE_OPTIONS = [
+  "Grade 6",
+  "Grade 7",
+  "Grade 8",
+  "Grade 9",
+  "Grade 10",
+  "Grade 11 (O/L)",
+  "Grade 12 (A/L)",
+  "Grade 13 (A/L)",
+];
 
 interface StudentSignupFormProps {
   onSuccess: () => void;
 }
 
 export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
-  const { setCurrentRole, addToast } = useApp();
+  const { addToast, registerUser } = useApp();
 
   const [signupName, setSignupName] = useState("");
+  const [selectedGrade, setSelectedGrade] = useState("Grade 12 (A/L)");
   const [signupPhone, setSignupPhone] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
@@ -43,21 +55,21 @@ export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
 
     setIsLoading(true);
     try {
-      const res = await api.auth.registerStudent({
-        firstName: signupName.trim(),
+      const nameParts = signupName.trim().split(" ");
+      const firstName = nameParts[0] || "Student";
+      const lastName = nameParts.slice(1).join(" ");
+
+      const res = await registerUser({
+        role: "student",
+        firstName,
+        lastName,
         email: signupEmail.trim(),
         password: signupPassword,
+        phoneNumber: signupPhone.trim(),
+        gradeLevel: selectedGrade,
       });
 
-      if (res.success && res.token && res.user) {
-        api.token.set(res.token);
-        api.user.set(res.user);
-        setCurrentRole("student");
-        addToast({
-          type: "success",
-          title: "Student Account Created!",
-          message: `Welcome, ${signupName || "Student"}! Your Student learning portal has been initialized.`
-        });
+      if (res.success) {
         onSuccess();
       } else {
         addToast({
@@ -91,6 +103,24 @@ export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
             placeholder="e.g. Alex Morgan"
             className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium"
           />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs font-bold text-slate-700 block mb-1">Select Enrolled Grade *</label>
+        <div className="relative">
+          <GraduationCap className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <select
+            required
+            value={selectedGrade}
+            onChange={(e) => setSelectedGrade(e.target.value)}
+            className="w-full h-10 pl-9 pr-9 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium appearance-none cursor-pointer"
+          >
+            {GRADE_OPTIONS.map((g) => (
+              <option key={g} value={g}>{g}</option>
+            ))}
+          </select>
+          <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
       </div>
 

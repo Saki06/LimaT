@@ -2,61 +2,6 @@ import { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
-/**
- * Helper to ensure initial realistic school announcements exist
- */
-const ensureDefaultAnnouncements = async (tenantId: string) => {
-  const count = await prisma.announcement.count({
-    where: { tenantId },
-  });
-
-  if (count <= 1) {
-    const defaults = [
-      {
-        title: 'Final Term Examination Timetable & Admission Card Release',
-        content: 'Official timetable for the 2026 G.C.E. A/L and Term Examinations has been published. All eligible students must download and print their certified Examination Hall Tickets from the portal before November 10th.',
-        targetRole: 'STUDENT' as const,
-        isPinned: true,
-      },
-      {
-        title: 'Special School Holiday Notice: National Cultural Festival',
-        content: 'Please note that the institution and physical campus will remain closed on Friday for the National Cultural Holiday. Online study materials, recorded masterclasses, and past paper repository remain accessible 24/7.',
-        targetRole: 'STUDENT' as const,
-        isPinned: true,
-      },
-      {
-        title: 'Annual Inter-House Athletic Meet & Track Squad Trials',
-        content: 'Selection trials for the Senior Track & Field squad will take place this Saturday at the Sports Complex ground. Interested students must complete online registration via the My Sports portal tab.',
-        targetRole: 'STUDENT' as const,
-        isPinned: false,
-      },
-      {
-        title: 'A/L Combined Mathematics & Physics Revision Masterclasses',
-        content: 'Special evening live broadcast sessions covering high-weightage Mechanics and Electricity modules will be hosted by department chairs starting this Wednesday. Check Live Video Schedule for direct join links.',
-        targetRole: 'STUDENT' as const,
-        isPinned: false,
-      },
-      {
-        title: 'Library Portal Update: 2020-2025 Past Papers Archive Added',
-        content: 'Over 150 certified provincial and national past papers with marking schemes have been indexed in the Study Resource Library. Accessible for offline review by all enrolled students.',
-        targetRole: 'STUDENT' as const,
-        isPinned: false,
-      },
-    ];
-
-    for (const item of defaults) {
-      await prisma.announcement.create({
-        data: {
-          tenantId,
-          title: item.title,
-          content: item.content,
-          targetRole: item.targetRole,
-          isPinned: item.isPinned,
-        },
-      });
-    }
-  }
-};
 
 /**
  * 1. Get All Announcements (Filtered by Role & Search)
@@ -72,43 +17,42 @@ export const getAnnouncements = async (
     const audience = req.query.audience ? String(req.query.audience).trim().toLowerCase() : 'all';
     const role = req.query.role ? String(req.query.role).toUpperCase() : undefined;
 
-    // Get default or first tenant
-    const tenant = await prisma.tenant.findFirst();
-    const tenantId = tenant?.id || '';
+    const authReq = req as AuthenticatedRequest;
+    const requestedTenantId = req.query.tenantId ? String(req.query.tenantId).trim() : undefined;
+    const userTenantId = authReq.user?.tenantId;
+    let tenantId = requestedTenantId || userTenantId;
 
-    if (tenantId) {
-      await ensureDefaultAnnouncements(tenantId);
+    if (!tenantId && authReq.user?.role !== 'SUPER_ADMIN') {
+      const firstTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+      tenantId = firstTenant?.id;
     }
 
-    const whereClause: any = {};
+    const andConditions: any[] = [];
     if (tenantId) {
-      whereClause.tenantId = tenantId;
+      andConditions.push({ tenantId });
     }
 
     // Role filtering: Students see STUDENT or null (platform-wide)
     if (role === 'STUDENT') {
-      whereClause.OR = [
-        { targetRole: 'STUDENT' },
-        { targetRole: null },
-      ];
+      andConditions.push({
+        OR: [{ targetRole: 'STUDENT' }, { targetRole: null }],
+      });
     } else if (role && role !== 'ALL') {
-      whereClause.OR = [
-        { targetRole: role as any },
-        { targetRole: null },
-      ];
+      andConditions.push({
+        OR: [{ targetRole: role as any }, { targetRole: null }],
+      });
     }
 
     if (search) {
-      whereClause.AND = [
-        ...(whereClause.AND || []),
-        {
-          OR: [
-            { title: { contains: search, mode: 'insensitive' } },
-            { content: { contains: search, mode: 'insensitive' } },
-          ],
-        },
-      ];
+      andConditions.push({
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { content: { contains: search, mode: 'insensitive' } },
+        ],
+      });
     }
+
+    const whereClause: any = andConditions.length > 0 ? { AND: andConditions } : {};
 
     const records = await prisma.announcement.findMany({
       where: whereClause,
@@ -118,11 +62,138 @@ export const getAnnouncements = async (
       ],
     });
 
-    const formatted = records.map((a) => {
-      let targetAudience = 'Platform-Wide (Everyone)';
-      if (a.targetRole === 'STUDENT') targetAudience = 'Students & Subscribers';
-      else if (a.targetRole === 'TEACHER') targetAudience = 'Tutors & Coaches';
-      else if (a.targetRole === 'PARENT') targetAudience = 'Parents & Guardians';
+    const userRole = authReq.user?.role;
+    const userId = authReq.user?.userId;
+
+    let studentEnrolledTeacherNames: string[] = [];
+    let studentEnrolledBatchTitles: string[] = [];
+    let studentGradeNumber: string | null = null;
+
+    if (userRole === 'STUDENT' && userId) {
+      try {
+        const studentProfile = await prisma.studentProfile.findUnique({
+          where: { userId },
+          include: {
+            enrollments: {
+              include: {
+                course: {
+                  include: {
+                    teacher: {
+                      include: {
+                        user: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            packageSubscriptions: {
+              where: { status: 'ACTIVE' },
+              include: {
+                package: {
+                  include: {
+                    teacher: {
+                      include: {
+                        user: true,
+                      },
+                    },
+                    courses: {
+                      include: {
+                        course: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (studentProfile) {
+          const gradeMatch = (studentProfile.gradeLevel || '').match(/\d+/);
+          studentGradeNumber = gradeMatch ? gradeMatch[0] : null;
+
+          studentProfile.enrollments?.forEach((e: any) => {
+            if (e.course?.teacher?.user) {
+              const u = e.course.teacher.user;
+              if (u.firstName) studentEnrolledTeacherNames.push(u.firstName.toLowerCase());
+              if (u.lastName) studentEnrolledTeacherNames.push(u.lastName.toLowerCase());
+              studentEnrolledTeacherNames.push(`${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase());
+            }
+            if (e.course?.title) {
+              studentEnrolledBatchTitles.push(e.course.title.toLowerCase());
+            }
+          });
+
+          studentProfile.packageSubscriptions?.forEach((sub: any) => {
+            if (sub.package?.teacher?.user) {
+              const u = sub.package.teacher.user;
+              if (u.firstName) studentEnrolledTeacherNames.push(u.firstName.toLowerCase());
+              if (u.lastName) studentEnrolledTeacherNames.push(u.lastName.toLowerCase());
+              studentEnrolledTeacherNames.push(`${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase());
+            }
+            if (sub.package?.title) {
+              studentEnrolledBatchTitles.push(sub.package.title.toLowerCase());
+            }
+            sub.package?.courses?.forEach((pc: any) => {
+              if (pc.course?.title) {
+                studentEnrolledBatchTitles.push(pc.course.title.toLowerCase());
+              }
+            });
+          });
+        }
+      } catch (err) {
+        console.warn('Error fetching student enrollment context for announcements:', err);
+      }
+    }
+
+    const eligibleRecords = records.filter((a) => {
+      if (userRole === 'STUDENT') {
+        const authorRole = (a.authorRole || '').toUpperCase();
+        const isFromTeacher =
+          authorRole === 'TEACHER' ||
+          authorRole === 'TUTOR' ||
+          authorRole.includes('TUTOR') ||
+          authorRole.includes('TEACHER');
+        const audienceLower = (a.targetAudience || '').toLowerCase();
+        const titleAndBody = `${a.title} ${a.content}`.toLowerCase();
+
+        // 1. Grade-level filtering: If target audience or announcement explicitly names a grade
+        const gradeMatchInAudience = audienceLower.match(/grade\s*(\d+)/i) || titleAndBody.match(/grade\s*(\d+)/i);
+        if (gradeMatchInAudience && studentGradeNumber) {
+          const targetGradeNum = gradeMatchInAudience[1];
+          if (targetGradeNum !== studentGradeNumber) {
+            return false;
+          }
+        }
+
+        // 2. Teacher notices filtering:
+        if (isFromTeacher) {
+          const author = (a.authorName || '').toLowerCase().trim();
+          const isStudentOfTeacher = studentEnrolledTeacherNames.some(
+            (name) => name && (author.includes(name) || name.includes(author))
+          );
+          const isEnrolledInBatch = studentEnrolledBatchTitles.some(
+            (title) => title && (audienceLower.includes(title) || title.includes(audienceLower))
+          );
+
+          // If the teacher notice is targeted to a batch, course, or "All Enrolled Students":
+          // The student MUST be enrolled with this teacher or enrolled in this batch!
+          if (!isStudentOfTeacher && !isEnrolledInBatch) {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+
+    const formatted = eligibleRecords.map((a) => {
+      let targetAudience = a.targetAudience || 'Platform-Wide (Everyone)';
+      if (!a.targetAudience) {
+        if (a.targetRole === 'STUDENT') targetAudience = 'Students & Subscribers';
+        else if (a.targetRole === 'TEACHER') targetAudience = 'Tutors & Coaches';
+        else if (a.targetRole === 'PARENT') targetAudience = 'Parents & Guardians';
+      }
 
       const priorityVal: 'normal' | 'high' | 'urgent' = a.isPinned ? 'urgent' : 'normal';
 
@@ -132,8 +203,8 @@ export const getAnnouncements = async (
         message: a.content,
         publishedAt: a.createdAt.toISOString().split('T')[0],
         createdAt: a.createdAt.toISOString(),
-        authorName: "Principal's Office & Academic Directorate",
-        authorRole: 'Administration',
+        authorName: a.authorName || 'Tutor Desk',
+        authorRole: a.authorRole || 'Tutor',
         targetAudience,
         targetRole: a.targetRole,
         priority: priorityVal,
@@ -186,10 +257,12 @@ export const getAnnouncementById = async (
       return;
     }
 
-    let targetAudience = 'Platform-Wide (Everyone)';
-    if (a.targetRole === 'STUDENT') targetAudience = 'Students & Subscribers';
-    else if (a.targetRole === 'TEACHER') targetAudience = 'Tutors & Coaches';
-    else if (a.targetRole === 'PARENT') targetAudience = 'Parents & Guardians';
+    let targetAudience = a.targetAudience || 'Platform-Wide (Everyone)';
+    if (!a.targetAudience) {
+      if (a.targetRole === 'STUDENT') targetAudience = 'Students & Subscribers';
+      else if (a.targetRole === 'TEACHER') targetAudience = 'Tutors & Coaches';
+      else if (a.targetRole === 'PARENT') targetAudience = 'Parents & Guardians';
+    }
 
     res.status(200).json({
       success: true,
@@ -198,8 +271,8 @@ export const getAnnouncementById = async (
         title: a.title,
         message: a.content,
         publishedAt: a.createdAt.toISOString().split('T')[0],
-        authorName: "Principal's Office & Academic Directorate",
-        authorRole: 'Administration',
+        authorName: a.authorName || 'Tutor Desk',
+        authorRole: a.authorRole || 'Tutor',
         targetAudience,
         targetRole: a.targetRole,
         priority: a.isPinned ? 'urgent' : 'normal',
@@ -238,11 +311,32 @@ export const createAnnouncement = async (
 
     let targetRole: any = null;
     const audienceStr = String(targetAudience || '').toLowerCase();
-    if (audienceStr.includes('student')) targetRole = 'STUDENT';
-    else if (audienceStr.includes('tutor') || audienceStr.includes('teacher')) targetRole = 'TEACHER';
-    else if (audienceStr.includes('parent')) targetRole = 'PARENT';
+    if (
+      audienceStr.includes('student') ||
+      audienceStr.includes('batch') ||
+      audienceStr.includes('grade') ||
+      audienceStr.includes('class') ||
+      audienceStr.includes('revision') ||
+      audienceStr.includes('masterclass')
+    ) {
+      targetRole = 'STUDENT';
+    } else if (audienceStr.includes('tutor') || audienceStr.includes('teacher') || audienceStr.includes('coach')) {
+      targetRole = 'TEACHER';
+    } else if (audienceStr.includes('parent')) {
+      targetRole = 'PARENT';
+    } else if (req.user?.role === 'TEACHER') {
+      targetRole = 'STUDENT';
+    }
 
     const pinned = Boolean(isPinned || priority === 'urgent');
+    const userRole = req.user?.role || 'TEACHER';
+    let authorName = req.body.authorName;
+    if (!authorName && req.user?.userId) {
+      const u = await prisma.user.findUnique({ where: { id: req.user.userId } });
+      if (u) authorName = `${u.firstName || ''} ${u.lastName || ''}`.trim();
+    }
+    if (!authorName) authorName = 'Tutor';
+    const authorRole = req.body.authorRole || (userRole === 'TEACHER' ? 'Tutor' : userRole);
 
     const created = await prisma.announcement.create({
       data: {
@@ -251,6 +345,10 @@ export const createAnnouncement = async (
         content: message || content,
         targetRole,
         isPinned: pinned,
+        authorName,
+        authorRole,
+        priority: pinned ? 'urgent' : (priority || 'normal'),
+        targetAudience: targetAudience || 'Platform-Wide (Everyone)',
       },
     });
 
@@ -262,10 +360,10 @@ export const createAnnouncement = async (
         title: created.title,
         message: created.content,
         publishedAt: created.createdAt.toISOString().split('T')[0],
-        authorName: req.user ? `${req.user.role} Office` : "Principal's Office",
-        authorRole: req.user?.role || 'ADMIN',
-        targetAudience: targetAudience || 'Platform-Wide (Everyone)',
-        priority: pinned ? 'urgent' : 'normal',
+        authorName: created.authorName || authorName,
+        authorRole: created.authorRole || authorRole,
+        targetAudience: created.targetAudience || targetAudience || 'Platform-Wide (Everyone)',
+        priority: created.priority || (pinned ? 'urgent' : 'normal'),
         isPinned: created.isPinned,
       },
     });
@@ -285,7 +383,7 @@ export const updateAnnouncement = async (
 ): Promise<void> => {
   try {
     const id = String(req.params.id);
-    const { title, message, content, targetAudience, priority, isPinned } = req.body;
+    const { title, message, content, targetAudience, priority, isPinned, authorName, authorRole } = req.body;
 
     const existing = await prisma.announcement.findUnique({ where: { id } });
     if (!existing) {
@@ -307,10 +405,14 @@ export const updateAnnouncement = async (
     const updated = await prisma.announcement.update({
       where: { id },
       data: {
-        ...(title ? { title } : {}),
-        ...(message || content ? { content: message || content } : {}),
-        targetRole,
-        isPinned: pinned,
+        ...(title ? { title: title.trim() } : {}),
+        ...(message || content ? { content: (message || content).trim() } : {}),
+        ...(targetRole !== undefined ? { targetRole } : {}),
+        ...(targetAudience ? { targetAudience } : {}),
+        ...(priority ? { priority } : {}),
+        ...(isPinned !== undefined ? { isPinned: pinned } : {}),
+        ...(authorName ? { authorName } : {}),
+        ...(authorRole ? { authorRole } : {}),
       },
     });
 
@@ -322,10 +424,10 @@ export const updateAnnouncement = async (
         title: updated.title,
         message: updated.content,
         publishedAt: updated.createdAt.toISOString().split('T')[0],
-        authorName: "Principal's Office",
-        authorRole: 'ADMIN',
-        targetAudience: targetAudience || 'Platform-Wide (Everyone)',
-        priority: updated.isPinned ? 'urgent' : 'normal',
+        authorName: updated.authorName || 'Tutor',
+        authorRole: updated.authorRole || 'Tutor',
+        targetAudience: updated.targetAudience || targetAudience || 'Platform-Wide (Everyone)',
+        priority: updated.priority || (updated.isPinned ? 'urgent' : 'normal'),
         isPinned: updated.isPinned,
       },
     });

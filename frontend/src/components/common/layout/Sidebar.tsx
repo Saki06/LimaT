@@ -260,14 +260,6 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
     ...(isFeatureEnabled("batch_management")
       ? [
           {
-            id: "classes",
-            label: "Batches & Attendance",
-            icon: Users,
-            badge: "Active",
-            badgeVariant: "gold" as const,
-            group: "Tutor Operations"
-          },
-          {
             id: "announcements",
             label: "Class Notices & Alerts",
             icon: Bell,

@@ -25,56 +25,42 @@ export function TenantSchools({
   onDeleteTenant,
   onConfigureFeatures
 }: TenantSchoolsProps) {
-  const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredTenants = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return tenants;
+
     return tenants.filter((t) => {
-      const matchSubject =
-        subjectFilter === "all" ||
-        t.name.toLowerCase().includes(subjectFilter.toLowerCase()) ||
-        (t.tagline && t.tagline.toLowerCase().includes(subjectFilter.toLowerCase())) ||
-        t.code.toLowerCase().includes(subjectFilter.toLowerCase());
-      const matchQuery =
-        !searchQuery.trim() ||
-        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.adminName.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchSubject && matchQuery;
+      return (
+        t.name.toLowerCase().includes(query) ||
+        t.code.toLowerCase().includes(query) ||
+        t.adminName.toLowerCase().includes(query) ||
+        (t.tagline && t.tagline.toLowerCase().includes(query)) ||
+        (t.subjects && t.subjects.some((s) => s.toLowerCase().includes(query))) ||
+        (t.courses && t.courses.some((c) => c.toLowerCase().includes(query)))
+      );
     });
-  }, [tenants, subjectFilter, searchQuery]);
+  }, [tenants, searchQuery]);
 
   return (
     <div className="space-y-4">
-      {/* Subject Stream Filter & Search */}
+      {/* Search & Overview Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-[#e6ece8] shadow-2xs">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-          {[
-            { key: "all", label: "👨‍🏫 All Tutors" },
-            { key: "maths", label: "📐 Combined Maths" },
-            { key: "phys", label: "⚡ Physics" },
-            { key: "chem", label: "🧪 Chemistry" },
-            { key: "commerce", label: "📊 Commerce & Accounts" }
-          ].map((sub) => (
-            <button
-              key={sub.key}
-              onClick={() => setSubjectFilter(sub.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                subjectFilter === sub.key
-                  ? "bg-[#0d5c4d] text-white shadow-xs"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              {sub.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-[#0d5c4d] text-white shadow-xs">
+            👨‍🏫 All Tutors
+            <span className="px-2 py-0.5 rounded-full bg-white/20 text-[11px] font-black text-white">
+              {tenants.length}
+            </span>
+          </span>
         </div>
 
         <div className="relative w-full sm:w-72">
           <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search institution, code, admin..."
+            placeholder="Search institution, code, admin, subject..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#0d5c4d] focus:bg-white transition-all"
@@ -82,8 +68,36 @@ export function TenantSchools({
         </div>
       </div>
 
-      {/* Tenants Cards Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Empty State when no tutors match */}
+      {filteredTenants.length === 0 ? (
+        <div className="p-12 text-center rounded-2xl border-2 border-dashed border-slate-200 bg-white shadow-2xs space-y-3">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-2xl">
+            🔍
+          </div>
+          <h4 className="text-base font-black text-slate-800">
+            No Tutors Found
+          </h4>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            {searchQuery
+              ? `No educational studios or tutors matched "${searchQuery}". Try another name, code, or subject.`
+              : "No educational studios or tutors registered yet."}
+          </p>
+          {searchQuery && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchQuery("")}
+                className="text-xs font-bold border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                Clear Search
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Tenants Cards Grid */
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredTenants.map((tenant) => {
           const enabledModulesCount = HIERARCHICAL_MODULES.filter((m) => tenant.enabledFeatures[m.key]).length;
           const isSimulated = tenant.id === activeTenantId;
@@ -127,6 +141,21 @@ export function TenantSchools({
 
                       <h3 className="text-base font-black text-[#0d2b26] mt-1">{tenant.name}</h3>
                       {tenant.tagline && <p className="text-xs text-slate-500 italic">&ldquo;{tenant.tagline}&rdquo;</p>}
+
+                      {tenant.subjects && tenant.subjects.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {tenant.subjects.slice(0, 3).map((sub, idx) => (
+                            <span key={idx} className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                              📚 {sub}
+                            </span>
+                          ))}
+                          {tenant.subjects.length > 3 && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                              +{tenant.subjects.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
@@ -224,6 +253,7 @@ export function TenantSchools({
           );
         })}
       </div>
+      )}
     </div>
   );
 }

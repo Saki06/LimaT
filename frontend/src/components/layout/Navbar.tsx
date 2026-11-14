@@ -6,9 +6,6 @@ import {
   Bell,
   Search,
   Menu,
-  GraduationCap,
-  School,
-  Shield,
   Sparkles,
   ChevronDown,
   X,
@@ -22,26 +19,10 @@ import { Modal } from "@/components/ui/modal";
 import { Announcement } from "@/types/lms";
 
 export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () => void }) {
-  const { currentRole, currentUser, t, announcements, setCurrentView, setIsLanding, logoutUser } = useApp();
+  const { currentRole, currentUser, t, announcements, setCurrentView, setIsLanding, setLandingPortal, logoutUser } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const [selectedAnnouncementModal, setSelectedAnnouncementModal] = useState<Announcement | null>(null);
-
-  const roleBadgeColor = {
-    student: "bg-[#ecf8f5] text-[#0d5c4d] border-[#c4e9e0]",
-    teacher: "bg-[#fef7e6] text-[#b47a16] border-[#fde4af]",
-    admin: "bg-slate-100 text-slate-800 border-slate-200",
-    super_admin: "bg-amber-100 text-amber-950 border-amber-300 font-black",
-    parent: "bg-indigo-50 text-indigo-700 border-indigo-200 font-bold"
-  }[currentRole] || "bg-slate-100 text-slate-800 border-slate-200";
-
-  const roleIcon = {
-    student: <GraduationCap className="h-4 w-4" />,
-    teacher: <School className="h-4 w-4" />,
-    admin: <Shield className="h-4 w-4" />,
-    super_admin: <span className="text-xs">👑</span>,
-    parent: <span className="text-xs">👨‍👩‍👧</span>
-  }[currentRole] || <Shield className="h-4 w-4" />;
 
   const { activeTenant } = useApp();
 
@@ -56,10 +37,14 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
           <Menu className="h-5 w-5" />
         </button>
 
-        {/* Newtoz Brand & Tozy Winged Mascot */}
+        {/* Newtoz Brand & Tozy Winged Mascot - Click to All Portals Landing */}
         <div
-          onClick={() => setCurrentView("dashboard")}
+          onClick={() => {
+            setIsLanding(true);
+            setLandingPortal("gateway");
+          }}
           className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group min-w-0"
+          title="Return to All Portals (Landing Page)"
         >
           {/* Tozy Winged Mascot Logo */}
           <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm group-hover:scale-105 transition-all shrink-0 ring-2 ring-emerald-500/20">
@@ -95,12 +80,6 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
 
       {/* Right controls */}
       <div className="flex items-center gap-3">
-        {/* Active Role Pill */}
-        <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${roleBadgeColor}`}>
-          {roleIcon}
-          <span className="capitalize">{currentRole} Portal</span>
-        </div>
-
         {/* Notifications */}
         <div className="relative">
           <button
@@ -209,8 +188,16 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
           className="flex items-center gap-2.5 pl-3 border-l border-slate-200 group cursor-pointer text-left focus:outline-none"
           title="View & Edit Profile"
         >
-          <div className="h-9 w-9 rounded-xl bg-[#0d5c4d] group-hover:bg-[#0a473b] group-hover:scale-105 flex items-center justify-center font-bold text-xs text-white shadow-sm transition-all ring-2 ring-transparent group-hover:ring-[#0d5c4d]/20">
-            {currentUser.name.charAt(0)}
+          <div className="h-9 w-9 rounded-xl bg-[#0d5c4d] group-hover:bg-[#0a473b] group-hover:scale-105 flex items-center justify-center font-bold text-xs text-white shadow-sm transition-all ring-2 ring-transparent group-hover:ring-[#0d5c4d]/20 overflow-hidden shrink-0">
+            {currentUser.avatar ? (
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              currentUser.name ? currentUser.name.charAt(0).toUpperCase() : "U"
+            )}
           </div>
           <div className="hidden lg:block text-left">
             <p className="text-xs font-bold text-slate-900 group-hover:text-[#0d5c4d] transition-colors leading-none">

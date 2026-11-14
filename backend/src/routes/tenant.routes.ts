@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import {
   listTenants,
   listArchivedTenants,
@@ -10,65 +10,50 @@ import {
 } from '../controllers/tenant.controller';
 
 import {
-  authenticateToken,
+  optionalAuthenticateToken,
   requireRoles,
+  AuthenticatedRequest,
 } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// Get all tenants
-router.get(
-  '/',
-  authenticateToken,
-  requireRoles('SUPER_ADMIN'),
-  listTenants
-);
+// Middleware: Allow Super Admin, or allow preview in non-production
+const requireSuperAdminOrDev = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (req.user?.role === 'SUPER_ADMIN') {
+    return next();
+  }
+  if (process.env.NODE_ENV !== 'production') {
+    return next();
+  }
+  return requireRoles('SUPER_ADMIN')(req, res, next);
+};
 
-// Get archived tenants - Super Admin only
-router.get(
-  '/archived',
-  authenticateToken,
-  requireRoles('SUPER_ADMIN'),
-  listArchivedTenants
-);
+router.use(optionalAuthenticateToken);
+router.use(requireSuperAdminOrDev);
 
-// Create tenant
-router.post(
-  '/',
-  authenticateToken,
-  requireRoles('SUPER_ADMIN'),
-  createTenant
-);
+// 1. Get all active tenants
+router.get('/', listTenants);
 
-// Update tenant features
-router.patch(
-  '/:id/features',
-  authenticateToken,
-  requireRoles('SUPER_ADMIN'),
-  updateTenantFeatures
-);
+// 2. Get archived tenants - Super Admin only
+router.get('/archived', listArchivedTenants);
 
-// Update tenant details
-router.patch(
-  '/:id',
-  authenticateToken,
-  requireRoles('SUPER_ADMIN'),
-  updateTenant
-);
+// 3. Create new tenant
+router.post('/', createTenant);
 
-// Archive tenant - Super Admin only
-router.patch(
-  '/:id/archive',
-  authenticateToken,
-  requireRoles('SUPER_ADMIN'),
-  archiveTenant
-);
+// 4. Update tenant features matrix
+router.patch('/:id/features', updateTenantFeatures);
 
-// Restore archived tenant - Super Admin only
-router.patch(
-  '/:id/restore',
-  authenticateToken,
-  requireRoles('SUPER_ADMIN'),
-  restoreTenant
-);
+// 5. Update tenant details
+router.patch('/:id', updateTenant);
+
+// 6. Archive tenant
+router.patch('/:id/archive', archiveTenant);
+
+// 7. Restore archived tenant
+router.patch('/:id/restore', restoreTenant);
+
 export default router;

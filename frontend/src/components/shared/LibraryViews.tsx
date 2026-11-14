@@ -3,7 +3,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import { LibraryResource, LibraryResourceType } from "@/types/lms";
-import { initialTutorPackages } from "@/data/connectMockData";
 import { api } from "@/lib/api";
 import {
   Library,
@@ -104,7 +103,31 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
 
   // Locked Resource Access Modal & Active Subscriptions for Students
   const [lockedResourceModal, setLockedResourceModal] = useState<LibraryResource | null>(null);
-  const [subscribedPackageIds, setSubscribedPackageIds] = useState<string[]>(["pkg_01"]);
+  const [subscribedPackageIds, setSubscribedPackageIds] = useState<string[]>([]);
+
+  // Load student's active subscriptions to accurately compute lock status
+  useEffect(() => {
+    if (currentRole === "student") {
+      api.students
+        .getMyPackages()
+        .then((res) => {
+          if (res?.success && Array.isArray(res.data)) {
+            const activeIds: string[] = [];
+            res.data.forEach((sub: any) => {
+              if (sub.status === "ACTIVE") {
+                if (sub.packageId) activeIds.push(sub.packageId);
+                if (sub.package?.id) activeIds.push(sub.package.id);
+                if (sub.package?.teacherId) activeIds.push(sub.package.teacherId);
+              }
+            });
+            setSubscribedPackageIds(activeIds);
+          }
+        })
+        .catch((err) => {
+          console.warn("Could not load student packages:", err);
+        });
+    }
+  }, [currentRole]);
 
   // Teacher Upload & Management states
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -136,13 +159,13 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             resourceType: initialTab === "past_papers" ? "PAST_PAPER" : undefined,
           });
         }
-        if (!res || !res.success || !Array.isArray(res.data) || res.data.length === 0) {
+        if (!res || !res.success || !Array.isArray(res.data)) {
           res = await api.resources.getAll({
             resourceType: initialTab === "past_papers" ? "PAST_PAPER" : undefined,
           });
         }
 
-        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res?.success && Array.isArray(res.data)) {
           const mapped: LibraryResource[] = res.data.map((item: any) => ({
             id: item.id,
             title: item.title,
@@ -480,19 +503,19 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 <>
                   <div className="text-center px-2 border-r border-white/20">
                     <p className="text-lg font-bold text-white">
-                      {libraryResources.filter((r) => r.resourceType === "past_paper").length}
+                      {combinedResources.filter((r) => r.resourceType === "past_paper").length}
                     </p>
                     <p className="text-[10px] text-emerald-200">Past Papers</p>
                   </div>
                   <div className="text-center px-2 border-r border-white/20">
                     <p className="text-lg font-bold text-[#f3b738]">
-                      {libraryResources.filter((r) => r.resourceType === "past_paper" && r.examType?.includes("Advanced")).length}
+                      {combinedResources.filter((r) => r.resourceType === "past_paper" && r.examType?.includes("Advanced")).length}
                     </p>
                     <p className="text-[10px] text-emerald-200">G.C.E. A/L</p>
                   </div>
                   <div className="text-center px-2">
                     <p className="text-lg font-bold text-[#86efac]">
-                      {libraryResources.filter((r) => r.resourceType === "past_paper" && r.hasMarkingScheme).length}
+                      {combinedResources.filter((r) => r.resourceType === "past_paper" && r.hasMarkingScheme).length}
                     </p>
                     <p className="text-[10px] text-emerald-200">Marking Schemes</p>
                   </div>
@@ -501,19 +524,19 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 <>
                   <div className="text-center px-2 border-r border-white/20">
                     <p className="text-lg font-bold text-white">
-                      {libraryResources.filter((r) => r.resourceType !== "past_paper").length}
+                      {combinedResources.filter((r) => r.resourceType !== "past_paper").length}
                     </p>
                     <p className="text-[10px] text-emerald-200">Total Items</p>
                   </div>
                   <div className="text-center px-2 border-r border-white/20">
                     <p className="text-lg font-bold text-[#86efac]">
-                      {libraryResources.filter((r) => r.resourceType === "tute").length}
+                      {combinedResources.filter((r) => r.resourceType === "tute").length}
                     </p>
                     <p className="text-[10px] text-emerald-200">Tutes</p>
                   </div>
                   <div className="text-center px-2">
                     <p className="text-lg font-bold text-purple-200">
-                      {libraryResources.filter((r) => r.resourceType === "book").length}
+                      {combinedResources.filter((r) => r.resourceType === "book").length}
                     </p>
                     <p className="text-[10px] text-emerald-200">Books</p>
                   </div>
@@ -693,7 +716,7 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                   Teacher &amp; Author Resource Desk
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Managing learning materials uploaded by <span className="font-semibold text-[#0d5c4d]">{currentUser.name || "Mr. Samantha Perera"}</span> ({myTeacherResources.length} resources)
+                  Managing learning materials uploaded by <span className="font-semibold text-[#0d5c4d]">{currentUser.name || "Tutor"}</span> ({myTeacherResources.length} resources)
                 </p>
               </div>
 
@@ -2229,7 +2252,7 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                   Contents & Chapters
                 </h4>
                 <div className="space-y-1">
-                  {activeReaderResource.sampleContent.map((chapter, idx) => (
+                  {(activeReaderResource.sampleContent || []).map((chapter, idx) => (
                     <button
                       key={idx}
                       onClick={() => setReaderCurrentChapterIndex(idx)}
@@ -2243,6 +2266,9 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                       <p className="text-[10px] opacity-75 font-mono">Page {chapter.pageNumber}</p>
                     </button>
                   ))}
+                  {(!activeReaderResource.sampleContent || activeReaderResource.sampleContent.length === 0) && (
+                    <p className="text-xs text-slate-400 italic p-2">Full reader view active</p>
+                  )}
                 </div>
               </div>
             )}
@@ -2634,13 +2660,33 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             {/* Subscription CTA Action */}
             <div className="space-y-2 pt-1">
               <button
-                onClick={() => {
-                  const pkgId = lockedResourceModal.packageId || lockedResourceModal.teacherId || "pkg_01";
-                  setSubscribedPackageIds((prev) => [...prev, pkgId]);
+                onClick={async () => {
+                  const pkgId = lockedResourceModal.packageId;
+                  if (pkgId) {
+                    try {
+                      const res = await api.students.subscribePackage(pkgId);
+                      if (res?.success) {
+                        setSubscribedPackageIds((prev) => [
+                          ...prev,
+                          pkgId,
+                          lockedResourceModal.teacherId || "",
+                        ]);
+                        addToast({
+                          type: "success",
+                          title: "Package Subscribed! 🎉",
+                          message: `You are now subscribed to ${lockedResourceModal.author}'s package. All exclusive materials are unlocked!`,
+                        });
+                        setLockedResourceModal(null);
+                        return;
+                      }
+                    } catch (e: any) {
+                      console.warn("Direct subscribe error:", e);
+                    }
+                  }
                   addToast({
-                    type: "success",
-                    title: "Package Subscribed! 🎉",
-                    message: `You are now subscribed to ${lockedResourceModal.author}'s package. All exclusive materials are unlocked!`
+                    type: "info",
+                    title: "Subscription Required",
+                    message: `Please subscribe to ${lockedResourceModal.author}'s package to access this exclusive material.`,
                   });
                   setLockedResourceModal(null);
                 }}
@@ -2686,30 +2732,47 @@ function TeacherUploadModal({
     resource?.resourceType || "tute"
   );
   const [subject, setSubject] = useState(resource?.subject || availableSubjects[0] || "Combined Mathematics");
-  const [author, setAuthor] = useState(resource?.author || currentUser.name || "Dr. Sarath Perera");
+  const [author, setAuthor] = useState(resource?.author || currentUser.name || "Educator");
   const [description, setDescription] = useState(resource?.description || "");
   const [topic, setTopic] = useState(resource?.topic || "");
   const [category, setCategory] = useState(resource?.category || "Advanced Level");
   const [fileType, setFileType] = useState(resource?.fileType || "PDF");
   const [fileSize, setFileSize] = useState(resource?.fileSize || "4.5 MB");
   const [visibility, setVisibility] = useState<"public" | "subscribers_only" | "class_only" | "private">(
-    resource?.visibility || "public"
+    resource?.visibility || "subscribers_only"
   );
 
   // Available packages for this tutor
-  const tutorPackages = useMemo(() => {
-    return initialTutorPackages;
-  }, []);
+  const [tutorPackages, setTutorPackages] = useState<any[]>([]);
 
   const [selectedPackageId, setSelectedPackageId] = useState<string>(
-    resource?.packageId || (tutorPackages[0]?.id || "pkg_01")
+    resource?.packageId || ""
   );
   const [selectedPackageName, setSelectedPackageName] = useState<string>(
-    resource?.packageName || (tutorPackages[0]?.title || "A/L Combined Mathematics Full Masterclass")
+    resource?.packageName || ""
   );
   const [selectedPackagePrice, setSelectedPackagePrice] = useState<number>(
-    resource?.packagePrice || (tutorPackages[0]?.monthlyFeeLkr || 3500)
+    resource?.packagePrice || 0
   );
+
+  useEffect(() => {
+    api.packages
+      .getMyPackages()
+      .then((res) => {
+        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+          setTutorPackages(res.data);
+          if (!resource?.packageId) {
+            const first = res.data[0];
+            setSelectedPackageId(first.id);
+            setSelectedPackageName(first.title);
+            setSelectedPackagePrice(first.price || first.monthlyFeeLkr || 0);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch tutor packages:", err);
+      });
+  }, [resource]);
   const [allowDownload, setAllowDownload] = useState<boolean>(
     resource ? resource.allowDownload : true
   );
@@ -3190,7 +3253,7 @@ function TeacherUploadModal({
                   <Globe className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="font-extrabold text-xs">🌐 Public (அனைவருக்கும் பொதுவானது)</p>
+                  <p className="font-extrabold text-xs">🌐 Public</p>
                   <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
                     Available to all students, tutors, and visitors across the academy. Free educational access.
                   </p>
@@ -3211,7 +3274,7 @@ function TeacherUploadModal({
                   <Lock className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="font-extrabold text-xs">🔒 Subscribers Only (சந்தாதாரர்கள் மட்டும்)</p>
+                  <p className="font-extrabold text-xs">🔒 Subscribers Only</p>
                   <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
                     Accessible ONLY to you and students subscribed to your tuition package. Locked for other students.
                   </p>
@@ -3239,16 +3302,20 @@ function TeacherUploadModal({
                     const found = tutorPackages.find((p) => p.id === id);
                     if (found) {
                       setSelectedPackageName(found.title);
-                      setSelectedPackagePrice(found.monthlyFeeLkr);
+                      setSelectedPackagePrice(found.price || found.monthlyFeeLkr || 0);
                     }
                   }}
                   className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                 >
-                  {tutorPackages.map((pkg) => (
-                    <option key={pkg.id} value={pkg.id}>
-                      {pkg.title} — LKR {pkg.monthlyFeeLkr.toLocaleString()} / month ({pkg.subject})
-                    </option>
-                  ))}
+                  {tutorPackages.length === 0 ? (
+                    <option value="">General Teacher Subscription</option>
+                  ) : (
+                    tutorPackages.map((pkg) => (
+                      <option key={pkg.id} value={pkg.id}>
+                        {pkg.title} — LKR {(pkg.price || pkg.monthlyFeeLkr || 0).toLocaleString()} / month {pkg.subject ? `(${pkg.subject})` : ""}
+                      </option>
+                    ))
+                  )}
                 </select>
                 <p className="text-[10px] text-amber-800/80 leading-relaxed">
                   Students without an active monthly subscription to this package will see a "Subscribe to Unlock (LKR {selectedPackagePrice.toLocaleString()})" prompt.

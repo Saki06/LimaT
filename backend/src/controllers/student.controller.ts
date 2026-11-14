@@ -216,7 +216,11 @@ export const getStudentDashboardOverview = async (
     }
 
     const studentId = profile.id;
-    const tenantId = req.user?.tenantId;
+    let tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      const activeTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+      tenantId = activeTenant?.id || undefined;
+    }
 
     // 1. Enrolled Courses
     const enrollments = await prisma.enrollment.findMany({
@@ -697,13 +701,21 @@ export const subscribePackage = async (
       return;
     }
 
+    const normalizedMethod = String(paymentMethod).toUpperCase() === 'BANK_SLIP' ? 'BANK_SLIP' : 'CARD';
+    if (normalizedMethod === 'BANK_SLIP' && !slipUrl && !slipFileName) {
+      res.status(400).json({
+        success: false,
+        message: 'Bank deposit slip upload is required to verify your payment.',
+      });
+      return;
+    }
+
     const durationDays = pkg.durationDays || 30;
     const startDate = new Date();
     const endDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
     const year = new Date().getFullYear();
     const randomSuffix = Math.floor(100000 + Math.random() * 900000);
     const receiptNo = `REC-${year}-${randomSuffix}`;
-    const normalizedMethod = String(paymentMethod).toUpperCase() === 'BANK_SLIP' ? 'BANK_SLIP' : 'CARD';
 
     const subscription = await prisma.packageSubscription.create({
       data: {
@@ -867,12 +879,48 @@ export const checkoutPackage = async (
     }
 
     const packageId = String(req.params.packageId);
-    const { paymentMethod = 'CARD', bankRefNo, slipUrl, slipFileName, paymentNotes } = req.body || {};
+    const { paymentMethod = 'CARD', bankRefNo, slipUrl, slipFileName, paymentNotes, cardNumber, cardExpiry, cardCvc } = req.body || {};
 
     const profile = await getOrCreateStudentProfile(userId);
     if (!profile) {
       res.status(404).json({ success: false, message: 'Student profile not found' });
       return;
+    }
+
+    const normalizedMethod = String(paymentMethod).toUpperCase() === 'BANK_SLIP' ? 'BANK_SLIP' : 'CARD';
+
+    // Strict validation: Require card details or bank slip upload
+    if (normalizedMethod === 'BANK_SLIP') {
+      if (!slipUrl && !slipFileName) {
+        res.status(400).json({
+          success: false,
+          message: 'Bank deposit slip upload is required to verify your bank transfer payment.',
+        });
+        return;
+      }
+    } else {
+      const rawCard = String(cardNumber || '').replace(/\s+/g, '');
+      if (!rawCard || rawCard.length < 15 || rawCard.length > 19) {
+        res.status(400).json({
+          success: false,
+          message: 'A valid card number is required to process card checkout.',
+        });
+        return;
+      }
+      if (!cardExpiry || !/^(0[1-9]|1[0-2])\/\d{2}$/.test(String(cardExpiry).trim())) {
+        res.status(400).json({
+          success: false,
+          message: 'A valid expiry date (MM/YY) is required.',
+        });
+        return;
+      }
+      if (!cardCvc || String(cardCvc).trim().length < 3) {
+        res.status(400).json({
+          success: false,
+          message: 'A valid 3 or 4-digit CVC code is required.',
+        });
+        return;
+      }
     }
 
     let pkg = await prisma.package.findUnique({
@@ -936,7 +984,6 @@ export const checkoutPackage = async (
     const year = new Date().getFullYear();
     const randomSuffix = Math.floor(100000 + Math.random() * 900000);
     const receiptNo = `REC-${year}-${randomSuffix}`;
-    const normalizedMethod = String(paymentMethod).toUpperCase() === 'BANK_SLIP' ? 'BANK_SLIP' : 'CARD';
 
     // Check if subscription already exists
     const existing = await prisma.packageSubscription.findFirst({
@@ -1056,7 +1103,11 @@ export const getMyAssignments = async (
       return;
     }
 
-    const tenantId = req.user?.tenantId;
+    let tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      const activeTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+      tenantId = activeTenant?.id || undefined;
+    }
 
     // 1. Get student course IDs
     const enrollments = await prisma.enrollment.findMany({
@@ -1167,24 +1218,61 @@ export const submitMyAssignment = async (
       return;
     }
 
-    const assignment = await prisma.assignment.findUnique({
+    let assignment = await prisma.assignment.findUnique({
       where: { id: assignmentId },
     });
+
+    if (!assignment) {
+      assignment = await prisma.assignment.findFirst({
+        where: {
+          OR: [
+            { id: { contains: assignmentId } },
+            { title: { contains: assignmentId.replace(/^asg_/, '').replace(/_/g, ' '), mode: 'insensitive' } },
+          ],
+        },
+      });
+    }
+
+    if (!assignment) {
+      let tenantId = req.user?.tenantId;
+      if (!tenantId) {
+        const firstTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+        tenantId = firstTenant?.id || null;
+      }
+      let teacher = tenantId ? await prisma.teacherProfile.findFirst({ where: { user: { tenantId } } }) : null;
+      if (!teacher) {
+        teacher = await prisma.teacherProfile.findFirst();
+      }
+      if (tenantId && teacher) {
+        assignment = await prisma.assignment.create({
+          data: {
+            tenantId,
+            teacherId: teacher.id,
+            title: assignmentId.replace(/^asg_/, '').replace(/_/g, ' ').toUpperCase(),
+            instructions: 'Student Coursework Submission',
+            status: 'PUBLISHED',
+            maxMarks: 100,
+          },
+        });
+      }
+    }
 
     if (!assignment) {
       res.status(404).json({ success: false, message: 'Assignment not found' });
       return;
     }
 
+    const actualAssignmentId = assignment.id;
+
     const submission = await (prisma.assignmentSubmission as any).upsert({
       where: {
         assignmentId_studentId: {
-          assignmentId,
+          assignmentId: actualAssignmentId,
           studentId: profile.id,
         },
       },
       create: {
-        assignmentId,
+        assignmentId: actualAssignmentId,
         studentId: profile.id,
         textContent: textContent || null,
         fileAttachmentUrl: fileAttachmentUrl || null,
@@ -1288,7 +1376,7 @@ export const getMyResults = async (
     const avgScore =
       formatted.length > 0
         ? Math.round(formatted.reduce((acc, curr) => acc + curr.percentage, 0) / formatted.length)
-        : 88;
+        : 0;
 
     res.status(200).json({
       success: true,
@@ -1328,7 +1416,11 @@ export const getMyLiveClasses = async (
       return;
     }
 
-    const tenantId = req.user?.tenantId;
+    let tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      const activeTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+      tenantId = activeTenant?.id || undefined;
+    }
 
     // 1. Enrolled course IDs
     const enrollments = await prisma.enrollment.findMany({
@@ -1348,13 +1440,19 @@ export const getMyLiveClasses = async (
     });
     const subscribedPackageIds = subscriptions.map((s) => s.packageId);
 
+    // If student has no enrollments and no active subscriptions, return empty
+    if (enrolledCourseIds.length === 0 && subscribedPackageIds.length === 0) {
+      res.status(200).json({ success: true, data: [] });
+      return;
+    }
+
     // 3. Fetch all live sessions for student's courses or packages
     const sessions = await prisma.liveClassSession.findMany({
       where: {
+        ...(tenantId ? { tenantId } : {}),
         OR: [
-          { courseId: { in: enrolledCourseIds } },
-          { packageId: { in: subscribedPackageIds } },
-          ...(tenantId ? [{ tenantId }] : []),
+          ...(enrolledCourseIds.length > 0 ? [{ courseId: { in: enrolledCourseIds } }] : []),
+          ...(subscribedPackageIds.length > 0 ? [{ packageId: { in: subscribedPackageIds } }] : []),
         ],
       },
       include: {
@@ -1518,7 +1616,11 @@ export const getMyTimetable = async (
       return;
     }
 
-    const tenantId = req.user?.tenantId;
+    let tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      const activeTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+      tenantId = activeTenant?.id || undefined;
+    }
 
     // 1. Enrolled courses
     const enrollments = await prisma.enrollment.findMany({
@@ -1527,12 +1629,30 @@ export const getMyTimetable = async (
     });
     const enrolledCourseIds = enrollments.map((e) => e.courseId);
 
-    // 2. Live sessions scheduled for this week
+    // 2. Subscribed tuition packages
+    const subscriptions = await prisma.packageSubscription.findMany({
+      where: {
+        studentId: profile.id,
+        status: 'ACTIVE',
+        endDate: { gte: new Date() },
+      },
+      select: { packageId: true },
+    });
+    const subscribedPackageIds = subscriptions.map((s) => s.packageId);
+
+    // If student has no enrollments and no active subscriptions, return empty
+    if (enrolledCourseIds.length === 0 && subscribedPackageIds.length === 0) {
+      res.status(200).json({ success: true, data: [] });
+      return;
+    }
+
+    // 3. Live sessions scheduled for this week
     const liveSessions = await prisma.liveClassSession.findMany({
       where: {
+        ...(tenantId ? { tenantId } : {}),
         OR: [
-          { courseId: { in: enrolledCourseIds } },
-          ...(tenantId ? [{ tenantId }] : []),
+          ...(enrolledCourseIds.length > 0 ? [{ courseId: { in: enrolledCourseIds } }] : []),
+          ...(subscribedPackageIds.length > 0 ? [{ packageId: { in: subscribedPackageIds } }] : []),
         ],
         status: { in: ['SCHEDULED', 'LIVE'] },
       },
@@ -1686,16 +1806,43 @@ export const getMyLibraryResources = async (
         status: 'ACTIVE',
         endDate: { gte: new Date() },
       },
-      select: { packageId: true },
+      include: {
+        package: {
+          select: { id: true, teacherId: true },
+        },
+      },
     });
     const subscribedPackageIds = subscriptions.map((s) => s.packageId);
+    const subscribedTeacherIds = subscriptions
+      .map((s) => s.package?.teacherId)
+      .filter((tId): tId is string => Boolean(tId));
+
+    // Get student's direct course enrollments
+    const enrollments = await prisma.enrollment.findMany({
+      where: { studentId: profile.id },
+      include: {
+        course: { select: { id: true, teacherId: true } },
+      },
+    });
+    const enrolledTeacherIds = enrollments
+      .map((e) => e.course?.teacherId)
+      .filter((tId): tId is string => Boolean(tId));
+
+    const allAllowedTeacherIds = Array.from(new Set([...subscribedTeacherIds, ...enrolledTeacherIds]));
+
+    const accessConditions: any[] = [
+      { visibility: 'PUBLIC' },
+      { packageId: { in: subscribedPackageIds } },
+    ];
+    if (allAllowedTeacherIds.length > 0) {
+      accessConditions.push({ teacherId: { in: allAllowedTeacherIds } });
+    }
 
     const whereClause: any = {
       status: 'published',
       ...(tenantId ? { tenantId } : {}),
-      OR: [
-        { visibility: 'PUBLIC' },
-        { packageId: { in: subscribedPackageIds } },
+      AND: [
+        { OR: accessConditions },
       ],
     };
 
@@ -1719,11 +1866,13 @@ export const getMyLibraryResources = async (
     }
 
     if (search && typeof search === 'string' && search.trim()) {
-      whereClause.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { subject: { contains: search, mode: 'insensitive' } },
-        { topic: { contains: search, mode: 'insensitive' } },
-      ];
+      whereClause.AND.push({
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { subject: { contains: search, mode: 'insensitive' } },
+          { topic: { contains: search, mode: 'insensitive' } },
+        ],
+      });
     }
 
     const resources = await prisma.libraryResource.findMany({

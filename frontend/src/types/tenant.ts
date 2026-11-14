@@ -55,6 +55,8 @@ export interface Tenant {
   address?: string;
   tagline?: string;
   googleMeetLink?: string;
+  subjects?: string[];
+  courses?: string[];
 }
 
 export interface TenantPreset {

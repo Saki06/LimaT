@@ -10,7 +10,7 @@ interface ParentSignupFormProps {
 }
 
 export function ParentSignupForm({ onSuccess }: ParentSignupFormProps) {
-  const { setCurrentRole, addToast } = useApp();
+  const { addToast, registerUser } = useApp();
 
   const [parentTitle, setParentTitle] = useState("Mrs.");
   const [signupName, setSignupName] = useState("");
@@ -56,7 +56,8 @@ export function ParentSignupForm({ onSuccess }: ParentSignupFormProps) {
     setIsLoading(true);
     try {
       const parentEmail = `${parentPhone.replace(/[^0-9]/g, '')}@parent.lms.edu`;
-      const res = await api.auth.registerParent({
+      const res = await registerUser({
+        role: "parent",
         firstName: `${parentTitle} ${signupName}`.trim(),
         email: parentEmail,
         password: signupPassword,
@@ -64,15 +65,7 @@ export function ParentSignupForm({ onSuccess }: ParentSignupFormProps) {
         childStudentId: childPhoneOrId,
       });
 
-      if (res.success && res.token && res.user) {
-        api.token.set(res.token);
-        api.user.set(res.user);
-        setCurrentRole("parent");
-        addToast({
-          type: "success",
-          title: "Guardian Account Registered!",
-          message: `Welcome, ${parentTitle} ${signupName}! Account successfully linked with ${childName}.`
-        });
+      if (res.success) {
         onSuccess();
       } else {
         addToast({

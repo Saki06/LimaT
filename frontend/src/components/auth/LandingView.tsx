@@ -76,7 +76,7 @@ export function LandingView({
   onEnterApp: () => void;
   initialPortal?: PortalType;
 }) {
-  const { setCurrentRole, addToast, schools, t, landingPortal, setLandingPortal, loginUser } = useApp();
+  const { setCurrentRole, addToast, schools, t, landingPortal, setLandingPortal, loginUser, registerUser } = useApp();
 
   // Auto-rotate the student banner image every 3.5 seconds
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -193,7 +193,20 @@ export function LandingView({
     }
   };
 
-  const handle1ClickDemoLogin = (role: SupportedRole) => {
+  const handle1ClickDemoLogin = async (role: SupportedRole) => {
+    const creds = rolePresetCredentials[role];
+    if (creds) {
+      try {
+        const res = await loginUser(creds.email, "password123");
+        if (res.success) {
+          setAuthMode("closed");
+          onEnterApp();
+          return;
+        }
+      } catch {
+        // Fallback below
+      }
+    }
     setCurrentRole(role);
     setAuthMode("closed");
     addToast({
@@ -262,32 +275,25 @@ export function LandingView({
         setAuthMode("closed");
         onEnterApp();
         return;
+      } else {
+        addToast({
+          type: "error",
+          title: "Login Failed",
+          message: res.message || "Invalid credentials. Please verify your email and password."
+        });
+        return;
       }
-    } catch {
-      // ignore
+    } catch (err: any) {
+      addToast({
+        type: "error",
+        title: "Connection Error",
+        message: err?.message || "Failed to reach authentication server."
+      });
+      return;
     }
-
-    // Fallback role switch
-    setCurrentRole(selectedRole);
-    setAuthMode("closed");
-    addToast({
-      type: "success",
-      title: "Login Successful",
-      message:
-        selectedRole === "parent"
-          ? "Welcome to Parent Guardian Desk! Live attendance and fee receipts loaded."
-          : selectedRole === "teacher"
-          ? "Welcome to Tutor Cockpit! Course creator desk loaded."
-          : selectedRole === "super_admin"
-          ? "Welcome to Super Admin Console! Platform master controls loaded."
-          : selectedRole === "admin"
-          ? "Welcome to Admin Operations Desk!"
-          : "Welcome back to Newtoz! Shape Your Future!"
-    });
-    onEnterApp();
   };
 
-  const handleSignupSubmit = (e: React.FormEvent) => {
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (signupPassword && signupConfirmPassword && signupPassword !== signupConfirmPassword) {
       addToast({
@@ -316,6 +322,39 @@ export function LandingView({
         });
         return;
       }
+
+      const nameParts = signupName.trim().split(" ");
+      const firstName = nameParts[0] || "Guardian";
+      const lastName = nameParts.slice(1).join(" ") || parentTitle;
+      const cleanPhone = parentPhone.trim().replace(/[^0-9]/g, "");
+      const email = signupEmail.trim() || `guardian_${cleanPhone || Date.now()}@parent.local`;
+      const pwd = signupPassword.trim() || "password123";
+
+      try {
+        const res = await registerUser({
+          role: "parent",
+          firstName,
+          lastName,
+          email,
+          password: pwd,
+          phoneNumber: parentPhone.trim(),
+          childStudentId: childPhoneOrId.trim()
+        });
+        if (res.success) {
+          setAuthMode("closed");
+          onEnterApp();
+          return;
+        } else if (res.message) {
+          addToast({
+            type: "warning",
+            title: "Registration Note",
+            message: res.message
+          });
+        }
+      } catch {
+        // Fallback gracefully
+      }
+
       setCurrentRole("parent");
       setAuthMode("closed");
       addToast({
@@ -325,6 +364,47 @@ export function LandingView({
       });
       onEnterApp();
       return;
+    }
+
+    // Student / Tutor Registration
+    const nameParts = (signupName.trim() || (selectedRole === "teacher" ? "Master Tutor" : "New Student")).split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(" ");
+    const email = signupEmail.trim();
+    const pwd = signupPassword.trim() || "password123";
+
+    if (email && (selectedRole === "student" || selectedRole === "teacher")) {
+      try {
+        const res = await registerUser({
+          role: selectedRole,
+          firstName,
+          lastName,
+          email,
+          password: pwd,
+          phoneNumber: signupPhone.trim(),
+          gradeLevel: "Grade 10",
+          specialization: selectedRole === "teacher" ? "Science & Mathematics" : undefined
+        });
+        if (res.success) {
+          setAuthMode("closed");
+          onEnterApp();
+          return;
+        } else {
+          addToast({
+            type: "error",
+            title: "Registration Failed",
+            message: res.message || "Could not complete registration. Please check your details and try again."
+          });
+          return;
+        }
+      } catch (err: any) {
+        addToast({
+          type: "error",
+          title: "Registration Error",
+          message: err?.message || "Failed to reach registration server."
+        });
+        return;
+      }
     }
 
     setCurrentRole(selectedRole);
@@ -342,57 +422,6 @@ export function LandingView({
   // =========================================================================
   const renderAuthContent = () => (
     <div className="space-y-4">
-      {/* Active Role Dedicated Badge Header (Hidden on Parent Registration) */}
-      {!(selectedRole === "parent" && authTab === "signup") && (
-        <div className={`p-3 rounded-2xl flex items-center justify-between border ${
-          selectedRole === "student"
-            ? "bg-[#ecf8f5] border-[#c4e9e0] text-[#0d5c4d]"
-            : selectedRole === "parent"
-            ? "bg-[#f0f5fa] border-[#cbdfe8] text-[#1e3a5f]"
-            : selectedRole === "admin"
-            ? "bg-slate-100 border-slate-300 text-slate-800"
-            : selectedRole === "super_admin"
-            ? "bg-slate-900 border-amber-400/40 text-amber-300"
-            : "bg-[#fef7e6] border-[#fde4af] text-[#b47a16]"
-        }`}>
-          <div className="flex items-center gap-2">
-            {selectedRole === "student" ? (
-              <GraduationCap className="h-4 w-4" />
-            ) : selectedRole === "parent" ? (
-              <Users className="h-4 w-4" />
-            ) : selectedRole === "admin" ? (
-              <Shield className="h-4 w-4 text-[#0d5c4d]" />
-            ) : selectedRole === "super_admin" ? (
-              <span className="text-sm">👑</span>
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            <span className="text-xs font-black uppercase tracking-wider">
-              {selectedRole === "student"
-                ? "Student Portal"
-                : selectedRole === "parent"
-                ? "Parent & Guardian Portal"
-                : selectedRole === "admin"
-                ? "Admin Operations"
-                : selectedRole === "super_admin"
-                ? "Super Admin SaaS Console"
-                : "Tutor Cockpit"}
-            </span>
-          </div>
-          <span className="text-[10px] font-bold opacity-75">
-            {selectedRole === "student"
-              ? "Direct Enrollment"
-              : selectedRole === "parent"
-              ? "Fee & Attendance"
-              : selectedRole === "admin"
-              ? "Tuition Desk Administration"
-              : selectedRole === "super_admin"
-              ? "Master Platform Control"
-              : "Course Creator"}
-          </span>
-        </div>
-      )}
-
       {/* Tab Switcher: Sign In vs Create Account */}
       {selectedRole !== "admin" && selectedRole !== "super_admin" ? (
         <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 text-xs font-bold">
@@ -653,7 +682,7 @@ export function LandingView({
                       ? "Admin Desk"
                       : selectedRole === "super_admin"
                       ? "Super Admin Console"
-                      : "Tutor Cockpit"}
+                      : "Teacher Portal"}
                   </span>
                 </button>
               </>
@@ -1042,7 +1071,7 @@ export function LandingView({
                     ? "Parent & Guardian Desk"
                     : selectedRole === "admin"
                     ? "Admin Operations Desk"
-                    : "Tutor Cockpit"}
+                    : "Teacher Portal"}
                 </span>
               </div>
 
@@ -1158,8 +1187,12 @@ export function LandingView({
       {/* ----------------- 1. STUDENT PORTAL NAVIGATION ----------------- */}
       {portalType === "student" && (
         <nav className="h-16 sm:h-20 border-b border-emerald-100/60 bg-[#ebf8f4]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-emerald-500/20">
+          <div
+            onClick={() => setLandingPortal("gateway")}
+            className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-85 transition-opacity"
+            title="Return to All Portals"
+          >
+            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-emerald-500/20 group-hover:scale-105 transition-transform">
               <img
                 src="/images/tozy_icon.jpg"
                 alt="Tozy - Newtoz Mascot"
@@ -1196,8 +1229,12 @@ export function LandingView({
       {/* ----------------- 2. PARENT PORTAL NAVIGATION ----------------- */}
       {portalType === "parent" && (
         <nav className="h-16 sm:h-20 border-b border-sky-100/60 bg-[#f0f6fc]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-sky-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-sky-500/20">
+          <div
+            onClick={() => setLandingPortal("gateway")}
+            className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-85 transition-opacity"
+            title="Return to All Portals"
+          >
+            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-sky-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-sky-500/20 group-hover:scale-105 transition-transform">
               <img
                 src="/images/tozy_icon.jpg"
                 alt="Tozy - Newtoz Mascot"
@@ -1233,8 +1270,12 @@ export function LandingView({
       {/* ----------------- 3. TUTOR / STAFF PORTAL NAVIGATION ----------------- */}
       {portalType === "staff" && (
         <nav className="h-16 sm:h-20 border-b border-amber-200/50 bg-[#fef8eb]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 transition-colors">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-amber-400 via-emerald-300 to-cyan-300 p-0.5 shadow-sm shrink-0 ring-2 ring-amber-500/20">
+          <div
+            onClick={() => setLandingPortal("gateway")}
+            className="flex items-center gap-2.5 sm:gap-3 min-w-0 cursor-pointer group hover:opacity-85 transition-opacity"
+            title="Return to All Portals"
+          >
+            <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-amber-400 via-emerald-300 to-cyan-300 p-0.5 shadow-sm shrink-0 ring-2 ring-amber-500/20 group-hover:scale-105 transition-transform">
               <img
                 src="/images/tozy_icon.jpg"
                 alt="Tozy - Newtoz Mascot"
@@ -2073,21 +2114,21 @@ export function LandingView({
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1 w-full">
                   <button
                     type="button"
-                    onClick={() => handle1ClickDemoLogin("teacher")}
+                    onClick={() => openAuth("signup", "teacher", "drawer")}
                     className="bg-[#b47a16] hover:bg-[#8d5f10] text-white font-black text-sm px-7 py-3.5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto group"
                   >
-                    <Sparkles className="h-4 sm:h-5 w-4 sm:w-5 text-[#fde047]" />
-                    <span>Launch Tutor Cockpit</span>
+                    <UserPlus className="h-4 sm:h-5 w-4 sm:w-5" />
+                    <span>Register as Tutor</span>
                     <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => openAuth("signup", "teacher", "drawer")}
+                    onClick={() => openAuth("login", "teacher", "drawer")}
                     className="bg-white/90 backdrop-blur-xs border-2 border-amber-100 hover:border-[#b47a16] text-slate-800 font-extrabold text-sm px-6 py-3.5 rounded-full shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer w-full sm:w-auto"
                   >
-                    <UserPlus className="h-4 w-4 text-[#b47a16]" />
-                    <span>Register as Tutor</span>
+                    <LogIn className="h-4 w-4 text-[#b47a16]" />
+                    <span>Tutor Sign In</span>
                   </button>
                 </div>
               </div>
@@ -2367,7 +2408,7 @@ export function LandingView({
                       ? "Admin Operations"
                       : selectedRole === "super_admin"
                       ? "Super Admin SaaS Console"
-                      : "Tutor Cockpit"}
+                      : "Teacher Portal"}
                   </p>
                 </div>
               </div>

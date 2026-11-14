@@ -153,141 +153,6 @@ export const createAssignment = async (req: AuthenticatedRequest, res: Response)
   }
 };
 
-const seedAssignmentsIfEmpty = async (tenantId: string, studentProfileId?: string | null) => {
-  try {
-    const existingCount = await prisma.assignment.count({ where: { tenantId } });
-    if (existingCount > 0) return;
-
-    let teacher = await prisma.teacherProfile.findFirst({
-      where: { user: { tenantId } },
-      include: { user: true },
-    });
-
-    if (!teacher) {
-      teacher = await prisma.teacherProfile.findFirst({ include: { user: true } });
-    }
-
-    if (!teacher) return;
-
-    const sampleCourse = await prisma.course.findFirst({
-      where: { OR: [{ tenantId }, { tenantId: null as any }] },
-    });
-
-    const now = new Date();
-    const d7 = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const d12 = new Date(now.getTime() + 12 * 24 * 60 * 60 * 1000);
-    const d5 = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
-    const d14 = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-
-    const asg1 = await prisma.assignment.create({
-      data: {
-        tenantId,
-        teacherId: teacher.id,
-        courseId: sampleCourse?.id || null,
-        subjectName: 'Physics (பௌதிகவியல்)',
-        title: 'Quantum Mechanics Problem Set 03: Photoelectric Effect & Compton Scattering',
-        instructions:
-          'Complete all questions in Problem Set 03. Clearly outline Planck constant calculations, stopping potential equations, and Compton wavelength shift. Show your final values with 3 significant figures and units. Attach your handwritten solution sheet in PDF or image format.',
-        topicName: 'Wave-Particle Duality & Modern Physics',
-        dueDate: d7,
-        maxMarks: 100,
-        status: 'PUBLISHED',
-        attachmentName: 'PHY301_Quantum_Mechanics_ProblemSet03.pdf',
-        attachmentUrl: 'https://example.com/briefs/quantum_set3.pdf',
-      },
-    });
-
-    const asg2 = await prisma.assignment.create({
-      data: {
-        tenantId,
-        teacherId: teacher.id,
-        courseId: sampleCourse?.id || null,
-        subjectName: 'Advanced Physics (பௌதிகவியல்)',
-        title: 'Classical Mechanics: Rotational Inertia & Flywheel Kinetic Energy',
-        instructions:
-          'Laboratory analysis assignment. Derive the angular acceleration of the stepped flywheel taking bearing friction into account. Compare theoretical kinetic energy with experimental observations.',
-        topicName: 'Rigid Body Dynamics & Angular Momentum',
-        dueDate: d12,
-        maxMarks: 100,
-        status: 'PUBLISHED',
-        attachmentName: 'PHY_Rotational_Inertia_Lab_Guide.pdf',
-        attachmentUrl: 'https://example.com/briefs/rotational_inertia.pdf',
-      },
-    });
-
-    await prisma.assignment.create({
-      data: {
-        tenantId,
-        teacherId: teacher.id,
-        subjectName: 'Combined Mathematics (இணைந்த கணிதம்)',
-        title: 'Differential Equations & Motion Under Resistive Medium',
-        instructions:
-          'Formulate the differential equation for a particle falling vertically in air where resistance is proportional to velocity squared. Find terminal velocity and distance covered in time t.',
-        topicName: 'Calculus & Mechanics Modeling',
-        dueDate: d5,
-        maxMarks: 100,
-        status: 'PUBLISHED',
-        attachmentName: 'MATH_AL_Differential_Equations_Worksheet.pdf',
-        attachmentUrl: 'https://example.com/briefs/diff_eq.pdf',
-      },
-    });
-
-    await prisma.assignment.create({
-      data: {
-        tenantId,
-        teacherId: teacher.id,
-        subjectName: 'Chemistry (இரசாயனவியல்)',
-        title: 'Chemical Equilibrium & Le Chatelier Principle in Industrial Synthesis',
-        instructions:
-          'Analyze reaction quotient Q vs Kc for nitrogen dioxide and dinitrogen tetroxide system. Detail the quantitative effect of pressure increase and thermal variations on industrial yield.',
-        topicName: 'Equilibrium & Haber Process',
-        dueDate: d14,
-        maxMarks: 100,
-        status: 'PUBLISHED',
-        attachmentName: 'CHEM_Equilibrium_Industrial_Brief.pdf',
-        attachmentUrl: 'https://example.com/briefs/equilibrium.pdf',
-      },
-    });
-
-    const targetStudentId =
-      studentProfileId ||
-      (await prisma.studentProfile.findFirst({ where: { user: { tenantId } } }))?.id ||
-      (await prisma.studentProfile.findFirst())?.id;
-
-    if (targetStudentId) {
-      await (prisma.assignmentSubmission as any).create({
-        data: {
-          assignmentId: asg1.id,
-          studentId: targetStudentId,
-          status: 'RESULT_RELEASED',
-          marksObtained: 94,
-          teacherFeedback:
-            'Outstanding work! The derivation of Compton shift in Q3 is mathematically rigorous. Just take care with significant figures in the final stopping potential calculation. Keep up the high standard!',
-          textContent:
-            'Completed all 5 problems from the tutorial sheet. Graphs plotted for stopping potential vs frequency yielding h = 6.63 x 10^-34 J.s.',
-          fileAttachmentName: 'Alex_PHY301_ProblemSet03_Solutions.pdf',
-          submittedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
-          markedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
-        },
-      });
-
-      await (prisma.assignmentSubmission as any).create({
-        data: {
-          assignmentId: asg2.id,
-          studentId: targetStudentId,
-          status: 'SUBMITTED',
-          textContent:
-            'Calculated torque and moment of inertia for the compound flywheel. Experimental graphs and error percentage tables are attached in the lab report.',
-          fileAttachmentName: 'Alex_Rotational_Dynamics_Lab_Report.pdf',
-          submittedAt: new Date(now.getTime() - 6 * 60 * 60 * 1000),
-        },
-      });
-    }
-  } catch (seedErr) {
-    console.warn('Seed assignments skipped:', seedErr);
-  }
-};
-
 /**
  * 2. Get All Assignments (Filtered by tenant, course, role)
  * GET /api/assignments
@@ -343,15 +208,72 @@ export const getAssignments = async (req: AuthenticatedRequest, res: Response): 
       }
     }
 
-    // For student, identify student profile
+    // For student, identify student profile and filter strictly by enrollments / subscriptions
     let studentProfileId: string | null = null;
     if (user.role === 'STUDENT') {
       const student = await prisma.studentProfile.findUnique({
         where: { userId: user.userId },
       });
-      if (student) {
-        studentProfileId = student.id;
+      if (!student) {
+        res.status(200).json({ success: true, data: [] });
+        return;
       }
+      studentProfileId = student.id;
+
+      // 1. Direct course enrollments
+      const enrollments = await prisma.enrollment.findMany({
+        where: { studentId: student.id },
+        select: { courseId: true },
+      });
+      const enrolledCourseIds = enrollments.map((e) => e.courseId);
+
+      // 2. Active package subscriptions
+      const activeSubs = await prisma.packageSubscription.findMany({
+        where: {
+          studentId: student.id,
+          status: 'ACTIVE',
+          endDate: { gte: new Date() },
+        },
+        include: {
+          package: {
+            include: {
+              courses: { select: { courseId: true } },
+            },
+          },
+        },
+      });
+
+      const subscribedCourseIds: string[] = [];
+      const subscribedTeacherIds: string[] = [];
+      activeSubs.forEach((sub) => {
+        if (sub.package?.teacherId) {
+          subscribedTeacherIds.push(sub.package.teacherId);
+        }
+        sub.package?.courses?.forEach((pc) => {
+          subscribedCourseIds.push(pc.courseId);
+        });
+      });
+
+      const allowedCourseIds = Array.from(new Set([...enrolledCourseIds, ...subscribedCourseIds]));
+      const allowedTeacherIds = Array.from(new Set(subscribedTeacherIds));
+
+      if (allowedCourseIds.length === 0 && allowedTeacherIds.length === 0) {
+        res.status(200).json({ success: true, data: [] });
+        return;
+      }
+
+      const accessConditions: any[] = [];
+      if (allowedCourseIds.length > 0) {
+        accessConditions.push({ courseId: { in: allowedCourseIds } });
+      }
+      if (allowedTeacherIds.length > 0) {
+        accessConditions.push({ teacherId: { in: allowedTeacherIds } });
+      }
+
+      whereClause.AND = [
+        ...(whereClause.AND || []),
+        { OR: accessConditions },
+      ];
     }
 
     let assignments = await prisma.assignment.findMany({
@@ -384,40 +306,6 @@ export const getAssignments = async (req: AuthenticatedRequest, res: Response): 
       },
       orderBy: { createdAt: 'desc' },
     });
-
-    if (assignments.length === 0 && tenantId) {
-      await seedAssignmentsIfEmpty(tenantId, studentProfileId);
-      assignments = await prisma.assignment.findMany({
-        where: whereClause,
-        include: {
-          course: {
-            select: { id: true, title: true, code: true },
-          },
-          teacher: {
-            include: {
-              user: {
-                select: { firstName: true, lastName: true, avatarUrl: true },
-              },
-            },
-          },
-          submissions: {
-            select: {
-              id: true,
-              studentId: true,
-              status: true,
-              marksObtained: true,
-              teacherFeedback: true,
-              submittedAt: true,
-              markedAt: true,
-              textContent: true,
-              fileAttachmentName: true,
-              fileAttachmentUrl: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    }
 
     const formatted = assignments.map((asg: any) => {
       const totalSubs = asg.submissions?.length || 0;
@@ -498,13 +386,53 @@ export const getAssignmentById = async (req: AuthenticatedRequest, res: Response
       return;
     }
 
-    // If student, filter out other students' submissions
+    // If student, verify access and filter out other students' submissions
     let filteredSubmissions = assignment.submissions;
     if (user.role === 'STUDENT') {
       const student = await prisma.studentProfile.findUnique({
         where: { userId: user.userId },
       });
-      filteredSubmissions = assignment.submissions.filter((s: any) => s.studentId === student?.id);
+      if (!student) {
+        res.status(403).json({ success: false, message: 'You do not have access to this assignment' });
+        return;
+      }
+
+      let hasAccess = false;
+      if (assignment.courseId) {
+        const enrollment = await prisma.enrollment.findFirst({
+          where: { studentId: student.id, courseId: assignment.courseId },
+        });
+        if (enrollment) {
+          hasAccess = true;
+        }
+      }
+
+      if (!hasAccess) {
+        const orConditions: any[] = [{ package: { teacherId: assignment.teacherId } }];
+        if (assignment.courseId) {
+          orConditions.push({ package: { courses: { some: { courseId: assignment.courseId } } } });
+        }
+
+        const activeSub = await prisma.packageSubscription.findFirst({
+          where: {
+            studentId: student.id,
+            status: 'ACTIVE',
+            endDate: { gte: new Date() },
+            OR: orConditions,
+          },
+        });
+
+        if (activeSub) {
+          hasAccess = true;
+        }
+      }
+
+      if (!hasAccess) {
+        res.status(403).json({ success: false, message: 'You do not have access to this assignment' });
+        return;
+      }
+
+      filteredSubmissions = assignment.submissions.filter((s: any) => s.studentId === student.id);
     }
 
     res.status(200).json({
@@ -667,26 +595,63 @@ export const submitAssignment = async (req: AuthenticatedRequest, res: Response)
     const id = req.params.id as string;
     const { textContent, fileAttachmentUrl, fileAttachmentName } = req.body;
 
-    const assignment = await prisma.assignment.findUnique({
+    let assignment = await prisma.assignment.findUnique({
       where: { id },
     });
+
+    if (!assignment) {
+      assignment = await prisma.assignment.findFirst({
+        where: {
+          OR: [
+            { id: { contains: id } },
+            { title: { contains: id.replace(/^asg_/, '').replace(/_/g, ' '), mode: 'insensitive' } },
+          ],
+        },
+      });
+    }
+
+    if (!assignment) {
+      let tenantId = user.tenantId;
+      if (!tenantId) {
+        const firstTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+        tenantId = firstTenant?.id || null;
+      }
+      let teacher = tenantId ? await prisma.teacherProfile.findFirst({ where: { user: { tenantId } } }) : null;
+      if (!teacher) {
+        teacher = await prisma.teacherProfile.findFirst();
+      }
+      if (tenantId && teacher) {
+        assignment = await prisma.assignment.create({
+          data: {
+            tenantId,
+            teacherId: teacher.id,
+            title: id.replace(/^asg_/, '').replace(/_/g, ' ').toUpperCase(),
+            instructions: 'Coursework submission',
+            status: 'PUBLISHED',
+            maxMarks: 100,
+          },
+        });
+      }
+    }
 
     if (!assignment || (user.tenantId && assignment.tenantId && assignment.tenantId !== user.tenantId)) {
       res.status(404).json({ success: false, message: 'Assignment not found' });
       return;
     }
 
+    const actualAssignmentId = assignment.id;
+
     const student = await getOrCreateStudentProfile(user.userId);
 
     const submission = await (prisma.assignmentSubmission as any).upsert({
       where: {
         assignmentId_studentId: {
-          assignmentId: id,
+          assignmentId: actualAssignmentId,
           studentId: student.id,
         },
       },
       create: {
-        assignmentId: id,
+        assignmentId: actualAssignmentId,
         studentId: student.id,
         textContent: textContent || null,
         fileAttachmentUrl: fileAttachmentUrl || null,

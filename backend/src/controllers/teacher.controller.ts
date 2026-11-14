@@ -33,27 +33,25 @@ const getOrCreateTeacherProfile = async (userId: string) => {
   });
 
   if (!profile) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     const employeeNo = `TUTOR-${userId.substring(0, 8).toUpperCase()}`;
     await prisma.teacherProfile.create({
       data: {
         userId,
         employeeNo,
-        specialization: 'Combined Mathematics & Sciences',
-        title: 'Lead Specialist Educator & Department Chair',
-        bio: 'Specialist Educator with over a decade of teaching excellence preparing students for G.C.E. Advanced Level with distinction.',
-        mediums: ['English', 'Sinhala', 'Tamil'],
-        experienceYears: 12,
-        qualifications: [
-          { degree: 'B.Sc. (Hons) in Mathematics', institution: 'University of Colombo', year: '2012', grade: 'First Class' },
-          { degree: 'Postgraduate Diploma in Education (PGDE)', institution: 'University of Peradeniya', year: '2015', grade: 'Distinction' },
-        ],
-        bankName: 'Commercial Bank of Ceylon',
-        bankAccountName: 'Samantha Priyantha Perera',
-        bankAccountNumber: '8004561234',
-        bankBranch: 'Havelock Town',
-        bankBranchCode: '042',
-        rating: 4.9,
-        isVerified: true,
+        specialization: 'General',
+        title: 'Educator & Instructor',
+        bio: '',
+        mediums: ['English'],
+        experienceYears: 0,
+        qualifications: [],
+        bankName: null,
+        bankAccountName: user ? `${user.firstName} ${user.lastName || ''}`.trim() : null,
+        bankAccountNumber: null,
+        bankBranch: null,
+        bankBranchCode: null,
+        rating: 5.0,
+        isVerified: false,
       },
     });
 
@@ -113,6 +111,8 @@ const parseQualificationsField = (raw: any) => {
       accreditations: Array.isArray(raw.accreditations) ? raw.accreditations : [],
       bankAccounts: Array.isArray(raw.bankAccounts) ? raw.bankAccounts : [],
       socialChannels: Array.isArray(raw.socialChannels) ? raw.socialChannels : [],
+      dob: raw.dob || raw.dateOfBirth || '',
+      gender: raw.gender || '',
     };
   }
   return {
@@ -120,6 +120,8 @@ const parseQualificationsField = (raw: any) => {
     accreditations: [],
     bankAccounts: [],
     socialChannels: [],
+    dob: '',
+    gender: '',
   };
 };
 
@@ -162,6 +164,8 @@ export const getMyTeacherProfile = async (req: AuthenticatedRequest, res: Respon
         accreditations: parsedQ.accreditations,
         bankAccounts: parsedQ.bankAccounts,
         socialChannels: parsedQ.socialChannels,
+        dob: parsedQ.dob,
+        gender: parsedQ.gender,
         stats: {
           totalSubscribers,
           monthlyGrossRevenue,
@@ -221,6 +225,8 @@ export const updateMyTeacherProfile = async (req: AuthenticatedRequest, res: Res
       whatsappNumber,
       websiteUrl,
       coverImageUrl,
+      dob,
+      gender,
     } = req.body;
 
     // Ensure teacher profile exists
@@ -255,12 +261,14 @@ export const updateMyTeacherProfile = async (req: AuthenticatedRequest, res: Res
 
     // Merge qualifications object if any extended collection is provided
     let qualificationsPayload: any = undefined;
-    if (qualifications !== undefined || accreditations !== undefined || bankAccounts !== undefined || socialChannels !== undefined) {
+    if (qualifications !== undefined || accreditations !== undefined || bankAccounts !== undefined || socialChannels !== undefined || dob !== undefined || gender !== undefined) {
       qualificationsPayload = {
         degrees: qualifications !== undefined ? (Array.isArray(qualifications) ? qualifications : existingQ.qualifications) : existingQ.qualifications,
         accreditations: accreditations !== undefined ? accreditations : existingQ.accreditations,
         bankAccounts: bankAccounts !== undefined ? bankAccounts : existingQ.bankAccounts,
         socialChannels: socialChannels !== undefined ? socialChannels : existingQ.socialChannels,
+        dob: dob !== undefined ? dob : (existingQ.dob || ''),
+        gender: gender !== undefined ? gender : (existingQ.gender || ''),
       };
     }
 
@@ -357,6 +365,8 @@ export const updateMyTeacherProfile = async (req: AuthenticatedRequest, res: Res
         accreditations: parsedUpdated.accreditations,
         bankAccounts: parsedUpdated.bankAccounts,
         socialChannels: parsedUpdated.socialChannels,
+        dob: parsedUpdated.dob,
+        gender: parsedUpdated.gender,
       },
     });
   } catch (error) {
@@ -556,23 +566,23 @@ export const getTutorsMarketplace = async (req: Request, res: Response): Promise
       const lowestFee =
         t.packages.length > 0
           ? Math.min(...t.packages.map((p) => p.price))
-          : 3500;
+          : 0;
 
       return {
         id: t.id,
         userId: t.userId,
-        name: `${t.user.firstName} ${t.user.lastName}`,
+        name: `${t.user.firstName} ${t.user.lastName}`.trim(),
         email: t.user.email,
         avatarUrl: t.user.avatarUrl,
         title: t.title || 'Specialist Educator',
         specialization: t.specialization,
         bio: t.bio,
-        rating: t.rating || 4.9,
+        rating: null, // Only displayed when real student reviews exist
         isVerified: t.isVerified,
         mediums: t.mediums,
-        experienceYears: t.experienceYears || 5,
-        city: t.city || 'Colombo',
-        district: t.district || 'Colombo',
+        experienceYears: t.experienceYears || 0,
+        city: t.city || '',
+        district: t.district || '',
         coverImageUrl: t.coverImageUrl,
         publicSlug: t.publicSlug,
         youtubeUrl: t.youtubeUrl,
@@ -582,6 +592,10 @@ export const getTutorsMarketplace = async (req: Request, res: Response): Promise
         coursesCount: t._count.courses,
         monthlyFeeLkr: lowestFee,
         packages: t.packages,
+        bankName: t.bankName,
+        bankAccountName: t.bankAccountName,
+        bankAccountNumber: t.bankAccountNumber,
+        bankBranch: t.bankBranch,
       };
     });
 
@@ -634,7 +648,7 @@ export const getMyTeacherDashboard = async (req: AuthenticatedRequest, res: Resp
         ? activeSubscribersCount
         : totalStudentsInTenant > 0
         ? totalStudentsInTenant
-        : 136;
+        : 0;
 
     // 2. Active Batches / Courses
     const coursesCount = await prisma.course.count({
@@ -642,7 +656,7 @@ export const getMyTeacherDashboard = async (req: AuthenticatedRequest, res: Resp
         OR: [{ teacherId }, ...(tenantId ? [{ tenantId }] : [])],
       },
     });
-    const activeBatchesCount = coursesCount > 0 ? coursesCount : teacher.courses?.length || 2;
+    const activeBatchesCount = coursesCount > 0 ? coursesCount : (teacher.courses?.length || 0);
 
     // 3. Pending Reviews (Assignments submissions waiting to be graded)
     const pendingReviewsCount = await (prisma.assignmentSubmission as any).count({
@@ -736,7 +750,7 @@ export const getMyTeacherDashboard = async (req: AuthenticatedRequest, res: Resp
           meetingId: s.meetingId || '',
           passcode: s.passcode || '',
           status: s.status === 'LIVE' ? 'in_progress' : s.status === 'COMPLETED' ? 'completed' : 'upcoming',
-          studentsCount: 35,
+          studentsCount: 0,
         })),
         recentSubmissions: recentSubmissions.map((s: any) => ({
           id: s.id,
