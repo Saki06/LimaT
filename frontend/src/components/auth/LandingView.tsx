@@ -36,6 +36,8 @@ import {
   Phone,
   Heart,
   ChevronRight,
+  ChevronDown,
+  MapPin,
   BarChart3,
   CreditCard,
   Send
@@ -116,6 +118,32 @@ export function LandingView({
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(true);
+  const [studentGrade, setStudentGrade] = useState("");
+  const [studentGender, setStudentGender] = useState("");
+  const [studentMedium, setStudentMedium] = useState("Tamil Medium");
+  const [studentStream, setStudentStream] = useState("");
+  const [studentDistrict, setStudentDistrict] = useState("Jaffna");
+
+  const isStudentAL = studentGrade === "Grade 12 (A/L)" || studentGrade === "Grade 13 (A/L)";
+
+  const isValidSriLankanPhone = (phone: string) => {
+    const cleaned = phone.trim().replace(/[\s-]/g, "");
+    return /^(?:0[1-9]\d{8}|\+94[1-9]\d{8})$/.test(cleaned);
+  };
+
+  const isValidEmailAddress = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(email.trim());
+  };
+
+  const phoneError =
+    signupPhone.trim().length > 0 && !isValidSriLankanPhone(signupPhone)
+      ? "Enter valid 10-digit SL number (e.g. 0771234567)"
+      : "";
+
+  const emailError =
+    signupEmail.trim().length > 0 && !isValidEmailAddress(signupEmail)
+      ? "Enter a valid email (e.g. name@gmail.com)"
+      : "";
 
   // Sri Lankan Parent-Specific Sign In & Registration States
   const [parentLoginMethod, setParentLoginMethod] = useState<"password" | "otp">("password");
@@ -130,6 +158,11 @@ export function LandingView({
   const [childPhoneOrId, setChildPhoneOrId] = useState("");
   const [childBatch, setChildBatch] = useState("2026 A/L Theory (English / Tamil)");
   const [parentConsent, setParentConsent] = useState(true);
+
+  const parentPhoneError =
+    parentPhone.trim().length > 0 && !isValidSriLankanPhone(parentPhone)
+      ? "Enter valid 10-digit SL number (e.g. 0771234567)"
+      : "";
 
   // Pre-fill credentials based on role (Tutor Platform)
   const rolePresetCredentials: Record<SupportedRole, { name: string; email: string; detail: string; school: string }> = {
@@ -270,7 +303,7 @@ export function LandingView({
 
     // Try real backend authentication
     try {
-      const res = await loginUser(loginEmail.trim(), loginPassword);
+      const res = await loginUser(loginEmail.trim().toLowerCase(), loginPassword);
       if (res.success) {
         setAuthMode("closed");
         onEnterApp();
@@ -306,11 +339,27 @@ export function LandingView({
 
     // Role-based Registration Enforcement
     if (selectedRole === "parent") {
-      if (!signupName.trim() || !parentPhone.trim() || !childName.trim() || !childPhoneOrId.trim()) {
+      if (!signupName.trim() || !signupEmail.trim() || !parentPhone.trim() || !childPhoneOrId.trim()) {
         addToast({
           type: "error",
           title: "Missing Required Details",
-          message: "Please fill in Guardian Name, Mobile Number, Student Full Name, and Student WhatsApp/ID."
+          message: "Please fill in Guardian Name, Email Address, Mobile Number, and Student WhatsApp/ID."
+        });
+        return;
+      }
+      if (!isValidEmailAddress(signupEmail)) {
+        addToast({
+          type: "error",
+          title: "Invalid Email Address",
+          message: "Please enter a valid email address (e.g. parent@gmail.com)."
+        });
+        return;
+      }
+      if (!isValidSriLankanPhone(parentPhone)) {
+        addToast({
+          type: "error",
+          title: "Invalid Mobile Number",
+          message: "Please enter a valid 10-digit Sri Lankan mobile number (e.g. 077 123 4567 or +94771234567)."
         });
         return;
       }
@@ -326,8 +375,7 @@ export function LandingView({
       const nameParts = signupName.trim().split(" ");
       const firstName = nameParts[0] || "Guardian";
       const lastName = nameParts.slice(1).join(" ") || parentTitle;
-      const cleanPhone = parentPhone.trim().replace(/[^0-9]/g, "");
-      const email = signupEmail.trim() || `guardian_${cleanPhone || Date.now()}@parent.local`;
+      const email = signupEmail.trim();
       const pwd = signupPassword.trim() || "password123";
 
       try {
@@ -360,13 +408,40 @@ export function LandingView({
       addToast({
         type: "success",
         title: "Guardian Account Registered!",
-        message: `Welcome, ${parentTitle} ${signupName}! Account successfully linked with ${childName}.`
+        message: `Welcome, ${parentTitle} ${signupName}! Account successfully linked with ${childPhoneOrId}.`
       });
       onEnterApp();
       return;
     }
 
     // Student / Tutor Registration
+    if (!isValidSriLankanPhone(signupPhone)) {
+      addToast({
+        type: "error",
+        title: "Invalid Mobile Number",
+        message: "Please enter a valid 10-digit Sri Lankan mobile number (e.g. 077 123 4567 or +94771234567)."
+      });
+      return;
+    }
+
+    if (!isValidEmailAddress(signupEmail)) {
+      addToast({
+        type: "error",
+        title: "Invalid Email Address",
+        message: "Please enter a valid email address (e.g. student@gmail.com)."
+      });
+      return;
+    }
+
+    if (signupPassword.trim().length < 6) {
+      addToast({
+        type: "error",
+        title: "Weak Password",
+        message: "Password must be at least 6 characters long."
+      });
+      return;
+    }
+
     const nameParts = (signupName.trim() || (selectedRole === "teacher" ? "Master Tutor" : "New Student")).split(" ");
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(" ");
@@ -382,7 +457,11 @@ export function LandingView({
           email,
           password: pwd,
           phoneNumber: signupPhone.trim(),
-          gradeLevel: "Grade 10",
+          gradeLevel: selectedRole === "student" ? studentGrade : undefined,
+          section: selectedRole === "student" ? (isStudentAL ? studentStream : studentMedium) : undefined,
+          gender: selectedRole === "student" ? studentGender : undefined,
+          medium: selectedRole === "student" ? studentMedium : undefined,
+          district: selectedRole === "student" ? studentDistrict : undefined,
           specialization: selectedRole === "teacher" ? "Science & Mathematics" : undefined
         });
         if (res.success) {
@@ -463,230 +542,129 @@ export function LandingView({
       {/* -------------------- SIGN IN TAB CONTENT -------------------- */}
       {authTab === "login" && (
         <div className="space-y-4 pt-1">
-          {/* Parent Login Method Switcher */}
-          {selectedRole === "parent" && (
-            <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-100 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => {
-                  setParentLoginMethod("password");
-                  setParentOtpSent(false);
-                }}
-                className={`py-1.5 rounded-lg transition-all cursor-pointer ${
-                  parentLoginMethod === "password"
-                    ? "bg-white text-[#1e3a5f] shadow-2xs font-black"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                Password Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => setParentLoginMethod("otp")}
-                className={`py-1.5 rounded-lg transition-all cursor-pointer ${
-                  parentLoginMethod === "otp"
-                    ? "bg-white text-[#1e3a5f] shadow-2xs font-black"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                SMS OTP Login
-              </button>
-            </div>
-          )}
-
           <form onSubmit={handleLoginSubmit} className="space-y-3">
-            {/* If Parent chose SMS OTP Login */}
-            {selectedRole === "parent" && parentLoginMethod === "otp" ? (
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Registered Mobile Number (Sri Lanka) *
-                  </label>
-                  <div className="relative">
+            {/* Standard Password Login (for Student, Parent, Tutor) */}
+            <>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  {selectedRole === "student"
+                    ? "Student Mobile No or Email"
+                    : selectedRole === "parent"
+                    ? "Parent Mobile No or Email Address"
+                    : selectedRole === "admin"
+                    ? "Admin Email Address"
+                    : selectedRole === "super_admin"
+                    ? "Super Admin Master Email"
+                    : "Tutor Email or Mobile Number"}
+                </label>
+                <div className="relative">
+                  {selectedRole === "parent" ? (
                     <Phone className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="tel"
-                      required
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="e.g. 077 123 4567 or 071 987 6543"
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10 transition-all font-medium"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Enter the mobile phone registered with your child&apos;s tuition class.
-                  </p>
+                  ) : (
+                    <Mail className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  )}
+                  <input
+                    type="text"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder={
+                      selectedRole === "student"
+                        ? "e.g. 077 123 4567 or student@apex.edu"
+                        : selectedRole === "parent"
+                        ? "e.g. 077 123 4567 or parent@apex.edu"
+                        : selectedRole === "admin"
+                        ? "e.g. admin@apex.edu"
+                        : selectedRole === "super_admin"
+                        ? "e.g. superadmin@apex.edu"
+                        : "e.g. teacher@apex.edu or 077 987 6543"
+                    }
+                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
+                  />
                 </div>
-
-                {parentOtpSent ? (
-                  <div className="space-y-2 pt-1 animate-in fade-in duration-200">
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Enter 6-Digit SMS Verification Code *
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      required
-                      value={parentOtpCode}
-                      onChange={(e) => setParentOtpCode(e.target.value)}
-                      placeholder="e.g. 849201"
-                      className="w-full h-11 text-center font-mono text-base tracking-widest font-black rounded-xl bg-white border border-[#cfdeea] text-slate-900 focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/15"
-                    />
-                    <div className="flex justify-between items-center text-[11px] pt-1">
-                      <span className="text-slate-500">Didn&apos;t receive code?</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          addToast({
-                            type: "info",
-                            title: "SMS Re-dispatched",
-                            message: `New OTP sent to ${loginEmail}.`
-                          });
-                        }}
-                        className="font-bold text-[#1e3a5f] hover:underline cursor-pointer"
-                      >
-                        Resend SMS OTP
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                <button
-                  type="submit"
-                  className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-2"
-                >
-                  <LogIn className="h-4 w-4" />
-                  <span>
-                    {parentOtpSent ? "Verify Code & Sign In" : "Send SMS Verification OTP"}
-                  </span>
-                </button>
               </div>
-            ) : (
-              /* Standard Password Login (for Student, Parent, Tutor) */
-              <>
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    {selectedRole === "student"
-                      ? "Student Mobile No or Email"
-                      : selectedRole === "parent"
-                      ? "Parent Mobile No or Email Address"
-                      : selectedRole === "admin"
-                      ? "Admin Email Address"
-                      : selectedRole === "super_admin"
-                      ? "Super Admin Master Email"
-                      : "Tutor Email or Mobile Number"}
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    Password
                   </label>
-                  <div className="relative">
-                    {selectedRole === "parent" ? (
-                      <Phone className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    ) : (
-                      <Mail className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    )}
-                    <input
-                      type="text"
-                      required
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder={
-                        selectedRole === "student"
-                          ? "e.g. 077 123 4567 or student@apex.edu"
-                          : selectedRole === "parent"
-                          ? "e.g. 077 123 4567 or parent@apex.edu"
-                          : selectedRole === "admin"
-                          ? "e.g. admin@apex.edu"
-                          : selectedRole === "super_admin"
-                          ? "e.g. superadmin@apex.edu"
-                          : "e.g. teacher@apex.edu or 077 987 6543"
-                      }
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
-                    />
-                  </div>
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      addToast({
+                        type: "info",
+                        title: "Password Reset Code",
+                        message: "Enter your registered mobile number or email to receive a password reset OTP code."
+                      });
+                    }}
+                    className="text-[11px] font-bold text-[#0d5c4d] hover:underline"
+                  >
+                    Forgot password?
+                  </a>
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold text-slate-700">
-                      Password
-                    </label>
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        addToast({
-                          type: "info",
-                          title: "Password Reset Code",
-                          message: selectedRole === "parent"
-                            ? "Use SMS OTP Login to sign in instantly, or enter your mobile to receive a reset code."
-                            : "Enter your registered mobile number or email to receive a password reset OTP code."
-                        });
-                      }}
-                      className="text-[11px] font-bold text-[#0d5c4d] hover:underline"
-                    >
-                      Forgot password?
-                    </a>
-                  </div>
-                  <div className="relative">
-                    <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="Enter password"
-                      className="w-full h-10 pl-9 pr-10 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="p-1 rounded-md text-slate-400 hover:text-slate-600 absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
+                <div className="relative">
+                  <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Enter password"
+                    className="w-full h-10 pl-9 pr-10 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between pt-0.5 text-xs">
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-600 font-medium select-none">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="rounded text-[#0d5c4d] focus:ring-0"
-                    />
-                    <span>Remember me on this device</span>
-                  </label>
-                </div>
+              <div className="flex items-center justify-between pt-0.5 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer text-slate-600 font-medium select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="rounded text-[#0d5c4d] focus:ring-0"
+                  />
+                  <span>Remember me on this device</span>
+                </label>
+              </div>
 
-                <button
-                  type="submit"
-                  className={`w-full text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1 ${
-                    selectedRole === "parent"
-                      ? "bg-[#1e3a5f] hover:bg-[#152a45]"
-                      : selectedRole === "teacher"
-                      ? "bg-[#b47a16] hover:bg-[#96640f]"
-                      : selectedRole === "admin"
-                      ? "bg-slate-800 hover:bg-slate-900"
-                      : selectedRole === "super_admin"
-                      ? "bg-slate-900 hover:bg-black text-amber-300 border border-amber-400/40"
-                      : "bg-[#0d5c4d] hover:bg-[#083e34]"
-                  }`}
-                >
-                  <LogIn className="h-4 w-4" />
-                  <span>
-                    Sign In to{" "}
-                    {selectedRole === "student"
-                      ? "Student Portal"
-                      : selectedRole === "parent"
-                      ? "Parent Portal"
-                      : selectedRole === "admin"
-                      ? "Admin Desk"
-                      : selectedRole === "super_admin"
-                      ? "Super Admin Console"
-                      : "Teacher Portal"}
-                  </span>
-                </button>
-              </>
-            )}
+              <button
+                type="submit"
+                className={`w-full text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1 ${
+                  selectedRole === "parent"
+                    ? "bg-[#1e3a5f] hover:bg-[#152a45]"
+                    : selectedRole === "teacher"
+                    ? "bg-[#b47a16] hover:bg-[#96640f]"
+                    : selectedRole === "admin"
+                    ? "bg-slate-800 hover:bg-slate-900"
+                    : selectedRole === "super_admin"
+                    ? "bg-slate-900 hover:bg-black text-amber-300 border border-amber-400/40"
+                    : "bg-[#0d5c4d] hover:bg-[#083e34]"
+                }`}
+              >
+                <LogIn className="h-4 w-4" />
+                <span>
+                  Sign In to{" "}
+                  {selectedRole === "student"
+                    ? "Student Portal"
+                    : selectedRole === "parent"
+                    ? "Parent Portal"
+                    : selectedRole === "admin"
+                    ? "Admin Desk"
+                    : selectedRole === "super_admin"
+                    ? "Super Admin Console"
+                    : "Teacher Portal"}
+                </span>
+              </button>
+            </>
           </form>
         </div>
       )}
@@ -699,11 +677,6 @@ export function LandingView({
             <div className="space-y-4">
               {/* SECTION 1: GUARDIAN PERSONAL DETAILS */}
               <div className="space-y-3 pt-1">
-                <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5 text-[#1e3a5f]" />
-                  <span>1. Guardian Information</span>
-                </p>
-
                 {/* Title + Full Name as single unified row */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -761,41 +734,50 @@ export function LandingView({
                       <input
                         type="tel"
                         required
+                        maxLength={15}
                         value={parentPhone}
-                        onChange={(e) => setParentPhone(e.target.value)}
+                        onChange={(e) => setParentPhone(e.target.value.replace(/[^0-9+\s-]/g, ""))}
                         placeholder="e.g. 077 123 4567"
-                        className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10 transition-all font-medium"
+                        className={`w-full h-10 pl-9 pr-3 rounded-xl bg-white border text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all font-medium ${
+                          parentPhoneError
+                            ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                            : "border-slate-200 focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10"
+                        }`}
                       />
                     </div>
+                    {parentPhoneError && (
+                      <p className="text-[10px] font-bold text-rose-600 mt-1">{parentPhoneError}</p>
+                    )}
                   </div>
+                </div>
+                {/* Guardian Email Address */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Email Address *
+                  </label>
+                  <div className="relative">
+                    <Mail className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      value={signupEmail}
+                      onChange={(e) => setSignupEmail(e.target.value)}
+                      placeholder="e.g. parent@gmail.com"
+                      className={`w-full h-10 pl-9 pr-3 rounded-xl bg-white border text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all font-medium ${
+                        emailError
+                          ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                          : "border-slate-200 focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10"
+                      }`}
+                    />
+                  </div>
+                  {emailError && (
+                    <p className="text-[10px] font-bold text-rose-600 mt-1">{emailError}</p>
+                  )}
                 </div>
               </div>
 
               {/* SECTION 2: STUDENT / CHILD TUITION RECORD LINKING */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
-                <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <GraduationCap className="h-3.5 w-3.5 text-[#1e3a5f]" />
-                  <span>2. Student Linking &amp; Verification</span>
-                </p>
-
-                {/* Child Full Name */}
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Child&apos;s Full Name *
-                  </label>
-                  <div className="relative">
-                    <UserIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={childName}
-                      onChange={(e) => setChildName(e.target.value)}
-                      placeholder="e.g. Sathurjan Kaveen"
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
-                    />
-                  </div>
-                </div>
-
                 {/* Student WhatsApp No / Student ID */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -817,10 +799,6 @@ export function LandingView({
 
               {/* SECTION 3: ACCOUNT SECURITY */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
-                <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <Lock className="h-3.5 w-3.5 text-[#1e3a5f]" />
-                  <span>3. Account Security</span>
-                </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
@@ -901,6 +879,171 @@ export function LandingView({
                 </div>
               </div>
 
+              {selectedRole === "student" && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Enrolled Grade *
+                      </label>
+                      <div className="relative">
+                        <GraduationCap className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          required
+                          value={studentGrade}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setStudentGrade(val);
+                            if (val !== "Grade 12 (A/L)" && val !== "Grade 13 (A/L)") {
+                              setStudentStream("");
+                            } else if (!studentStream) {
+                              setStudentStream("Physical Science (Maths)");
+                            }
+                          }}
+                          className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium appearance-none cursor-pointer"
+                        >
+                          <option value="" disabled>Select Grade</option>
+                          {[
+                            "Grade 6",
+                            "Grade 7",
+                            "Grade 8",
+                            "Grade 9",
+                            "Grade 10",
+                            "Grade 11 (O/L)",
+                            "Grade 12 (A/L)",
+                            "Grade 13 (A/L)",
+                          ].map((g) => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Gender *
+                      </label>
+                      <div className="relative">
+                        <UserIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          required
+                          value={studentGender}
+                          onChange={(e) => setStudentGender(e.target.value)}
+                          className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium appearance-none cursor-pointer"
+                        >
+                          <option value="" disabled>Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                        <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {isStudentAL && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        A/L Subject Stream *
+                      </label>
+                      <div className="relative">
+                        <BookOpen className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          required
+                          value={studentStream}
+                          onChange={(e) => setStudentStream(e.target.value)}
+                          className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium appearance-none cursor-pointer"
+                        >
+                          {[
+                            "Physical Science (Maths)",
+                            "Biological Science",
+                            "Commerce",
+                            "Arts",
+                            "Engineering Technology",
+                            "Bio Systems Technology",
+                          ].map((stream) => (
+                            <option key={stream} value={stream}>{stream}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Medium of Study *
+                      </label>
+                      <div className="relative">
+                        <Globe className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          required
+                          value={studentMedium}
+                          onChange={(e) => setStudentMedium(e.target.value)}
+                          className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium appearance-none cursor-pointer"
+                        >
+                          {[
+                            "Tamil Medium",
+                            "English Medium",
+                            "Sinhala Medium",
+                          ].map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        District / City *
+                      </label>
+                      <div className="relative">
+                        <MapPin className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <select
+                          required
+                          value={studentDistrict}
+                          onChange={(e) => setStudentDistrict(e.target.value)}
+                          className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium appearance-none cursor-pointer"
+                        >
+                          {[
+                            "Jaffna",
+                            "Colombo",
+                            "Kandy",
+                            "Batticaloa",
+                            "Vavuniya",
+                            "Kilinochchi",
+                            "Trincomalee",
+                            "Mannar",
+                            "Mullaitivu",
+                            "Gampaha",
+                            "Nuwara Eliya",
+                            "Ampara",
+                            "Puttalam",
+                            "Kurunegala",
+                            "Galle",
+                            "Matara",
+                            "Badulla",
+                            "Ratnapura",
+                            "Anuradhapura",
+                            "Polonnaruwa",
+                            "Kegalle",
+                            "Kalutara",
+                            "Matale",
+                            "Hambantota",
+                            "Monaragala",
+                          ].map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -911,12 +1054,20 @@ export function LandingView({
                     <input
                       type="tel"
                       required
+                      maxLength={15}
                       value={signupPhone}
-                      onChange={(e) => setSignupPhone(e.target.value)}
+                      onChange={(e) => setSignupPhone(e.target.value.replace(/[^0-9+\s-]/g, ""))}
                       placeholder="e.g. 077 123 4567"
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
+                      className={`w-full h-10 pl-9 pr-3 rounded-xl bg-white border text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all font-medium ${
+                        phoneError
+                          ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                          : "border-slate-200 focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      }`}
                     />
                   </div>
+                  {phoneError && (
+                    <p className="text-[10px] font-bold text-rose-600 mt-1">{phoneError}</p>
+                  )}
                 </div>
 
                 <div>
@@ -931,9 +1082,16 @@ export function LandingView({
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
                       placeholder={selectedRole === "teacher" ? "tutor@soloclass.lk" : "student@gmail.com"}
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
+                      className={`w-full h-10 pl-9 pr-3 rounded-xl bg-white border text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all font-medium ${
+                        emailError
+                          ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                          : "border-slate-200 focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10"
+                      }`}
                     />
                   </div>
+                  {emailError && (
+                    <p className="text-[10px] font-bold text-rose-600 mt-1">{emailError}</p>
+                  )}
                 </div>
               </div>
 
@@ -1158,7 +1316,7 @@ export function LandingView({
   // VIEW MODE: STANDARD LANDING PAGE (Student View OR Faculty/Admin View)
   // =========================================================================
   return (
-    <div className={`${portalType === "gateway" ? "h-screen overflow-hidden" : "min-h-screen"} bg-[#fbfcfb] text-[#0d2b26] flex flex-col justify-between selection:bg-[#0d5c4d] selection:text-white`}>
+    <div className="min-h-screen overflow-x-hidden bg-[#fbfcfb] text-[#0d2b26] flex flex-col justify-between selection:bg-[#0d5c4d] selection:text-white">
       {/* ----------------- 0. GATEWAY PORTAL NAVIGATION ----------------- */}
       {portalType === "gateway" && (
         <nav className="h-14 sm:h-16 border-b border-emerald-100/60 bg-[#ebf8f4]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 shrink-0 transition-colors">
@@ -1313,7 +1471,7 @@ export function LandingView({
       {/* Active when portalType === "gateway"                                       */}
       {/* ========================================================================= */}
       {portalType === "gateway" && (
-        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#ebf8f4] via-[#ffffff] to-[#fef8eb] overflow-hidden">
+        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#ebf8f4] via-[#ffffff] to-[#fef8eb] overflow-x-hidden">
           {/* Luminous Ambient Lighting Orbs */}
           <div className="absolute -top-20 -left-20 w-[450px] h-[450px] rounded-full bg-emerald-300/40 blur-3xl pointer-events-none" />
           <div className="absolute -top-16 -right-16 w-[450px] h-[450px] rounded-full bg-[#38bdf8]/30 blur-3xl pointer-events-none" />
@@ -1386,18 +1544,18 @@ export function LandingView({
               </div>
             </div>
 
-            {/* 4 Clean Role Cards: Student, Parent, Tutor & Admin */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 lg:gap-5 my-1.5 sm:my-3 max-w-6xl mx-auto w-full items-stretch">
-              {/* CARD 1: STUDENT */}
-              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+            {/* 4 Clean Role Cards: Row 1 (Student | Tutor), Row 2 (Parent | Admin) on 2-col mobile grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5 my-1.5 sm:my-3 max-w-6xl mx-auto w-full items-stretch">
+              {/* CARD 1 (Row 1, Col 1): STUDENT */}
+              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl transition-all duration-300 p-2.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
                 {/* Tozy Buddy Badge */}
-                <div className="absolute top-2.5 right-2.5 bg-emerald-50 text-[#0d5c4d] text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200/80 flex items-center gap-1">
+                <div className="sm:absolute sm:top-2.5 sm:right-2.5 bg-emerald-50 text-[#0d5c4d] text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200/80 inline-flex items-center gap-1 self-end sm:self-auto">
                   <span>🐘</span>
                   <span>Learn with Tozy</span>
                 </div>
 
                 {/* Brush-Splash Character Illustration */}
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
+                <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
                   <img
                     src="/images/student_brush_portrait.jpg"
                     alt="Student learning with Newtoz"
@@ -1409,63 +1567,29 @@ export function LandingView({
                 <button
                   type="button"
                   onClick={() => handlePortalSwitch("student")}
-                  className="w-full max-w-xs bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
+                  className="w-full max-w-xs bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-xs sm:text-base py-2 sm:py-3 px-3 sm:px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer mt-1.5 group"
                 >
-                  <GraduationCap className="h-4 sm:h-5 w-4 sm:w-5" />
+                  <GraduationCap className="h-3.5 sm:h-5 w-3.5 sm:w-5 shrink-0" />
                   <span>Student</span>
-                  <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="h-3.5 sm:h-4 w-3.5 sm:w-4 ml-0.5 sm:ml-1 group-hover:translate-x-1 transition-transform shrink-0" />
                 </button>
 
                 {/* Subtitle Caption */}
-                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
+                <p className="text-[10px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs leading-snug">
                   Shape your future, learn anytime, fly high!
                 </p>
               </div>
 
-              {/* CARD 2: PARENT */}
-              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-slate-200 hover:border-[#1e3a5f] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+              {/* CARD 2 (Row 1, Col 2): TUTOR */}
+              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-amber-100 hover:border-[#b47a16] shadow-sm hover:shadow-xl transition-all duration-300 p-2.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
                 {/* Tozy Buddy Badge */}
-                <div className="absolute top-2.5 right-2.5 bg-sky-50 text-[#1e3a5f] text-[10px] font-black px-2 py-0.5 rounded-full border border-sky-200/80 flex items-center gap-1">
-                  <span>🐘</span>
-                  <span>Guide with Tozy</span>
-                </div>
-
-                {/* Brush-Splash Character Illustration */}
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
-                  <img
-                    src="/images/parent_brush_portrait.jpg"
-                    alt="Parent reviewing student progress with Newtoz"
-                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
-
-                {/* Pill Button in our Slate Navy Theme (#1e3a5f) */}
-                <button
-                  type="button"
-                  onClick={() => handlePortalSwitch("parent")}
-                  className="w-full max-w-xs bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
-                >
-                  <Users className="h-4 sm:h-5 w-4 sm:w-5" />
-                  <span>Parent</span>
-                  <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
-                </button>
-
-                {/* Subtitle Caption */}
-                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
-                  Support, monitor, be part of their journey.
-                </p>
-              </div>
-
-              {/* CARD 3: TUTOR */}
-              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-amber-100 hover:border-[#b47a16] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
-                {/* Tozy Buddy Badge */}
-                <div className="absolute top-2.5 right-2.5 bg-amber-50 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-200/80 flex items-center gap-1">
+                <div className="sm:absolute sm:top-2.5 sm:right-2.5 bg-amber-50 text-amber-800 text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-200/80 inline-flex items-center gap-1 self-end sm:self-auto">
                   <span>🐘</span>
                   <span>Mentor with Tozy</span>
                 </div>
 
                 {/* Teacher / Educator Character Illustration */}
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
+                <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
                   <img
                     src="/images/tutor_brush_portrait.jpg"
                     alt="Teacher and Tutor educator with Newtoz"
@@ -1477,29 +1601,63 @@ export function LandingView({
                 <button
                   type="button"
                   onClick={() => handlePortalSwitch("staff")}
-                  className="w-full max-w-xs bg-[#b47a16] hover:bg-[#8d5f10] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
+                  className="w-full max-w-xs bg-[#b47a16] hover:bg-[#8d5f10] text-white font-black text-xs sm:text-base py-2 sm:py-3 px-3 sm:px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer mt-1.5 group"
                 >
-                  <BookOpen className="h-4 sm:h-5 w-4 sm:w-5" />
+                  <BookOpen className="h-3.5 sm:h-5 w-3.5 sm:w-5 shrink-0" />
                   <span>Tutor</span>
-                  <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="h-3.5 sm:h-4 w-3.5 sm:w-4 ml-0.5 sm:ml-1 group-hover:translate-x-1 transition-transform shrink-0" />
                 </button>
 
                 {/* Subtitle Caption */}
-                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
-                  Teach, broadcast notices, manage batches & fees.
+                <p className="text-[10px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs leading-snug">
+                  Teach, broadcast notices, manage batches &amp; fees.
                 </p>
               </div>
 
-              {/* CARD 4: ADMIN */}
-              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-slate-200 hover:border-[#1e293b] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+              {/* CARD 3 (Row 2, Col 1): PARENT */}
+              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-slate-200 hover:border-[#1e3a5f] shadow-sm hover:shadow-xl transition-all duration-300 p-2.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
                 {/* Tozy Buddy Badge */}
-                <div className="absolute top-2.5 right-2.5 bg-slate-100 text-slate-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-slate-300/80 flex items-center gap-1">
+                <div className="sm:absolute sm:top-2.5 sm:right-2.5 bg-sky-50 text-[#1e3a5f] text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-sky-200/80 inline-flex items-center gap-1 self-end sm:self-auto">
+                  <span>🐘</span>
+                  <span>Guide with Tozy</span>
+                </div>
+
+                {/* Brush-Splash Character Illustration */}
+                <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
+                  <img
+                    src="/images/parent_brush_portrait.jpg"
+                    alt="Parent reviewing student progress with Newtoz"
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+
+                {/* Pill Button in our Slate Navy Theme (#1e3a5f) */}
+                <button
+                  type="button"
+                  onClick={() => handlePortalSwitch("parent")}
+                  className="w-full max-w-xs bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-xs sm:text-base py-2 sm:py-3 px-3 sm:px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer mt-1.5 group"
+                >
+                  <Users className="h-3.5 sm:h-5 w-3.5 sm:w-5 shrink-0" />
+                  <span>Parent</span>
+                  <ArrowRight className="h-3.5 sm:h-4 w-3.5 sm:w-4 ml-0.5 sm:ml-1 group-hover:translate-x-1 transition-transform shrink-0" />
+                </button>
+
+                {/* Subtitle Caption */}
+                <p className="text-[10px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs leading-snug">
+                  Support, monitor, be part of their journey.
+                </p>
+              </div>
+
+              {/* CARD 4 (Row 2, Col 2): ADMIN */}
+              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-slate-200 hover:border-[#1e293b] shadow-sm hover:shadow-xl transition-all duration-300 p-2.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+                {/* Tozy Buddy Badge */}
+                <div className="sm:absolute sm:top-2.5 sm:right-2.5 bg-slate-100 text-slate-800 text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-slate-300/80 inline-flex items-center gap-1 self-end sm:self-auto">
                   <span>🐘</span>
                   <span>Lead with Tozy</span>
                 </div>
 
                 {/* Administrator Character Illustration */}
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
+                <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
                   <img
                     src="/images/admin_brush_portrait.jpg"
                     alt="School Principal and Administrator with Newtoz"
@@ -1511,16 +1669,16 @@ export function LandingView({
                 <button
                   type="button"
                   onClick={() => openAuth("login", "admin", "drawer")}
-                  className="w-full max-w-xs bg-[#1e293b] hover:bg-[#0f172a] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
+                  className="w-full max-w-xs bg-[#1e293b] hover:bg-[#0f172a] text-white font-black text-xs sm:text-base py-2 sm:py-3 px-3 sm:px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer mt-1.5 group"
                 >
-                  <Shield className="h-4 sm:h-5 w-4 sm:w-5" />
+                  <Shield className="h-3.5 sm:h-5 w-3.5 sm:w-5 shrink-0" />
                   <span>Admin</span>
-                  <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="h-3.5 sm:h-4 w-3.5 sm:w-4 ml-0.5 sm:ml-1 group-hover:translate-x-1 transition-transform shrink-0" />
                 </button>
 
                 {/* Subtitle Caption */}
-                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
-                  Campus governance, school operations & analytics.
+                <p className="text-[10px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs leading-snug">
+                  Campus governance, school operations &amp; analytics.
                 </p>
               </div>
             </div>
@@ -1542,7 +1700,7 @@ export function LandingView({
       {/* Creative, Modern, Atmospheric & Attractive (Inheriting Gateway DNA)     */}
       {/* ========================================================================= */}
       {portalType === "student" && (
-        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#ebf8f4] via-[#ffffff] to-[#fef8eb] overflow-hidden">
+        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#ebf8f4] via-[#ffffff] to-[#fef8eb] overflow-x-hidden">
           {/* Luminous Ambient Lighting Orbs (Same as Gateway) */}
           <div className="absolute -top-24 -left-20 w-[500px] h-[500px] rounded-full bg-emerald-300/35 blur-3xl pointer-events-none" />
           <div className="absolute top-1/4 -right-20 w-[500px] h-[500px] rounded-full bg-[#38bdf8]/25 blur-3xl pointer-events-none" />
@@ -1873,7 +2031,7 @@ export function LandingView({
       {/* Creative, Modern, Atmospheric & Attractive (Inheriting Gateway DNA)     */}
       {/* ========================================================================= */}
       {portalType === "parent" && (
-        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#f0f6fc] via-[#ffffff] to-[#eef5fc] overflow-hidden">
+        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#f0f6fc] via-[#ffffff] to-[#eef5fc] overflow-x-hidden">
           {/* Luminous Ambient Lighting Orbs */}
           <div className="absolute -top-24 -left-20 w-[500px] h-[500px] rounded-full bg-sky-300/35 blur-3xl pointer-events-none" />
           <div className="absolute top-1/4 -right-20 w-[500px] h-[500px] rounded-full bg-indigo-300/25 blur-3xl pointer-events-none" />
@@ -2075,7 +2233,7 @@ export function LandingView({
       {/* Creative, Modern, Atmospheric & Attractive (Inheriting Gateway DNA)     */}
       {/* ========================================================================= */}
       {portalType === "staff" && (
-        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#fef8eb] via-[#ffffff] to-[#ebf8f4] overflow-hidden">
+        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#fef8eb] via-[#ffffff] to-[#ebf8f4] overflow-x-hidden">
           {/* Luminous Ambient Lighting Orbs */}
           <div className="absolute -top-24 -left-20 w-[500px] h-[500px] rounded-full bg-amber-300/35 blur-3xl pointer-events-none" />
           <div className="absolute top-1/4 -right-20 w-[500px] h-[500px] rounded-full bg-emerald-300/30 blur-3xl pointer-events-none" />

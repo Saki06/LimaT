@@ -356,7 +356,6 @@ export function SportsView({
       description: editingTournament.description || "",
     });
   }, [editingTournament]);
-
   // Team states
   const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] =
     useState(false);
@@ -575,7 +574,6 @@ export function SportsView({
 
     setIsScheduleFixtureModalOpen(true);
   };
-
   // Update tournament
   const handleUpdateTournamentSubmit = async (
     e: React.FormEvent

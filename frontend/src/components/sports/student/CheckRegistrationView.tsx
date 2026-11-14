@@ -47,7 +47,7 @@ export function CheckRegistrationView({
     setSearchedRecord(null);
     setLookupError("");
     if (!cleanId || !cleanPhone) {
-      setLookupError("Enter both the registration number and registered mobile number.");
+      setLookupError("Enter your registration number and registered mobile number.");
       return;
     }
 
@@ -59,7 +59,7 @@ export function CheckRegistrationView({
       const rec = records[0];
       const details = (rec.athleteDetails || {}) as Record<string, unknown>;
       const selectedEvents = Array.isArray(details.selectedEvents)
-        ? details.selectedEvents as StoredAthleteRegistration["selectedEvents"]
+        ? (details.selectedEvents as StoredAthleteRegistration["selectedEvents"])
         : records.map((registration) => ({
             id: registration.eventId,
             sportName: registration.event?.sportType || "Sports",
@@ -76,7 +76,7 @@ export function CheckRegistrationView({
       setSearchedRecord({
         id: rec.registrationNumber || rec.id,
         registrationNumber: rec.registrationNumber || cleanId,
-        athleteName: String(details.athleteName || `${details.firstName || ""} ${details.lastName || ""}`).trim(),
+        athleteName: String(details.athleteName || `${details.firstName || ""} ${details.lastName || ""}`).trim() || "Athlete Participant",
         firstName: String(details.firstName || ""),
         lastName: String(details.lastName || ""),
         dob: String(details.dob || ""),
@@ -87,9 +87,9 @@ export function CheckRegistrationView({
         email: String(details.email || ""),
         province: String(details.province || ""),
         district: String(details.district || ""),
-        schoolName: String(details.schoolName || ""),
+        schoolName: String(details.schoolName || "Academy"),
         grade: String(details.grade || ""),
-        sports: Array.isArray(details.sports) ? details.sports.map(String) : [],
+        sports: Array.isArray(details.sports) ? details.sports.map(String) : [rec.event?.sportType || "Sports"],
         selectedEvents,
         isTeamInterest: Boolean(details.isTeamInterest),
         ...(details.teamSquad && typeof details.teamSquad === "object"
@@ -101,7 +101,7 @@ export function CheckRegistrationView({
           : {}),
         ...(typeof details.guardianMobile === "string" ? { guardianMobile: details.guardianMobile } : {}),
         consentTimestamp: rec.createdAt,
-        paymentStatus: rec.paymentStatus as StoredAthleteRegistration["paymentStatus"],
+        paymentStatus: (rec.paymentStatus as StoredAthleteRegistration["paymentStatus"]) || "PAID",
         totalAmount: rec.totalAmount,
         status,
         createdAt: rec.createdAt,
@@ -169,7 +169,7 @@ export function CheckRegistrationView({
               <span>Check My Championship Registration Status</span>
             </h3>
             <p className="text-xs text-slate-500">
-              Enter your registration ID or registered mobile number to verify your participant status.
+              Enter your registration ID and registered mobile number to verify your participant status.
             </p>
           </div>
 

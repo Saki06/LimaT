@@ -84,14 +84,17 @@ import {
 import SportsNotificationController from '../controllers/sports-notification.controller';
 import SportsNotificationServiceController from '../controllers/sports-notification-service.controller';
 import SportsAnalyticsController from '../controllers/sports-analytics.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import { authenticateToken, optionalAuthenticateToken } from '../middlewares/auth.middleware';
+
 const router = Router();
+
 // Events
-router.get('/events', authenticateToken, listSportsEvents);
+router.get('/events', optionalAuthenticateToken, listSportsEvents);
 router.post('/events', authenticateToken, createSportsEvent);
 router.patch('/events/:id', authenticateToken, updateSportsEvent);
 router.delete('/events/:id', authenticateToken, deleteSportsEvent);
-router.delete('/events/:eventId/register', authenticateToken, cancelSportsRegistration);
+router.delete('/events/:id/register', authenticateToken, cancelSportsRegistration);
+
 // Registrations
 router.get('/my-registrations', authenticateToken, getMySportsRegistrations);
 router.get('/registrations/me', authenticateToken, getMySportsRegistrations);
@@ -109,11 +112,13 @@ router.get('/payments-admin/all', authenticateToken, listTenantPayments);
 router.post('/payments/:paymentId/approve', authenticateToken, approvePayment);
 router.post('/payments/:paymentId/reject', authenticateToken, rejectPayment);
 router.get('/payments/:paymentId/receipt', authenticateToken, getPaymentReceipt);
+
 // Disciplines
-router.get('/disciplines', authenticateToken, listSportsDisciplines);
+router.get('/disciplines', optionalAuthenticateToken, listSportsDisciplines);
 router.post('/disciplines', authenticateToken, createSportsDiscipline);
+
 // Teams
-router.get('/teams', authenticateToken, listSportsTeams);
+router.get('/teams', optionalAuthenticateToken, listSportsTeams);
 router.post('/teams', authenticateToken, createSportsTeam);
 router.patch('/teams/:id', authenticateToken, updateSportsTeam);
 router.delete('/teams/:id', authenticateToken, deleteSportsTeam);
@@ -127,8 +132,9 @@ router.post('/teams/invitations/accept', authenticateToken, acceptTeamInvitation
 router.post('/teams/invitations/reject', authenticateToken, rejectTeamInvitation);
 router.get('/my-teams', authenticateToken, getMyTeamMemberships);
 router.get('/my-team-invitations', authenticateToken, getMyTeamInvitations);
+
 // Tournaments
-router.get('/tournaments', authenticateToken, listSportsTournaments);
+router.get('/tournaments', optionalAuthenticateToken, listSportsTournaments);
 router.post('/tournaments', authenticateToken, createSportsTournament);
 router.patch('/tournaments/:id', authenticateToken, updateSportsTournament);
 router.delete('/tournaments/:id', authenticateToken, deleteSportsTournament);
@@ -141,25 +147,29 @@ router.get('/fixtures/date-range', authenticateToken, getFixturesByDateRange);
 router.get('/fixtures/:fixtureId', authenticateToken, getFixtureById);
 router.patch('/fixtures/:fixtureId', authenticateToken, updateFixture);
 router.delete('/fixtures/:id', authenticateToken, deleteSportsFixture);
+router.patch('/fixtures/:id/result', authenticateToken, recordSportsFixtureResult);
 router.post('/fixtures/:fixtureId/live-score', authenticateToken, updateLiveScore);
-router.get('/fixtures/:fixtureId/live-updates', authenticateToken, getLiveUpdates);
+router.get('/fixtures/:fixtureId/live-updates', optionalAuthenticateToken, getLiveUpdates);
 router.post('/fixtures/:fixtureId/complete', authenticateToken, completeFixture);
+
 // Brackets (Phase 2)
 router.post('/brackets', authenticateToken, createBracket);
-router.get('/brackets/:bracketId', authenticateToken, getBracketById);
-router.get('/tournaments/:tournamentId/brackets', authenticateToken, getTournamentBrackets);
+router.get('/brackets/:bracketId', optionalAuthenticateToken, getBracketById);
+router.get('/tournaments/:tournamentId/brackets', optionalAuthenticateToken, getTournamentBrackets);
 router.post('/brackets/:bracketId/matches', authenticateToken, addMatchToBracket);
 router.patch('/brackets/matches/:matchId/result', authenticateToken, updateBracketMatchResult);
 router.post('/brackets/matches/:matchId/progress', authenticateToken, progressWinnerToNextRound);
-router.get('/brackets/:bracketId/results', authenticateToken, getBracketResults);
+router.get('/brackets/:bracketId/results', optionalAuthenticateToken, getBracketResults);
 router.patch('/brackets/:bracketId/status', authenticateToken, updateBracketStatus);
+
 // Old fixture endpoints (kept for backward compatibility)
-router.get('/fixtures-old', authenticateToken, listSportsFixtures);
+router.get('/fixtures-old', optionalAuthenticateToken, listSportsFixtures);
 router.post('/fixtures-old', authenticateToken, createSportsFixture);
 router.patch('/fixtures-old/:id', authenticateToken, updateSportsFixture);
 router.delete('/fixtures-old/:id', authenticateToken, deleteSportsFixture);
 router.patch('/fixtures-old/:id/result', authenticateToken, recordSportsFixtureResult);
-router.get('/standings', authenticateToken, listSportsStandings);
+router.get('/standings', optionalAuthenticateToken, listSportsStandings);
+
 // Athlete Profiles
 router.get('/athletes/:userId/profile', authenticateToken, getAthleteProfile);
 router.get('/athletes/profile/me', authenticateToken, getMyAthleteProfile);
@@ -167,9 +177,11 @@ router.put('/athletes/profile/me', authenticateToken, upsertAthleteProfile);
 router.get('/athletes/interest/:sport', authenticateToken, listAthletesByInterest);
 router.post('/athletes/profile/achievement', authenticateToken, addAthleteAchievement);
 router.post('/athletes/profile/participation', authenticateToken, addParticipationRecord);
+
 // Locations
-router.get('/locations', authenticateToken, getSportsLocations);
+router.get('/locations', optionalAuthenticateToken, getSportsLocations);
 router.post('/locations/seed', authenticateToken, seedSportsLocations);
+
 // Phase 3: Notifications
 router.get('/notifications', authenticateToken, (req, res, next) => SportsNotificationController.getUserNotifications(req, res, next));
 router.patch('/notifications/:notificationId/read', authenticateToken, (req, res, next) => SportsNotificationController.markAsRead(req, res, next));

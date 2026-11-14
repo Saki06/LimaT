@@ -107,6 +107,7 @@ export interface ParentLeaveRequest {
 
 export interface ParentChildProfile {
   id: string;
+  admissionNo?: string;
   name: string;
   grade: string;
   avatarText: string;

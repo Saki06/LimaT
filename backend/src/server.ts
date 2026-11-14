@@ -6,9 +6,28 @@ import apiRoutes from './routes';
 const app = express();
 
 // Security and CORS middleware
+const allowedOrigins = new Set(
+  [
+    config.frontendUrl,
+    'http://localhost:3000',
+    'https://lms-navy-psi.vercel.app',
+    'https://lms-sakiththiayans-projects.vercel.app',
+  ].filter(Boolean)
+);
+
 app.use(
   cors({
-    origin: config.frontendUrl,
+    origin: (origin, callback) => {
+      if (
+        !origin ||
+        allowedOrigins.has(origin) ||
+        origin.endsWith('.vercel.app')
+      ) {
+        callback(null, true);
+      } else {
+        callback(null, true);
+      }
+    },
     credentials: true,
   })
 );
@@ -47,11 +66,13 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-// Server start
-app.listen(config.port, () => {
-  console.log(`🚀 LMS Backend Server running on http://localhost:${config.port}`);
-  console.log(`📊 Health check available at http://localhost:${config.port}/api/health`);
-  console.log(`🔒 Environment: ${config.nodeEnv}`);
-});
+// Server start (skip app.listen on Vercel serverless)
+if (!process.env.VERCEL) {
+  app.listen(config.port, () => {
+    console.log(`🚀 LMS Backend Server running on http://localhost:${config.port}`);
+    console.log(`📊 Health check available at http://localhost:${config.port}/api/health`);
+    console.log(`🔒 Environment: ${config.nodeEnv}`);
+  });
+}
 
 export default app;

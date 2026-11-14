@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { User as UserIcon, Phone, Mail, Lock, UserPlus, GraduationCap, Loader2, ChevronDown } from "lucide-react";
+import { User as UserIcon, Phone, Mail, Lock, UserPlus, GraduationCap, Loader2, ChevronDown, Globe, MapPin, BookOpen } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/lib/api";
 
@@ -16,6 +16,54 @@ const GRADE_OPTIONS = [
   "Grade 13 (A/L)",
 ];
 
+const GENDER_OPTIONS = [
+  "Male",
+  "Female",
+];
+
+const MEDIUM_OPTIONS = [
+  "Tamil Medium",
+  "English Medium",
+  "Sinhala Medium",
+];
+
+const STREAM_OPTIONS = [
+  "Physical Science (Maths)",
+  "Biological Science",
+  "Commerce",
+  "Arts",
+  "Engineering Technology",
+  "Bio Systems Technology",
+];
+
+const DISTRICT_OPTIONS = [
+  "Jaffna",
+  "Colombo",
+  "Kandy",
+  "Batticaloa",
+  "Vavuniya",
+  "Kilinochchi",
+  "Trincomalee",
+  "Mannar",
+  "Mullaitivu",
+  "Gampaha",
+  "Nuwara Eliya",
+  "Ampara",
+  "Puttalam",
+  "Kurunegala",
+  "Galle",
+  "Matara",
+  "Badulla",
+  "Ratnapura",
+  "Anuradhapura",
+  "Polonnaruwa",
+  "Kegalle",
+  "Kalutara",
+  "Matale",
+  "Hambantota",
+  "Monaragala",
+];
+
 interface StudentSignupFormProps {
   onSuccess: () => void;
 }
@@ -24,7 +72,11 @@ export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
   const { addToast, registerUser } = useApp();
 
   const [signupName, setSignupName] = useState("");
-  const [selectedGrade, setSelectedGrade] = useState("Grade 12 (A/L)");
+  const [selectedGrade, setSelectedGrade] = useState("");
+  const [selectedGender, setSelectedGender] = useState("");
+  const [selectedMedium, setSelectedMedium] = useState("Tamil Medium");
+  const [selectedStream, setSelectedStream] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState("Jaffna");
   const [signupPhone, setSignupPhone] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
@@ -32,8 +84,56 @@ export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
+  const isAdvancedLevel = selectedGrade === "Grade 12 (A/L)" || selectedGrade === "Grade 13 (A/L)";
+
+  const isValidSriLankanPhone = (phone: string) => {
+    const cleaned = phone.trim().replace(/[\s-]/g, "");
+    return /^(?:0[1-9]\d{8}|\+94[1-9]\d{8})$/.test(cleaned);
+  };
+
+  const isValidEmailAddress = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(email.trim());
+  };
+
+  const phoneError =
+    signupPhone.trim().length > 0 && !isValidSriLankanPhone(signupPhone)
+      ? "Enter valid 10-digit SL number (e.g. 0771234567)"
+      : "";
+
+  const emailError =
+    signupEmail.trim().length > 0 && !isValidEmailAddress(signupEmail)
+      ? "Enter a valid email (e.g. name@gmail.com)"
+      : "";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isValidEmailAddress(signupEmail)) {
+      addToast({
+        type: "error",
+        title: "Invalid Email Address",
+        message: "Please enter a valid email address (e.g. student@gmail.com)."
+      });
+      return;
+    }
+
+    if (!isValidSriLankanPhone(signupPhone)) {
+      addToast({
+        type: "error",
+        title: "Invalid Mobile Number",
+        message: "Please enter a valid 10-digit Sri Lankan mobile number (e.g. 077 123 4567)."
+      });
+      return;
+    }
+
+    if (signupPassword.trim().length < 6) {
+      addToast({
+        type: "error",
+        title: "Weak Password",
+        message: "Password must be at least 6 characters long."
+      });
+      return;
+    }
 
     if (signupPassword && signupConfirmPassword && signupPassword !== signupConfirmPassword) {
       addToast({
@@ -67,6 +167,10 @@ export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
         password: signupPassword,
         phoneNumber: signupPhone.trim(),
         gradeLevel: selectedGrade,
+        section: isAdvancedLevel ? selectedStream : selectedMedium,
+        gender: selectedGender,
+        medium: selectedMedium,
+        district: selectedDistrict,
       });
 
       if (res.success) {
@@ -90,7 +194,7 @@ export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+    <form onSubmit={handleSubmit} className="space-y-3.5 pt-1">
       <div>
         <label className="text-xs font-bold text-slate-700 block mb-1">Student Full Name *</label>
         <div className="relative">
@@ -106,21 +210,109 @@ export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
         </div>
       </div>
 
-      <div>
-        <label className="text-xs font-bold text-slate-700 block mb-1">Select Enrolled Grade *</label>
-        <div className="relative">
-          <GraduationCap className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <select
-            required
-            value={selectedGrade}
-            onChange={(e) => setSelectedGrade(e.target.value)}
-            className="w-full h-10 pl-9 pr-9 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium appearance-none cursor-pointer"
-          >
-            {GRADE_OPTIONS.map((g) => (
-              <option key={g} value={g}>{g}</option>
-            ))}
-          </select>
-          <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-bold text-slate-700 block mb-1">Enrolled Grade *</label>
+          <div className="relative">
+            <GraduationCap className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              required
+              value={selectedGrade}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedGrade(val);
+                if (val !== "Grade 12 (A/L)" && val !== "Grade 13 (A/L)") {
+                  setSelectedStream("");
+                } else if (!selectedStream) {
+                  setSelectedStream("Physical Science (Maths)");
+                }
+              }}
+              className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium appearance-none cursor-pointer"
+            >
+              <option value="" disabled>Select Grade</option>
+              {GRADE_OPTIONS.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+            <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-700 block mb-1">Gender *</label>
+          <div className="relative">
+            <UserIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              required
+              value={selectedGender}
+              onChange={(e) => setSelectedGender(e.target.value)}
+              className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium appearance-none cursor-pointer"
+            >
+              <option value="" disabled>Select Gender</option>
+              {GENDER_OPTIONS.map((gender) => (
+                <option key={gender} value={gender}>{gender}</option>
+              ))}
+            </select>
+            <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+      </div>
+
+      {isAdvancedLevel && (
+        <div>
+          <label className="text-xs font-bold text-slate-700 block mb-1">A/L Subject Stream *</label>
+          <div className="relative">
+            <BookOpen className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              required
+              value={selectedStream}
+              onChange={(e) => setSelectedStream(e.target.value)}
+              className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium appearance-none cursor-pointer"
+            >
+              {STREAM_OPTIONS.map((stream) => (
+                <option key={stream} value={stream}>{stream}</option>
+              ))}
+            </select>
+            <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-bold text-slate-700 block mb-1">Medium of Study *</label>
+          <div className="relative">
+            <Globe className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              required
+              value={selectedMedium}
+              onChange={(e) => setSelectedMedium(e.target.value)}
+              className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium appearance-none cursor-pointer"
+            >
+              {MEDIUM_OPTIONS.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-700 block mb-1">District / City *</label>
+          <div className="relative">
+            <MapPin className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              required
+              value={selectedDistrict}
+              onChange={(e) => setSelectedDistrict(e.target.value)}
+              className="w-full h-10 pl-9 pr-8 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium appearance-none cursor-pointer"
+            >
+              {DISTRICT_OPTIONS.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+            <ChevronDown className="h-4 w-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
         </div>
       </div>
 
@@ -135,22 +327,38 @@ export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
               value={signupEmail}
               onChange={(e) => setSignupEmail(e.target.value)}
               placeholder="student@apex.edu"
-              className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium"
+              className={`w-full h-10 pl-9 pr-3 rounded-xl bg-white border text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all font-medium ${
+                emailError
+                  ? "border-rose-400 focus:border-rose-500"
+                  : "border-slate-200 focus:border-[#0d5c4d]"
+              }`}
             />
           </div>
+          {emailError && (
+            <p className="text-[10px] font-bold text-rose-600 mt-1">{emailError}</p>
+          )}
         </div>
         <div>
-          <label className="text-xs font-bold text-slate-700 block mb-1">Mobile No (Optional)</label>
+          <label className="text-xs font-bold text-slate-700 block mb-1">Mobile No (WhatsApp) *</label>
           <div className="relative">
             <Phone className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="tel"
+              required
+              maxLength={15}
               value={signupPhone}
-              onChange={(e) => setSignupPhone(e.target.value)}
+              onChange={(e) => setSignupPhone(e.target.value.replace(/[^0-9+\s-]/g, ""))}
               placeholder="077 123 4567"
-              className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] transition-all font-medium"
+              className={`w-full h-10 pl-9 pr-3 rounded-xl bg-white border text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all font-medium ${
+                phoneError
+                  ? "border-rose-400 focus:border-rose-500"
+                  : "border-slate-200 focus:border-[#0d5c4d]"
+              }`}
             />
           </div>
+          {phoneError && (
+            <p className="text-[10px] font-bold text-rose-600 mt-1">{phoneError}</p>
+          )}
         </div>
       </div>
 

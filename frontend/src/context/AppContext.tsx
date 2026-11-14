@@ -85,6 +85,10 @@ interface AppContextType {
     password: string;
     phoneNumber?: string;
     gradeLevel?: string;
+    section?: string;
+    gender?: string;
+    medium?: string;
+    district?: string;
     studentIdNo?: string;
     specialization?: string;
     childStudentId?: string;
@@ -117,9 +121,9 @@ interface AppContextType {
   }) => Promise<{ success: boolean; message?: string }>;
   submitChampionshipRegistration: (input: {
     eventIds: string[];
-    registrationNumber: string;
+    registrationNumber?: string;
     athleteDetails: Record<string, unknown>;
-  }) => Promise<{ success: boolean; message?: string }>;
+  }) => Promise<{ success: boolean; message?: string; registrationNumber?: string }>;
   updateChampionshipRegistrationStatus: (
     registrationNumber: string,
     status: StoredAthleteRegistration['status']
@@ -942,6 +946,7 @@ useEffect(() => {
   };
 
   useEffect(() => {
+    fetchAnnouncements();
     fetchAssignments();
     fetchSubmissions();
     fetchCourses();
@@ -950,7 +955,7 @@ useEffect(() => {
     fetchTimetable();
     fetchClasses();
     fetchSubjects();
-  }, [currentRole, activeTenantId]);
+  }, [currentRole, activeTenantId, authToken]);
 
   useEffect(() => {
     if (!authToken) return;
@@ -1042,6 +1047,10 @@ useEffect(() => {
     password: string;
     phoneNumber?: string;
     gradeLevel?: string;
+    section?: string;
+    gender?: string;
+    medium?: string;
+    district?: string;
     studentIdNo?: string;
     specialization?: string;
     childStudentId?: string;
@@ -1055,6 +1064,7 @@ useEffect(() => {
           email: input.email,
           password: input.password,
           gradeLevel: input.gradeLevel,
+          section: input.section,
           studentIdNo: input.studentIdNo,
         });
       } else if (input.role === 'teacher') {
@@ -1077,6 +1087,15 @@ useEffect(() => {
       }
 
       if (res && res.success && res.token && res.user) {
+        if (typeof window !== 'undefined' && res.user.id) {
+          if (input.gender) localStorage.setItem(`lms_gender_${res.user.id}`, input.gender);
+          if (input.medium) localStorage.setItem(`lms_medium_${res.user.id}`, input.medium);
+          if (input.district) {
+            localStorage.setItem(`lms_city_${res.user.id}`, input.district);
+            localStorage.setItem(`lms_district_${res.user.id}`, input.district);
+          }
+          if (input.phoneNumber) localStorage.setItem(`lms_phone_${res.user.id}`, input.phoneNumber);
+        }
         api.token.set(res.token);
         api.user.set(res.user);
         setEvents((prev) => prev.filter((event) => event.organizer !== sportsEventOrganizer));
@@ -1184,7 +1203,10 @@ useEffect(() => {
       role: currentRole,
       avatar: userAvatar,
       schoolId: authUser.schoolId || '',
-      schoolName: authUser.schoolName || ''
+      schoolName: authUser.schoolName || '',
+      grade: authUser.studentProfile?.gradeLevel || authUser.grade || '',
+      class: authUser.studentProfile?.gradeLevel || authUser.grade || 'Student',
+      ...(authUser.studentProfile ? { studentProfile: authUser.studentProfile } : {}),
     }
     : {
       id: 'unauthenticated',
@@ -1387,18 +1409,19 @@ useEffect(() => {
 
   const submitChampionshipRegistration = async (input: {
     eventIds: string[];
-    registrationNumber: string;
+    registrationNumber?: string;
     athleteDetails: Record<string, unknown>;
-  }): Promise<{ success: boolean; message?: string }> => {
+  }): Promise<{ success: boolean; message?: string; registrationNumber?: string }> => {
     try {
-      await api.sports.registerChampionship(input);
+      const registrations = await api.sports.registerChampionship(input);
+      const regNum = registrations?.[0]?.registrationNumber || input.registrationNumber;
       await Promise.all([fetchSportsEvents(), fetchMySportsRegistrations()]);
       addToast({
         type: 'success',
         title: 'Championship Registration Submitted',
         message: 'Your athlete registration has been saved and sent for review.',
       });
-      return { success: true };
+      return { success: true, registrationNumber: regNum };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
       addToast({ type: 'error', title: 'Championship Registration Failed', message });

@@ -6,6 +6,7 @@ import {
   submitDepositSlip,
   getMyParentProfile,
   updateMyParentProfile,
+  linkChildStudent,
 } from '../controllers/parent.controller';
 import { authenticateToken } from '../middlewares/auth.middleware';
 
@@ -20,6 +21,7 @@ router.put('/me', updateMyParentProfile);
 
 // 1. Children profiles with live academic standing
 router.get('/children', getMyChildren);
+router.post('/link-child', linkChildStudent);
 
 // 2. Parent Dashboard Cockpit
 router.get('/dashboard', getParentDashboardOverview);

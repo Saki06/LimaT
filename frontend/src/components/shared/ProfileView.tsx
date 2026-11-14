@@ -424,48 +424,48 @@ export function ProfileView() {
 
     if (currentRole === "parent") {
       return {
-        name: currentUser.name || "Mrs. Priyadarshani Kulatunga",
-        fullName: "Priyadarshani Kulatunga",
-        preferredName: "Priya",
-        studentId: "PAR-2026-012",
-        indexNumber: "PAR/NIC-786542190V",
-        email: currentUser.email || "priya.k@gmail.com",
-        phone: "+94 77 345 6789",
-        altPhone: "+94 11 289 1234",
-        dob: "1982-11-24",
-        gender: "Female",
-        bloodGroup: "A+",
-        medium: "English & Sinhala",
-        address: "No. 42, Temple Road, Wellawatte",
-        city: "Colombo 06",
-        district: "Colombo",
-        province: "Western Province",
-        postalCode: "00600",
-        bio: "Parent & Guardian of Sathurjan K. (Physical Science A/L Masterclass Batch). Active member of the Masterclass Parent-Mentor Council.",
-        schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Independent Tuition & Masterclasses",
-        schoolCode: "LMT-COLOMBO",
+        name: currentUser.name || "Parent / Guardian",
+        fullName: currentUser.name || "Parent / Guardian",
+        preferredName: (currentUser.name || "Parent").split(" ")[0],
+        studentId: currentUser.id ? `PAR-${currentUser.id.slice(0, 6).toUpperCase()}` : "PAR-PORTAL",
+        indexNumber: "",
+        email: currentUser.email || "",
+        phone: (currentUser as any).phoneNumber || "",
+        altPhone: "",
+        dob: "",
+        gender: "",
+        bloodGroup: "",
+        medium: "",
+        address: "",
+        city: "",
+        district: "",
+        province: "",
+        postalCode: "",
+        bio: "Registered Parent & Guardian account.",
+        schoolName: (currentUser.schoolName && currentUser.schoolName !== "St. Michael High School") ? currentUser.schoolName : "LimaT Learning Portal",
+        schoolCode: "",
         gradeLevel: "Parent",
-        grade: "Registered Parent Council Member",
-        classRoom: "Guardian of Enrolled Student",
-        stream: "Parent-Mentor Council",
-        examYear: "2026",
-        academicYear: "2024 - Present",
-        house: "Lions Sports Academy Supporter",
-        classTeacher: "Academic Lead & Faculty Mentors",
-        admittedDate: "January 2024",
-        attendanceRate: "100% PTM Attendance",
-        gpa: "Verified Guardian Status",
-        guardianName: "Mrs. Priyadarshani Kulatunga",
-        guardianRelationship: "Mother",
-        guardianPhone: "+94 77 345 6789",
-        guardianEmail: "priya.k@gmail.com",
-        guardianOccupation: "Chartered Accountant & Finance Director",
-        motherName: "P. Kulatunga",
-        motherPhone: "+94 77 345 6789",
-        emergencyContact: "Mr. K. Kulatunga (+94 71 888 4321)",
-        transportMode: "Private Vehicle Pickup",
-        healthNotes: "Verified emergency contacts on file.",
-        extracurricular: "School Development Fund Committee, Annual Sports Meet Organizer"
+        grade: "Registered Guardian",
+        classRoom: "Guardian Portal",
+        stream: "",
+        examYear: new Date().getFullYear().toString(),
+        academicYear: new Date().getFullYear().toString(),
+        house: "",
+        classTeacher: "",
+        admittedDate: "",
+        attendanceRate: "",
+        gpa: "Verified Guardian",
+        guardianName: currentUser.name || "",
+        guardianRelationship: "Parent / Guardian",
+        guardianPhone: (currentUser as any).phoneNumber || "",
+        guardianEmail: currentUser.email || "",
+        guardianOccupation: "",
+        motherName: "",
+        motherPhone: "",
+        emergencyContact: "",
+        transportMode: "",
+        healthNotes: "",
+        extracurricular: ""
       };
     }
 
@@ -526,6 +526,7 @@ export function ProfileView() {
       name: userFullName,
       fullName: userFullName,
       preferredName: userFirstName,
+      avatarUrl: currentUser.avatar || (typeof window !== "undefined" ? localStorage.getItem(`lms_avatar_${currentUser.id || 'student'}`) || "" : ""),
       studentId: (currentUser as any)?.studentIdNo || (currentUser as any)?.studentProfile?.studentIdNo || (currentUser?.id ? `STU-${currentUser.id.slice(0, 4).toUpperCase()}` : "STU-0001"),
       indexNumber: (typeof window !== "undefined" ? localStorage.getItem(`lms_index_${currentUser.id || 'student'}`) || "" : "") || (currentUser as any)?.studentIdNo || (currentUser as any)?.studentProfile?.studentIdNo || "",
       email: currentUser.email || "",
@@ -634,21 +635,33 @@ export function ProfileView() {
             const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
             setProfileData((prev) => ({ ...prev, avatarUrl: compressedDataUrl }));
             if (typeof window !== "undefined") {
-              localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, compressedDataUrl);
-              localStorage.setItem("lms_avatar_teacher", compressedDataUrl);
+              localStorage.setItem(`lms_avatar_${currentUser.id || currentRole}`, compressedDataUrl);
+              if (currentRole === "teacher") {
+                localStorage.setItem("lms_avatar_teacher", compressedDataUrl);
+              }
+            }
+            updateAuthUser({ avatarUrl: compressedDataUrl });
+            if (currentRole === "student") {
+              api.students.updateMyProfile({ avatarUrl: compressedDataUrl }).catch(() => {});
             }
             addToast({
               type: "success",
-              title: "Profile Photo Selected",
-              message: "Click 'Save Details' to apply and persist your photo."
+              title: "Profile Photo Updated",
+              message: currentRole === "student" ? "Your profile picture has been saved." : "Click 'Save Details' to apply and persist your photo."
             });
           }
         } catch {
           const rawUrl = e.target?.result as string;
           setProfileData((prev) => ({ ...prev, avatarUrl: rawUrl }));
           if (typeof window !== "undefined") {
-            localStorage.setItem(`lms_avatar_${currentUser.id || 'teacher'}`, rawUrl);
-            localStorage.setItem("lms_avatar_teacher", rawUrl);
+            localStorage.setItem(`lms_avatar_${currentUser.id || currentRole}`, rawUrl);
+            if (currentRole === "teacher") {
+              localStorage.setItem("lms_avatar_teacher", rawUrl);
+            }
+          }
+          updateAuthUser({ avatarUrl: rawUrl });
+          if (currentRole === "student") {
+            api.students.updateMyProfile({ avatarUrl: rawUrl }).catch(() => {});
           }
         }
       };
@@ -884,6 +897,7 @@ if (savedProfile.preferredName) {
         setProfileData((previous) => ({
           ...previous,
           email: studentUser?.email ?? previous.email,
+          avatarUrl: studentUser?.avatarUrl || previous.avatarUrl,
           studentId: data.studentIdNo ?? previous.studentId,
           indexNumber: previous.indexNumber || data.studentIdNo || previous.studentId,
           fullName: fullName || previous.fullName,
@@ -1617,6 +1631,7 @@ if (savedProfile.preferredName) {
         const response = await api.students.updateMyProfile({
           firstName,
           lastName,
+          avatarUrl: profileData.avatarUrl,
           gradeLevel: profileData.grade || profileData.gradeLevel,
           section: profileData.classRoom || profileData.stream,
         });
@@ -1628,6 +1643,7 @@ if (savedProfile.preferredName) {
         updateAuthUser({
           firstName,
           lastName,
+          avatarUrl: profileData.avatarUrl,
         });
 
         setIsEditing(false);
@@ -1806,7 +1822,7 @@ if (savedProfile.preferredName) {
               />
             )}
 
-            {currentRole === "teacher" && (
+            {currentRole !== "super_admin" && (
               <input
                 id="teacher-avatar-file-input"
                 type="file"
@@ -1827,35 +1843,31 @@ if (savedProfile.preferredName) {
                   <Camera className="h-4 w-4" />
                 </label>
               )
-            ) : currentRole === "teacher" ? (
-              <label
-                htmlFor="teacher-avatar-file-input"
-                className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#0d5c4d] text-white flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform cursor-pointer"
-                title="Change Profile Photo"
-              >
-                <Camera className="h-4 w-4" />
-              </label>
             ) : (
               isEditing && (
-                <button
-                  type="button"
-                  className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#f3b738] text-slate-900 flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform"
-                  title="Change Avatar Photo"
+                <label
+                  htmlFor="teacher-avatar-file-input"
+                  className="absolute -bottom-1.5 -right-1.5 h-8 w-8 rounded-full bg-[#0d5c4d] text-white flex items-center justify-center shadow-md border-2 border-white hover:scale-105 transition-transform cursor-pointer"
+                  title="Change Profile Photo"
                 >
                   <Camera className="h-4 w-4" />
-                </button>
+                </label>
               )
             )}
 
-            {currentRole === "teacher" && profileData.avatarUrl && (
+            {currentRole !== "super_admin" && isEditing && profileData.avatarUrl && (
               <button
                 type="button"
                 onClick={() => {
                   setProfileData((prev) => ({ ...prev, avatarUrl: "" }));
                   if (typeof window !== "undefined") {
-                    localStorage.removeItem(`lms_avatar_${currentUser.id || 'teacher'}`);
+                    localStorage.removeItem(`lms_avatar_${currentUser.id || currentRole}`);
                   }
-                  addToast({ type: "info", title: "Photo Removed", message: "Click 'Save Details' to persist this change." });
+                  updateAuthUser({ avatarUrl: "" });
+                  if (currentRole === "student") {
+                    api.students.updateMyProfile({ avatarUrl: "" }).catch(() => {});
+                  }
+                  addToast({ type: "info", title: "Photo Removed", message: currentRole === "student" ? "Profile photo removed." : "Click 'Save Details' to persist this change." });
                 }}
                 title="Remove profile picture"
                 className="absolute -bottom-1.5 -left-1.5 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-red-50 text-red-600 shadow-md transition-transform hover:scale-105 hover:bg-red-100 cursor-pointer"

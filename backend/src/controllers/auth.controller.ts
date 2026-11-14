@@ -14,22 +14,29 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const user = await prisma.user.findUnique({
-  where: { email },
-  include: {
-    tenant: true,
-    studentProfile: true,
-    teacherProfile: {
-      select: {
-        id: true,
-        userId: true,
-        employeeNo: true,
-        specialization: true,
+    const cleanEmail = String(email).trim();
+
+    const user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: cleanEmail,
+          mode: 'insensitive',
+        },
       },
-    },
-    parentProfile: true,
-  },
-});
+      include: {
+        tenant: true,
+        studentProfile: true,
+        teacherProfile: {
+          select: {
+            id: true,
+            userId: true,
+            employeeNo: true,
+            specialization: true,
+          },
+        },
+        parentProfile: true,
+      },
+    });
 
     if (!user) {
   res.status(401).json({
@@ -121,14 +128,23 @@ const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
 export const registerStudent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { firstName, lastName, email, password, gradeLevel, studentIdNo, tenantId } = req.body;
+    const { firstName, lastName, email, password, phoneNumber, gradeLevel, section, studentIdNo, tenantId } = req.body;
 
     if (!email || !password || !firstName) {
       res.status(400).json({ success: false, message: 'Missing required student registration fields' });
       return;
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+      return;
+    }
+
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+    });
     if (existingUser) {
       res.status(409).json({ success: false, message: 'Email already registered.' });
       return;
@@ -174,18 +190,41 @@ if (
 
     const passwordHash = await bcrypt.hash(password, 10);
 
+    let generatedStudentIdNo = typeof studentIdNo === 'string' && studentIdNo.trim()
+      ? studentIdNo.trim()
+      : '';
+
+    if (!generatedStudentIdNo) {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const candidate = `STU-${Math.floor(1000 + Math.random() * 9000)}`;
+        const existingId = await prisma.studentProfile.findUnique({
+          where: { studentIdNo: candidate },
+          select: { id: true },
+        });
+        if (!existingId) {
+          generatedStudentIdNo = candidate;
+          break;
+        }
+      }
+      if (!generatedStudentIdNo) {
+        generatedStudentIdNo = `STU-${Date.now().toString().slice(-6)}`;
+      }
+    }
+
     const newUser = await prisma.user.create({
       data: {
         tenantId: selectedTenantId,
-        email,
+        email: normalizedEmail,
         passwordHash,
         role: Role.STUDENT,
         firstName,
         lastName: lastName || '',
         studentProfile: {
           create: {
-            studentIdNo: studentIdNo || 'STU-' + Math.floor(1000 + Math.random() * 9000),
+            studentIdNo: generatedStudentIdNo,
             gradeLevel: gradeLevel || 'Grade 10',
+            section: section || null,
+            phoneNumber: typeof phoneNumber === 'string' && phoneNumber.trim() ? phoneNumber.trim() : null,
           },
         },
       },
@@ -224,7 +263,10 @@ export const registerTutor = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+    });
     if (existingUser) {
       res.status(409).json({ success: false, message: 'Email already registered.' });
       return;
@@ -275,7 +317,7 @@ if (
     const newUser = await prisma.user.create({
       data: {
         tenantId: selectedTenantId!,
-        email,
+        email: normalizedEmail,
         passwordHash,
         role: Role.TEACHER,
         firstName,
@@ -322,7 +364,10 @@ export const registerParent = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+    });
     if (existingUser) {
       res.status(409).json({ success: false, message: 'Email already registered.' });
       return;
@@ -373,7 +418,7 @@ if (
     const newUser = await prisma.user.create({
       data: {
         tenantId: selectedTenantId!,
-        email,
+        email: normalizedEmail,
         passwordHash,
         role: Role.PARENT,
         firstName,
@@ -386,6 +431,33 @@ if (
       },
       include: { parentProfile: true },
     });
+
+    if (newUser.parentProfile && typeof childStudentId === 'string' && childStudentId.trim()) {
+      const cleanRef = childStudentId.trim();
+      const digitsOnly = cleanRef.replace(/\D/g, '');
+      const matchedStudent = await prisma.studentProfile.findFirst({
+        where: {
+          OR: [
+            { studentIdNo: { equals: cleanRef, mode: 'insensitive' } },
+            ...(digitsOnly.length >= 7
+              ? [
+                  { phoneNumber: { contains: digitsOnly.slice(-9) } },
+                  { phoneNumber: { equals: cleanRef } },
+                ]
+              : []),
+            { user: { email: { equals: cleanRef, mode: 'insensitive' } } },
+          ],
+        },
+        select: { id: true },
+      });
+
+      if (matchedStudent) {
+        await prisma.studentProfile.update({
+          where: { id: matchedStudent.id },
+          data: { guardianId: newUser.parentProfile.id },
+        });
+      }
+    }
 
     const token = jwt.sign(
       {

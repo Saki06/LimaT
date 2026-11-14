@@ -81,6 +81,43 @@ const EMPTY_PARENT_CHILD: ParentChildProfile = {
   pendingSlipsCount: 0,
 };
 
+const EMPTY_CHILD_PROFILE: ParentChildProfile = {
+  id: "",
+  studentId: "",
+  name: "No Student Linked",
+  admissionNo: "—",
+  grade: "Link Student ID",
+  classSection: "—",
+  avatarText: "ST",
+  schoolName: "LimaT Learning Portal",
+  enrolledSinceYear: new Date().getFullYear().toString(),
+  admissionGrade: "—",
+  currentStage: "—",
+  cumulativeCareerAverage: 0,
+  totalYearsEnrolled: 0,
+  classTeacher: "—",
+  classTeacherEmail: "",
+  classTeacherPhone: "",
+  attendanceRate: 0,
+  presentDays: 0,
+  totalDays: 0,
+  overallAverage: 0,
+  classRank: 0,
+  totalStudents: 0,
+  upcomingExamsCount: 0,
+  hallTicketNo: "—",
+  nextExamDate: "",
+  nextExamName: "",
+  monthlyInvestmentLkr: 0,
+  activeEnrolmentsCount: 0,
+  pendingSlipsCount: 0,
+  enrolments: [],
+  invoices: [],
+  announcements: [],
+  paperMarks: [],
+  attendanceLogs: [],
+} as unknown as ParentChildProfile;
+
 export function ParentDashboardView() {
   const { currentView, setCurrentView, addToast } = useApp();
 
@@ -88,6 +125,15 @@ export function ParentDashboardView() {
   const [childrenList, setChildrenList] = useState<ParentChildProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const currentMonthStr = useMemo(
+    () => new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+    []
+  );
+  const todayIsoStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+
+  const [isLinkChildModalOpen, setIsLinkChildModalOpen] = useState<boolean>(false);
+  const [linkStudentInput, setLinkStudentInput] = useState<string>("");
+  const [isLinkingStudent, setIsLinkingStudent] = useState<boolean>(false);
 
   const fetchParentData = async (showToast = false) => {
     try {
@@ -144,7 +190,52 @@ export function ParentDashboardView() {
     fetchParentData(false);
   }, []);
 
-  const activeChild = childrenList.find((c) => c.id === selectedChildId) || childrenList[0] || EMPTY_PARENT_CHILD;
+  const handleLinkChildSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkStudentInput.trim()) {
+      addToast({
+        type: "warning",
+        title: "Student ID Required",
+        message: "Please enter your child's Student ID (e.g. STU-1234), mobile number, or email."
+      });
+      return;
+    }
+
+    try {
+      setIsLinkingStudent(true);
+      const res = await api.parents.linkChild(linkStudentInput.trim());
+      if (!res?.success) {
+        addToast({
+          type: "error",
+          title: "Could Not Link Student",
+          message: res?.message || "No student found matching that Student ID or mobile number."
+        });
+        return;
+      }
+
+      addToast({
+        type: "success",
+        title: "Student Linked!",
+        message: res.message || "Student profile linked to your Parent Portal."
+      });
+      setLinkStudentInput("");
+      setIsLinkChildModalOpen(false);
+      await fetchParentData(false);
+    } catch (err) {
+      addToast({
+        type: "error",
+        title: "Error Linking Student",
+        message: err instanceof Error ? err.message : "Failed to link student."
+      });
+    } finally {
+      setIsLinkingStudent(false);
+    }
+  };
+
+  const activeChild =
+    childrenList.find((c) => c.id === selectedChildId) ||
+    childrenList[0] ||
+    EMPTY_CHILD_PROFILE;
 
   // Map currentView to internal active tab
   const getInitialTab = (): ParentTab => {
@@ -208,44 +299,49 @@ export function ParentDashboardView() {
 
   // Dynamic subjects list for paper marks filter
   const availablePaperSubjects = useMemo(() => {
-    return Array.from(new Set(activeChild.paperMarks.map((p) => p.subject)));
+    return Array.from(new Set((activeChild.paperMarks || []).map((p) => p.subject)));
   }, [activeChild.paperMarks]);
 
   // Filtered papers
   const filteredPapers = useMemo(() => {
-    if (paperSubjectFilter === "all") return activeChild.paperMarks;
-    return activeChild.paperMarks.filter(
+    const marks = activeChild.paperMarks || [];
+    if (paperSubjectFilter === "all") return marks;
+    return marks.filter(
       (p) => p.subject.toLowerCase() === paperSubjectFilter.toLowerCase()
     );
   }, [activeChild.paperMarks, paperSubjectFilter]);
 
   // Leave Requests state
   const [leaveRequests, setLeaveRequests] = useState<ParentLeaveRequest[]>([]);
-  const [leaveTutor, setLeaveTutor] = useState(activeChild.enrolments[0]?.teacherName || "Dr. Samantha Perera");
-  const [leaveDate, setLeaveDate] = useState("2026-10-20");
+  const [leaveTutor, setLeaveTutor] = useState(activeChild.enrolments[0]?.teacherName || "");
+  const [leaveDate, setLeaveDate] = useState(todayIsoStr);
   const [leaveReason, setLeaveReason] = useState<ParentLeaveRequest["reason"]>("School Exam Clashing");
   const [leaveNote, setLeaveNote] = useState("");
 
   // Deposit Slip Upload Form State
-  const [depositTutor, setDepositTutor] = useState(activeChild.enrolments[0]?.teacherName || "Dr. Samantha Perera");
-  const [depositMonth, setDepositMonth] = useState("October 2026");
-  const [depositAmount, setDepositAmount] = useState(activeChild.enrolments[0]?.monthlyFeeLkr || 3500);
+  const [depositTutor, setDepositTutor] = useState(activeChild.enrolments[0]?.teacherName || "");
+  const [depositMonth, setDepositMonth] = useState(currentMonthStr);
+  const [depositAmount, setDepositAmount] = useState(activeChild.enrolments[0]?.monthlyFeeLkr || 0);
   const [depositBank, setDepositBank] = useState("Commercial Bank of Ceylon");
-  const [depositBranch, setDepositBranch] = useState("Colombo Main Branch");
+  const [depositBranch, setDepositBranch] = useState("");
   const [depositRefNumber, setDepositRefNumber] = useState("");
-  const [depositDate, setDepositDate] = useState("2026-10-14");
+  const [depositDate, setDepositDate] = useState(todayIsoStr);
   const [slipFileName, setSlipFileName] = useState("Bank_Deposit_Slip_Receipt.jpg");
 
   // Invoices list state (allow live additions when parent uploads bank slip)
-  const [invoices, setInvoices] = useState<TuitionInvoice[]>(activeChild.invoices);
+  const [invoices, setInvoices] = useState<TuitionInvoice[]>(activeChild.invoices || []);
 
   // Sync invoices when active child changes
   React.useEffect(() => {
-    setInvoices(activeChild.invoices);
-    if (activeChild.enrolments.length > 0) {
+    setInvoices(activeChild.invoices || []);
+    if ((activeChild.enrolments || []).length > 0) {
       setDepositTutor(activeChild.enrolments[0].teacherName);
       setDepositAmount(activeChild.enrolments[0].monthlyFeeLkr);
       setLeaveTutor(activeChild.enrolments[0].teacherName);
+    } else {
+      setDepositTutor("");
+      setDepositAmount(0);
+      setLeaveTutor("");
     }
   }, [activeChild]);
 
@@ -410,35 +506,51 @@ export function ParentDashboardView() {
               Select Child:
             </span>
             <div className="flex items-center gap-2 overflow-x-auto min-w-0 py-0.5">
-              {childrenList.map((child) => {
-                const isSelected = child.id === activeChild.id;
-                return (
-                  <button
-                    key={child.id}
-                    type="button"
-                    onClick={() => handleChildSwitch(child.id)}
-                    className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      isSelected
-                        ? "bg-white text-[#082a24] shadow-lg scale-102 font-black"
-                        : "bg-white/10 text-white hover:bg-white/20 hover:text-emerald-100"
-                    }`}
-                  >
-                    <div
-                      className={`h-7 w-7 rounded-lg flex items-center justify-center font-black text-xs ${
-                        isSelected ? "bg-[#0d5c4d] text-white" : "bg-white/20 text-white"
+              {childrenList.length === 0 ? (
+                <span className="px-3 py-1.5 rounded-xl bg-white/10 text-emerald-100 text-xs font-semibold">
+                  No linked students yet
+                </span>
+              ) : (
+                childrenList.map((child) => {
+                  const isSelected = child.id === activeChild.id;
+                  return (
+                    <button
+                      key={child.id}
+                      type="button"
+                      onClick={() => handleChildSwitch(child.id)}
+                      className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? "bg-white text-[#082a24] shadow-lg scale-102 font-black"
+                          : "bg-white/10 text-white hover:bg-white/20 hover:text-emerald-100"
                       }`}
                     >
-                      {child.avatarText}
-                    </div>
-                    <div className="text-left">
-                      <p className="leading-tight">{child.name}</p>
-                      <p className={`text-[10px] ${isSelected ? "text-slate-600" : "text-emerald-200/80"}`}>
-                        {child.grade.split(" ")[0]} {child.grade.split(" ")[1]}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
+                      <div
+                        className={`h-7 w-7 rounded-lg flex items-center justify-center font-black text-xs ${
+                          isSelected ? "bg-[#0d5c4d] text-white" : "bg-white/20 text-white"
+                        }`}
+                      >
+                        {child.avatarText}
+                      </div>
+                      <div className="text-left">
+                        <p className="leading-tight">{child.name}</p>
+                        <p className={`text-[10px] ${isSelected ? "text-slate-600" : "text-emerald-200/80"}`}>
+                          {child.admissionNo || child.grade}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+
+              <button
+                type="button"
+                onClick={() => setIsLinkChildModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#f3b738] hover:bg-[#e5a92a] text-slate-950 text-xs font-black transition-all cursor-pointer shrink-0"
+                title="Link a Child Student Account"
+              >
+                <PlusCircle className="h-3.5 w-3.5" />
+                <span>Link Student</span>
+              </button>
             </div>
 
             {/* Live Refresh Button */}
@@ -454,6 +566,27 @@ export function ParentDashboardView() {
           </div>
         </div>
       </div>
+
+      {childrenList.length === 0 && !isLoading && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#c4e9e0] shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-base font-black text-[#0d2b26]">
+              No Student Account Linked Yet
+            </h3>
+            <p className="text-xs text-slate-600 max-w-xl">
+              Link your child&apos;s student profile using their unique Student ID (e.g., <code className="font-mono font-bold text-[#0d5c4d]">STU-1234</code>), mobile number, or email address to view their real enrolled tutors, live classes, fee invoices, and paper marks.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsLinkChildModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-black shadow-xs transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+          >
+            <PlusCircle className="h-4 w-4 text-[#f3b738]" />
+            <span>Link Child Student ID</span>
+          </button>
+        </div>
+      )}
 
       {/* ========================================================= */}
       {/* TAB 1: EXECUTIVE OVERVIEW                                 */}
@@ -481,49 +614,69 @@ export function ParentDashboardView() {
               </div>
             </div>
 
-            {/* Card 2: Monthly Tuition Investment */}
+            {/* Card 2: Monthly Tuition Fee */}
             <div className="bg-white rounded-2xl p-5 border border-[#e6ece8] shadow-xs hover:border-[#0d5c4d]/40 transition-all">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Monthly Investment</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Monthly Tuition Fee</span>
                 <span className="p-2 rounded-xl bg-amber-50 text-amber-700">
                   <CreditCard className="h-5 w-5" />
                 </span>
               </div>
               <div className="mt-3">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-[#0d2b26]">LKR {activeChild.monthlyInvestmentLkr.toLocaleString()}</span>
+                  <span className="text-3xl font-black text-[#0d2b26]">
+                    LKR {(
+                      activeChild.monthlyInvestmentLkr ??
+                      (activeChild.enrolments || []).reduce((sum, e) => sum + (Number(e.monthlyFeeLkr) || 0), 0)
+                    ).toLocaleString()}
+                  </span>
                   <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
                     / month
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Status: {activeChild.pendingSlipsCount > 0 ? "1 Slip Under Review" : "All Paid & Active"}
+                  Status:{" "}
+                  {(activeChild.pendingSlipsCount ?? 0) > 0
+                    ? `${activeChild.pendingSlipsCount} Slip(s) Under Review`
+                    : (activeChild.enrolments || []).length > 0
+                    ? "All Paid & Active"
+                    : "No Active Subscriptions"}
                 </p>
               </div>
             </div>
 
-            {/* Card 3: Paper Class Performance */}
+            {/* Card 3: Assignments & Marks Performance */}
             <div className="bg-white rounded-2xl p-5 border border-[#e6ece8] shadow-xs hover:border-[#0d5c4d]/40 transition-all">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Paper Class Average</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Assignments &amp; Marks Average</span>
                 <span className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
                   <Award className="h-5 w-5" />
                 </span>
               </div>
               <div className="mt-3">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-[#0d2b26]">{activeChild.overallAverage}%</span>
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                    Batch Rank #{activeChild.classRank}
-                  </span>
+                  <span className="text-3xl font-black text-[#0d2b26]">{activeChild.overallAverage ?? 0}%</span>
+                  {(activeChild.paperMarks || []).length > 0 ? (
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                      {(activeChild.paperMarks || []).length} Graded
+                    </span>
+                  ) : (
+                    <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      No Marks Yet
+                    </span>
+                  )}
                 </div>
-                <p className="text-xs text-slate-500 mt-1">Ranked out of {activeChild.totalStudents} candidates</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {(activeChild.paperMarks || []).length > 0
+                    ? `Across ${(activeChild.paperMarks || []).length} graded assignments`
+                    : "Marks appear once assignments are graded by the tutor"}
+                </p>
               </div>
             </div>
           </div>
 
           {/* Quick Action Shortcuts Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               type="button"
               onClick={() => setIsDepositModalOpen(true)}
@@ -539,23 +692,6 @@ export function ParentDashboardView() {
                 </div>
               </div>
               <ChevronRight className="h-4 w-4 text-[#0d5c4d] group-hover:translate-x-1 transition-transform" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsLeaveModalOpen(true)}
-              className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 hover:bg-amber-100/70 text-left transition-all flex items-center justify-between group cursor-pointer shadow-2xs"
-            >
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold">
-                  <FileCheck className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-900">Notify Tutor of Absence</p>
-                  <p className="text-xs text-slate-600">Request recording access extension</p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-amber-700 group-hover:translate-x-1 transition-transform" />
             </button>
 
             <button
@@ -593,45 +729,58 @@ export function ParentDashboardView() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {activeChild.enrolments.map((enrol) => (
-                <div
-                  key={enrol.id}
-                  className="p-4 rounded-2xl border border-slate-200 bg-[#fbfdfc] hover:border-[#0d5c4d]/50 transition-all space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md">
-                      {enrol.subject}
-                    </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 flex items-center gap-1">
-                      <Video className="h-3 w-3 text-purple-600" />
-                      <span>{enrol.platform}</span>
-                    </span>
-                  </div>
+            {activeChild.enrolments.length === 0 ? (
+              <div className="p-8 rounded-2xl border border-dashed border-slate-200 bg-[#fbfdfc] text-center space-y-1">
+                <p className="text-sm font-bold text-slate-700">No Live Classes Scheduled Yet</p>
+                <p className="text-xs text-slate-500">
+                  Once {activeChild.name} enrolls in a course or tuition package, upcoming live sessions will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {activeChild.enrolments.map((enrol) => (
+                  <div
+                    key={enrol.id}
+                    className="p-4 rounded-2xl border border-slate-200 bg-[#fbfdfc] hover:border-[#0d5c4d]/50 transition-all space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md">
+                        {enrol.subject}
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 flex items-center gap-1">
+                        <Video className="h-3 w-3 text-purple-600" />
+                        <span>{enrol.platform}</span>
+                      </span>
+                    </div>
 
-                  <div>
-                    <h4 className="font-extrabold text-sm text-[#0d2b26]">{enrol.teacherName}</h4>
-                    <p className="text-xs text-slate-600 font-medium mt-0.5 line-clamp-1">{enrol.nextSessionTopic}</p>
-                  </div>
+                    <div>
+                      <h4 className="font-extrabold text-sm text-[#0d2b26]">{enrol.teacherName}</h4>
+                      <p className="text-xs text-slate-600 font-medium mt-0.5 line-clamp-1">{enrol.nextSessionTopic}</p>
+                    </div>
 
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-100 text-xs text-slate-600 flex items-center justify-between">
-                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-amber-600" />
-                      <span>{enrol.nextSessionDate}</span>
-                    </span>
-                    <a
-                      href={enrol.meetingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11px] font-black text-[#0d5c4d] hover:underline flex items-center gap-1"
-                    >
-                      <span>Join Link</span>
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-100 text-xs text-slate-600 flex items-center justify-between">
+                      <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-amber-600" />
+                        <span>{enrol.nextSessionDate}</span>
+                      </span>
+                      {enrol.meetingUrl && enrol.meetingUrl !== "#" ? (
+                        <a
+                          href={enrol.meetingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] font-black text-[#0d5c4d] hover:underline flex items-center gap-1"
+                        >
+                          <span>Join Link</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <span className="text-[11px] font-semibold text-slate-400">No Link Yet</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Active Tutors Detailed Enrolment Cards */}
@@ -651,6 +800,14 @@ export function ParentDashboardView() {
               </button>
             </div>
 
+            {activeChild.enrolments.length === 0 ? (
+              <div className="p-8 rounded-2xl border border-dashed border-slate-200 bg-[#fbfdfc] text-center space-y-2">
+                <p className="text-sm font-bold text-slate-700">No Enrolled Tuition Masterclasses</p>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  {activeChild.name} has not enrolled in any courses or monthly packages yet.
+                </p>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {activeChild.enrolments.map((enrol) => (
                 <div
@@ -702,8 +859,10 @@ export function ParentDashboardView() {
                         <span className="font-black text-emerald-700">{enrol.attendanceRate}% ({enrol.attendedSessions}/{enrol.totalSessions} Sessions)</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Latest Paper Score:</span>
-                        <span className="font-black text-[#0d5c4d]">{enrol.latestPaperMark}/100 (Rank #{enrol.batchRank})</span>
+                        <span className="text-slate-500">Latest Assignment Score:</span>
+                        <span className="font-black text-[#0d5c4d]">
+                          {enrol.latestPaperMark > 0 ? `${enrol.latestPaperMark}/${enrol.latestPaperMax}` : "No assignment graded yet"}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -749,6 +908,7 @@ export function ParentDashboardView() {
                 </div>
               ))}
             </div>
+            )}
           </div>
         </div>
       )}
@@ -775,6 +935,14 @@ export function ParentDashboardView() {
             </button>
           </div>
 
+          {activeChild.enrolments.length === 0 ? (
+            <div className="bg-white rounded-3xl p-8 border border-dashed border-slate-200 text-center space-y-2">
+              <p className="text-sm font-bold text-slate-700">No Active Masterclass Cohorts</p>
+              <p className="text-xs text-slate-500">
+                No enrolled tutors found for {activeChild.name}.
+              </p>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {activeChild.enrolments.map((enrol) => (
               <div
@@ -810,32 +978,37 @@ export function ParentDashboardView() {
                         <p className="text-[11px] font-bold text-slate-500 uppercase">Platform Link</p>
                         <p className="font-bold text-slate-800">{enrol.platform}</p>
                       </div>
-                      <a
-                        href={enrol.meetingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1 rounded-lg bg-[#0d5c4d] text-white text-xs font-bold hover:bg-[#0a483c] flex items-center gap-1"
-                      >
-                        <span>Join</span>
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
+                      {enrol.meetingUrl && enrol.meetingUrl !== "#" ? (
+                        <a
+                          href={enrol.meetingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 rounded-lg bg-[#0d5c4d] text-white text-xs font-bold hover:bg-[#0a483c] flex items-center gap-1"
+                        >
+                          <span>Join</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <span className="text-[11px] font-semibold text-slate-400">Not Scheduled</span>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Direct Phone:</span>
+                    <span className="text-slate-500 font-medium">Direct Contact:</span>
                     <span className="font-bold text-slate-800">{enrol.tutorPhone}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Batch Standing:</span>
-                    <span className="font-black text-[#0d5c4d]">Rank #{enrol.batchRank} / {enrol.batchTotalStudents}</span>
+                    <span className="text-slate-500 font-medium">Attendance:</span>
+                    <span className="font-black text-[#0d5c4d]">{enrol.attendanceRate}% ({enrol.attendedSessions}/{enrol.totalSessions})</span>
                   </div>
                 </div>
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
 
@@ -897,7 +1070,14 @@ export function ParentDashboardView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
-                  {invoices.map((inv) => (
+                  {invoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 px-4 text-center text-slate-500">
+                        No tuition invoices or bank deposit slips recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                  invoices.map((inv) => (
                     <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3.5 px-4 font-black text-slate-900">{inv.invoiceNumber}</td>
                       <td className="py-3.5 px-4">
@@ -942,7 +1122,8 @@ export function ParentDashboardView() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -953,53 +1134,22 @@ export function ParentDashboardView() {
 
 
       {/* ========================================================= */}
-      {/* TAB 5: PAPER CLASS MARKS & HOMEWORK (NEW FORMAT)          */}
+      {/* TAB 5: ASSIGNMENTS & ASSESSMENT MARKS                     */}
       {/* ========================================================= */}
       {activeTab === "progress" && (
         <div className="space-y-6">
-          {/* Header Controls: Title, View Switcher, and Analytics */}
+          {/* Header Controls */}
           <div className="bg-white rounded-3xl p-6 border border-[#e6ece8] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <span className="p-2 rounded-xl bg-emerald-50 text-[#0d5c4d]">
                   <Award className="h-5 w-5" />
                 </span>
-                <h2 className="text-xl font-black text-[#0d2b26]">Tutor Model Papers &amp; Gradebook Ledger</h2>
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">
-                  Batch Evaluated
-                </span>
+                <h2 className="text-xl font-black text-[#0d2b26]">Assignments &amp; Assessment Marks</h2>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Verified marks, comparative cohort rankings, and personalized educator feedback for {activeChild.name}
+                Graded assignments, scores, and tutor feedback for {activeChild.name}
               </p>
-            </div>
-
-            {/* View Mode Toggle: Gradebook Table vs Cards */}
-            <div className="flex items-center gap-1.5 p-1 bg-[#f4f7f5] rounded-xl border border-slate-200/80 self-start md:self-auto">
-              <button
-                type="button"
-                onClick={() => setPaperViewMode("table")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  paperViewMode === "table"
-                    ? "bg-[#0d5c4d] text-white shadow-xs font-black"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
-                }`}
-              >
-                <Table className="h-3.5 w-3.5" />
-                <span>Gradebook Table</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaperViewMode("cards")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  paperViewMode === "cards"
-                    ? "bg-[#0d5c4d] text-white shadow-xs font-black"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
-                }`}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" />
-                <span>Assessment Cards</span>
-              </button>
             </div>
           </div>
 
@@ -1016,10 +1166,10 @@ export function ParentDashboardView() {
                     : "bg-[#f4f7f5] text-slate-600 hover:bg-slate-200"
                 }`}
               >
-                All Subjects ({activeChild.paperMarks.length})
+                All Subjects ({(activeChild.paperMarks || []).length})
               </button>
               {availablePaperSubjects.map((sub) => {
-                const count = activeChild.paperMarks.filter((p) => p.subject === sub).length;
+                const count = (activeChild.paperMarks || []).filter((p) => p.subject === sub).length;
                 return (
                   <button
                     key={sub}
@@ -1040,187 +1190,107 @@ export function ParentDashboardView() {
             {/* Quick Metrics Tag Strip */}
             <div className="flex items-center gap-3 text-xs self-end lg:self-auto shrink-0">
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
-                <span className="text-slate-500 font-normal">Filtered Avg:</span>
+                <span className="text-slate-500 font-normal">Average Score:</span>
                 <span className="font-black text-[#0d2b26]">
                   {(
-                    filteredPapers.reduce((acc, p) => acc + p.score, 0) / (filteredPapers.length || 1)
+                    filteredPapers.reduce((acc, p) => acc + (p.maxScore > 0 ? (p.score / p.maxScore) * 100 : p.score), 0) /
+                    (filteredPapers.length || 1)
                   ).toFixed(1)}%
                 </span>
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 font-bold">
-                <span className="text-slate-500 font-normal">Top Score:</span>
+                <span className="text-slate-500 font-normal">Graded Count:</span>
                 <span className="font-black text-amber-800">
-                  {Math.max(...filteredPapers.map((p) => p.score), 0)} / 100
+                  {filteredPapers.length}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* ======================================================= */}
-          {/* FORMAT A: GRADEBOOK TABLE VIEW (HIGH DENSITY LEDGER)    */}
-          {/* ======================================================= */}
-          {paperViewMode === "table" && (
-            <div className="bg-white rounded-3xl p-6 border border-[#e6ece8] shadow-xs space-y-4">
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-[#f4f7f5] text-slate-700 font-black uppercase text-[10px] tracking-wider">
+          {/* ASSIGNMENTS & MARKS TABLE */}
+          <div className="bg-white rounded-3xl p-6 border border-[#e6ece8] shadow-xs space-y-4">
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#f4f7f5] text-slate-700 font-black uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Assignment Title</th>
+                    <th className="py-3 px-4">Subject &amp; Tutor</th>
+                    <th className="py-3 px-4 text-center">Marks</th>
+                    <th className="py-3 px-4 text-center">Grade</th>
+                    <th className="py-3 px-4">Tutor Feedback</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {filteredPapers.length === 0 ? (
                     <tr>
-                      <th className="py-3 px-4">Date &amp; Paper Code</th>
-                      <th className="py-3 px-4">Assessment Title</th>
-                      <th className="py-3 px-4">Educator / Subject</th>
-                      <th className="py-3 px-4 text-center">Score / 100</th>
-                      <th className="py-3 px-4 text-center">Grade</th>
-                      <th className="py-3 px-4 text-center">Batch Benchmark</th>
-                      <th className="py-3 px-4 text-center">Batch Rank</th>
-                      <th className="py-3 px-4 text-right">Educator Rubric</th>
+                      <td colSpan={6} className="py-8 px-4 text-center text-slate-500">
+                        No graded assignments recorded yet for {activeChild.name}.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
-                    {filteredPapers.map((paper) => {
-                      const diff = paper.score - paper.batchAverage;
-                      return (
-                        <tr key={paper.id} className="hover:bg-slate-50/80 transition-colors">
-                          {/* Date & Code */}
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span className="font-bold text-slate-900 block">{paper.date}</span>
-                            <span className="inline-block px-2 py-0.2 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-700 mt-0.5">
-                              {paper.paperCode}
-                            </span>
-                          </td>
+                  ) : (
+                    filteredPapers.map((paper) => (
+                      <tr key={paper.id} className="hover:bg-slate-50/80 transition-colors">
+                        {/* Date */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="font-bold text-slate-900">{paper.date}</span>
+                        </td>
 
-                          {/* Title */}
-                          <td className="py-3.5 px-4 font-bold text-slate-900 max-w-xs">
-                            <p className="line-clamp-2">{paper.title}</p>
-                          </td>
+                        {/* Title */}
+                        <td className="py-3.5 px-4 font-bold text-slate-900 max-w-xs">
+                          <p className="line-clamp-2">{paper.title}</p>
+                        </td>
 
-                          {/* Tutor & Subject */}
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span className="font-bold text-[#0d5c4d] block">{paper.tutorName}</span>
-                            <span className="text-[10px] text-slate-500 font-semibold">{paper.subject}</span>
-                          </td>
+                        {/* Tutor & Subject */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="font-bold text-[#0d5c4d] block">{paper.subject}</span>
+                          <span className="text-[10px] text-slate-500 font-semibold">{paper.tutorName}</span>
+                        </td>
 
-                          {/* Score & Visual Bar */}
-                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                            <span className="text-base font-black text-[#0d2b26]">{paper.score}</span>
-                            <span className="text-[10px] text-slate-400 font-bold"> / {paper.maxScore}</span>
-                            <div className="w-20 mx-auto bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
-                              <div
-                                className={`h-full rounded-full ${
-                                  paper.score >= 85 ? "bg-emerald-500" : paper.score >= 70 ? "bg-blue-500" : "bg-amber-500"
-                                }`}
-                                style={{ width: `${(paper.score / paper.maxScore) * 100}%` }}
-                              />
-                            </div>
-                          </td>
+                        {/* Score & Visual Bar */}
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <span className="text-base font-black text-[#0d2b26]">{paper.score}</span>
+                          <span className="text-[10px] text-slate-400 font-bold"> / {paper.maxScore}</span>
+                          <div className="w-20 mx-auto bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
+                            <div
+                              className={`h-full rounded-full ${
+                                paper.score >= 85 ? "bg-emerald-500" : paper.score >= 70 ? "bg-blue-500" : "bg-amber-500"
+                              }`}
+                              style={{ width: `${Math.min(100, (paper.score / (paper.maxScore || 100)) * 100)}%` }}
+                            />
+                          </div>
+                        </td>
 
-                          {/* Grade Badge */}
-                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                            <span className="inline-block px-2.5 py-1 rounded-md bg-[#ecf8f5] text-[#0d5c4d] font-black text-xs">
-                              Grade {paper.grade}
-                            </span>
-                          </td>
+                        {/* Grade Badge */}
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <span className="inline-block px-2.5 py-1 rounded-md bg-[#ecf8f5] text-[#0d5c4d] font-black text-xs">
+                            Grade {paper.grade}
+                          </span>
+                        </td>
 
-                          {/* Batch Benchmark */}
-                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                            <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                              <TrendingUp className="h-3 w-3" />
-                              <span>+{diff}% vs Avg</span>
-                            </span>
-                            <span className="block text-[10px] text-slate-400 mt-0.5">
-                              (Batch Avg: {paper.batchAverage}%)
-                            </span>
-                          </td>
-
-                          {/* Batch Rank */}
-                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                            <span className="font-black text-[#0d2b26] text-xs">#{paper.rank}</span>
-                            <span className="text-[10px] text-slate-500 font-semibold"> / {paper.batchTotal}</span>
-                          </td>
-
-                          {/* Actions */}
-                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        {/* Tutor Feedback */}
+                        <td className="py-3.5 px-4 max-w-xs">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-slate-600 line-clamp-2 text-xs">
+                              {paper.tutorFeedback || "Completed & graded by tutor."}
+                            </p>
                             <button
                               type="button"
                               onClick={() => setSelectedPaperModal(paper)}
-                              className="px-3 py-1.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                              className="px-3 py-1.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all shadow-2xs inline-flex items-center gap-1.5 shrink-0 cursor-pointer"
                             >
                               <FileText className="h-3 w-3" />
-                              <span>Inspect Feedback</span>
+                              <span>View</span>
                             </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
-
-          {/* ======================================================= */}
-          {/* FORMAT B: ASSESSMENT CARDS VIEW (ANALYTIC TILES)       */}
-          {/* ======================================================= */}
-          {paperViewMode === "cards" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {filteredPapers.map((paper) => {
-                const diff = paper.score - paper.batchAverage;
-                return (
-                  <div
-                    key={paper.id}
-                    className="bg-white rounded-3xl p-6 border border-slate-200 hover:border-[#0d5c4d]/50 transition-all space-y-4 shadow-xs"
-                  >
-                    {/* Top Code & Score Row */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-md bg-[#ecf8f5] text-[#0d5c4d] font-black text-xs">
-                            {paper.subject}
-                          </span>
-                          <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                            {paper.paperCode}
-                          </span>
-                        </div>
-                        <h4 className="text-base font-extrabold text-[#0d2b26] leading-snug pt-1">
-                          {paper.title}
-                        </h4>
-                        <p className="text-xs text-slate-500 font-semibold">
-                          Educator: {paper.tutorName} • Date: {paper.date}
-                        </p>
-                      </div>
-
-                      {/* Big Score Dial */}
-                      <div className="text-right shrink-0 p-3 rounded-2xl bg-[#f8faf9] border border-slate-200">
-                        <span className="text-2xl font-black text-[#0d2b26]">{paper.score}</span>
-                        <span className="text-xs text-slate-500 font-bold"> / {paper.maxScore}</span>
-                        <span className="block text-[10px] font-black uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mt-1 text-center">
-                          Grade {paper.grade}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Cohort Comparison Bar Gauge */}
-                    <div className="p-3.5 rounded-2xl bg-[#f4f7f5] border border-slate-200/80 space-y-2 text-xs">
-                      <div className="flex items-center justify-between font-bold">
-                        <span className="text-slate-600">Cohort Comparison</span>
-                        <span className="text-emerald-700 font-black">+{diff}% Above Batch Average</span>
-                      </div>
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden flex">
-                        <div
-                          className="bg-[#0d5c4d] h-full rounded-full transition-all"
-                          style={{ width: `${(paper.score / paper.maxScore) * 100}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold pt-0.5">
-                        <span>Batch Average: {paper.batchAverage}%</span>
-                        <span>Standing: Rank #{paper.rank} of {paper.batchTotal}</span>
-                        <span>Highest: {paper.highestScore}%</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -1238,8 +1308,16 @@ export function ParentDashboardView() {
             </div>
           </div>
 
+          {(activeChild.announcements || []).length === 0 ? (
+            <div className="bg-white rounded-3xl p-8 border border-dashed border-slate-200 text-center space-y-2">
+              <p className="text-sm font-bold text-slate-700">No Announcements Posted Yet</p>
+              <p className="text-xs text-slate-500">
+                Official circulars and educator notices will appear here once published.
+              </p>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {activeChild.announcements.map((ann) => (
+            {(activeChild.announcements || []).map((ann) => (
               <div
                 key={ann.id}
                 className="bg-white rounded-3xl p-6 border border-[#e6ece8] shadow-xs flex flex-col justify-between hover:border-[#0d5c4d]/50 transition-all group"
@@ -1276,8 +1354,51 @@ export function ParentDashboardView() {
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
+
+      {/* ========================================================= */}
+      {/* MODAL 0: LINK A CHILD STUDENT PROFILE                     */}
+      {/* ========================================================= */}
+      <Modal
+        isOpen={isLinkChildModalOpen}
+        onClose={() => setIsLinkChildModalOpen(false)}
+        title="Link Your Child's Student Account"
+        description="Enter your child's Student ID (e.g. STU-1234), registered mobile number, or email address."
+      >
+        <form onSubmit={handleLinkChildSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Child&apos;s Student ID, Mobile Number, or Email *
+            </label>
+            <input
+              type="text"
+              value={linkStudentInput}
+              onChange={(e) => setLinkStudentInput(e.target.value)}
+              placeholder="e.g. STU-1234 or 0771234567"
+              required
+              className="w-full h-10 px-3 rounded-xl bg-[#f6f9f7] border border-[#e2e8e4] text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsLinkChildModalOpen(false)}
+              className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLinkingStudent}
+              className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-black cursor-pointer disabled:opacity-50"
+            >
+              {isLinkingStudent ? "Linking..." : "Link Student"}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* ========================================================= */}
       {/* MODAL 1: UPLOAD BANK DEPOSIT SLIP                         */}
@@ -1646,32 +1767,26 @@ export function ParentDashboardView() {
       )}
 
       {/* ========================================================= */}
-      {/* MODAL 5: PAPER EVALUATION & EDUCATOR RUBRIC DETAILS        */}
+      {/* MODAL 5: ASSIGNMENT EVALUATION & TUTOR FEEDBACK           */}
       {/* ========================================================= */}
       {selectedPaperModal && (
         <Modal
           isOpen={true}
           onClose={() => setSelectedPaperModal(null)}
-          title="Model Paper Assessment &amp; Rubric Breakdown"
-          description={`${selectedPaperModal.paperCode} • Released by ${selectedPaperModal.tutorName} (${selectedPaperModal.subject})`}
-          maxWidth="max-w-2xl"
+          title="Assignment Evaluation &amp; Tutor Feedback"
+          description={`Graded by ${selectedPaperModal.tutorName} (${selectedPaperModal.subject})`}
+          maxWidth="max-w-xl"
         >
           <div className="space-y-5 text-xs">
-            {/* Certificate Header */}
             <div className="p-5 rounded-2xl bg-white border-2 border-[#0d5c4d]/20 relative overflow-hidden shadow-xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-md bg-[#ecf8f5] text-[#0d5c4d] font-black text-xs">
-                      {selectedPaperModal.subject}
-                    </span>
-                    <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                      {selectedPaperModal.paperCode}
-                    </span>
-                  </div>
+                  <span className="px-2 py-0.5 rounded-md bg-[#ecf8f5] text-[#0d5c4d] font-black text-xs">
+                    {selectedPaperModal.subject}
+                  </span>
                   <h3 className="text-base font-black text-[#0d2b26] mt-1">{selectedPaperModal.title}</h3>
                   <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                    Evaluated for: {activeChild.name} • Assessment Date: {selectedPaperModal.date}
+                    Student: {activeChild.name} • Date: {selectedPaperModal.date}
                   </p>
                 </div>
 
@@ -1684,32 +1799,14 @@ export function ParentDashboardView() {
                 </div>
               </div>
 
-              {/* Cohort Benchmark Metrics Grid */}
-              <div className="grid grid-cols-3 gap-3 p-3.5 bg-[#f6f9f7] rounded-xl border border-slate-200 text-center">
-                <div>
-                  <span className="text-slate-500 text-[10px] font-bold uppercase">Child Score</span>
-                  <p className="text-base font-black text-[#0d2b26] mt-0.5">{selectedPaperModal.score}%</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-[10px] font-bold uppercase">Batch Average</span>
-                  <p className="text-base font-black text-slate-700 mt-0.5">{selectedPaperModal.batchAverage}%</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-[10px] font-bold uppercase">Batch Standing</span>
-                  <p className="text-base font-black text-[#0d5c4d] mt-0.5">
-                    Rank #{selectedPaperModal.rank} / {selectedPaperModal.batchTotal}
-                  </p>
-                </div>
-              </div>
-
               {/* Tutor Personalized Feedback Quote Block */}
               <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200 text-slate-800 space-y-2">
                 <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs">
                   <Sparkles className="h-4 w-4 text-amber-600" />
-                  <span>Educator's Detailed Rubric &amp; Feedback:</span>
+                  <span>Tutor Feedback:</span>
                 </div>
                 <p className="text-xs italic leading-relaxed text-slate-700 font-medium pl-3 border-l-2 border-amber-400">
-                  "{selectedPaperModal.tutorFeedback}"
+                  &ldquo;{selectedPaperModal.tutorFeedback || "Completed and graded by tutor."}&rdquo;
                 </p>
                 <div className="text-right pt-1">
                   <span className="text-[11px] font-bold text-slate-600">— {selectedPaperModal.tutorName}</span>
@@ -1718,39 +1815,22 @@ export function ParentDashboardView() {
             </div>
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={() =>
-                  addToast({
-                    type: "success",
-                    title: "Downloading Model Paper",
-                    message: `${selectedPaperModal.paperCode}_Model_Paper.pdf saved to device.`
-                  })
-                }
-                className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                onClick={() => window.print()}
+                className="px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 hover:bg-slate-800 cursor-pointer"
               >
-                <Download className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                <span>Download Paper &amp; Scheme PDF</span>
+                <Printer className="h-3.5 w-3.5" />
+                <span>Print Marksheet</span>
               </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 hover:bg-slate-800 cursor-pointer"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  <span>Print Marksheet</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedPaperModal(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPaperModal(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 cursor-pointer"
+              >
+                Close
+              </button>
             </div>
           </div>
         </Modal>

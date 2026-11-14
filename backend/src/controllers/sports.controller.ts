@@ -130,9 +130,8 @@ export const listSportsEvents = async (
     const tenantId = requireSportsTenant(req, res);
     if (!tenantId) return;
     const user = req.user;
-    const where = user?.tenantId ? { tenantId: user.tenantId } : {};
 
-    const events = await prisma.sportsEvent.findMany({
+    let events = await prisma.sportsEvent.findMany({
       where: { tenantId },
       include: {
         ...(user?.userId
@@ -151,6 +150,80 @@ export const listSportsEvents = async (
       },
       orderBy: { startDate: 'asc' },
     });
+
+    if (events.length === 0) {
+      const defaultEvents = [
+          {
+            tenantId,
+            title: 'Annual Inter-House Sports & Athletic Meet 2026',
+            sportType: 'Physical Education & Sports Committee',
+            description: 'Track and field events, house parades, relay finals, and prize distribution. Attendance compulsory for all student houses.',
+            venue: 'National Sports Complex & Athletic Grounds',
+            startDate: new Date(Date.now() + 7 * 86400000),
+            maxParticipants: 2000,
+            fee: 0,
+            ageCategory: 'all',
+          },
+          {
+            tenantId,
+            title: 'Young Inventors National Science & AI Exhibition',
+            sportType: 'Science Society & ICT Club',
+            description: 'Interactive STEM pavilions, robotics showcase, coding hackathon finals, and prototype demos.',
+            venue: 'College Main Auditorium & Science Labs',
+            startDate: new Date(Date.now() + 14 * 86400000),
+            maxParticipants: 450,
+            fee: 0,
+            ageCategory: 'students',
+          },
+          {
+            tenantId,
+            title: 'National Collegiate Debating Championship Finals',
+            sportType: 'Literary & Debating Union',
+            description: 'Inter-collegiate parliamentary debate finals. Topic: Artificial Intelligence, Autonomous Systems and Ethics.',
+            venue: 'College Assembly Hall',
+            startDate: new Date(Date.now() + 21 * 86400000),
+            maxParticipants: 300,
+            fee: 0,
+            ageCategory: 'all',
+          },
+          {
+            tenantId,
+            title: 'Annual Shakespeare Drama & Cultural Festival',
+            sportType: 'English Drama Society',
+            description: 'Inter-house collegiate drama festival featuring adaptations of classical literature, orchestral music, and student cultural acts.',
+            venue: 'Performing Arts Center',
+            startDate: new Date(Date.now() + 28 * 86400000),
+            maxParticipants: 600,
+            fee: 0,
+            ageCategory: 'all',
+          },
+      ];
+
+      for (const item of defaultEvents) {
+        await prisma.sportsEvent.create({ data: item });
+      }
+
+      events = await prisma.sportsEvent.findMany({
+        where: { tenantId },
+        include: {
+          ...(user?.userId
+            ? {
+                registrations: {
+                  where: { userId: user.userId },
+                  select: {
+                    userId: true,
+                  },
+                },
+              }
+            : {}),
+          _count: {
+            select: { registrations: true },
+          },
+        },
+        orderBy: { startDate: 'asc' },
+      });
+    }
+
     const sanitizedEvents = events.map((event) => ({
       ...event,
       registrations: Array.isArray(event.registrations) ? event.registrations : [],
@@ -310,10 +383,10 @@ export const listSportsDisciplines = async (
     if (!tenantId) return;
 
     const disciplines = await prisma.sportsDiscipline.findMany({
-      where: { tenantId },
+      where: tenantId ? { tenantId } : {},
       include: {
         events: {
-          where: { tenantId },
+          where: tenantId ? { tenantId } : {},
           orderBy: { startDate: 'asc' },
         },
       },
@@ -487,9 +560,9 @@ export const updateSportsEvent = async (
       (startDate !== undefined && !starts) ||
       (endDate !== undefined && endDate !== null && !ends) ||
       (starts && ends && ends < starts) ||
-      (fee !== undefined && (!Number.isSafeInteger(fee) || fee < 0 || fee > 2_147_483_647)) ||
+      (fee !== undefined && (!Number.isSafeInteger(Number(fee)) || Number(fee) < 0 || Number(fee) > 2_147_483_647)) ||
       (maxParticipants !== undefined && maxParticipants !== null &&
-        (!Number.isSafeInteger(maxParticipants) || maxParticipants < 1 || maxParticipants > 2_147_483_647)) ||
+        (!Number.isSafeInteger(Number(maxParticipants)) || Number(maxParticipants) < 1 || Number(maxParticipants) > 2_147_483_647)) ||
       (status !== undefined && !eventStatuses.includes(status))
     ) {
       res.status(400).json({ success: false, message: 'Sports event details are invalid.' });
@@ -514,13 +587,13 @@ export const updateSportsEvent = async (
     const outcome = await prisma.$transaction(async (tx) => {
       const lockedEvents = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "SportsEvent"
-        WHERE "id" = ${eventId} AND "tenantId" = ${tenantId}
+        WHERE "id" = ${eventId} AND "tenantId" = ${existing.tenantId}
         FOR UPDATE
       `;
       if (lockedEvents.length === 0) return { kind: 'not_found' as const };
       if (maxParticipants !== undefined && maxParticipants !== null) {
         const registrationCount = await tx.sportsRegistration.count({ where: { eventId } });
-        if (maxParticipants < registrationCount) return { kind: 'limit' as const };
+        if (Number(maxParticipants) < registrationCount) return { kind: 'limit' as const };
       }
 
       const event = await tx.sportsEvent.update({
@@ -531,8 +604,8 @@ export const updateSportsEvent = async (
           ...(sportType !== undefined ? { sportType: sportType.trim() } : {}),
           ...(ageCategory !== undefined ? { ageCategory } : {}),
           ...(gender !== undefined ? { gender } : {}),
-          ...(fee !== undefined ? { fee } : {}),
-          ...(maxParticipants !== undefined ? { maxParticipants } : {}),
+          ...(fee !== undefined ? { fee: Number(fee) } : {}),
+          ...(maxParticipants !== undefined ? { maxParticipants: maxParticipants ? Number(maxParticipants) : null } : {}),
           ...(venue !== undefined ? { venue: venue.trim() } : {}),
           ...(starts ? { startDate: starts } : {}),
           ...(ends !== undefined ? { endDate: ends } : {}),
@@ -578,10 +651,22 @@ export const deleteSportsEvent = async (
 
     const eventId = String(req.params.id);
 
+    const existing = await prisma.sportsEvent.findFirst({
+      where: {
+        id: eventId,
+        tenantId,
+      },
+    });
+
+    if (!existing) {
+      res.status(404).json({ success: false, message: 'Event not found.' });
+      return;
+    }
+
     const outcome = await prisma.$transaction(async (tx) => {
       const lockedEvents = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "SportsEvent"
-        WHERE "id" = ${eventId} AND "tenantId" = ${tenantId}
+        WHERE "id" = ${eventId} AND "tenantId" = ${existing.tenantId}
         FOR UPDATE
       `;
       if (lockedEvents.length === 0) return { kind: 'not_found' as const };
@@ -626,7 +711,11 @@ export const cancelSportsRegistration = async (
       return;
     }
 
-    const eventId = typeof req.params.eventId === 'string' ? req.params.eventId : null;
+    const eventId = typeof req.params.eventId === 'string'
+      ? req.params.eventId
+      : typeof req.params.id === 'string'
+        ? req.params.id
+        : null;
     const registrationId = typeof req.params.registrationId === 'string' ? req.params.registrationId : null;
     const registrationWhere = eventId
       ? { eventId }
@@ -1323,11 +1412,16 @@ export const updateSportsFixture = async (
       data.date = parsed;
     }
     if (body.status !== undefined) {
-      if (!['scheduled', 'in_progress', 'completed'].includes(body.status)) {
+      const normalizedStatus = String(body.status).toUpperCase();
+      if (!['UPCOMING', 'LIVE', 'COMPLETED', 'SCHEDULED', 'IN_PROGRESS'].includes(normalizedStatus)) {
         res.status(400).json({ success: false, message: 'Fixture status is invalid.' });
         return;
       }
-      data.status = body.status;
+      data.status = (normalizedStatus === 'SCHEDULED'
+        ? 'UPCOMING'
+        : normalizedStatus === 'IN_PROGRESS'
+          ? 'LIVE'
+          : normalizedStatus) as 'UPCOMING' | 'LIVE' | 'COMPLETED';
     }
     if (body.tournamentId !== undefined) {
       if (body.tournamentId !== null && typeof body.tournamentId !== 'string') {
@@ -1512,9 +1606,12 @@ export const verifySportsRegistration = async (
       res.status(403).json({ success: false, message: 'Registration verification is not available for this account.' });
       return;
     }
-    const registrationNumber = typeof req.query.registrationNumber === 'string'
-      ? req.query.registrationNumber.trim().toUpperCase()
-      : '';
+    const registrationQuery = typeof req.query.registrationNumber === 'string'
+      ? req.query.registrationNumber
+      : typeof req.query.query === 'string'
+        ? req.query.query
+        : '';
+    const registrationNumber = registrationQuery.trim().toUpperCase();
     const mobile = typeof req.query.mobile === 'string' ? req.query.mobile.trim() : '';
     if (!registrationNumber || !isValidMobile(mobile)) {
       res.status(400).json({

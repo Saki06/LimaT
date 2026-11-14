@@ -381,6 +381,7 @@ export const api = {
       email: string;
       password: string;
       gradeLevel?: string;
+      section?: string;
       studentIdNo?: string;
     }): Promise<AuthResponse> {
       const response = await fetch(`${API_BASE_URL}/auth/register/student`, {
@@ -1110,7 +1111,6 @@ export const api = {
     },
   },
 
-
   // Sports Events and Registrations
   sports: {
     async getEvents(): Promise<SportsEvent[]> {
@@ -1129,8 +1129,8 @@ export const api = {
         startDate: string;
         endDate: string | null;
         status: SportsEventStatus;
-        _count: { registrations: number };
-        registrations: Array<{ userId: string }>;
+        _count?: { registrations: number };
+        registrations?: Array<{ userId: string }>;
       }>>('/events');
       return result.map((event) => ({
         id: event.id,
@@ -1147,8 +1147,8 @@ export const api = {
         startDate: event.startDate,
         endDate: event.endDate,
         status: event.status,
-        registrationCount: event._count.registrations,
-        isRegistered: event.registrations.length > 0,
+        registrationCount: event._count?.registrations ?? 0,
+        isRegistered: (event.registrations?.length ?? 0) > 0,
       }));
     },
 
@@ -1165,7 +1165,7 @@ export const api = {
 
     async updateEvent(
       id: string,
-      input: Partial<Pick<SportsEvent, 'title' | 'sportType' | 'ageCategory' | 'gender' | 'fee' | 'maxParticipants' | 'venue' | 'startDate' | 'endDate' | 'description' | 'isTeamSport' | 'status'>>,
+      input: Partial<Pick<SportsEvent, 'disciplineId' | 'title' | 'sportType' | 'ageCategory' | 'gender' | 'fee' | 'maxParticipants' | 'venue' | 'startDate' | 'endDate' | 'description' | 'isTeamSport' | 'status'>>,
     ): Promise<SportsEvent> {
       return sportsRequest<SportsEvent>(`/events/${encodeURIComponent(id)}`, {
         method: 'PATCH',
@@ -1246,12 +1246,13 @@ export const api = {
       sportType: string;
       ageCategory?: string | null;
       gender?: string | null;
-      fee: number;
+      fee?: number;
       maxParticipants?: number | null;
       venue: string;
       startDate: string;
+      endDate?: string | null;
       description?: string;
-      isTeamSport: boolean;
+      isTeamSport?: boolean;
     }): Promise<SportsEvent> {
       return sportsRequest<SportsEvent>('/events', {
         method: 'POST',
@@ -1261,7 +1262,7 @@ export const api = {
 
     async registerChampionship(input: {
       eventIds: string[];
-      registrationNumber: string;
+      registrationNumber?: string;
       athleteDetails: Record<string, unknown>;
     }): Promise<SportsRegistration[]> {
       return sportsRequest<SportsRegistration[]>('/registrations/championship', {
@@ -1610,6 +1611,19 @@ export const api = {
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+      });
+      return res.json();
+    },
+
+    async linkChild(studentIdentifier: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/parents/link-child`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ studentIdentifier }),
       });
       return res.json();
     },
@@ -2019,7 +2033,6 @@ export const api = {
       return result;
     },
   },
-
   // School Admin Workspace APIs
   admin: {
     async getOverview() {

@@ -174,6 +174,8 @@ export default function HomePage() {
       }
     } else if (currentRole === "parent") {
       switch (currentView) {
+        case "profile":
+          return <ProfileView />;
         case "connect":
           return <ConnectView />;
         case "school_life":
