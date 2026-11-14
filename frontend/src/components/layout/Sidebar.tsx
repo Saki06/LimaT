@@ -38,8 +38,7 @@ import {
   UserCheck,
   Globe,
   Sparkles,
-  X,
-  Search
+  X
 } from "lucide-react";
 
 interface SidebarProps {
@@ -228,39 +227,11 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
       group: "Notices & Updates"
     },
 
-    // Sports & Tournaments with Sub-headings
     {
       id: "sports",
       label: "My Sports",
       icon: Trophy,
-      group: "Sports & Academy",
-      children: [
-        {
-          id: "sports_tournaments",
-          label: "Tournaments & Championships",
-          icon: Trophy
-        },
-        {
-          id: "sports_registration",
-          label: "Online Registration",
-          icon: Sparkles
-        },
-        {
-          id: "sports_check",
-          label: "Check My Registration",
-          icon: Search
-        },
-        {
-          id: "sports_fixtures",
-          label: "Fixtures & Schedule",
-          icon: Calendar
-        },
-        {
-          id: "sports_standings",
-          label: "League Standings",
-          icon: TrendingUp
-        }
-      ]
+      group: "Sports & Academy"
     },
 
     // Account & Profile

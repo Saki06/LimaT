@@ -65,6 +65,7 @@ export function SportsView({
     fixtures,
     sportsRegistrations,
     standings,
+    standingsStatus,
     tournaments = [],
     createTournament,
     updateTournament,
@@ -1402,8 +1403,8 @@ export function SportsView({
       {activeTab === "standings" && (
         <ChampionshipStandingsView
           defaultStandings={standings}
-          tournaments={tournaments}
-          fixtures={fixtures}
+          status={standingsStatus}
+          onRetry={fetchSportsOperations}
         />
       )}
 
