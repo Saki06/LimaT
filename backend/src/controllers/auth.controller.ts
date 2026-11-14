@@ -14,22 +14,29 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const user = await prisma.user.findUnique({
-  where: { email },
-  include: {
-    tenant: true,
-    studentProfile: true,
-    teacherProfile: {
-      select: {
-        id: true,
-        userId: true,
-        employeeNo: true,
-        specialization: true,
+    const cleanEmail = String(email).trim();
+
+    const user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: cleanEmail,
+          mode: 'insensitive',
+        },
       },
-    },
-    parentProfile: true,
-  },
-});
+      include: {
+        tenant: true,
+        studentProfile: true,
+        teacherProfile: {
+          select: {
+            id: true,
+            userId: true,
+            employeeNo: true,
+            specialization: true,
+          },
+        },
+        parentProfile: true,
+      },
+    });
 
     if (!user) {
   res.status(401).json({
@@ -128,13 +135,16 @@ export const registerStudent = async (req: Request, res: Response): Promise<void
       return;
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
-    if (!emailRegex.test(String(email).trim())) {
+    if (!emailRegex.test(normalizedEmail)) {
       res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
       return;
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+    });
     if (existingUser) {
       res.status(409).json({ success: false, message: 'Email already registered.' });
       return;
@@ -204,7 +214,7 @@ if (
     const newUser = await prisma.user.create({
       data: {
         tenantId: selectedTenantId,
-        email,
+        email: normalizedEmail,
         passwordHash,
         role: Role.STUDENT,
         firstName,
@@ -253,7 +263,10 @@ export const registerTutor = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+    });
     if (existingUser) {
       res.status(409).json({ success: false, message: 'Email already registered.' });
       return;
@@ -304,7 +317,7 @@ if (
     const newUser = await prisma.user.create({
       data: {
         tenantId: selectedTenantId!,
-        email,
+        email: normalizedEmail,
         passwordHash,
         role: Role.TEACHER,
         firstName,
@@ -351,7 +364,10 @@ export const registerParent = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+    });
     if (existingUser) {
       res.status(409).json({ success: false, message: 'Email already registered.' });
       return;
@@ -402,7 +418,7 @@ if (
     const newUser = await prisma.user.create({
       data: {
         tenantId: selectedTenantId!,
-        email,
+        email: normalizedEmail,
         passwordHash,
         role: Role.PARENT,
         firstName,

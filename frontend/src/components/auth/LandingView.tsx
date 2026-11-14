@@ -303,7 +303,7 @@ export function LandingView({
 
     // Try real backend authentication
     try {
-      const res = await loginUser(loginEmail.trim(), loginPassword);
+      const res = await loginUser(loginEmail.trim().toLowerCase(), loginPassword);
       if (res.success) {
         setAuthMode("closed");
         onEnterApp();
@@ -1544,18 +1544,18 @@ export function LandingView({
               </div>
             </div>
 
-            {/* 4 Clean Role Cards: Student, Parent, Tutor & Admin */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 lg:gap-5 my-1.5 sm:my-3 max-w-6xl mx-auto w-full items-stretch">
-              {/* CARD 1: STUDENT */}
-              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+            {/* 4 Clean Role Cards: Row 1 (Student | Tutor), Row 2 (Parent | Admin) on 2-col mobile grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 lg:gap-5 my-1.5 sm:my-3 max-w-6xl mx-auto w-full items-stretch">
+              {/* CARD 1 (Row 1, Col 1): STUDENT */}
+              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-emerald-100 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl transition-all duration-300 p-2.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
                 {/* Tozy Buddy Badge */}
-                <div className="absolute top-2.5 right-2.5 bg-emerald-50 text-[#0d5c4d] text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200/80 flex items-center gap-1">
+                <div className="sm:absolute sm:top-2.5 sm:right-2.5 bg-emerald-50 text-[#0d5c4d] text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200/80 inline-flex items-center gap-1 self-end sm:self-auto">
                   <span>🐘</span>
                   <span>Learn with Tozy</span>
                 </div>
 
                 {/* Brush-Splash Character Illustration */}
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
+                <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
                   <img
                     src="/images/student_brush_portrait.jpg"
                     alt="Student learning with Newtoz"
@@ -1567,63 +1567,29 @@ export function LandingView({
                 <button
                   type="button"
                   onClick={() => handlePortalSwitch("student")}
-                  className="w-full max-w-xs bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
+                  className="w-full max-w-xs bg-[#0d5c4d] hover:bg-[#083e34] text-white font-black text-xs sm:text-base py-2 sm:py-3 px-3 sm:px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer mt-1.5 group"
                 >
-                  <GraduationCap className="h-4 sm:h-5 w-4 sm:w-5" />
+                  <GraduationCap className="h-3.5 sm:h-5 w-3.5 sm:w-5 shrink-0" />
                   <span>Student</span>
-                  <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="h-3.5 sm:h-4 w-3.5 sm:w-4 ml-0.5 sm:ml-1 group-hover:translate-x-1 transition-transform shrink-0" />
                 </button>
 
                 {/* Subtitle Caption */}
-                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
+                <p className="text-[10px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs leading-snug">
                   Shape your future, learn anytime, fly high!
                 </p>
               </div>
 
-              {/* CARD 2: PARENT */}
-              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-slate-200 hover:border-[#1e3a5f] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+              {/* CARD 2 (Row 1, Col 2): TUTOR */}
+              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-amber-100 hover:border-[#b47a16] shadow-sm hover:shadow-xl transition-all duration-300 p-2.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
                 {/* Tozy Buddy Badge */}
-                <div className="absolute top-2.5 right-2.5 bg-sky-50 text-[#1e3a5f] text-[10px] font-black px-2 py-0.5 rounded-full border border-sky-200/80 flex items-center gap-1">
-                  <span>🐘</span>
-                  <span>Guide with Tozy</span>
-                </div>
-
-                {/* Brush-Splash Character Illustration */}
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
-                  <img
-                    src="/images/parent_brush_portrait.jpg"
-                    alt="Parent reviewing student progress with Newtoz"
-                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
-
-                {/* Pill Button in our Slate Navy Theme (#1e3a5f) */}
-                <button
-                  type="button"
-                  onClick={() => handlePortalSwitch("parent")}
-                  className="w-full max-w-xs bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
-                >
-                  <Users className="h-4 sm:h-5 w-4 sm:w-5" />
-                  <span>Parent</span>
-                  <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
-                </button>
-
-                {/* Subtitle Caption */}
-                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
-                  Support, monitor, be part of their journey.
-                </p>
-              </div>
-
-              {/* CARD 3: TUTOR */}
-              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-amber-100 hover:border-[#b47a16] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
-                {/* Tozy Buddy Badge */}
-                <div className="absolute top-2.5 right-2.5 bg-amber-50 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-200/80 flex items-center gap-1">
+                <div className="sm:absolute sm:top-2.5 sm:right-2.5 bg-amber-50 text-amber-800 text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-200/80 inline-flex items-center gap-1 self-end sm:self-auto">
                   <span>🐘</span>
                   <span>Mentor with Tozy</span>
                 </div>
 
                 {/* Teacher / Educator Character Illustration */}
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
+                <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
                   <img
                     src="/images/tutor_brush_portrait.jpg"
                     alt="Teacher and Tutor educator with Newtoz"
@@ -1635,29 +1601,63 @@ export function LandingView({
                 <button
                   type="button"
                   onClick={() => handlePortalSwitch("staff")}
-                  className="w-full max-w-xs bg-[#b47a16] hover:bg-[#8d5f10] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
+                  className="w-full max-w-xs bg-[#b47a16] hover:bg-[#8d5f10] text-white font-black text-xs sm:text-base py-2 sm:py-3 px-3 sm:px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer mt-1.5 group"
                 >
-                  <BookOpen className="h-4 sm:h-5 w-4 sm:w-5" />
+                  <BookOpen className="h-3.5 sm:h-5 w-3.5 sm:w-5 shrink-0" />
                   <span>Tutor</span>
-                  <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="h-3.5 sm:h-4 w-3.5 sm:w-4 ml-0.5 sm:ml-1 group-hover:translate-x-1 transition-transform shrink-0" />
                 </button>
 
                 {/* Subtitle Caption */}
-                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
-                  Teach, broadcast notices, manage batches & fees.
+                <p className="text-[10px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs leading-snug">
+                  Teach, broadcast notices, manage batches &amp; fees.
                 </p>
               </div>
 
-              {/* CARD 4: ADMIN */}
-              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-slate-200 hover:border-[#1e293b] shadow-sm hover:shadow-xl transition-all duration-300 p-3.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+              {/* CARD 3 (Row 2, Col 1): PARENT */}
+              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-slate-200 hover:border-[#1e3a5f] shadow-sm hover:shadow-xl transition-all duration-300 p-2.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
                 {/* Tozy Buddy Badge */}
-                <div className="absolute top-2.5 right-2.5 bg-slate-100 text-slate-800 text-[10px] font-black px-2 py-0.5 rounded-full border border-slate-300/80 flex items-center gap-1">
+                <div className="sm:absolute sm:top-2.5 sm:right-2.5 bg-sky-50 text-[#1e3a5f] text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-sky-200/80 inline-flex items-center gap-1 self-end sm:self-auto">
+                  <span>🐘</span>
+                  <span>Guide with Tozy</span>
+                </div>
+
+                {/* Brush-Splash Character Illustration */}
+                <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
+                  <img
+                    src="/images/parent_brush_portrait.jpg"
+                    alt="Parent reviewing student progress with Newtoz"
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+
+                {/* Pill Button in our Slate Navy Theme (#1e3a5f) */}
+                <button
+                  type="button"
+                  onClick={() => handlePortalSwitch("parent")}
+                  className="w-full max-w-xs bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-xs sm:text-base py-2 sm:py-3 px-3 sm:px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer mt-1.5 group"
+                >
+                  <Users className="h-3.5 sm:h-5 w-3.5 sm:w-5 shrink-0" />
+                  <span>Parent</span>
+                  <ArrowRight className="h-3.5 sm:h-4 w-3.5 sm:w-4 ml-0.5 sm:ml-1 group-hover:translate-x-1 transition-transform shrink-0" />
+                </button>
+
+                {/* Subtitle Caption */}
+                <p className="text-[10px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs leading-snug">
+                  Support, monitor, be part of their journey.
+                </p>
+              </div>
+
+              {/* CARD 4 (Row 2, Col 2): ADMIN */}
+              <div className="group rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xs border-2 border-slate-200 hover:border-[#1e293b] shadow-sm hover:shadow-xl transition-all duration-300 p-2.5 sm:p-5 lg:p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+                {/* Tozy Buddy Badge */}
+                <div className="sm:absolute sm:top-2.5 sm:right-2.5 bg-slate-100 text-slate-800 text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-slate-300/80 inline-flex items-center gap-1 self-end sm:self-auto">
                   <span>🐘</span>
                   <span>Lead with Tozy</span>
                 </div>
 
                 {/* Administrator Character Illustration */}
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-2">
+                <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
                   <img
                     src="/images/admin_brush_portrait.jpg"
                     alt="School Principal and Administrator with Newtoz"
@@ -1669,16 +1669,16 @@ export function LandingView({
                 <button
                   type="button"
                   onClick={() => openAuth("login", "admin", "drawer")}
-                  className="w-full max-w-xs bg-[#1e293b] hover:bg-[#0f172a] text-white font-black text-sm sm:text-base py-2.5 sm:py-3 px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer mt-1.5 group"
+                  className="w-full max-w-xs bg-[#1e293b] hover:bg-[#0f172a] text-white font-black text-xs sm:text-base py-2 sm:py-3 px-3 sm:px-5 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer mt-1.5 group"
                 >
-                  <Shield className="h-4 sm:h-5 w-4 sm:w-5" />
+                  <Shield className="h-3.5 sm:h-5 w-3.5 sm:w-5 shrink-0" />
                   <span>Admin</span>
-                  <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="h-3.5 sm:h-4 w-3.5 sm:w-4 ml-0.5 sm:ml-1 group-hover:translate-x-1 transition-transform shrink-0" />
                 </button>
 
                 {/* Subtitle Caption */}
-                <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs">
-                  Campus governance, school operations & analytics.
+                <p className="text-[10px] sm:text-xs text-slate-600 font-medium mt-1 max-w-xs leading-snug">
+                  Campus governance, school operations &amp; analytics.
                 </p>
               </div>
             </div>
