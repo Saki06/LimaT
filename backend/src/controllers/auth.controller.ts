@@ -121,7 +121,7 @@ const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
 export const registerStudent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { firstName, lastName, email, password, gradeLevel, section, studentIdNo, tenantId } = req.body;
+    const { firstName, lastName, email, password, phoneNumber, gradeLevel, section, studentIdNo, tenantId } = req.body;
 
     if (!email || !password || !firstName) {
       res.status(400).json({ success: false, message: 'Missing required student registration fields' });
@@ -180,6 +180,27 @@ if (
 
     const passwordHash = await bcrypt.hash(password, 10);
 
+    let generatedStudentIdNo = typeof studentIdNo === 'string' && studentIdNo.trim()
+      ? studentIdNo.trim()
+      : '';
+
+    if (!generatedStudentIdNo) {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const candidate = `STU-${Math.floor(1000 + Math.random() * 9000)}`;
+        const existingId = await prisma.studentProfile.findUnique({
+          where: { studentIdNo: candidate },
+          select: { id: true },
+        });
+        if (!existingId) {
+          generatedStudentIdNo = candidate;
+          break;
+        }
+      }
+      if (!generatedStudentIdNo) {
+        generatedStudentIdNo = `STU-${Date.now().toString().slice(-6)}`;
+      }
+    }
+
     const newUser = await prisma.user.create({
       data: {
         tenantId: selectedTenantId,
@@ -190,9 +211,10 @@ if (
         lastName: lastName || '',
         studentProfile: {
           create: {
-            studentIdNo: studentIdNo || 'STU-' + Math.floor(1000 + Math.random() * 9000),
+            studentIdNo: generatedStudentIdNo,
             gradeLevel: gradeLevel || 'Grade 10',
             section: section || null,
+            phoneNumber: typeof phoneNumber === 'string' && phoneNumber.trim() ? phoneNumber.trim() : null,
           },
         },
       },

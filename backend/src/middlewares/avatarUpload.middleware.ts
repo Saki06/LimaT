@@ -2,18 +2,25 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { randomUUID } from 'crypto';
 import { Request } from 'express';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 
-const avatarDirectory = path.resolve(
-  process.cwd(),
-  'uploads',
-  'avatars'
-);
+const avatarDirectory = process.env.VERCEL
+  ? path.join(os.tmpdir(), 'uploads', 'avatars')
+  : path.resolve(
+      process.cwd(),
+      'uploads',
+      'avatars'
+    );
 
-fs.mkdirSync(avatarDirectory, { recursive: true });
+try {
+  fs.mkdirSync(avatarDirectory, { recursive: true });
+} catch {
+  // Ignore directory creation errors in restricted environments
+}
 
 const storage = multer.diskStorage({
   destination: (_req, _file, callback) => {
