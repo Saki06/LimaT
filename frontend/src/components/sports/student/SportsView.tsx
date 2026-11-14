@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from "react";
@@ -6,32 +7,32 @@ import {
   Trophy,
   Calendar,
   MapPin,
-  CheckCircle2,
   Award,
-  Flame,
-  Zap,
-  Activity,
   Plus,
   Edit3,
   Search,
   Filter,
   Trash2,
-  ChevronRight,
-  ExternalLink,
   Crown,
   Sparkles,
-  Info,
-  ShieldCheck,
-  FileText,
-  Download,
   ClipboardCheck,
-  Users
+  Users,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
-import { Tournament, TournamentFormat, TournamentStatus, Fixture } from "@/types/lms";
+import {
+  Tournament,
+  TournamentFormat,
+  TournamentStatus,
+  Fixture,
+} from "@/types/lms";
 import { SportsRegistrationWizard } from "./SportsRegistrationWizard";
 import { CheckRegistrationView } from "./CheckRegistrationView";
 import { AdminSportsRegistrationsDesk } from "../admin/AdminSportsRegistrationsDesk";
@@ -39,7 +40,7 @@ import { ChampionshipStandingsView } from "./ChampionshipStandingsView";
 import { MatchCenterFixturesView } from "./MatchCenterFixturesView";
 import {
   ChampionshipSportItem,
-  StoredAthleteRegistration
+  StoredAthleteRegistration,
 } from "@/components/sports/sportsRegistrationData";
 import { api, SportsRegistration } from "@/lib/api";
 
@@ -53,7 +54,7 @@ type SportsTab =
   | "standings";
 
 export function SportsView({
-  initialTab = "tournaments"
+  initialTab = "tournaments",
 }: {
   initialTab?: SportsTab;
 }) {
@@ -72,7 +73,6 @@ export function SportsView({
     updateFixture,
     deleteFixture,
     createSportsTeam,
-    updateSportsTeam,
     deleteSportsTeam,
     fetchSportsEvents,
     fetchMySportsRegistrations,
@@ -85,69 +85,126 @@ export function SportsView({
     currentUser,
     recordMatchResult,
     addToast,
-    t
+    t,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<SportsTab>(initialTab);
-  if (activeTab !== initialTab) setActiveTab(initialTab);
+
+  React.useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const [selectedSport, setSelectedSport] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // Eezhagam / Championship Sports Web Registration Platform States
-  const [adminAthleteRegistrations, setAdminAthleteRegistrations] = useState<StoredAthleteRegistration[]>([]);
-  const athleteRegistrations = activeTab === "admin_registrations"
-    ? adminAthleteRegistrations
-    : mapRegistrationRecords(sportsRegistrations);
+  // Championship registration states
+  const [adminAthleteRegistrations, setAdminAthleteRegistrations] =
+    useState<StoredAthleteRegistration[]>([]);
+
+  const athleteRegistrations =
+    activeTab === "admin_registrations"
+      ? adminAthleteRegistrations
+      : mapRegistrationRecords(sportsRegistrations);
 
   React.useEffect(() => {
-    void Promise.all([fetchSportsEvents(), fetchSportsOperations()]).catch((error) => {
-      console.warn("Sports sync notice:", error);
+    void Promise.all([
+      fetchSportsEvents(),
+      fetchSportsOperations(),
+    ]).catch((error) => {
+      addToast({
+        type: "error",
+        title: "Unable to Load Sports",
+        message:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred.",
+      });
     });
-  }, [fetchSportsEvents, fetchSportsOperations]);
+  }, [addToast, fetchSportsEvents, fetchSportsOperations]);
 
-  function mapRegistrationRecords(records: SportsRegistration[]): StoredAthleteRegistration[] {
+  function mapRegistrationRecords(
+    records: SportsRegistration[]
+  ): StoredAthleteRegistration[] {
     const mapped = new Map<string, StoredAthleteRegistration>();
+
     records.forEach((registration) => {
-      if (!registration.registrationNumber || !registration.athleteDetails ||
-        typeof registration.athleteDetails !== "object" || Array.isArray(registration.athleteDetails)) return;
-      const details = registration.athleteDetails as Record<string, unknown>;
+      if (
+        !registration.registrationNumber ||
+        !registration.athleteDetails ||
+        typeof registration.athleteDetails !== "object" ||
+        Array.isArray(registration.athleteDetails)
+      ) {
+        return;
+      }
+
+      const details = registration.athleteDetails as Record<
+        string,
+        unknown
+      >;
+
       if (
         typeof details.athleteName !== "string" ||
         typeof details.firstName !== "string" ||
         typeof details.lastName !== "string" ||
         !Array.isArray(details.selectedEvents)
-      ) return;
-      const status = records.some((item) =>
-        item.registrationNumber === registration.registrationNumber && item.status === "REJECTED"
-      ) ? "Rejected" : records.some((item) =>
-        item.registrationNumber === registration.registrationNumber && item.status === "CONFIRMED"
-      ) ? "Approved" : "Pending";
-      const selectedEvents = details.selectedEvents.filter((item): item is StoredAthleteRegistration["selectedEvents"][number] =>
-        Boolean(item && typeof item === "object" &&
-          "id" in item && "sportName" in item && "eventName" in item &&
-          "ageCategory" in item && "gender" in item && "fee" in item)
+      ) {
+        return;
+      }
+
+      const status = records.some(
+        (item) =>
+          item.registrationNumber === registration.registrationNumber &&
+          item.status === "REJECTED"
+      )
+        ? "Rejected"
+        : records.some(
+            (item) =>
+              item.registrationNumber === registration.registrationNumber &&
+              item.status === "CONFIRMED"
+          )
+        ? "Approved"
+        : "Pending";
+
+      const selectedEvents = details.selectedEvents.filter(
+        (
+          item
+        ): item is StoredAthleteRegistration["selectedEvents"][number] =>
+          Boolean(
+            item &&
+              typeof item === "object" &&
+              "id" in item &&
+              "sportName" in item &&
+              "eventName" in item &&
+              "ageCategory" in item &&
+              "gender" in item &&
+              "fee" in item
+          )
       );
+
       mapped.set(registration.registrationNumber, {
         ...(details as unknown as StoredAthleteRegistration),
         id: registration.registrationNumber,
         registrationNumber: registration.registrationNumber,
         selectedEvents,
         status,
-        paymentStatus: registration.paymentStatus as StoredAthleteRegistration["paymentStatus"],
+        paymentStatus:
+          registration.paymentStatus as StoredAthleteRegistration["paymentStatus"],
         totalAmount: registration.totalAmount,
       });
     });
+
     return Array.from(mapped.values());
   }
 
-  const handleNewRegistration = async (newRecord: StoredAthleteRegistration) => {
-    const result = await submitChampionshipRegistration({
+  const handleNewRegistration = async (
+    newRecord: StoredAthleteRegistration
+  ) => {
+    return await submitChampionshipRegistration({
       eventIds: newRecord.selectedEvents.map((event) => event.id),
+      registrationNumber: newRecord.registrationNumber,
       athleteDetails: newRecord as unknown as Record<string, unknown>,
     });
-    return result;
   };
 
   const handleUpdateRegStatus = async (
@@ -155,33 +212,56 @@ export function SportsView({
     newStatus: "Confirmed" | "Pending" | "Approved" | "Rejected"
   ) => {
     await updateChampionshipRegistrationStatus(id, newStatus);
-    setAdminAthleteRegistrations((prev) => prev.map((registration) =>
-      registration.registrationNumber === id ? { ...registration, status: newStatus } : registration
-    ));
+
+    setAdminAthleteRegistrations((prev) =>
+      prev.map((registration) =>
+        registration.registrationNumber === id
+          ? { ...registration, status: newStatus }
+          : registration
+      )
+    );
   };
 
   React.useEffect(() => {
     if (activeTab !== "admin_registrations") return;
-    api.sports.getRegistrations()
-      .then((records) => setAdminAthleteRegistrations(mapRegistrationRecords(records)))
-      .catch((error) => addToast({
-        type: "error",
-        title: "Unable to Load Sports Registrations",
-        message: error instanceof Error ? error.message : "An unexpected error occurred.",
-      }));
+
+    api.sports
+      .getRegistrations()
+      .then((records) =>
+        setAdminAthleteRegistrations(mapRegistrationRecords(records))
+      )
+      .catch((error) =>
+        addToast({
+          type: "error",
+          title: "Unable to Load Sports Registrations",
+          message:
+            error instanceof Error
+              ? error.message
+              : "An unexpected error occurred.",
+        })
+      );
   }, [activeTab, addToast]);
 
   React.useEffect(() => {
     if (activeTab !== "check_registration") return;
-    void fetchMySportsRegistrations().catch((error) => addToast({
-      type: "error",
-      title: "Unable to Load Your Registrations",
-      message: error instanceof Error ? error.message : "An unexpected error occurred.",
-    }));
+
+    void fetchMySportsRegistrations().catch((error) =>
+      addToast({
+        type: "error",
+        title: "Unable to Load Your Registrations",
+        message:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred.",
+      })
+    );
   }, [activeTab, addToast, fetchMySportsRegistrations]);
 
   const handleAddChampionshipSport = async (
-    newSport: Omit<ChampionshipSportItem, "id" | "events" | "registrationStatus">
+    newSport: Omit<
+      ChampionshipSportItem,
+      "id" | "events" | "registrationStatus"
+    >
   ) => {
     await createChampionshipSport(newSport);
   };
@@ -193,13 +273,17 @@ export function SportsView({
     await createChampionshipEvent(sportId, newEvent);
   };
 
-  // Modals state
-  const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] = useState(false);
-  const [isScheduleFixtureModalOpen, setIsScheduleFixtureModalOpen] = useState(false);
-  const [selectedFixtureForScore, setSelectedFixtureForScore] = useState<string | null>(null);
+  // Modal states
+  const [isCreateTournamentModalOpen, setIsCreateTournamentModalOpen] =
+    useState(false);
+  const [isScheduleFixtureModalOpen, setIsScheduleFixtureModalOpen] =
+    useState(false);
+  const [selectedFixtureForScore, setSelectedFixtureForScore] = useState<
+    string | null
+  >(null);
   const [editingFixture, setEditingFixture] = useState<Fixture | null>(null);
 
-  // Tournament Form State
+  // Tournament form
   const [tournamentForm, setTournamentForm] = useState({
     name: "",
     sportName: "",
@@ -214,10 +298,10 @@ export function SportsView({
     status: "upcoming" as TournamentStatus,
     currentRound: "",
     description: "",
-    rules: ""
+    rules: "",
   });
 
-  // Schedule Fixture Form State
+  // Fixture form
   const [fixtureForm, setFixtureForm] = useState({
     tournamentId: "",
     competitionName: "",
@@ -226,16 +310,18 @@ export function SportsView({
     awayTeam: "",
     date: "",
     time: "",
-    venue: ""
+    venue: "",
   });
 
-  // Score recording modal states
+  // Score recording
   const [homeScore, setHomeScore] = useState("");
   const [awayScore, setAwayScore] = useState("");
   const [outcome, setOutcome] = useState("");
 
-  // Edit Tournament Modal State
-  const [editingTournament, setEditingTournament] = useState<Tournament | null>(null);
+  // Tournament edit state
+  const [editingTournament, setEditingTournament] =
+    useState<Tournament | null>(null);
+
   const [editTournamentForm, setEditTournamentForm] = useState({
     name: "",
     sportName: "",
@@ -251,38 +337,43 @@ export function SportsView({
     description: "",
   });
 
+  // Populate edit form when a tournament is selected
   React.useEffect(() => {
-    if (editingTournament) {
-      setEditTournamentForm({
-        name: editingTournament.name,
-        sportName: editingTournament.sportName,
-        category: editingTournament.category,
-        format: editingTournament.format,
-        status: editingTournament.status,
-        currentRound: editingTournament.currentRound || "",
-        venue: editingTournament.venue,
-        organizer: editingTournament.organizer,
-        trophyTitle: editingTournament.trophyTitle,
-        champion: editingTournament.champion || "",
-        runnerUp: editingTournament.runnerUp || "",
-        description: editingTournament.description || "",
-      });
-    }
+    if (!editingTournament) return;
+
+    setEditTournamentForm({
+      name: editingTournament.name,
+      sportName: editingTournament.sportName,
+      category: editingTournament.category,
+      format: editingTournament.format,
+      status: editingTournament.status,
+      currentRound: editingTournament.currentRound || "",
+      venue: editingTournament.venue,
+      organizer: editingTournament.organizer,
+      trophyTitle: editingTournament.trophyTitle,
+      champion: editingTournament.champion || "",
+      runnerUp: editingTournament.runnerUp || "",
+      description: editingTournament.description || "",
+    });
   }, [editingTournament]);
-  // Create Team Squad Modal State
-  const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
-  const [selectedSportForTeams, setSelectedSportForTeams] = useState<string>("All");
+  // Team states
+  const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] =
+    useState(false);
+  const [selectedSportForTeams, setSelectedSportForTeams] =
+    useState<string>("All");
   const [teamSearchQuery, setTeamSearchQuery] = useState("");
+
   const [teamForm, setTeamForm] = useState({
     name: "",
     sportName: "Cricket",
     coachName: "",
     trainingSchedule: "Tue & Thu 3:30 PM - 5:30 PM",
     status: "active" as "active" | "draft" | "completed",
-    playersText: ""
+    playersText: "",
   });
 
-  const isAdminOrTeacher = currentRole === "admin" || currentRole === "teacher";
+  const isAdminOrTeacher =
+    currentRole === "admin" || currentRole === "teacher";
 
   const handleOpenTournamentEditor = (tournament: Tournament) => {
     setEditTournamentForm({
@@ -299,43 +390,57 @@ export function SportsView({
       runnerUp: tournament.runnerUp || "",
       description: tournament.description || "",
     });
+
     setEditingTournament(tournament);
   };
 
-  // Filtered Tournaments
+  // Filter tournaments
   const filteredTournaments = tournaments.filter((tr) => {
-    const matchSport = selectedSport === "All" || tr.sportName.toLowerCase().includes(selectedSport.toLowerCase());
-    const matchStatus = selectedStatus === "All" || tr.status === selectedStatus;
+    const matchSport =
+      selectedSport === "All" ||
+      tr.sportName.toLowerCase().includes(selectedSport.toLowerCase());
+
+    const matchStatus =
+      selectedStatus === "All" || tr.status === selectedStatus;
+
     const matchSearch =
       tr.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       tr.venue.toLowerCase().includes(searchQuery.toLowerCase()) ||
       tr.trophyTitle.toLowerCase().includes(searchQuery.toLowerCase());
+
     return matchSport && matchStatus && matchSearch;
   });
 
-  // Filtered Fixtures
+  // Filter fixtures
   const filteredFixtures = fixtures.filter((fx) => {
-    const matchSport = selectedSport === "All" || fx.sportName.toLowerCase().includes(selectedSport.toLowerCase());
-    return matchSport;
+    return (
+      selectedSport === "All" ||
+      fx.sportName.toLowerCase().includes(selectedSport.toLowerCase())
+    );
   });
 
-  // Handle Create Tournament Submit
+  // Create tournament
   const handleCreateTournament = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (
       !tournamentForm.name.trim() ||
       !tournamentForm.sportName ||
       !tournamentForm.startDate ||
       !tournamentForm.endDate ||
       !tournamentForm.venue.trim()
-    ) return;
+    ) {
+      return;
+    }
 
     const teamsArray = tournamentForm.participatingTeamsInput
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
 
-    const sportObj = sports.find((s) => s.name === tournamentForm.sportName);
+    const sportObj = sports.find(
+      (s) => s.name === tournamentForm.sportName
+    );
 
     createTournament({
       name: tournamentForm.name,
@@ -353,11 +458,11 @@ export function SportsView({
       status: tournamentForm.status,
       currentRound: tournamentForm.currentRound,
       description: tournamentForm.description,
-      rules: tournamentForm.rules
+      rules: tournamentForm.rules,
     });
 
     setIsCreateTournamentModalOpen(false);
-    // Reset form
+
     setTournamentForm({
       name: "",
       sportName: "",
@@ -372,13 +477,14 @@ export function SportsView({
       status: "upcoming",
       currentRound: "",
       description: "",
-      rules: ""
+      rules: "",
     });
   };
 
-  // Handle Schedule Fixture Submit
+  // Schedule or update fixture
   const handleScheduleFixture = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (
       !fixtureForm.competitionName.trim() ||
       !fixtureForm.sportName ||
@@ -387,7 +493,9 @@ export function SportsView({
       !fixtureForm.date ||
       !fixtureForm.time.trim() ||
       !fixtureForm.venue.trim()
-    ) return;
+    ) {
+      return;
+    }
 
     try {
       const fixture = {
@@ -399,8 +507,9 @@ export function SportsView({
         date: fixtureForm.date,
         time: fixtureForm.time,
         venue: fixtureForm.venue,
-        status: editingFixture?.status || "scheduled" as const,
+        status: editingFixture?.status || ("scheduled" as const),
       };
+
       if (editingFixture) {
         await updateFixture(editingFixture.id, fixture);
       } else {
@@ -412,6 +521,7 @@ export function SportsView({
 
     setIsScheduleFixtureModalOpen(false);
     setEditingFixture(null);
+
     setFixtureForm({
       tournamentId: "",
       competitionName: "",
@@ -424,23 +534,33 @@ export function SportsView({
     });
   };
 
-  // Handle Score Submit
+  // Record match score
   const handleScoreSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!selectedFixtureForScore) return;
+
     try {
-      await recordMatchResult(selectedFixtureForScore, homeScore, awayScore, outcome);
+      await recordMatchResult(
+        selectedFixtureForScore,
+        homeScore,
+        awayScore,
+        outcome
+      );
     } catch {
       return;
     }
+
     setSelectedFixtureForScore(null);
     setHomeScore("");
     setAwayScore("");
     setOutcome("");
   };
 
+  // Edit fixture
   const handleEditFixture = (fixture: Fixture) => {
     setEditingFixture(fixture);
+
     setFixtureForm({
       tournamentId: fixture.tournamentId || "",
       competitionName: fixture.competitionName,
@@ -451,11 +571,17 @@ export function SportsView({
       time: fixture.time,
       venue: fixture.venue,
     });
+
     setIsScheduleFixtureModalOpen(true);
   };
-  const handleUpdateTournamentSubmit = async (e: React.FormEvent) => {
+  // Update tournament
+  const handleUpdateTournamentSubmit = async (
+    e: React.FormEvent
+  ) => {
     e.preventDefault();
+
     if (!editingTournament) return;
+
     await updateTournament(editingTournament.id, {
       name: editTournamentForm.name,
       sportName: editTournamentForm.sportName,
@@ -470,18 +596,23 @@ export function SportsView({
       runnerUp: editTournamentForm.runnerUp || undefined,
       description: editTournamentForm.description,
     });
+
     setEditingTournament(null);
   };
 
+  // Create team
   const handleCreateTeamSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!teamForm.name.trim() || !teamForm.sportName.trim()) return;
+
     const playersList = teamForm.playersText
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line, idx) => {
         const parts = line.split("-").map((p) => p.trim());
+
         return {
           id: `player_${idx + 1}`,
           name: parts[0] || `Player ${idx + 1}`,
@@ -500,13 +631,14 @@ export function SportsView({
     });
 
     setIsCreateTeamModalOpen(false);
+
     setTeamForm({
       name: "",
       sportName: "Cricket",
       coachName: "",
       trainingSchedule: "Tue & Thu 3:30 PM - 5:30 PM",
       status: "active",
-      playersText: ""
+      playersText: "",
     });
   };
 
@@ -524,32 +656,43 @@ export function SportsView({
               <Trophy className="h-3.5 w-3.5 text-[#f3b738]" />
               <span>Athletics, Tournaments &amp; Sports Hub</span>
             </div>
+
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
               {t.sports.title || "Sports Operations & Tournaments"}
             </h1>
+
             <p className="text-sm text-emerald-100/80 leading-relaxed">
-              Organize sports tournaments, manage team rosters, track live scorecards, and monitor league standings.
+              Organize sports tournaments, manage team rosters, track live
+              scorecards, and monitor league standings.
             </p>
           </div>
 
-          {/* Quick Metrics & Admin Actions */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 text-xs shrink-0">
               <div className="text-center px-3 border-r border-white/20">
-                <p className="text-xl font-extrabold text-[#f3b738]">{tournaments.length}</p>
-                <p className="text-[10px] text-emerald-200">Tournaments</p>
+                <p className="text-xl font-extrabold text-[#f3b738]">
+                  {tournaments.length}
+                </p>
+                <p className="text-[10px] text-emerald-200">
+                  Tournaments
+                </p>
               </div>
+
               <div className="text-center px-3 border-r border-white/20">
-                <p className="text-xl font-extrabold text-white">{teams.length}</p>
+                <p className="text-xl font-extrabold text-white">
+                  {teams.length}
+                </p>
                 <p className="text-[10px] text-emerald-200">Squads</p>
               </div>
+
               <div className="text-center px-3">
-                <p className="text-xl font-extrabold text-[#86efac]">{fixtures.length}</p>
+                <p className="text-xl font-extrabold text-[#86efac]">
+                  {fixtures.length}
+                </p>
                 <p className="text-[10px] text-emerald-200">Fixtures</p>
               </div>
             </div>
 
-            {/* Action Buttons: Admin Management vs Student Actions */}
             <div className="flex flex-col sm:flex-row gap-2 shrink-0">
               {isAdminOrTeacher ? (
                 <>
@@ -561,6 +704,7 @@ export function SportsView({
                     <ClipboardCheck className="h-4 w-4 mr-1 text-[#a5f3df]" />
                     <span>Approvals Desk</span>
                   </Button>
+
                   <Button
                     onClick={() => {
                       setEditingFixture(null);
@@ -572,12 +716,15 @@ export function SportsView({
                     <Calendar className="h-4 w-4 mr-1 text-[#a5f3df]" />
                     <span>Schedule Match</span>
                   </Button>
+
                   <Button
                     onClick={() => setIsCreateTournamentModalOpen(true)}
                     className="bg-[#f3b738] hover:bg-[#dfa224] text-[#0d2b26] font-black text-xs shadow-md flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl cursor-pointer"
                   >
                     <Plus className="h-4 w-4 text-[#0d2b26]" />
-                    <span>{t.sports.createTournament || "New Tournament"}</span>
+                    <span>
+                      {t.sports.createTournament || "New Tournament"}
+                    </span>
                   </Button>
                 </>
               ) : (
@@ -594,7 +741,7 @@ export function SportsView({
         </div>
       </div>
 
-      {/* Navigation Tabs (Admin Management vs Student) */}
+      {/* Navigation Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar border-b border-[#e6ece8]">
         {isAdminOrTeacher ? (
           <>
@@ -609,6 +756,7 @@ export function SportsView({
               <Trophy className="h-4 w-4" />
               <span>Tournaments & Brackets</span>
             </button>
+
             <button
               onClick={() => setActiveTab("teams")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
@@ -629,6 +777,7 @@ export function SportsView({
                 {teams.length}
               </span>
             </button>
+
             <button
               onClick={() => setActiveTab("admin_registrations")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
@@ -649,6 +798,7 @@ export function SportsView({
                 {athleteRegistrations.length}
               </span>
             </button>
+
             <button
               onClick={() => setActiveTab("fixtures")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
@@ -660,6 +810,7 @@ export function SportsView({
               <Calendar className="h-4 w-4" />
               <span>Fixtures & Match Scoring</span>
             </button>
+
             <button
               onClick={() => setActiveTab("standings")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
@@ -685,6 +836,7 @@ export function SportsView({
               <Trophy className="h-4 w-4" />
               <span>Tournaments & Championships</span>
             </button>
+
             <button
               onClick={() => setActiveTab("teams")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
@@ -696,6 +848,7 @@ export function SportsView({
               <Users className="h-4 w-4" />
               <span>Teams & Squads</span>
             </button>
+
             <button
               onClick={() => setActiveTab("registration")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
@@ -707,6 +860,7 @@ export function SportsView({
               <Sparkles className="h-4 w-4 text-amber-500" />
               <span>Online Registration</span>
             </button>
+
             <button
               onClick={() => setActiveTab("check_registration")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
@@ -718,6 +872,7 @@ export function SportsView({
               <Search className="h-4 w-4" />
               <span>Check My Registration</span>
             </button>
+
             <button
               onClick={() => setActiveTab("fixtures")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
@@ -729,6 +884,7 @@ export function SportsView({
               <Calendar className="h-4 w-4" />
               <span>Fixtures & Schedule</span>
             </button>
+
             <button
               onClick={() => setActiveTab("standings")}
               className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
@@ -744,12 +900,9 @@ export function SportsView({
         )}
       </div>
 
-      {/* ========================================================================= */}
-      {/* TAB 1: TOURNAMENTS & CHAMPIONSHIPS */}
-      {/* ========================================================================= */}
+      {/* TAB 1: TOURNAMENTS */}
       {activeTab === "tournaments" && (
         <div className="space-y-6">
-          {/* Filters & Search Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[#e6ece8] shadow-xs">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -797,14 +950,16 @@ export function SportsView({
             </div>
           </div>
 
-          {/* Tournaments Grid */}
           {filteredTournaments.length === 0 ? (
             <Card className="border-[#e6ece8] bg-white p-12 text-center space-y-4">
               <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
                 <Trophy className="w-8 h-8" />
               </div>
+
               <div className="space-y-1 max-w-sm mx-auto">
-                <h3 className="text-base font-black text-[#0d2b26]">No Tournaments Found</h3>
+                <h3 className="text-base font-black text-[#0d2b26]">
+                  No Tournaments Found
+                </h3>
                 <p className="text-xs text-slate-500">
                   {searchQuery || selectedSport !== "All"
                     ? "Try adjusting your filters or search keywords."
@@ -820,12 +975,12 @@ export function SportsView({
                   className="border-[#e6ece8] bg-white shadow-xs hover:border-[#0d5c4d]/40 transition-all overflow-hidden flex flex-col justify-between"
                 >
                   <div>
-                    {/* Card Header Banner */}
                     <div className="p-5 border-b border-[#f0f4f1] bg-[#fafcfb] flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3.5">
                         <div className="w-12 h-12 rounded-2xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0 border border-[#c4e9e0] shadow-xs">
                           <Trophy className="h-6 w-6 text-[#b47a16]" />
                         </div>
+
                         <div>
                           <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#0d5c4d] text-white">
@@ -835,9 +990,11 @@ export function SportsView({
                               {tr.category}
                             </span>
                           </div>
+
                           <h3 className="text-base font-black text-[#0d2b26] leading-snug">
                             {tr.name}
                           </h3>
+
                           <p className="text-xs text-[#b47a16] font-bold flex items-center gap-1 mt-0.5">
                             <Crown className="w-3.5 h-3.5" />
                             <span>{tr.trophyTitle}</span>
@@ -845,7 +1002,6 @@ export function SportsView({
                         </div>
                       </div>
 
-                      {/* Status Badge */}
                       <Badge
                         variant={
                           tr.status === "ongoing"
@@ -862,7 +1018,6 @@ export function SportsView({
                       </Badge>
                     </div>
 
-                    {/* Card Body Details */}
                     <CardContent className="p-5 space-y-4 text-xs">
                       <p className="text-slate-600 text-xs leading-relaxed">
                         {tr.description}
@@ -870,20 +1025,28 @@ export function SportsView({
 
                       <div className="grid grid-cols-2 gap-2 bg-[#f8faf9] p-3 rounded-xl border border-[#eef4f1]">
                         <div className="space-y-0.5">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Dates</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                            Dates
+                          </span>
                           <span className="font-bold text-slate-700 flex items-center gap-1">
                             <Calendar className="w-3 h-3 text-[#0d5c4d]" />
                             {tr.startDate} → {tr.endDate}
                           </span>
                         </div>
+
                         <div className="space-y-0.5">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Format</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                            Format
+                          </span>
                           <span className="font-bold text-slate-700 capitalize">
                             {tr.format.replace(/_/g, " ")}
                           </span>
                         </div>
+
                         <div className="col-span-2 space-y-0.5 pt-1 border-t border-slate-100">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Host Grounds</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">
+                            Host Grounds
+                          </span>
                           <span className="font-bold text-slate-700 flex items-center gap-1">
                             <MapPin className="w-3 h-3 text-slate-400" />
                             {tr.venue}
@@ -891,10 +1054,13 @@ export function SportsView({
                         </div>
                       </div>
 
-                      {/* Participating Squads list */}
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
-                          <span>Participating Schools &amp; Teams ({tr.participatingTeams?.length || 0})</span>
+                          <span>
+                            Participating Schools &amp; Teams (
+                            {tr.participatingTeams?.length || 0})
+                          </span>
+
                           {tr.currentRound && (
                             <span className="text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md font-black">
                               {tr.currentRound}
@@ -918,24 +1084,25 @@ export function SportsView({
                         </div>
                       </div>
 
-                      {/* Champion Showcase if completed */}
                       {tr.champion && (
                         <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center font-black">
                             🏆
                           </div>
+
                           <div>
                             <span className="text-[10px] font-black uppercase text-amber-700 block">
                               Defending Champion
                             </span>
-                            <span className="text-xs font-black text-amber-950">{tr.champion}</span>
+                            <span className="text-xs font-black text-amber-950">
+                              {tr.champion}
+                            </span>
                           </div>
                         </div>
                       )}
                     </CardContent>
                   </div>
 
-                  {/* Card Footer Actions */}
                   <div className="p-4 bg-[#fbfcfb] border-t border-[#eef4f1] flex items-center justify-between gap-2">
                     <Button
                       variant="outline"
@@ -960,7 +1127,7 @@ export function SportsView({
                               tournamentId: tr.id,
                               competitionName: tr.name,
                               sportName: tr.sportName,
-                              venue: tr.venue
+                              venue: tr.venue,
                             });
                             setEditingFixture(null);
                             setIsScheduleFixtureModalOpen(true);
@@ -969,15 +1136,19 @@ export function SportsView({
                         >
                           + Add Fixture
                         </Button>
+
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setEditingTournament(tr)}
+                          onClick={() =>
+                            handleOpenTournamentEditor(tr)
+                          }
                           className="text-slate-500 hover:text-[#0d5c4d] hover:border-[#0d5c4d] p-2"
                           title="Edit Tournament"
                         >
                           <Edit3 className="h-3.5 w-3.5" />
                         </Button>
+
                         <Button
                           variant="outline"
                           size="sm"
@@ -997,9 +1168,7 @@ export function SportsView({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 2: MATCH FIXTURES & LIVE RESULTS (MODERN STADIUM MATCH-CENTER)        */}
-      {/* ========================================================================= */}
+      {/* TAB: FIXTURES */}
       {activeTab === "fixtures" && (
         <MatchCenterFixturesView
           defaultFixtures={fixtures}
@@ -1009,21 +1178,29 @@ export function SportsView({
             setIsScheduleFixtureModalOpen(true);
           }}
           onEditFixture={handleEditFixture}
-          onRecordScore={(fixtureId: string) => setSelectedFixtureForScore(fixtureId)}
-          onDeleteFixture={(fixtureId: string) => deleteFixture(fixtureId)}
+          onRecordScore={(fixtureId: string) =>
+            setSelectedFixtureForScore(fixtureId)
+          }
+          onDeleteFixture={(fixtureId: string) =>
+            deleteFixture(fixtureId)
+          }
         />
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB: TEAMS & ACTIVE SQUADS ROSTER                                         */}
-      {/* ========================================================================= */}
+      {/* TAB: TEAMS */}
       {activeTab === "teams" && (
         <div className="space-y-6">
-          {/* Filter & Actions Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#e6ece8]">
-            {/* Sport Filter Pills */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-              {["All", "Cricket", "Football", "Basketball", "Athletics", "Volleyball", "Badminton"].map((sportName) => (
+              {[
+                "All",
+                "Cricket",
+                "Football",
+                "Basketball",
+                "Athletics",
+                "Volleyball",
+                "Badminton",
+              ].map((sportName) => (
                 <button
                   key={sportName}
                   onClick={() => setSelectedSportForTeams(sportName)}
@@ -1062,20 +1239,35 @@ export function SportsView({
             </div>
           </div>
 
-          {/* Teams Grid */}
-          {teams.filter((t) => {
-            const matchSport = selectedSportForTeams === "All" || t.sportName.toLowerCase().includes(selectedSportForTeams.toLowerCase());
-            const matchSearch = !teamSearchQuery || t.name.toLowerCase().includes(teamSearchQuery.toLowerCase()) || t.coachName.toLowerCase().includes(teamSearchQuery.toLowerCase());
+          {teams.filter((team) => {
+            const matchSport =
+              selectedSportForTeams === "All" ||
+              team.sportName
+                .toLowerCase()
+                .includes(selectedSportForTeams.toLowerCase());
+
+            const matchSearch =
+              !teamSearchQuery ||
+              team.name
+                .toLowerCase()
+                .includes(teamSearchQuery.toLowerCase()) ||
+              team.coachName
+                .toLowerCase()
+                .includes(teamSearchQuery.toLowerCase());
+
             return matchSport && matchSearch;
           }).length === 0 ? (
             <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 space-y-3">
               <Users className="h-10 w-10 text-slate-300 mx-auto" />
-              <p className="font-bold text-sm text-slate-700">No sports squads found</p>
+              <p className="font-bold text-sm text-slate-700">
+                No sports squads found
+              </p>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
                 {teams.length === 0
                   ? "Squads and athlete rosters will appear here once registered or created."
                   : "No squads match the selected sport filter or search query."}
               </p>
+
               {isAdminOrTeacher && (
                 <Button
                   onClick={() => setIsCreateTeamModalOpen(true)}
@@ -1088,53 +1280,98 @@ export function SportsView({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {teams
-                .filter((t) => {
-                  const matchSport = selectedSportForTeams === "All" || t.sportName.toLowerCase().includes(selectedSportForTeams.toLowerCase());
-                  const matchSearch = !teamSearchQuery || t.name.toLowerCase().includes(teamSearchQuery.toLowerCase()) || t.coachName.toLowerCase().includes(teamSearchQuery.toLowerCase());
+                .filter((team) => {
+                  const matchSport =
+                    selectedSportForTeams === "All" ||
+                    team.sportName
+                      .toLowerCase()
+                      .includes(selectedSportForTeams.toLowerCase());
+
+                  const matchSearch =
+                    !teamSearchQuery ||
+                    team.name
+                      .toLowerCase()
+                      .includes(teamSearchQuery.toLowerCase()) ||
+                    team.coachName
+                      .toLowerCase()
+                      .includes(teamSearchQuery.toLowerCase());
+
                   return matchSport && matchSearch;
                 })
                 .map((team) => (
-                  <Card key={team.id} className="border-[#e6ece8] bg-white shadow-xs overflow-hidden flex flex-col justify-between">
+                  <Card
+                    key={team.id}
+                    className="border-[#e6ece8] bg-white shadow-xs overflow-hidden flex flex-col justify-between"
+                  >
                     <div>
                       <CardHeader className="p-5 pb-3 border-b border-[#eef4f1]">
                         <div className="flex items-center justify-between gap-2">
-                          <Badge variant="success" className="capitalize text-[10px]">
+                          <Badge
+                            variant="success"
+                            className="capitalize text-[10px]"
+                          >
                             {team.status || "active squad"}
                           </Badge>
+
                           <span className="text-xs text-slate-500 font-bold bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
-                            {team.players?.length || team.playersCount || 0} Athletes
+                            {team.players?.length ||
+                              team.playersCount ||
+                              0}{" "}
+                            Athletes
                           </span>
                         </div>
+
                         <CardTitle className="text-base font-black text-[#0d2b26] mt-2">
                           {team.name}
                         </CardTitle>
+
                         <p className="text-xs text-[#0d5c4d] font-bold flex items-center gap-1.5 mt-0.5">
                           <Trophy className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                           <span>{team.sportName}</span>
-                          {team.coachName && <span className="text-slate-400">• Coach: {team.coachName}</span>}
+                          {team.coachName && (
+                            <span className="text-slate-400">
+                              • Coach: {team.coachName}
+                            </span>
+                          )}
                         </p>
                       </CardHeader>
 
                       <CardContent className="p-5 space-y-3">
                         {team.trainingSchedule && (
                           <div className="p-2.5 rounded-xl bg-[#f8faf9] border border-[#eef4f1] text-[11px] text-slate-700">
-                            <span className="text-[10px] font-black uppercase text-slate-400 block">Training Routine</span>
-                            <span className="font-semibold text-slate-700">{team.trainingSchedule}</span>
+                            <span className="text-[10px] font-black uppercase text-slate-400 block">
+                              Training Routine
+                            </span>
+                            <span className="font-semibold text-slate-700">
+                              {team.trainingSchedule}
+                            </span>
                           </div>
                         )}
 
                         <div className="space-y-1.5">
-                          <span className="text-[10px] font-black uppercase text-slate-400 block">Squad Roster</span>
+                          <span className="text-[10px] font-black uppercase text-slate-400 block">
+                            Squad Roster
+                          </span>
+
                           <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
                             {team.players && team.players.length > 0 ? (
-                              team.players.map((pl, idx) => (
-                                <div key={pl.id || idx} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 text-xs">
-                                  <span className="font-bold text-[#0d2b26]">{pl.name}</span>
-                                  <span className="text-[11px] text-slate-500 font-medium">{pl.position}</span>
+                              team.players.map((player, idx) => (
+                                <div
+                                  key={player.id || idx}
+                                  className="flex items-center justify-between p-2 rounded-lg bg-slate-50 text-xs"
+                                >
+                                  <span className="font-bold text-[#0d2b26]">
+                                    {player.name}
+                                  </span>
+                                  <span className="text-[11px] text-slate-500 font-medium">
+                                    {player.position}
+                                  </span>
                                 </div>
                               ))
                             ) : (
-                              <p className="text-xs text-slate-400 italic">No individual players assigned yet.</p>
+                              <p className="text-xs text-slate-400 italic">
+                                No individual players assigned yet.
+                              </p>
                             )}
                           </div>
                         </div>
@@ -1161,9 +1398,7 @@ export function SportsView({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB 4: LEAGUE STANDINGS CALCULATED FROM SAVED FIXTURE RESULTS */}
-      {/* ========================================================================= */}
+      {/* TAB: STANDINGS */}
       {activeTab === "standings" && (
         <ChampionshipStandingsView
           defaultStandings={standings}
@@ -1172,9 +1407,7 @@ export function SportsView({
         />
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB: ONLINE ATHLETE REGISTRATION WIZARD (10-STEP MULTI-STEP FLOW)         */}
-      {/* ========================================================================= */}
+      {/* TAB: ONLINE REGISTRATION */}
       {activeTab === "registration" && (
         <SportsRegistrationWizard
           championshipSports={championshipSports}
@@ -1184,9 +1417,7 @@ export function SportsView({
         />
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB: CHECK MY REGISTRATION (ID + PHONE SEARCH)                            */}
-      {/* ========================================================================= */}
+      {/* TAB: CHECK REGISTRATION */}
       {activeTab === "check_registration" && (
         <CheckRegistrationView
           registrations={sportsRegistrations}
@@ -1194,9 +1425,7 @@ export function SportsView({
         />
       )}
 
-      {/* ========================================================================= */}
-      {/* TAB: ADMIN REGISTRATIONS DESK (KPIs, MULTI-FILTERS, CSV EXPORT)           */}
-      {/* ========================================================================= */}
+      {/* TAB: ADMIN REGISTRATIONS */}
       {activeTab === "admin_registrations" && (
         <AdminSportsRegistrationsDesk
           registrations={athleteRegistrations}
@@ -1207,9 +1436,7 @@ export function SportsView({
         />
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 1: CREATE TOURNAMENT (Admin / Teacher) */}
-      {/* ========================================================================= */}
+      {/* MODAL: CREATE TOURNAMENT */}
       {isCreateTournamentModalOpen && (
         <Modal
           isOpen={isCreateTournamentModalOpen}
@@ -1217,7 +1444,10 @@ export function SportsView({
           title="Create Inter-School Tournament / Championship 🏆"
           description="Publish a new school tournament with official rules, host grounds, and participating teams."
         >
-          <form onSubmit={handleCreateTournament} className="space-y-4">
+          <form
+            onSubmit={handleCreateTournament}
+            className="space-y-4"
+          >
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                 Tournament Title *
@@ -1227,7 +1457,12 @@ export function SportsView({
                 required
                 placeholder="e.g. All-Island Inter-School T20 Cricket Championship 2026"
                 value={tournamentForm.name}
-                onChange={(e) => setTournamentForm({ ...tournamentForm, name: e.target.value })}
+                onChange={(e) =>
+                  setTournamentForm({
+                    ...tournamentForm,
+                    name: e.target.value,
+                  })
+                }
                 className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
               />
             </div>
@@ -1240,12 +1475,19 @@ export function SportsView({
                 <select
                   required
                   value={tournamentForm.sportName}
-                  onChange={(e) => setTournamentForm({ ...tournamentForm, sportName: e.target.value })}
+                  onChange={(e) =>
+                    setTournamentForm({
+                      ...tournamentForm,
+                      sportName: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 >
                   <option value="">Select a sport</option>
                   {sports.map((sp) => (
-                    <option key={sp.id} value={sp.name}>{sp.name}</option>
+                    <option key={sp.id} value={sp.name}>
+                      {sp.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1258,7 +1500,12 @@ export function SportsView({
                   type="text"
                   placeholder="e.g. Under-19 Division 1 or Under-17"
                   value={tournamentForm.category}
-                  onChange={(e) => setTournamentForm({ ...tournamentForm, category: e.target.value })}
+                  onChange={(e) =>
+                    setTournamentForm({
+                      ...tournamentForm,
+                      category: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1272,11 +1519,16 @@ export function SportsView({
                 <select
                   value={tournamentForm.format}
                   onChange={(e) =>
-                    setTournamentForm({ ...tournamentForm, format: e.target.value as TournamentFormat })
+                    setTournamentForm({
+                      ...tournamentForm,
+                      format: e.target.value as TournamentFormat,
+                    })
                   }
                   className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 >
-                  <option value="group_stage_knockout">Group Stage + Knockout</option>
+                  <option value="group_stage_knockout">
+                    Group Stage + Knockout
+                  </option>
                   <option value="knockout">Pure Knockout Cup</option>
                   <option value="round_robin">Round Robin League</option>
                   <option value="league">Points League</option>
@@ -1291,7 +1543,12 @@ export function SportsView({
                   type="date"
                   required
                   value={tournamentForm.startDate}
-                  onChange={(e) => setTournamentForm({ ...tournamentForm, startDate: e.target.value })}
+                  onChange={(e) =>
+                    setTournamentForm({
+                      ...tournamentForm,
+                      startDate: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1304,7 +1561,12 @@ export function SportsView({
                   type="date"
                   required
                   value={tournamentForm.endDate}
-                  onChange={(e) => setTournamentForm({ ...tournamentForm, endDate: e.target.value })}
+                  onChange={(e) =>
+                    setTournamentForm({
+                      ...tournamentForm,
+                      endDate: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1320,7 +1582,12 @@ export function SportsView({
                   required
                   placeholder="e.g. Colombo Colts Grounds & College Oval"
                   value={tournamentForm.venue}
-                  onChange={(e) => setTournamentForm({ ...tournamentForm, venue: e.target.value })}
+                  onChange={(e) =>
+                    setTournamentForm({
+                      ...tournamentForm,
+                      venue: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1333,7 +1600,12 @@ export function SportsView({
                   type="text"
                   placeholder="e.g. Governor's Challenge Shield"
                   value={tournamentForm.trophyTitle}
-                  onChange={(e) => setTournamentForm({ ...tournamentForm, trophyTitle: e.target.value })}
+                  onChange={(e) =>
+                    setTournamentForm({
+                      ...tournamentForm,
+                      trophyTitle: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1347,13 +1619,17 @@ export function SportsView({
                 rows={2}
                 value={tournamentForm.participatingTeamsInput}
                 onChange={(e) =>
-                  setTournamentForm({ ...tournamentForm, participatingTeamsInput: e.target.value })
+                  setTournamentForm({
+                    ...tournamentForm,
+                    participatingTeamsInput: e.target.value,
+                  })
                 }
                 placeholder="Enter school or team names, separated by commas"
                 className="w-full p-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-xs focus:outline-none focus:border-[#0d5c4d]"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
-                Type team names separated by commas. Each will be automatically registered into the tournament bracket.
+                Type team names separated by commas. Each will be
+                automatically registered into the tournament bracket.
               </span>
             </div>
 
@@ -1365,13 +1641,18 @@ export function SportsView({
                 <select
                   value={tournamentForm.status}
                   onChange={(e) =>
-                    setTournamentForm({ ...tournamentForm, status: e.target.value as TournamentStatus })
+                    setTournamentForm({
+                      ...tournamentForm,
+                      status: e.target.value as TournamentStatus,
+                    })
                   }
                   className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 >
                   <option value="upcoming">Upcoming</option>
                   <option value="ongoing">Ongoing</option>
-                  <option value="registration_open">Registration Open</option>
+                  <option value="registration_open">
+                    Registration Open
+                  </option>
                   <option value="completed">Completed</option>
                 </select>
               </div>
@@ -1384,7 +1665,12 @@ export function SportsView({
                   type="text"
                   placeholder="e.g. Group Stage, Quarter Finals"
                   value={tournamentForm.currentRound}
-                  onChange={(e) => setTournamentForm({ ...tournamentForm, currentRound: e.target.value })}
+                  onChange={(e) =>
+                    setTournamentForm({
+                      ...tournamentForm,
+                      currentRound: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1397,7 +1683,12 @@ export function SportsView({
               <textarea
                 rows={2}
                 value={tournamentForm.description}
-                onChange={(e) => setTournamentForm({ ...tournamentForm, description: e.target.value })}
+                onChange={(e) =>
+                  setTournamentForm({
+                    ...tournamentForm,
+                    description: e.target.value,
+                  })
+                }
                 placeholder="Brief summary of tournament rules, qualifications, and live stream coverage."
                 className="w-full p-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-xs focus:outline-none focus:border-[#0d5c4d]"
               />
@@ -1422,9 +1713,7 @@ export function SportsView({
         </Modal>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 2: SCHEDULE FIXTURE (Admin / Teacher) */}
-      {/* ========================================================================= */}
+      {/* MODAL: SCHEDULE / EDIT FIXTURE */}
       {isScheduleFixtureModalOpen && (
         <Modal
           isOpen={isScheduleFixtureModalOpen}
@@ -1432,12 +1721,21 @@ export function SportsView({
             setIsScheduleFixtureModalOpen(false);
             setEditingFixture(null);
           }}
-          title={editingFixture ? "Edit Match Fixture" : "Schedule Match Fixture"}
-          description={editingFixture
-            ? "Update this fixture's schedule and participating teams."
-            : "Schedule a match under an existing tournament or inter-collegiate friendly."}
+          title={
+            editingFixture
+              ? "Edit Match Fixture"
+              : "Schedule Match Fixture"
+          }
+          description={
+            editingFixture
+              ? "Update this fixture's schedule and participating teams."
+              : "Schedule a match under an existing tournament or inter-collegiate friendly."
+          }
         >
-          <form onSubmit={handleScheduleFixture} className="space-y-4">
+          <form
+            onSubmit={handleScheduleFixture}
+            className="space-y-4"
+          >
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                 Tournament (Optional)
@@ -1445,25 +1743,35 @@ export function SportsView({
               <select
                 value={fixtureForm.tournamentId}
                 onChange={(event) => {
-                  const tournament = tournaments.find((item) => item.id === event.target.value);
+                  const tournament = tournaments.find(
+                    (item) => item.id === event.target.value
+                  );
+
                   setFixtureForm({
                     ...fixtureForm,
                     tournamentId: tournament?.id || "",
-                    ...(tournament ? {
-                      competitionName: tournament.name,
-                      sportName: tournament.sportName,
-                      venue: tournament.venue,
-                    } : {}),
+                    ...(tournament
+                      ? {
+                          competitionName: tournament.name,
+                          sportName: tournament.sportName,
+                          venue: tournament.venue,
+                        }
+                      : {}),
                   });
                 }}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm"
               >
-                <option value="">Independent fixture / friendly</option>
+                <option value="">
+                  Independent fixture / friendly
+                </option>
                 {tournaments.map((tournament) => (
-                  <option key={tournament.id} value={tournament.id}>{tournament.name}</option>
+                  <option key={tournament.id} value={tournament.id}>
+                    {tournament.name}
+                  </option>
                 ))}
               </select>
             </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                 Tournament / Competition Name
@@ -1473,7 +1781,12 @@ export function SportsView({
                 required
                 placeholder="e.g. All-Island Inter-School Tier 1 Cricket Championship"
                 value={fixtureForm.competitionName}
-                onChange={(e) => setFixtureForm({ ...fixtureForm, competitionName: e.target.value })}
+                onChange={(e) =>
+                  setFixtureForm({
+                    ...fixtureForm,
+                    competitionName: e.target.value,
+                  })
+                }
                 className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
               />
             </div>
@@ -1487,7 +1800,12 @@ export function SportsView({
                   type="text"
                   required
                   value={fixtureForm.homeTeam}
-                  onChange={(e) => setFixtureForm({ ...fixtureForm, homeTeam: e.target.value })}
+                  onChange={(e) =>
+                    setFixtureForm({
+                      ...fixtureForm,
+                      homeTeam: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1501,7 +1819,12 @@ export function SportsView({
                   required
                   placeholder="e.g. Trinity Central College"
                   value={fixtureForm.awayTeam}
-                  onChange={(e) => setFixtureForm({ ...fixtureForm, awayTeam: e.target.value })}
+                  onChange={(e) =>
+                    setFixtureForm({
+                      ...fixtureForm,
+                      awayTeam: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1515,12 +1838,19 @@ export function SportsView({
                 <select
                   required
                   value={fixtureForm.sportName}
-                  onChange={(e) => setFixtureForm({ ...fixtureForm, sportName: e.target.value })}
+                  onChange={(e) =>
+                    setFixtureForm({
+                      ...fixtureForm,
+                      sportName: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none"
                 >
                   <option value="">Select a sport</option>
                   {sports.map((sp) => (
-                    <option key={sp.id} value={sp.name}>{sp.name}</option>
+                    <option key={sp.id} value={sp.name}>
+                      {sp.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1533,7 +1863,12 @@ export function SportsView({
                   type="date"
                   required
                   value={fixtureForm.date}
-                  onChange={(e) => setFixtureForm({ ...fixtureForm, date: e.target.value })}
+                  onChange={(e) =>
+                    setFixtureForm({
+                      ...fixtureForm,
+                      date: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none"
                 />
               </div>
@@ -1547,7 +1882,12 @@ export function SportsView({
                   required
                   placeholder="Enter start time"
                   value={fixtureForm.time}
-                  onChange={(e) => setFixtureForm({ ...fixtureForm, time: e.target.value })}
+                  onChange={(e) =>
+                    setFixtureForm({
+                      ...fixtureForm,
+                      time: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none"
                 />
               </div>
@@ -1562,7 +1902,12 @@ export function SportsView({
                 required
                 placeholder="Enter venue"
                 value={fixtureForm.venue}
-                onChange={(e) => setFixtureForm({ ...fixtureForm, venue: e.target.value })}
+                onChange={(e) =>
+                  setFixtureForm({
+                    ...fixtureForm,
+                    venue: e.target.value,
+                  })
+                }
                 className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
               />
             </div>
@@ -1578,6 +1923,7 @@ export function SportsView({
               >
                 Cancel
               </Button>
+
               <Button
                 type="submit"
                 className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold"
@@ -1589,9 +1935,7 @@ export function SportsView({
         </Modal>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 3: RECORD SCORE (Admin / Teacher) */}
-      {/* ========================================================================= */}
+      {/* MODAL: RECORD SCORE */}
       {selectedFixtureForScore && (
         <Modal
           isOpen={Boolean(selectedFixtureForScore)}
@@ -1613,6 +1957,7 @@ export function SportsView({
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                   Away Score
@@ -1649,7 +1994,11 @@ export function SportsView({
               >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold">
+
+              <Button
+                type="submit"
+                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold"
+              >
                 Publish Result
               </Button>
             </div>
@@ -1657,9 +2006,7 @@ export function SportsView({
         </Modal>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 4: EDIT TOURNAMENT (Admin / Teacher)                                */}
-      {/* ========================================================================= */}
+      {/* MODAL: EDIT TOURNAMENT */}
       {editingTournament && (
         <Modal
           isOpen={Boolean(editingTournament)}
@@ -1667,7 +2014,10 @@ export function SportsView({
           title="Edit Tournament & Championship 🏆"
           description="Update tournament progression, round, status, or crown defending champions."
         >
-          <form onSubmit={handleUpdateTournamentSubmit} className="space-y-4">
+          <form
+            onSubmit={handleUpdateTournamentSubmit}
+            className="space-y-4"
+          >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
@@ -1677,7 +2027,12 @@ export function SportsView({
                   type="text"
                   required
                   value={editTournamentForm.name}
-                  onChange={(e) => setEditTournamentForm({ ...editTournamentForm, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditTournamentForm({
+                      ...editTournamentForm,
+                      name: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1690,7 +2045,12 @@ export function SportsView({
                   type="text"
                   required
                   value={editTournamentForm.sportName}
-                  onChange={(e) => setEditTournamentForm({ ...editTournamentForm, sportName: e.target.value })}
+                  onChange={(e) =>
+                    setEditTournamentForm({
+                      ...editTournamentForm,
+                      sportName: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1703,7 +2063,12 @@ export function SportsView({
                 </label>
                 <select
                   value={editTournamentForm.status}
-                  onChange={(e) => setEditTournamentForm({ ...editTournamentForm, status: e.target.value as TournamentStatus })}
+                  onChange={(e) =>
+                    setEditTournamentForm({
+                      ...editTournamentForm,
+                      status: e.target.value as TournamentStatus,
+                    })
+                  }
                   className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none"
                 >
                   <option value="upcoming">Upcoming</option>
@@ -1722,7 +2087,12 @@ export function SportsView({
                   type="text"
                   placeholder="e.g. Semi Finals / Finals"
                   value={editTournamentForm.currentRound}
-                  onChange={(e) => setEditTournamentForm({ ...editTournamentForm, currentRound: e.target.value })}
+                  onChange={(e) =>
+                    setEditTournamentForm({
+                      ...editTournamentForm,
+                      currentRound: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1734,7 +2104,12 @@ export function SportsView({
                 <input
                   type="text"
                   value={editTournamentForm.venue}
-                  onChange={(e) => setEditTournamentForm({ ...editTournamentForm, venue: e.target.value })}
+                  onChange={(e) =>
+                    setEditTournamentForm({
+                      ...editTournamentForm,
+                      venue: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1749,7 +2124,12 @@ export function SportsView({
                   type="text"
                   placeholder="e.g. Jaffna Central College"
                   value={editTournamentForm.champion}
-                  onChange={(e) => setEditTournamentForm({ ...editTournamentForm, champion: e.target.value })}
+                  onChange={(e) =>
+                    setEditTournamentForm({
+                      ...editTournamentForm,
+                      champion: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1762,7 +2142,12 @@ export function SportsView({
                   type="text"
                   placeholder="e.g. St. Michael's College"
                   value={editTournamentForm.runnerUp}
-                  onChange={(e) => setEditTournamentForm({ ...editTournamentForm, runnerUp: e.target.value })}
+                  onChange={(e) =>
+                    setEditTournamentForm({
+                      ...editTournamentForm,
+                      runnerUp: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1776,7 +2161,11 @@ export function SportsView({
               >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold">
+
+              <Button
+                type="submit"
+                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold"
+              >
                 Save Changes
               </Button>
             </div>
@@ -1784,9 +2173,7 @@ export function SportsView({
         </Modal>
       )}
 
-      {/* ========================================================================= */}
-      {/* MODAL 5: CREATE SQUAD / TEAM (Admin / Teacher)                            */}
-      {/* ========================================================================= */}
+      {/* MODAL: CREATE TEAM */}
       {isCreateTeamModalOpen && (
         <Modal
           isOpen={isCreateTeamModalOpen}
@@ -1794,7 +2181,10 @@ export function SportsView({
           title="Create New Sports Squad 🛡️"
           description="Register a new school team squad with coach details and roster players."
         >
-          <form onSubmit={handleCreateTeamSubmit} className="space-y-4">
+          <form
+            onSubmit={handleCreateTeamSubmit}
+            className="space-y-4"
+          >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
@@ -1805,7 +2195,12 @@ export function SportsView({
                   required
                   placeholder="e.g. Apex Academy First XI"
                   value={teamForm.name}
-                  onChange={(e) => setTeamForm({ ...teamForm, name: e.target.value })}
+                  onChange={(e) =>
+                    setTeamForm({
+                      ...teamForm,
+                      name: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1817,7 +2212,12 @@ export function SportsView({
                 <select
                   required
                   value={teamForm.sportName}
-                  onChange={(e) => setTeamForm({ ...teamForm, sportName: e.target.value })}
+                  onChange={(e) =>
+                    setTeamForm({
+                      ...teamForm,
+                      sportName: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none"
                 >
                   <option value="Cricket">Cricket</option>
@@ -1839,7 +2239,12 @@ export function SportsView({
                   type="text"
                   placeholder="e.g. Coach K. Selvarajah"
                   value={teamForm.coachName}
-                  onChange={(e) => setTeamForm({ ...teamForm, coachName: e.target.value })}
+                  onChange={(e) =>
+                    setTeamForm({
+                      ...teamForm,
+                      coachName: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1852,7 +2257,12 @@ export function SportsView({
                   type="text"
                   placeholder="e.g. Mon & Wed 3:30 PM - 5:30 PM"
                   value={teamForm.trainingSchedule}
-                  onChange={(e) => setTeamForm({ ...teamForm, trainingSchedule: e.target.value })}
+                  onChange={(e) =>
+                    setTeamForm({
+                      ...teamForm,
+                      trainingSchedule: e.target.value,
+                    })
+                  }
                   className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
                 />
               </div>
@@ -1864,9 +2274,16 @@ export function SportsView({
               </label>
               <textarea
                 rows={4}
-                placeholder={"Sathurjan Kaveen - Captain & All-Rounder - Grade 12\nNimalan Raj - Opening Batsman - Grade 11\nKabilan V. - Fast Bowler - Grade 11"}
+                placeholder={
+                  "Sathurjan Kaveen - Captain & All-Rounder - Grade 12\nNimalan Raj - Opening Batsman - Grade 11\nKabilan V. - Fast Bowler - Grade 11"
+                }
                 value={teamForm.playersText}
-                onChange={(e) => setTeamForm({ ...teamForm, playersText: e.target.value })}
+                onChange={(e) =>
+                  setTeamForm({
+                    ...teamForm,
+                    playersText: e.target.value,
+                  })
+                }
                 className="w-full p-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-xs font-mono focus:outline-none focus:border-[#0d5c4d]"
               />
             </div>
@@ -1879,7 +2296,11 @@ export function SportsView({
               >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold">
+
+              <Button
+                type="submit"
+                className="bg-[#0d5c4d] hover:bg-[#083e34] text-white font-bold"
+              >
                 Create Squad 🛡️
               </Button>
             </div>

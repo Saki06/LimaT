@@ -2,15 +2,13 @@
 
 import React, { useState, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
-import {
-  ChildTuitionEnrolment,
+import type {
   TuitionInvoice,
-  LiveClassAttendanceLog,
   TutorPaperMarkRecord,
   TutorAnnouncement,
   ParentLeaveRequest,
   ParentChildProfile
-} from "@/data/parentMockData";
+} from "@/types/parent";
 import {
   Users,
   GraduationCap,
@@ -61,6 +59,27 @@ import { Modal } from "@/components/ui/modal";
 import { api } from "@/lib/api";
 
 type ParentTab = "overview" | "tuition_classes" | "fees" | "progress" | "circulars";
+type ParentChildrenResponse = {
+  success: boolean;
+  data: Partial<ParentChildProfile>[];
+  message?: string;
+};
+
+const EMPTY_PARENT_CHILD: ParentChildProfile = {
+  id: "",
+  name: "",
+  grade: "",
+  avatarText: "",
+  overallAverage: 0,
+  classRank: 0,
+  totalStudents: 0,
+  enrolments: [],
+  invoices: [],
+  paperMarks: [],
+  announcements: [],
+  monthlyInvestmentLkr: 0,
+  pendingSlipsCount: 0,
+};
 
 const EMPTY_CHILD_PROFILE: ParentChildProfile = {
   id: "",
@@ -102,15 +121,16 @@ const EMPTY_CHILD_PROFILE: ParentChildProfile = {
 export function ParentDashboardView() {
   const { currentView, setCurrentView, addToast } = useApp();
 
+  const [selectedChildId, setSelectedChildId] = useState<string>("");
+  const [childrenList, setChildrenList] = useState<ParentChildProfile[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const currentMonthStr = useMemo(
     () => new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
     []
   );
   const todayIsoStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
-  const [selectedChildId, setSelectedChildId] = useState<string>("");
-  const [childrenList, setChildrenList] = useState<ParentChildProfile[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isLinkChildModalOpen, setIsLinkChildModalOpen] = useState<boolean>(false);
   const [linkStudentInput, setLinkStudentInput] = useState<string>("");
   const [isLinkingStudent, setIsLinkingStudent] = useState<boolean>(false);
@@ -118,22 +138,49 @@ export function ParentDashboardView() {
   const fetchParentData = async (showToast = false) => {
     try {
       setIsLoading(true);
-      const res = await api.parents.getMyChildren();
-      if (res?.success && Array.isArray(res.data)) {
-        setChildrenList(res.data);
-        if (res.data.length > 0 && !res.data.some((c: any) => c.id === selectedChildId)) {
-          setSelectedChildId(res.data[0].id);
-        }
-        if (showToast) {
-          addToast({
-            type: "success",
-            title: "Parent Portal Refreshed",
-            message: "Updated live attendance, marks, and tuition pass status."
-          });
-        }
+      setLoadError(null);
+      const res = (await api.parents.getMyChildren()) as ParentChildrenResponse;
+      if (!res?.success || !Array.isArray(res.data)) {
+        throw new Error(res?.message || "The parent records response was invalid.");
+      }
+
+      const children = res.data.map((child) => {
+        const enrolments = Array.isArray(child.enrolments) ? child.enrolments : [];
+        const invoices = Array.isArray(child.invoices) ? child.invoices : [];
+
+        return {
+          ...EMPTY_PARENT_CHILD,
+          ...child,
+          id: child.id || "",
+          name: child.name || "Student",
+          grade: child.grade || "",
+          avatarText: child.avatarText || "",
+          enrolments,
+          invoices,
+          paperMarks: Array.isArray(child.paperMarks) ? child.paperMarks : [],
+          announcements: Array.isArray(child.announcements) ? child.announcements : [],
+          monthlyInvestmentLkr:
+            child.monthlyInvestmentLkr ??
+            enrolments.reduce((total, enrolment) => total + enrolment.monthlyFeeLkr, 0),
+          pendingSlipsCount:
+            child.pendingSlipsCount ?? invoices.filter((invoice) => invoice.status === "under_review").length,
+        };
+      });
+
+      setChildrenList(children);
+      if (!children.some((child) => child.id === selectedChildId)) {
+        setSelectedChildId(children[0]?.id || "");
+      }
+      if (showToast) {
+        addToast({
+          type: "success",
+          title: "Parent Portal Refreshed",
+          message: "Updated live attendance, marks, and tuition pass status."
+        });
       }
     } catch (err) {
       console.warn("Could not load backend parent children:", err);
+      setLoadError(err instanceof Error ? err.message : "Could not load linked student records.");
     } finally {
       setIsLoading(false);
     }
@@ -174,11 +221,11 @@ export function ParentDashboardView() {
       setLinkStudentInput("");
       setIsLinkChildModalOpen(false);
       await fetchParentData(false);
-    } catch (err: any) {
+    } catch (err) {
       addToast({
         type: "error",
         title: "Error Linking Student",
-        message: err?.message || "Failed to link student."
+        message: err instanceof Error ? err.message : "Failed to link student."
       });
     } finally {
       setIsLinkingStudent(false);
@@ -404,6 +451,30 @@ export function ParentDashboardView() {
       console.warn("Backend leave request submission skipped:", err);
     }
   };
+
+  if (childrenList.length === 0) {
+    return (
+      <div className="rounded-3xl border border-[#e6ece8] bg-white p-8 text-center shadow-xs">
+        <h1 className="text-xl font-black text-[#0d2b26]">Parent &amp; Guardian Portal</h1>
+        <p className="mt-2 text-sm text-slate-600" role={loadError ? "alert" : "status"}>
+          {isLoading
+            ? "Loading linked student records..."
+            : loadError || "No linked students were found for this parent account."}
+        </p>
+        {!isLoading && (
+          <button
+            type="button"
+            onClick={() => fetchParentData(true)}
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0d5c4d] px-4 py-2 text-sm font-bold text-white hover:bg-[#0a473b] disabled:opacity-60"
+            disabled={isLoading}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Retry
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-12">

@@ -100,11 +100,10 @@ router.get('/my-registrations', authenticateToken, getMySportsRegistrations);
 router.get('/registrations/me', authenticateToken, getMySportsRegistrations);
 router.get('/registrations', authenticateToken, listSportsRegistrations);
 router.get('/registrations/verify', authenticateToken, verifySportsRegistration);
-router.delete('/registrations/:id', authenticateToken, cancelSportsRegistration);
+router.delete('/registrations/:registrationId', authenticateToken, cancelSportsRegistration);
 router.post('/registrations/championship', authenticateToken, registerChampionshipAthlete);
 router.patch('/registrations/:registrationNumber/status', authenticateToken, updateSportsRegistrationStatus);
 router.post('/register', authenticateToken, registerForSport);
-
 // Payments
 router.get('/payments/:registrationId', authenticateToken, getRegistrationPayments);
 router.post('/payments', authenticateToken, createPaymentRecord);
@@ -139,15 +138,14 @@ router.get('/tournaments', optionalAuthenticateToken, listSportsTournaments);
 router.post('/tournaments', authenticateToken, createSportsTournament);
 router.patch('/tournaments/:id', authenticateToken, updateSportsTournament);
 router.delete('/tournaments/:id', authenticateToken, deleteSportsTournament);
-
-// Fixtures
-router.get('/fixtures', optionalAuthenticateToken, listSportsFixtures);
-router.post('/fixtures', authenticateToken, createSportsFixture);
-router.get('/fixtures/upcoming', optionalAuthenticateToken, getUpcomingFixtures);
-router.get('/fixtures/completed', optionalAuthenticateToken, getRecentlyCompletedFixtures);
-router.get('/fixtures/date-range', optionalAuthenticateToken, getFixturesByDateRange);
-router.get('/fixtures/:fixtureId', optionalAuthenticateToken, getFixtureById);
-router.patch('/fixtures/:id', authenticateToken, updateSportsFixture);
+// Fixtures (Phase 2)
+router.get('/fixtures', authenticateToken, listFixtures);
+router.post('/fixtures', authenticateToken, createFixture);
+router.get('/fixtures/upcoming', authenticateToken, getUpcomingFixtures);
+router.get('/fixtures/completed', authenticateToken, getRecentlyCompletedFixtures);
+router.get('/fixtures/date-range', authenticateToken, getFixturesByDateRange);
+router.get('/fixtures/:fixtureId', authenticateToken, getFixtureById);
+router.patch('/fixtures/:fixtureId', authenticateToken, updateFixture);
 router.delete('/fixtures/:id', authenticateToken, deleteSportsFixture);
 router.patch('/fixtures/:id/result', authenticateToken, recordSportsFixtureResult);
 router.post('/fixtures/:fixtureId/live-score', authenticateToken, updateLiveScore);

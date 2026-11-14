@@ -199,7 +199,18 @@ export const updateFixture = async (
     if (!tenantId) return;
 
     const { fixtureId } = req.params;
-    const { roundName, date, time, venue, status } = req.body;
+    const {
+      tournamentId,
+      sportName,
+      homeTeam,
+      awayTeam,
+      competitionName,
+      roundName,
+      date,
+      time,
+      venue,
+      status,
+    } = req.body;
 
     const existing = await prisma.sportsFixture.findUnique({
       where: { id: fixtureId },
@@ -210,8 +221,29 @@ export const updateFixture = async (
       return;
     }
 
-    const data: any = {};
-    if (roundName) data.roundName = (roundName as string).trim();
+    const data: Prisma.SportsFixtureUpdateInput = {};
+    if (tournamentId !== undefined) {
+      if (tournamentId !== null && typeof tournamentId !== 'string') {
+        res.status(400).json({ success: false, message: 'Invalid tournament ID.' });
+        return;
+      }
+      if (typeof tournamentId === 'string') {
+        const tournament = await prisma.sportsTournament.findFirst({
+          where: { id: tournamentId, tenantId },
+          select: { id: true },
+        });
+        if (!tournament) {
+          res.status(404).json({ success: false, message: 'Tournament not found.' });
+          return;
+        }
+      }
+      data.tournamentId = tournamentId;
+    }
+    if (typeof sportName === 'string' && sportName.trim()) data.sportName = sportName.trim();
+    if (typeof homeTeam === 'string' && homeTeam.trim()) data.homeTeam = homeTeam.trim();
+    if (typeof awayTeam === 'string' && awayTeam.trim()) data.awayTeam = awayTeam.trim();
+    if (typeof competitionName === 'string' && competitionName.trim()) data.competitionName = competitionName.trim();
+    if (typeof roundName === 'string') data.roundName = roundName.trim() || null;
     if (date) {
       const dateObj = new Date(date);
       if (Number.isNaN(dateObj.getTime())) {
@@ -222,7 +254,11 @@ export const updateFixture = async (
     }
     if (time) data.time = time;
     if (venue) data.venue = (venue as string).trim();
-    if (status && ['UPCOMING', 'LIVE', 'COMPLETED', 'CANCELLED'].includes(status)) {
+    if (status !== undefined) {
+      if (!['UPCOMING', 'LIVE', 'COMPLETED', 'CANCELLED'].includes(status)) {
+        res.status(400).json({ success: false, message: 'Invalid fixture status.' });
+        return;
+      }
       data.status = status;
     }
 

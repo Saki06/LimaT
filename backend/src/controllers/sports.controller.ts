@@ -127,11 +127,12 @@ export const listSportsEvents = async (
   res: Response,
 ): Promise<void> => {
   try {
+    const tenantId = requireSportsTenant(req, res);
+    if (!tenantId) return;
     const user = req.user;
-    const where = user?.tenantId ? { tenantId: user.tenantId } : {};
 
     let events = await prisma.sportsEvent.findMany({
-      where,
+      where: { tenantId },
       include: {
         ...(user?.userId
           ? {
@@ -151,17 +152,9 @@ export const listSportsEvents = async (
     });
 
     if (events.length === 0) {
-      let candidateTenantId = user?.tenantId ?? null;
-      if (!candidateTenantId) {
-        const activeTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
-        candidateTenantId = activeTenant?.id ?? null;
-      }
-
-      if (candidateTenantId) {
-        const targetTenantId: string = candidateTenantId;
-        const defaultEvents = [
+      const defaultEvents = [
           {
-            tenantId: targetTenantId,
+            tenantId,
             title: 'Annual Inter-House Sports & Athletic Meet 2026',
             sportType: 'Physical Education & Sports Committee',
             description: 'Track and field events, house parades, relay finals, and prize distribution. Attendance compulsory for all student houses.',
@@ -172,7 +165,7 @@ export const listSportsEvents = async (
             ageCategory: 'all',
           },
           {
-            tenantId: targetTenantId,
+            tenantId,
             title: 'Young Inventors National Science & AI Exhibition',
             sportType: 'Science Society & ICT Club',
             description: 'Interactive STEM pavilions, robotics showcase, coding hackathon finals, and prototype demos.',
@@ -183,7 +176,7 @@ export const listSportsEvents = async (
             ageCategory: 'students',
           },
           {
-            tenantId: targetTenantId,
+            tenantId,
             title: 'National Collegiate Debating Championship Finals',
             sportType: 'Literary & Debating Union',
             description: 'Inter-collegiate parliamentary debate finals. Topic: Artificial Intelligence, Autonomous Systems and Ethics.',
@@ -194,7 +187,7 @@ export const listSportsEvents = async (
             ageCategory: 'all',
           },
           {
-            tenantId: targetTenantId,
+            tenantId,
             title: 'Annual Shakespeare Drama & Cultural Festival',
             sportType: 'English Drama Society',
             description: 'Inter-house collegiate drama festival featuring adaptations of classical literature, orchestral music, and student cultural acts.',
@@ -204,35 +197,34 @@ export const listSportsEvents = async (
             fee: 0,
             ageCategory: 'all',
           },
-        ];
+      ];
 
-        for (const item of defaultEvents) {
-          await prisma.sportsEvent.create({ data: item });
-        }
-
-        events = await prisma.sportsEvent.findMany({
-          where,
-          include: {
-            ...(user?.userId
-              ? {
-                  registrations: {
-                    where: { userId: user.userId },
-                    select: {
-                      userId: true,
-                    },
-                  },
-                }
-              : {}),
-            _count: {
-              select: { registrations: true },
-            },
-          },
-          orderBy: { startDate: 'asc' },
-        });
+      for (const item of defaultEvents) {
+        await prisma.sportsEvent.create({ data: item });
       }
+
+      events = await prisma.sportsEvent.findMany({
+        where: { tenantId },
+        include: {
+          ...(user?.userId
+            ? {
+                registrations: {
+                  where: { userId: user.userId },
+                  select: {
+                    userId: true,
+                  },
+                },
+              }
+            : {}),
+          _count: {
+            select: { registrations: true },
+          },
+        },
+        orderBy: { startDate: 'asc' },
+      });
     }
 
-    const sanitizedEvents = events.map((event: any) => ({
+    const sanitizedEvents = events.map((event) => ({
       ...event,
       registrations: Array.isArray(event.registrations) ? event.registrations : [],
     }));
@@ -387,7 +379,8 @@ export const listSportsDisciplines = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const tenantId = getTenantId(req);
+    const tenantId = requireSportsTenant(req, res);
+    if (!tenantId) return;
 
     const disciplines = await prisma.sportsDiscipline.findMany({
       where: tenantId ? { tenantId } : {},
@@ -546,7 +539,7 @@ export const updateSportsEvent = async (
     const existing = await prisma.sportsEvent.findFirst({
       where: {
         id: eventId,
-        ...(req.user?.role === 'SUPER_ADMIN' ? {} : { tenantId }),
+        tenantId,
       },
     });
 
@@ -661,7 +654,7 @@ export const deleteSportsEvent = async (
     const existing = await prisma.sportsEvent.findFirst({
       where: {
         id: eventId,
-        ...(req.user?.role === 'SUPER_ADMIN' ? {} : { tenantId }),
+        tenantId,
       },
     });
 
@@ -1014,9 +1007,10 @@ export const listSportsTeams = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const tenantId = getTenantId(req);
+    const tenantId = requireSportsTenant(req, res);
+    if (!tenantId) return;
     const teams = await prisma.sportsTeam.findMany({
-      where: tenantId ? { tenantId } : {},
+      where: { tenantId },
       orderBy: { name: 'asc' },
     });
     res.status(200).json({ success: true, data: teams });
@@ -1120,9 +1114,10 @@ export const listSportsTournaments = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const tenantId = getTenantId(req);
+    const tenantId = requireSportsTenant(req, res);
+    if (!tenantId) return;
     const tournaments = await prisma.sportsTournament.findMany({
-      where: tenantId ? { tenantId } : {},
+      where: { tenantId },
       orderBy: { startDate: 'asc' },
     });
     res.status(200).json({ success: true, data: tournaments });
@@ -1258,9 +1253,10 @@ export const listSportsFixtures = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const tenantId = getTenantId(req);
+    const tenantId = requireSportsTenant(req, res);
+    if (!tenantId) return;
     const fixtures = await prisma.sportsFixture.findMany({
-      where: tenantId ? { tenantId } : {},
+      where: { tenantId },
       orderBy: [{ date: 'asc' }, { time: 'asc' }],
     });
     res.status(200).json({ success: true, data: fixtures });
@@ -1495,9 +1491,10 @@ export const listSportsStandings = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const tenantId = getTenantId(req);
+    const tenantId = requireSportsTenant(req, res);
+    if (!tenantId) return;
     const fixtures = await prisma.sportsFixture.findMany({
-      where: { ...(tenantId ? { tenantId } : {}), status: 'COMPLETED' },
+      where: { tenantId, status: 'COMPLETED' },
       orderBy: { date: 'asc' },
     });
     const groups = new Map<string, Map<string, {
@@ -1602,51 +1599,47 @@ export const verifySportsRegistration = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const tenantId = getTenantId(req);
-    const query = typeof req.query.query === 'string'
-      ? req.query.query.trim()
-      : typeof req.query.registrationNumber === 'string'
-        ? req.query.registrationNumber.trim()
+    const tenantId = requireSportsTenant(req, res);
+    if (!tenantId) return;
+    const user = req.user;
+    if (!user || (user.role !== 'STUDENT' && !sportsManagerRoles.has(user.role))) {
+      res.status(403).json({ success: false, message: 'Registration verification is not available for this account.' });
+      return;
+    }
+    const registrationQuery = typeof req.query.registrationNumber === 'string'
+      ? req.query.registrationNumber
+      : typeof req.query.query === 'string'
+        ? req.query.query
         : '';
+    const registrationNumber = registrationQuery.trim().toUpperCase();
     const mobile = typeof req.query.mobile === 'string' ? req.query.mobile.trim() : '';
-
-    if (!query && !mobile) {
-      res.status(400).json({ success: false, message: 'Registration number or mobile number is required.' });
+    if (!registrationNumber || !isValidMobile(mobile)) {
+      res.status(400).json({
+        success: false,
+        message: 'A registration number and valid registered mobile number are required.',
+      });
       return;
     }
 
-    const cleanQuery = query.toUpperCase();
     const registrations = await prisma.sportsRegistration.findMany({
       where: {
-        ...(tenantId ? { event: { is: { tenantId } } } : {}),
-        ...(cleanQuery
-          ? {
-              OR: [
-                { registrationNumber: cleanQuery },
-                { registrationNumber: { contains: cleanQuery, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
+        registrationNumber,
+        event: { is: { tenantId } },
+        ...(user.role === 'STUDENT' ? { userId: user.userId } : {}),
       },
       include: {
         event: true,
       },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: 50,
     });
-
-    if (mobile && isValidMobile(mobile)) {
-      const normalizedMobile = mobile.replace(/\D/g, '');
-      const verifiedRegistrations = registrations.filter((registration) => {
-        const details = registration.athleteDetails;
-        if (!details || typeof details !== 'object' || Array.isArray(details)) return false;
-        return String((details as Record<string, unknown>).mobile || '').replace(/\D/g, '') === normalizedMobile;
-      });
-      res.status(200).json({ success: true, data: verifiedRegistrations });
-      return;
-    }
-
-    res.status(200).json({ success: true, data: registrations });
+    const normalizedMobile = mobile.replace(/\D/g, '');
+    const verifiedRegistrations = registrations.filter((registration) => {
+      const details = registration.athleteDetails;
+      if (!details || typeof details !== 'object' || Array.isArray(details)) return false;
+      return String((details as Record<string, unknown>).mobile || '').replace(/\D/g, '') === normalizedMobile;
+    });
+    res.status(200).json({ success: true, data: verifiedRegistrations });
   } catch (error: any) {
     console.error('Error verifying sports registration:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });

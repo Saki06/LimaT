@@ -770,5 +770,3 @@ export const getMyTeacherDashboard = async (req: AuthenticatedRequest, res: Resp
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
-
-

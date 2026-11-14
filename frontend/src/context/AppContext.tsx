@@ -40,11 +40,7 @@ import {
   StoredAthleteRegistration,
 } from '@/components/sports/sportsRegistrationData';
 import { Tenant, TenantFeature, TenantType } from '@/types/tenant';
-import { INITIAL_TENANTS, TENANT_PRESETS } from '@/data/tenantMockData';
-import {
-  mockUsers,
-  initialGrades,
-} from '@/data/mockData';
+import { TENANT_PRESETS } from '@/data/tenantMockData';
 import { getTranslation } from '@/lib/i18n';
 import { api } from '@/lib/api';
 import { mapBackendTenant } from '@/lib/tenantMapper';
@@ -181,7 +177,7 @@ interface AppContextType {
   createSportsTeam: (team: Omit<SportsTeamRecord, 'id' | 'playersCount'>) => Promise<void>;
   updateSportsTeam: (id: string, updates: Partial<Omit<SportsTeamRecord, 'id'>>) => Promise<void>;
   deleteSportsTeam: (id: string) => Promise<void>;
-  verifySportsRegistration: (query: string) => Promise<SportsRegistration[]>;
+  verifySportsRegistration: (registrationNumber: string, mobile: string) => Promise<SportsRegistration[]>;
   createAssignment: (assignment: Partial<Assignment>) => void;
   updateAssignment: (id: string, updates: Partial<Assignment>) => void;
   deleteAssignment: (id: string) => void;
@@ -381,7 +377,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [landingPortal, setLandingPortal] = useState<'gateway' | 'student' | 'parent' | 'staff'>('gateway');
 
   const [schools, setSchools] = useState<School[]>([]);
-  const [grades, setGrades] = useState<GradeLevel[]>(initialGrades);
+  const [grades, setGrades] = useState<GradeLevel[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -408,8 +404,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
 
   // Multi-Tenant SaaS State
-  const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
-  const [activeTenantId, setActiveTenantId] = useState<string>(INITIAL_TENANTS[0].id);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [activeTenantId, setActiveTenantId] = useState<string>('');
 
   const activeTenant = tenants.find((t) => t.id === activeTenantId) || tenants[0];
 
@@ -1178,7 +1174,6 @@ useEffect(() => {
   const [teacherProfile, setTeacherProfile] = useState<TeacherProfileData | null>(null);
 
   const t = getTranslation(locale);
-  const baseUser = mockUsers[currentRole];
   const userAvatar =
   (currentRole === 'super_admin' && authUser?.role === 'SUPER_ADMIN'
     ? superAdminAvatarUrl
@@ -1191,11 +1186,10 @@ useEffect(() => {
     ? (localStorage.getItem(`lms_avatar_${authUser?.id || 'teacher'}`) ||
        localStorage.getItem('lms_avatar_teacher'))
     : null) ||
-  baseUser.avatar;
+  undefined;
 
   const currentUser: User = authUser
     ? {
-      ...baseUser,
       id: authUser.id,
       name:
   (currentRole === 'super_admin'
@@ -1208,13 +1202,20 @@ useEffect(() => {
       email: authUser.email,
       role: currentRole,
       avatar: userAvatar,
+      schoolId: authUser.schoolId || '',
+      schoolName: authUser.schoolName || '',
       grade: authUser.studentProfile?.gradeLevel || authUser.grade || '',
       class: authUser.studentProfile?.gradeLevel || authUser.grade || 'Student',
       ...(authUser.studentProfile ? { studentProfile: authUser.studentProfile } : {}),
     }
     : {
-      ...baseUser,
-      avatar: userAvatar
+      id: 'unauthenticated',
+      name: 'Guest',
+      email: '',
+      role: currentRole,
+      avatar: undefined,
+      schoolId: '',
+      schoolName: ''
     };
 
   const addToast = useCallback((toast: Omit<ToastMessage, 'id'>) => {
@@ -2197,26 +2198,30 @@ useEffect(() => {
 
   const updateFixture = async (id: string, updates: Partial<Fixture>) => {
     try {
+      const status = updates.status
+        ? ({
+            scheduled: 'UPCOMING',
+            in_progress: 'LIVE',
+            completed: 'COMPLETED',
+          } as const)[updates.status]
+        : undefined;
       await api.sports.updateFixture(id, {
-        tournamentId: updates.tournamentId || null,
-        sportName: updates.sportName,
-        homeTeam: updates.homeTeam,
-        awayTeam: updates.awayTeam,
-        date: updates.date,
-        time: updates.time,
-        venue: updates.venue,
-        competitionName: updates.competitionName,
-        status: updates.status,
+        ...(updates.tournamentId !== undefined ? { tournamentId: updates.tournamentId } : {}),
+        ...(updates.sportName !== undefined ? { sportName: updates.sportName } : {}),
+        ...(updates.homeTeam !== undefined ? { homeTeam: updates.homeTeam } : {}),
+        ...(updates.awayTeam !== undefined ? { awayTeam: updates.awayTeam } : {}),
+        ...(updates.date !== undefined ? { date: updates.date } : {}),
+        ...(updates.time !== undefined ? { time: updates.time } : {}),
+        ...(updates.venue !== undefined ? { venue: updates.venue } : {}),
+        ...(updates.competitionName !== undefined ? { competitionName: updates.competitionName } : {}),
+        ...(status ? { status } : {}),
       });
       await fetchSportsOperations();
-      addToast({
-        type: 'success',
-        title: 'Fixture Updated',
-        message: 'Match fixture details were saved.',
-      });
+      addToast({ type: 'success', title: 'Fixture Updated', message: 'Fixture changes were saved.' });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
       addToast({ type: 'error', title: 'Unable to Update Fixture', message });
+      throw error;
     }
   };
 
@@ -2280,9 +2285,12 @@ useEffect(() => {
     }
   };
 
-  const verifySportsRegistration = async (query: string): Promise<SportsRegistration[]> => {
+  const verifySportsRegistration = async (
+    registrationNumber: string,
+    mobile: string,
+  ): Promise<SportsRegistration[]> => {
     try {
-      return await api.sports.verifyRegistration(query);
+      return await api.sports.verifyRegistration(registrationNumber, mobile);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'An unexpected error occurred.';
       addToast({ type: 'error', title: 'Lookup Failed', message });

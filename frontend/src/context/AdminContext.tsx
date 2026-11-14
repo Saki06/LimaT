@@ -17,8 +17,6 @@ import {
   TeacherHub,
   TeacherHubStatus
 } from '@/types/lms';
-import { initialHubSettings } from '@/data/adminConnectMockData';
-
 export interface AdminOverviewData {
   school: {
     id: string;
@@ -103,7 +101,12 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [teacherHubs, setTeacherHubs] = useState<TeacherHub[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [hubFlags, setHubFlags] = useState<HubFlag[]>([]);
-  const [hubSettings, setHubSettings] = useState(initialHubSettings);
+  const [hubSettings, setHubSettings] = useState<HubSettings>({
+    schoolId: currentUser.schoolId || 'sch_apex_01',
+    enabled: false,
+    approvalRequired: true,
+    allowDirectMessages: false,
+  });
   const [auditLog, setAuditLog] = useState<HubAuditEntry[]>([]);
   const schoolId = currentUser.schoolId || 'sch_apex_01';
 
@@ -221,7 +224,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     updateStaff: (id, input) => {
       const duplicate = staff.some((record) => record.id !== id && (record.email.toLowerCase() === input.email.toLowerCase() || record.staffId.toLowerCase() === input.staffId.toLowerCase()));
       if (duplicate) return { ok: false, error: 'A staff member with this email or staff ID already exists.' };
-      
+
       setStaff((records) => records.map((record) => record.id === id ? {
         ...record,
         name: input.name,

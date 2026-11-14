@@ -46,15 +46,14 @@ export function CheckRegistrationView({
     const cleanPhone = searchMobile.trim().replace(/\s+/g, "");
     setSearchedRecord(null);
     setLookupError("");
-    const query = cleanId || cleanPhone;
-    if (!query) {
-      setLookupError("Enter your registration number or registered mobile number.");
+    if (!cleanId || !cleanPhone) {
+      setLookupError("Enter your registration number and registered mobile number.");
       return;
     }
 
     setIsSearchingBackend(true);
     try {
-      const records = await verifySportsRegistration(query);
+      const records = await verifySportsRegistration(cleanId, cleanPhone);
       if (records.length === 0) return;
 
       const rec = records[0];
@@ -170,7 +169,7 @@ export function CheckRegistrationView({
               <span>Check My Championship Registration Status</span>
             </h3>
             <p className="text-xs text-slate-500">
-              Enter your registration ID or registered mobile number to verify your participant status.
+              Enter your registration ID and registered mobile number to verify your participant status.
             </p>
           </div>
 

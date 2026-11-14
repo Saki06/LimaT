@@ -33,4 +33,3 @@ router.post('/leave-request', submitLeaveRequest);
 router.post('/deposit-slip', submitDepositSlip);
 
 export default router;
-
