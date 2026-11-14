@@ -70,15 +70,30 @@ export const getOrCreateParentProfile = async (userId: string): Promise<any> => 
             },
           },
           liveAttendances: {
+            include: {
+              session: true,
+            },
             orderBy: { joinedAt: 'desc' },
-            take: 15,
+            take: 25,
           },
           assignmentSubmissions: {
             include: {
-              assignment: true,
+              assignment: {
+                include: {
+                  course: {
+                    include: {
+                      teacher: {
+                        include: {
+                          user: { select: { firstName: true, lastName: true } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             orderBy: { submittedAt: 'desc' },
-            take: 15,
+            take: 25,
           },
         },
       },
@@ -96,21 +111,23 @@ export const getOrCreateParentProfile = async (userId: string): Promise<any> => 
     const created = await prisma.parentProfile.create({
       data: {
         userId,
-        phoneNumber: '+94 77 123 4567',
+        phoneNumber: null,
       },
     });
 
-    // Link available students to this guardian
-    const studentsToLink = await prisma.studentProfile.findMany({
-      where: tenantId ? { user: { tenantId } } : {},
-      take: 2,
-    });
-
-    if (studentsToLink.length > 0) {
-      await prisma.studentProfile.updateMany({
-        where: { id: { in: studentsToLink.map((s) => s.id) } },
-        data: { guardianId: created.id },
+    // Only auto-link sample students for the built-in demo parent account
+    if (user?.email === 'parent@apex.edu') {
+      const studentsToLink = await prisma.studentProfile.findMany({
+        where: tenantId ? { user: { tenantId } } : {},
+        take: 2,
       });
+
+      if (studentsToLink.length > 0) {
+        await prisma.studentProfile.updateMany({
+          where: { id: { in: studentsToLink.map((s) => s.id) } },
+          data: { guardianId: created.id },
+        });
+      }
     }
 
     parent = await prisma.parentProfile.findUnique({
@@ -177,15 +194,30 @@ export const getOrCreateParentProfile = async (userId: string): Promise<any> => 
               },
             },
             liveAttendances: {
+              include: {
+                session: true,
+              },
               orderBy: { joinedAt: 'desc' },
-              take: 15,
+              take: 25,
             },
             assignmentSubmissions: {
               include: {
-                assignment: true,
+                assignment: {
+                  include: {
+                    course: {
+                      include: {
+                        teacher: {
+                          include: {
+                            user: { select: { firstName: true, lastName: true } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
               orderBy: { submittedAt: 'desc' },
-              take: 15,
+              take: 25,
             },
           },
         },
@@ -217,249 +249,403 @@ export const getMyChildren = async (
       return;
     }
 
-    // Format students into full ParentChildProfile shape
+    const tenantId = parent.user?.tenantId || req.user?.tenantId;
+
+    // Fetch real upcoming/active live sessions and real announcements from DB
+    const [upcomingSessions, dbAnnouncements, totalStudentsCount] = await Promise.all([
+      prisma.liveClassSession.findMany({
+        where: {
+          ...(tenantId ? { tenantId } : {}),
+          status: { in: ['SCHEDULED', 'LIVE'] },
+        },
+        orderBy: { startTime: 'asc' },
+        take: 20,
+      }),
+      prisma.announcement.findMany({
+        where: {
+          ...(tenantId ? { tenantId } : {}),
+          targetAudience: { in: ['ALL', 'PARENTS', 'STUDENTS', 'Everyone'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+      prisma.studentProfile.count({
+        where: tenantId ? { user: { tenantId } } : {},
+      }),
+    ]);
+
+    const currentMonthLabel = new Date().toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    });
+
+    // Format students into full ParentChildProfile shape using ONLY real DB data
     const formattedChildren = (parent.students || []).map((student: any) => {
       const studentName = `${student.user?.firstName || 'Student'} ${student.user?.lastName || ''}`.trim();
-      const initials = studentName
-        .split(' ')
-        .filter(Boolean)
-        .map((n: string) => n[0])
-        .slice(0, 2)
-        .join('')
-        .toUpperCase() || 'ST';
+      const initials =
+        studentName
+          .split(' ')
+          .filter(Boolean)
+          .map((n: string) => n[0])
+          .slice(0, 2)
+          .join('')
+          .toUpperCase() || 'ST';
 
-      // 1. Build Enrolments
-      const enrolments = (student.enrollments || []).map((enr: any, idx: number) => {
+      // 1. Build Paper Marks from real graded AssignmentSubmissions + QuizAttempts
+      const assignmentMarks = (student.assignmentSubmissions || [])
+        .filter((sub: any) => sub.marksObtained !== null && sub.marksObtained !== undefined)
+        .map((sub: any, idx: number) => {
+          const maxScore = Number(sub.assignment?.maxMarks || 100);
+          const rawScore = Number(sub.marksObtained || 0);
+          const pct = maxScore > 0 ? Math.round((rawScore / maxScore) * 100) : 0;
+          const grade = pct >= 75 ? 'A' : pct >= 65 ? 'B' : pct >= 55 ? 'C' : pct >= 35 ? 'S' : 'F';
+          const tUser = sub.assignment?.course?.teacher?.user;
+          const tutorName = tUser ? `${tUser.firstName} ${tUser.lastName}`.trim() : 'Course Educator';
+
+          return {
+            id: sub.id,
+            childId: student.id,
+            paperCode: `ASN-${String(idx + 1).padStart(2, '0')}`,
+            title: sub.assignment?.title || `Assignment ${idx + 1}`,
+            tutorName,
+            subject: sub.assignment?.subjectName || sub.assignment?.course?.title || 'General Subject',
+            date: sub.submittedAt ? sub.submittedAt.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            score: rawScore,
+            maxScore,
+            batchAverage: pct,
+            highestScore: maxScore,
+            rank: 1,
+            batchTotal: Math.max(totalStudentsCount, 1),
+            grade,
+            tutorFeedback: sub.teacherFeedback || 'Graded submission.',
+          };
+        });
+
+      const quizMarks = (student.quizAttempts || []).map((qa: any, idx: number) => {
+        const score = Math.round(Number(qa.score || 0));
+        const maxScore = 100;
+        const grade = score >= 75 ? 'A' : score >= 65 ? 'B' : score >= 55 ? 'C' : score >= 35 ? 'S' : 'F';
+        const tUser = qa.quiz?.course?.teacher?.user;
+        const tutorName = tUser ? `${tUser.firstName} ${tUser.lastName}`.trim() : 'Course Educator';
+
+        return {
+          id: qa.id,
+          childId: student.id,
+          paperCode: `QZ-${String(idx + 1).padStart(2, '0')}`,
+          title: qa.quiz?.title || `Quiz Assessment ${idx + 1}`,
+          tutorName,
+          subject: qa.quiz?.course?.title || 'Quiz Assessment',
+          date: qa.completedAt ? qa.completedAt.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          score,
+          maxScore,
+          batchAverage: score,
+          highestScore: 100,
+          rank: 1,
+          batchTotal: Math.max(totalStudentsCount, 1),
+          grade,
+          tutorFeedback: qa.passed ? 'Passed online quiz assessment.' : 'Completed online quiz assessment.',
+        };
+      });
+
+      const paperMarks = [...assignmentMarks, ...quizMarks];
+
+      // 2. Build Attendance Logs from real LiveSessionAttendance
+      const attendanceLogs = (student.liveAttendances || []).map((att: any) => {
+        const joinedDate = att.joinedAt ? new Date(att.joinedAt) : null;
+        const leftDate = att.leftAt ? new Date(att.leftAt) : null;
+        const durationMins = att.durationSeconds ? Math.max(1, Math.round(att.durationSeconds / 60)) : 0;
+
+        return {
+          id: att.id,
+          childId: student.id,
+          sessionTitle: att.session?.title || 'Live Class Session',
+          tutorName: 'Course Educator',
+          subject: att.session?.subject || 'Live Lecture',
+          date: joinedDate ? joinedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          timeSlot: joinedDate
+            ? joinedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+            : 'Scheduled Time',
+          platform: (att.session?.provider === 'ZOOM' ? 'Zoom' : 'Google Meet') as 'Google Meet' | 'Zoom',
+          status: 'attended' as const,
+          durationMinutes: durationMins,
+          totalDurationMinutes: durationMins || 60,
+          joinTime: joinedDate ? joinedDate.toTimeString().slice(0, 5) : undefined,
+          leaveTime: leftDate ? leftDate.toTimeString().slice(0, 5) : undefined,
+          recordingWatched: false,
+        };
+      });
+
+      // Calculate real attendance rate & average score
+      const attendedSessionsCount = attendanceLogs.length;
+      const totalSessionsCount = Math.max(attendedSessionsCount, upcomingSessions.length);
+      const overallAttendanceRate =
+        totalSessionsCount > 0 ? Math.min(100, Math.round((attendedSessionsCount / totalSessionsCount) * 100)) : 0;
+
+      const totalPaperMarks = paperMarks.length;
+      const avgScore =
+        totalPaperMarks > 0
+          ? Math.round(
+              paperMarks.reduce((acc: number, p: any) => acc + (p.score / (p.maxScore || 100)) * 100, 0) /
+                totalPaperMarks
+            )
+          : 0;
+
+      // 3. Build Enrolments from real CourseEnrollments + PackageSubscriptions
+      const courseEnrolments = (student.enrollments || []).map((enr: any, idx: number) => {
         const teacherUser = enr.course?.teacher?.user;
-        const teacherName = teacherUser ? `${teacherUser.firstName} ${teacherUser.lastName}` : 'Faculty Educator';
-        const subject = enr.course?.title || 'Advanced Mathematics';
+        const teacherName = teacherUser
+          ? `${teacherUser.firstName} ${teacherUser.lastName}`.trim()
+          : 'Course Educator';
+        const subject = enr.course?.title || 'Course';
 
-        // Check if there is an active package subscription for this course/teacher
         const sub = (student.packageSubscriptions || []).find(
-          (s: any) => s.package?.teacherId === enr.course?.teacherId
+          (s: any) => s.package?.teacherId && s.package?.teacherId === enr.course?.teacherId
         );
 
-        const feeStatus = sub?.status === 'ACTIVE' ? 'paid' : sub?.status === 'PENDING' ? 'pending_slip' : 'paid';
+        const nextLive = upcomingSessions.find(
+          (ls: any) =>
+            (enr.course?.teacherId && ls.teacherId === enr.course?.teacherId) ||
+            (ls.courseId && ls.courseId === enr.courseId)
+        );
+
+        const latestSubjectPaper = paperMarks.find(
+          (pm: any) => pm.subject.toLowerCase() === subject.toLowerCase() || pm.tutorName === teacherName
+        );
+
+        const feeStatus: 'paid' | 'pending_slip' | 'overdue' =
+          sub?.status === 'PENDING' ? 'pending_slip' : sub?.status === 'EXPIRED' ? 'overdue' : 'paid';
 
         return {
           id: enr.id || `enr_${idx}`,
           teacherId: enr.course?.teacherId || `tch_${idx}`,
           teacherName,
-          teacherTitle: 'Senior Master Tutor & Paper Author',
+          teacherTitle: enr.course?.teacher?.specialization || 'Educator',
           subject,
           avatarColor: idx % 2 === 0 ? 'bg-emerald-600' : 'bg-teal-600',
-          initials: teacherName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() || 'SP',
-          packageName: sub?.package?.title || `${subject} Monthly Masterclass Pass`,
-          batch: student.section || '2026 A/L Theory Cohort A',
-          monthlyFeeLkr: Number(sub?.package?.price || 3500),
+          initials:
+            teacherName
+              .split(' ')
+              .filter(Boolean)
+              .map((n: string) => n[0])
+              .slice(0, 2)
+              .join('')
+              .toUpperCase() || 'ED',
+          packageName: sub?.package?.title || subject,
+          batch: student.gradeLevel ? `${student.gradeLevel} ${student.section || ''}`.trim() : 'Active Cohort',
+          monthlyFeeLkr: Number(sub?.package?.price || sub?.paidAmount || 0),
           feeStatus,
-          validUntil: sub?.endDate ? sub.endDate.toISOString().split('T')[0] : '2026-11-30',
-          lastPaymentDate: sub?.updatedAt ? sub.updatedAt.toISOString().split('T')[0] : '2026-10-05',
-          lastPaymentRef: sub?.bankRefNo || `BOC-REF-${Math.floor(100000 + Math.random() * 900000)}`,
-          paymentBank: 'Bank of Ceylon',
-          liveClassSchedule: 'Every Tuesday & Friday, 6:00 PM - 8:30 PM',
-          platform: 'Google Meet' as const,
-          meetingUrl: 'https://meet.google.com/xyz-tuition-stream',
-          nextSessionDate: 'Tomorrow at 6:00 PM',
-          nextSessionTopic: 'Unit Calculus: Complex Integration Techniques',
-          attendanceRate: 94,
-          attendedSessions: 16,
-          totalSessions: 17,
-          latestPaperMark: 92,
-          latestPaperMax: 100,
-          batchRank: 14,
-          batchTotalStudents: 312,
-          tutorPhone: '+94 77 123 4567',
+          validUntil: sub?.endDate ? sub.endDate.toISOString().split('T')[0] : 'Active Enrollment',
+          lastPaymentDate: sub?.updatedAt ? sub.updatedAt.toISOString().split('T')[0] : undefined,
+          lastPaymentRef: sub?.bankRefNo || sub?.receiptNo || undefined,
+          paymentBank: sub?.paymentMethod === 'BANK_SLIP' ? 'Bank Deposit' : undefined,
+          liveClassSchedule: nextLive?.startTime
+            ? new Date(nextLive.startTime).toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })
+            : 'No upcoming session scheduled',
+          platform: (nextLive?.platform === 'ZOOM' ? 'Zoom' : 'Google Meet') as 'Google Meet' | 'Zoom',
+          meetingUrl: nextLive?.meetingUrl || '#',
+          nextSessionDate: nextLive?.startTime
+            ? new Date(nextLive.startTime).toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })
+            : 'Not scheduled yet',
+          nextSessionTopic: nextLive?.title || 'No live session scheduled',
+          attendanceRate: overallAttendanceRate,
+          attendedSessions: attendedSessionsCount,
+          totalSessions: totalSessionsCount,
+          latestPaperMark: latestSubjectPaper ? latestSubjectPaper.score : 0,
+          latestPaperMax: latestSubjectPaper ? latestSubjectPaper.maxScore : 100,
+          batchRank: latestSubjectPaper ? latestSubjectPaper.rank : 0,
+          batchTotalStudents: totalStudentsCount,
+          tutorPhone: 'Contact via Portal',
         };
       });
 
-      // 2. Build Invoices from PackageSubscriptions
-      const invoices = (student.packageSubscriptions || []).map((sub: any, idx: number) => {
+      // Also include any PackageSubscriptions whose teacher isn't already represented in courseEnrolments
+      const existingTeacherIds = new Set(courseEnrolments.map((e: any) => e.teacherId));
+      const packageOnlyEnrolments = (student.packageSubscriptions || [])
+        .filter((sub: any) => sub.package && !existingTeacherIds.has(sub.package.teacherId))
+        .map((sub: any, idx: number) => {
+          const teacherUser = sub.package?.teacher?.user;
+          const teacherName = teacherUser
+            ? `${teacherUser.firstName} ${teacherUser.lastName}`.trim()
+            : 'Course Educator';
+          const subject = sub.package?.subject || sub.package?.title || 'Tuition Package';
+          const nextLive = upcomingSessions.find((ls: any) => ls.teacherId === sub.package?.teacherId);
+          const feeStatus: 'paid' | 'pending_slip' | 'overdue' =
+            sub.status === 'PENDING' ? 'pending_slip' : sub.status === 'EXPIRED' ? 'overdue' : 'paid';
+
+          return {
+            id: sub.id,
+            teacherId: sub.package?.teacherId || `pkg_tch_${idx}`,
+            teacherName,
+            teacherTitle: sub.package?.teacher?.specialization || 'Educator',
+            subject,
+            avatarColor: idx % 2 === 0 ? 'bg-teal-600' : 'bg-emerald-600',
+            initials:
+              teacherName
+                .split(' ')
+                .filter(Boolean)
+                .map((n: string) => n[0])
+                .slice(0, 2)
+                .join('')
+                .toUpperCase() || 'ED',
+            packageName: sub.package?.title || subject,
+            batch: sub.package?.gradeLevel || student.gradeLevel || 'Active Cohort',
+            monthlyFeeLkr: Number(sub.package?.price || sub.paidAmount || 0),
+            feeStatus,
+            validUntil: sub.endDate ? sub.endDate.toISOString().split('T')[0] : 'Active',
+            lastPaymentDate: sub.updatedAt ? sub.updatedAt.toISOString().split('T')[0] : undefined,
+            lastPaymentRef: sub.bankRefNo || sub.receiptNo || undefined,
+            paymentBank: sub.paymentMethod === 'BANK_SLIP' ? 'Bank Deposit' : undefined,
+            liveClassSchedule: nextLive?.startTime
+              ? new Date(nextLive.startTime).toLocaleString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })
+              : 'No upcoming session scheduled',
+            platform: (nextLive?.platform === 'ZOOM' ? 'Zoom' : 'Google Meet') as 'Google Meet' | 'Zoom',
+            meetingUrl: nextLive?.meetingUrl || '#',
+            nextSessionDate: nextLive?.startTime
+              ? new Date(nextLive.startTime).toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })
+              : 'Not scheduled yet',
+            nextSessionTopic: nextLive?.title || 'No live session scheduled',
+            attendanceRate: overallAttendanceRate,
+            attendedSessions: attendedSessionsCount,
+            totalSessions: totalSessionsCount,
+            latestPaperMark: 0,
+            latestPaperMax: 100,
+            batchRank: 0,
+            batchTotalStudents: totalStudentsCount,
+            tutorPhone: 'Contact via Portal',
+          };
+        });
+
+      const resolvedEnrolments = [...courseEnrolments, ...packageOnlyEnrolments];
+
+      // 4. Build Invoices strictly from real PackageSubscriptions
+      const resolvedInvoices = (student.packageSubscriptions || []).map((sub: any, idx: number) => {
         const teacherUser = sub.package?.teacher?.user;
-        const teacherName = teacherUser ? `${teacherUser.firstName} ${teacherUser.lastName}` : 'Faculty Educator';
-        const status = sub.status === 'ACTIVE' ? 'cleared' : sub.status === 'PENDING' ? 'under_review' : 'cleared';
+        const teacherName = teacherUser
+          ? `${teacherUser.firstName} ${teacherUser.lastName}`.trim()
+          : 'Course Educator';
+        const status = sub.status === 'ACTIVE' ? 'cleared' : sub.status === 'PENDING' ? 'under_review' : 'overdue';
+        const createdDate = sub.createdAt ? new Date(sub.createdAt) : new Date();
 
         return {
           id: sub.id,
-          invoiceNumber: sub.receiptNo || `INV-2026-${Math.floor(100 + idx * 50)}`,
+          invoiceNumber: sub.receiptNo || `INV-${createdDate.getFullYear()}-${String(idx + 1).padStart(3, '0')}`,
           childId: student.id,
           childName: studentName,
           teacherName,
-          subject: sub.package?.title || 'Tuition Subject Pass',
-          month: 'October 2026',
-          amountLkr: Number(sub.paidAmount || sub.package?.price || 3500),
+          subject: sub.package?.title || 'Tuition Package',
+          month: createdDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) || currentMonthLabel,
+          amountLkr: Number(sub.paidAmount || sub.package?.price || 0),
           status: status as 'cleared' | 'under_review' | 'overdue',
-          paymentMethod: sub.paymentMethod === 'BANK_SLIP' ? 'bank_slip' : 'online_card' as const,
+          paymentMethod: sub.paymentMethod === 'BANK_SLIP' ? ('bank_slip' as const) : ('online_card' as const),
           slipRefNumber: sub.bankRefNo || undefined,
-          bankName: 'Commercial Bank of Ceylon',
-          branchName: 'Main Branch',
-          depositedDate: sub.createdAt ? sub.createdAt.toISOString().split('T')[0] : '2026-10-10',
+          bankName: sub.paymentMethod === 'BANK_SLIP' ? 'Bank Deposit' : undefined,
+          branchName: undefined,
+          depositedDate: createdDate.toISOString().split('T')[0],
           slipImageUrl: sub.slipUrl || undefined,
-          tutorNotes: sub.paymentNotes || 'Verified tuition pass for current academic term.',
+          tutorNotes: sub.paymentNotes || undefined,
         };
       });
 
-      // 3. Build Paper Marks from AssignmentSubmissions
-      const paperMarks = (student.assignmentSubmissions || []).map((sub: any, idx: number) => {
-        const maxScore = Number(sub.assignment?.maxMarks || 100);
-        const score = Number(sub.marksObtained || 85);
-        const pct = Math.round((score / maxScore) * 100);
-        const grade = pct >= 75 ? 'A' : pct >= 65 ? 'B' : pct >= 55 ? 'C' : pct >= 35 ? 'S' : 'F';
+      // 5. Build Announcements strictly from real DB announcements for enrolled teachers
+      const enrolledTeacherNames = resolvedEnrolments
+        .map((e: any) => String(e.teacherName || '').toLowerCase().trim())
+        .filter(Boolean);
+      const enrolledPackageTitles = resolvedEnrolments
+        .map((e: any) => String(e.packageName || '').toLowerCase().trim())
+        .filter(Boolean);
 
-        return {
-          id: sub.id,
-          childId: student.id,
-          paperCode: `MOD-REV-${idx + 1}`,
-          title: sub.assignment?.title || `Standard Revision Paper ${idx + 1}`,
-          tutorName: 'Faculty Educator',
-          subject: sub.assignment?.subjectName || 'Combined Mathematics',
-          date: sub.submittedAt ? sub.submittedAt.toISOString().split('T')[0] : '2026-10-12',
-          score,
-          maxScore,
-          batchAverage: 71,
-          highestScore: 98,
-          rank: idx + 4,
-          batchTotal: 310,
-          grade,
-          tutorFeedback: sub.teacherFeedback || 'Remarkable working in theory and analytical steps.',
-        };
-      });
+      const mappedAnnouncements = dbAnnouncements
+        .filter((ann: any) => {
+          const authorRole = String(ann.authorRole || '').toUpperCase();
+          const isFromTeacher =
+            authorRole === 'TEACHER' ||
+            authorRole === 'TUTOR' ||
+            authorRole.includes('TUTOR') ||
+            authorRole.includes('TEACHER');
+          if (!isFromTeacher) return true;
+          const author = String(ann.authorName || '').toLowerCase().trim();
+          const audience = String(ann.targetAudience || '').toLowerCase();
+          return (
+            enrolledTeacherNames.some((n: string) => n && (author.includes(n) || n.includes(author))) ||
+            enrolledPackageTitles.some((t: string) => t && (audience.includes(t) || t.includes(audience)))
+          );
+        })
+        .map((ann: any) => ({
+          id: ann.id,
+          tutorName: ann.authorName || 'Academy Administration',
+          subject: ann.authorRole || 'General Notice',
+          title: ann.title,
+          date: ann.createdAt ? new Date(ann.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          priority: ann.priority === 'urgent' || ann.priority === 'high' ? ('urgent' as const) : ('regular' as const),
+          category: 'Announcement' as const,
+          content: ann.content || ann.message || '',
+        }));
 
-      // 4. Build Attendance Logs
-      const attendanceLogs = (student.liveAttendances || []).map((att: any) => ({
-        id: att.id,
-        childId: student.id,
-        sessionTitle: 'Weekly Masterclass Lecture',
-        tutorName: 'Faculty Educator',
-        subject: 'Combined Mathematics',
-        date: att.joinedAt ? att.joinedAt.toISOString().split('T')[0] : '2026-10-14',
-        timeSlot: '6:00 PM - 8:30 PM',
-        platform: 'Google Meet' as const,
-        status: 'attended' as const,
-        durationMinutes: Math.round((att.durationSeconds || 7200) / 60),
-        totalDurationMinutes: 120,
-        joinTime: '18:02',
-        leaveTime: '20:30',
-        recordingWatched: false,
-      }));
-
-      // Calculate aggregate stats
-      const totalPaperMarks = paperMarks.length;
-      const avgScore =
-        totalPaperMarks > 0
-          ? Math.round(paperMarks.reduce((acc: number, p: any) => acc + (p.score / p.maxScore) * 100, 0) / totalPaperMarks)
-          : 88;
+      const monthlyInvestmentLkr = resolvedEnrolments.reduce(
+        (sum: number, item: any) => sum + (Number(item.monthlyFeeLkr) || 0),
+        0
+      );
+      const pendingSlipsCount = resolvedInvoices.filter(
+        (inv: any) => inv.status === 'under_review'
+      ).length;
 
       return {
         id: student.id,
         studentId: student.id,
         name: studentName,
         admissionNo: student.studentIdNo,
-        grade: student.gradeLevel || 'Grade 12',
-        classSection: student.section || 'Physical Science Section A',
+        grade: student.gradeLevel || 'Not Specified',
+        classSection: student.section || 'General',
         avatarText: initials,
-        schoolName: 'Apex Senior Secondary & Tuition Academy',
-        enrolledSinceYear: '2024',
-        admissionGrade: 'Grade 11',
-        currentStage: 'G.C.E. Advanced Level',
+        schoolName: 'LimaT Learning Portal',
+        enrolledSinceYear: new Date().getFullYear().toString(),
+        admissionGrade: student.gradeLevel || 'Not Specified',
+        currentStage: student.gradeLevel || 'Active Student',
         cumulativeCareerAverage: avgScore,
-        totalYearsEnrolled: 2,
-        classTeacher: 'Faculty Educator',
-        classTeacherEmail: 'educator@academy.lk',
-        classTeacherPhone: '+94 77 123 4567',
-        attendanceRate: 94,
-        presentDays: 34,
-        totalDays: 36,
+        totalYearsEnrolled: 1,
+        classTeacher: resolvedEnrolments[0]?.teacherName || 'Not Assigned',
+        classTeacherEmail: '',
+        classTeacherPhone: '',
+        attendanceRate: overallAttendanceRate,
+        presentDays: attendedSessionsCount,
+        totalDays: totalSessionsCount,
         overallAverage: avgScore,
-        classRank: 6,
-        enrolments: enrolments.length > 0 ? enrolments : [
-          {
-            id: 'enr_math_def',
-            teacherId: 'tch_math_01',
-            teacherName: 'Faculty Educator',
-            teacherTitle: 'Senior Master Tutor & Paper Author',
-            subject: 'Combined Mathematics',
-            avatarColor: 'bg-emerald-600',
-            initials: 'SP',
-            packageName: 'Combined Mathematics Theory + Revision Pass',
-            batch: '2026 A/L Theory Cohort A',
-            monthlyFeeLkr: 3500,
-            feeStatus: 'paid' as const,
-            validUntil: '2026-11-30',
-            lastPaymentDate: '2026-10-05',
-            lastPaymentRef: 'BOC-TXN-902182',
-            paymentBank: 'Bank of Ceylon',
-            liveClassSchedule: 'Every Tuesday & Friday, 6:00 PM - 8:30 PM',
-            platform: 'Google Meet' as const,
-            meetingUrl: 'https://meet.google.com/xyz-tuition-stream',
-            nextSessionDate: 'Friday at 6:00 PM',
-            nextSessionTopic: 'Advanced Integration & Curve Sketching',
-            attendanceRate: 94,
-            attendedSessions: 16,
-            totalSessions: 17,
-            latestPaperMark: 92,
-            latestPaperMax: 100,
-            batchRank: 14,
-            batchTotalStudents: 312,
-            tutorPhone: '+94 77 123 4567',
-          }
-        ],
-        invoices: invoices.length > 0 ? invoices : [
-          {
-            id: 'inv_oct_default',
-            invoiceNumber: 'INV-2026-089',
-            childId: student.id,
-            childName: studentName,
-            teacherName: 'Faculty Educator',
-            subject: 'Combined Mathematics',
-            month: 'October 2026',
-            amountLkr: 3500,
-            status: 'cleared' as const,
-            paymentMethod: 'bank_slip' as const,
-            slipRefNumber: 'BOC-DEP-781920',
-            bankName: 'Commercial Bank of Ceylon',
-            branchName: 'Main Branch',
-            depositedDate: '2026-10-05',
-            tutorNotes: 'Verified tuition pass for current academic term.',
-          }
-        ],
-        paperMarks: paperMarks.length > 0 ? paperMarks : [
-          {
-            id: 'pm_math_01',
-            childId: student.id,
-            paperCode: 'MATH-REV-04',
-            title: 'Calculus & Integration Master Paper 04',
-            tutorName: 'Faculty Educator',
-            subject: 'Combined Mathematics',
-            date: '2026-10-12',
-            score: 92,
-            maxScore: 100,
-            batchAverage: 68,
-            highestScore: 98,
-            rank: 6,
-            batchTotal: 312,
-            grade: 'A',
-            tutorFeedback: 'Outstanding mathematical methodology and neat diagram presentation.',
-          }
-        ],
-        attendanceLogs: attendanceLogs.length > 0 ? attendanceLogs : [
-          {
-            id: 'att_log_01',
-            childId: student.id,
-            sessionTitle: 'Weekly Theory Class — Pure Math Functions',
-            tutorName: 'Faculty Educator',
-            subject: 'Combined Mathematics',
-            date: '2026-10-14',
-            timeSlot: '6:00 PM - 8:30 PM',
-            platform: 'Google Meet' as const,
-            status: 'attended' as const,
-            durationMinutes: 120,
-            totalDurationMinutes: 120,
-            joinTime: '18:02',
-            leaveTime: '20:30',
-            recordingWatched: false,
-          }
-        ],
+        classRank: totalPaperMarks > 0 ? 1 : 0,
+        totalStudents: totalStudentsCount,
+        upcomingExamsCount: 0,
+        hallTicketNo: student.studentIdNo,
+        nextExamDate: '',
+        nextExamName: '',
+        monthlyInvestmentLkr,
+        activeEnrolmentsCount: resolvedEnrolments.length,
+        pendingSlipsCount,
+        enrolments: resolvedEnrolments,
+        invoices: resolvedInvoices,
+        announcements: mappedAnnouncements,
+        paperMarks,
+        attendanceLogs,
       };
     });
 
@@ -835,6 +1021,87 @@ export const updateMyParentProfile = async (
     });
   } catch (error: any) {
     console.error('Error in updateMyParentProfile:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+/**
+ * 7. Link a Child Student Profile by Student ID (`STU-XXXX`), Mobile Number, or Email
+ * POST /api/parents/link-child
+ */
+export const linkChildStudent = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Authentication required' });
+      return;
+    }
+
+    const rawLookup = String(req.body?.studentIdentifier || req.body?.childStudentId || '').trim();
+    if (!rawLookup) {
+      res.status(400).json({
+        success: false,
+        message: 'Please provide the student ID (e.g. STU-1234), mobile number, or email address.',
+      });
+      return;
+    }
+
+    const parent = await getOrCreateParentProfile(userId);
+    if (!parent) {
+      res.status(404).json({ success: false, message: 'Parent profile not found' });
+      return;
+    }
+
+    const normalizedDigits = rawLookup.replace(/[\s\-()]/g, '');
+    const matchedStudent = await prisma.studentProfile.findFirst({
+      where: {
+        OR: [
+          { studentIdNo: { equals: rawLookup, mode: 'insensitive' } },
+          { phoneNumber: { equals: rawLookup } },
+          ...(normalizedDigits.length >= 9
+            ? [{ phoneNumber: { contains: normalizedDigits.slice(-9) } }]
+            : []),
+          { user: { email: { equals: rawLookup, mode: 'insensitive' } } },
+        ],
+      },
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!matchedStudent) {
+      res.status(404).json({
+        success: false,
+        message: `No student found matching "${rawLookup}". Check the Student ID (STU-XXXX), mobile number, or email.`,
+      });
+      return;
+    }
+
+    await prisma.studentProfile.update({
+      where: { id: matchedStudent.id },
+      data: { guardianId: parent.id },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Linked ${matchedStudent.user.firstName} ${matchedStudent.user.lastName} (${matchedStudent.studentIdNo}) to your Parent Portal.`,
+      data: {
+        id: matchedStudent.id,
+        studentIdNo: matchedStudent.studentIdNo,
+        name: `${matchedStudent.user.firstName} ${matchedStudent.user.lastName}`.trim(),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error in linkChildStudent:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };

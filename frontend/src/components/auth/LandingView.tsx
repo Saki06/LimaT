@@ -339,11 +339,19 @@ export function LandingView({
 
     // Role-based Registration Enforcement
     if (selectedRole === "parent") {
-      if (!signupName.trim() || !parentPhone.trim() || !childName.trim() || !childPhoneOrId.trim()) {
+      if (!signupName.trim() || !signupEmail.trim() || !parentPhone.trim() || !childPhoneOrId.trim()) {
         addToast({
           type: "error",
           title: "Missing Required Details",
-          message: "Please fill in Guardian Name, Mobile Number, Student Full Name, and Student WhatsApp/ID."
+          message: "Please fill in Guardian Name, Email Address, Mobile Number, and Student WhatsApp/ID."
+        });
+        return;
+      }
+      if (!isValidEmailAddress(signupEmail)) {
+        addToast({
+          type: "error",
+          title: "Invalid Email Address",
+          message: "Please enter a valid email address (e.g. parent@gmail.com)."
         });
         return;
       }
@@ -367,8 +375,7 @@ export function LandingView({
       const nameParts = signupName.trim().split(" ");
       const firstName = nameParts[0] || "Guardian";
       const lastName = nameParts.slice(1).join(" ") || parentTitle;
-      const cleanPhone = parentPhone.trim().replace(/[^0-9]/g, "");
-      const email = signupEmail.trim() || `guardian_${cleanPhone || Date.now()}@parent.local`;
+      const email = signupEmail.trim();
       const pwd = signupPassword.trim() || "password123";
 
       try {
@@ -401,7 +408,7 @@ export function LandingView({
       addToast({
         type: "success",
         title: "Guardian Account Registered!",
-        message: `Welcome, ${parentTitle} ${signupName}! Account successfully linked with ${childName}.`
+        message: `Welcome, ${parentTitle} ${signupName}! Account successfully linked with ${childPhoneOrId}.`
       });
       onEnterApp();
       return;
@@ -535,230 +542,129 @@ export function LandingView({
       {/* -------------------- SIGN IN TAB CONTENT -------------------- */}
       {authTab === "login" && (
         <div className="space-y-4 pt-1">
-          {/* Parent Login Method Switcher */}
-          {selectedRole === "parent" && (
-            <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-100 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => {
-                  setParentLoginMethod("password");
-                  setParentOtpSent(false);
-                }}
-                className={`py-1.5 rounded-lg transition-all cursor-pointer ${
-                  parentLoginMethod === "password"
-                    ? "bg-white text-[#1e3a5f] shadow-2xs font-black"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                Password Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => setParentLoginMethod("otp")}
-                className={`py-1.5 rounded-lg transition-all cursor-pointer ${
-                  parentLoginMethod === "otp"
-                    ? "bg-white text-[#1e3a5f] shadow-2xs font-black"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                SMS OTP Login
-              </button>
-            </div>
-          )}
-
           <form onSubmit={handleLoginSubmit} className="space-y-3">
-            {/* If Parent chose SMS OTP Login */}
-            {selectedRole === "parent" && parentLoginMethod === "otp" ? (
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Registered Mobile Number (Sri Lanka) *
-                  </label>
-                  <div className="relative">
+            {/* Standard Password Login (for Student, Parent, Tutor) */}
+            <>
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  {selectedRole === "student"
+                    ? "Student Mobile No or Email"
+                    : selectedRole === "parent"
+                    ? "Parent Mobile No or Email Address"
+                    : selectedRole === "admin"
+                    ? "Admin Email Address"
+                    : selectedRole === "super_admin"
+                    ? "Super Admin Master Email"
+                    : "Tutor Email or Mobile Number"}
+                </label>
+                <div className="relative">
+                  {selectedRole === "parent" ? (
                     <Phone className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="tel"
-                      required
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="e.g. 077 123 4567 or 071 987 6543"
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10 transition-all font-medium"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Enter the mobile phone registered with your child&apos;s tuition class.
-                  </p>
+                  ) : (
+                    <Mail className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  )}
+                  <input
+                    type="text"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder={
+                      selectedRole === "student"
+                        ? "e.g. 077 123 4567 or student@apex.edu"
+                        : selectedRole === "parent"
+                        ? "e.g. 077 123 4567 or parent@apex.edu"
+                        : selectedRole === "admin"
+                        ? "e.g. admin@apex.edu"
+                        : selectedRole === "super_admin"
+                        ? "e.g. superadmin@apex.edu"
+                        : "e.g. teacher@apex.edu or 077 987 6543"
+                    }
+                    className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
+                  />
                 </div>
-
-                {parentOtpSent ? (
-                  <div className="space-y-2 pt-1 animate-in fade-in duration-200">
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Enter 6-Digit SMS Verification Code *
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      required
-                      value={parentOtpCode}
-                      onChange={(e) => setParentOtpCode(e.target.value)}
-                      placeholder="e.g. 849201"
-                      className="w-full h-11 text-center font-mono text-base tracking-widest font-black rounded-xl bg-white border border-[#cfdeea] text-slate-900 focus:outline-none focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/15"
-                    />
-                    <div className="flex justify-between items-center text-[11px] pt-1">
-                      <span className="text-slate-500">Didn&apos;t receive code?</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          addToast({
-                            type: "info",
-                            title: "SMS Re-dispatched",
-                            message: `New OTP sent to ${loginEmail}.`
-                          });
-                        }}
-                        className="font-bold text-[#1e3a5f] hover:underline cursor-pointer"
-                      >
-                        Resend SMS OTP
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                <button
-                  type="submit"
-                  className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-2"
-                >
-                  <LogIn className="h-4 w-4" />
-                  <span>
-                    {parentOtpSent ? "Verify Code & Sign In" : "Send SMS Verification OTP"}
-                  </span>
-                </button>
               </div>
-            ) : (
-              /* Standard Password Login (for Student, Parent, Tutor) */
-              <>
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    {selectedRole === "student"
-                      ? "Student Mobile No or Email"
-                      : selectedRole === "parent"
-                      ? "Parent Mobile No or Email Address"
-                      : selectedRole === "admin"
-                      ? "Admin Email Address"
-                      : selectedRole === "super_admin"
-                      ? "Super Admin Master Email"
-                      : "Tutor Email or Mobile Number"}
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    Password
                   </label>
-                  <div className="relative">
-                    {selectedRole === "parent" ? (
-                      <Phone className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    ) : (
-                      <Mail className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    )}
-                    <input
-                      type="text"
-                      required
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder={
-                        selectedRole === "student"
-                          ? "e.g. 077 123 4567 or student@apex.edu"
-                          : selectedRole === "parent"
-                          ? "e.g. 077 123 4567 or parent@apex.edu"
-                          : selectedRole === "admin"
-                          ? "e.g. admin@apex.edu"
-                          : selectedRole === "super_admin"
-                          ? "e.g. superadmin@apex.edu"
-                          : "e.g. teacher@apex.edu or 077 987 6543"
-                      }
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
-                    />
-                  </div>
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      addToast({
+                        type: "info",
+                        title: "Password Reset Code",
+                        message: "Enter your registered mobile number or email to receive a password reset OTP code."
+                      });
+                    }}
+                    className="text-[11px] font-bold text-[#0d5c4d] hover:underline"
+                  >
+                    Forgot password?
+                  </a>
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold text-slate-700">
-                      Password
-                    </label>
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        addToast({
-                          type: "info",
-                          title: "Password Reset Code",
-                          message: selectedRole === "parent"
-                            ? "Use SMS OTP Login to sign in instantly, or enter your mobile to receive a reset code."
-                            : "Enter your registered mobile number or email to receive a password reset OTP code."
-                        });
-                      }}
-                      className="text-[11px] font-bold text-[#0d5c4d] hover:underline"
-                    >
-                      Forgot password?
-                    </a>
-                  </div>
-                  <div className="relative">
-                    <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="Enter password"
-                      className="w-full h-10 pl-9 pr-10 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="p-1 rounded-md text-slate-400 hover:text-slate-600 absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
+                <div className="relative">
+                  <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Enter password"
+                    className="w-full h-10 pl-9 pr-10 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 transition-all font-medium"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between pt-0.5 text-xs">
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-600 font-medium select-none">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="rounded text-[#0d5c4d] focus:ring-0"
-                    />
-                    <span>Remember me on this device</span>
-                  </label>
-                </div>
+              <div className="flex items-center justify-between pt-0.5 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer text-slate-600 font-medium select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="rounded text-[#0d5c4d] focus:ring-0"
+                  />
+                  <span>Remember me on this device</span>
+                </label>
+              </div>
 
-                <button
-                  type="submit"
-                  className={`w-full text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1 ${
-                    selectedRole === "parent"
-                      ? "bg-[#1e3a5f] hover:bg-[#152a45]"
-                      : selectedRole === "teacher"
-                      ? "bg-[#b47a16] hover:bg-[#96640f]"
-                      : selectedRole === "admin"
-                      ? "bg-slate-800 hover:bg-slate-900"
-                      : selectedRole === "super_admin"
-                      ? "bg-slate-900 hover:bg-black text-amber-300 border border-amber-400/40"
-                      : "bg-[#0d5c4d] hover:bg-[#083e34]"
-                  }`}
-                >
-                  <LogIn className="h-4 w-4" />
-                  <span>
-                    Sign In to{" "}
-                    {selectedRole === "student"
-                      ? "Student Portal"
-                      : selectedRole === "parent"
-                      ? "Parent Portal"
-                      : selectedRole === "admin"
-                      ? "Admin Desk"
-                      : selectedRole === "super_admin"
-                      ? "Super Admin Console"
-                      : "Teacher Portal"}
-                  </span>
-                </button>
-              </>
-            )}
+              <button
+                type="submit"
+                className={`w-full text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1 ${
+                  selectedRole === "parent"
+                    ? "bg-[#1e3a5f] hover:bg-[#152a45]"
+                    : selectedRole === "teacher"
+                    ? "bg-[#b47a16] hover:bg-[#96640f]"
+                    : selectedRole === "admin"
+                    ? "bg-slate-800 hover:bg-slate-900"
+                    : selectedRole === "super_admin"
+                    ? "bg-slate-900 hover:bg-black text-amber-300 border border-amber-400/40"
+                    : "bg-[#0d5c4d] hover:bg-[#083e34]"
+                }`}
+              >
+                <LogIn className="h-4 w-4" />
+                <span>
+                  Sign In to{" "}
+                  {selectedRole === "student"
+                    ? "Student Portal"
+                    : selectedRole === "parent"
+                    ? "Parent Portal"
+                    : selectedRole === "admin"
+                    ? "Admin Desk"
+                    : selectedRole === "super_admin"
+                    ? "Super Admin Console"
+                    : "Teacher Portal"}
+                </span>
+              </button>
+            </>
           </form>
         </div>
       )}
@@ -771,11 +677,6 @@ export function LandingView({
             <div className="space-y-4">
               {/* SECTION 1: GUARDIAN PERSONAL DETAILS */}
               <div className="space-y-3 pt-1">
-                <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5 text-[#1e3a5f]" />
-                  <span>1. Guardian Information</span>
-                </p>
-
                 {/* Title + Full Name as single unified row */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -849,33 +750,34 @@ export function LandingView({
                     )}
                   </div>
                 </div>
+                {/* Guardian Email Address */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Email Address *
+                  </label>
+                  <div className="relative">
+                    <Mail className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      value={signupEmail}
+                      onChange={(e) => setSignupEmail(e.target.value)}
+                      placeholder="e.g. parent@gmail.com"
+                      className={`w-full h-10 pl-9 pr-3 rounded-xl bg-white border text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition-all font-medium ${
+                        emailError
+                          ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                          : "border-slate-200 focus:border-[#1e3a5f] focus:ring-2 focus:ring-[#1e3a5f]/10"
+                      }`}
+                    />
+                  </div>
+                  {emailError && (
+                    <p className="text-[10px] font-bold text-rose-600 mt-1">{emailError}</p>
+                  )}
+                </div>
               </div>
 
               {/* SECTION 2: STUDENT / CHILD TUITION RECORD LINKING */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
-                <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <GraduationCap className="h-3.5 w-3.5 text-[#1e3a5f]" />
-                  <span>2. Student Linking &amp; Verification</span>
-                </p>
-
-                {/* Child Full Name */}
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Child&apos;s Full Name *
-                  </label>
-                  <div className="relative">
-                    <UserIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      required
-                      value={childName}
-                      onChange={(e) => setChildName(e.target.value)}
-                      placeholder="e.g. Sathurjan Kaveen"
-                      className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1e3a5f] font-medium"
-                    />
-                  </div>
-                </div>
-
                 {/* Student WhatsApp No / Student ID */}
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -897,10 +799,6 @@ export function LandingView({
 
               {/* SECTION 3: ACCOUNT SECURITY */}
               <div className="space-y-3 pt-3 border-t border-slate-100">
-                <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <Lock className="h-3.5 w-3.5 text-[#1e3a5f]" />
-                  <span>3. Account Security</span>
-                </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
@@ -1418,7 +1316,7 @@ export function LandingView({
   // VIEW MODE: STANDARD LANDING PAGE (Student View OR Faculty/Admin View)
   // =========================================================================
   return (
-    <div className={`${portalType === "gateway" ? "h-screen overflow-hidden" : "min-h-screen"} bg-[#fbfcfb] text-[#0d2b26] flex flex-col justify-between selection:bg-[#0d5c4d] selection:text-white`}>
+    <div className="min-h-screen overflow-x-hidden bg-[#fbfcfb] text-[#0d2b26] flex flex-col justify-between selection:bg-[#0d5c4d] selection:text-white">
       {/* ----------------- 0. GATEWAY PORTAL NAVIGATION ----------------- */}
       {portalType === "gateway" && (
         <nav className="h-14 sm:h-16 border-b border-emerald-100/60 bg-[#ebf8f4]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 shrink-0 transition-colors">
@@ -1573,7 +1471,7 @@ export function LandingView({
       {/* Active when portalType === "gateway"                                       */}
       {/* ========================================================================= */}
       {portalType === "gateway" && (
-        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#ebf8f4] via-[#ffffff] to-[#fef8eb] overflow-hidden">
+        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#ebf8f4] via-[#ffffff] to-[#fef8eb] overflow-x-hidden">
           {/* Luminous Ambient Lighting Orbs */}
           <div className="absolute -top-20 -left-20 w-[450px] h-[450px] rounded-full bg-emerald-300/40 blur-3xl pointer-events-none" />
           <div className="absolute -top-16 -right-16 w-[450px] h-[450px] rounded-full bg-[#38bdf8]/30 blur-3xl pointer-events-none" />
@@ -1802,7 +1700,7 @@ export function LandingView({
       {/* Creative, Modern, Atmospheric & Attractive (Inheriting Gateway DNA)     */}
       {/* ========================================================================= */}
       {portalType === "student" && (
-        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#ebf8f4] via-[#ffffff] to-[#fef8eb] overflow-hidden">
+        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#ebf8f4] via-[#ffffff] to-[#fef8eb] overflow-x-hidden">
           {/* Luminous Ambient Lighting Orbs (Same as Gateway) */}
           <div className="absolute -top-24 -left-20 w-[500px] h-[500px] rounded-full bg-emerald-300/35 blur-3xl pointer-events-none" />
           <div className="absolute top-1/4 -right-20 w-[500px] h-[500px] rounded-full bg-[#38bdf8]/25 blur-3xl pointer-events-none" />
@@ -2133,7 +2031,7 @@ export function LandingView({
       {/* Creative, Modern, Atmospheric & Attractive (Inheriting Gateway DNA)     */}
       {/* ========================================================================= */}
       {portalType === "parent" && (
-        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#f0f6fc] via-[#ffffff] to-[#eef5fc] overflow-hidden">
+        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#f0f6fc] via-[#ffffff] to-[#eef5fc] overflow-x-hidden">
           {/* Luminous Ambient Lighting Orbs */}
           <div className="absolute -top-24 -left-20 w-[500px] h-[500px] rounded-full bg-sky-300/35 blur-3xl pointer-events-none" />
           <div className="absolute top-1/4 -right-20 w-[500px] h-[500px] rounded-full bg-indigo-300/25 blur-3xl pointer-events-none" />
@@ -2335,7 +2233,7 @@ export function LandingView({
       {/* Creative, Modern, Atmospheric & Attractive (Inheriting Gateway DNA)     */}
       {/* ========================================================================= */}
       {portalType === "staff" && (
-        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#fef8eb] via-[#ffffff] to-[#ebf8f4] overflow-hidden">
+        <div className="relative flex-1 flex flex-col justify-between bg-gradient-to-b from-[#fef8eb] via-[#ffffff] to-[#ebf8f4] overflow-x-hidden">
           {/* Luminous Ambient Lighting Orbs */}
           <div className="absolute -top-24 -left-20 w-[500px] h-[500px] rounded-full bg-amber-300/35 blur-3xl pointer-events-none" />
           <div className="absolute top-1/4 -right-20 w-[500px] h-[500px] rounded-full bg-emerald-300/30 blur-3xl pointer-events-none" />

@@ -67,7 +67,44 @@ export const getAnnouncements = async (
 
     let studentEnrolledTeacherNames: string[] = [];
     let studentEnrolledBatchTitles: string[] = [];
-    let studentGradeNumber: string | null = null;
+    let studentGradeNumbers: string[] = [];
+
+    const collectStudentEnrollments = (studentProfile: any) => {
+      if (!studentProfile) return;
+      const gradeMatch = (studentProfile.gradeLevel || '').match(/\d+/);
+      if (gradeMatch && gradeMatch[0]) {
+        studentGradeNumbers.push(gradeMatch[0]);
+      }
+
+      studentProfile.enrollments?.forEach((e: any) => {
+        if (e.course?.teacher?.user) {
+          const u = e.course.teacher.user;
+          if (u.firstName) studentEnrolledTeacherNames.push(u.firstName.toLowerCase());
+          if (u.lastName) studentEnrolledTeacherNames.push(u.lastName.toLowerCase());
+          studentEnrolledTeacherNames.push(`${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase());
+        }
+        if (e.course?.title) {
+          studentEnrolledBatchTitles.push(e.course.title.toLowerCase());
+        }
+      });
+
+      studentProfile.packageSubscriptions?.forEach((sub: any) => {
+        if (sub.package?.teacher?.user) {
+          const u = sub.package.teacher.user;
+          if (u.firstName) studentEnrolledTeacherNames.push(u.firstName.toLowerCase());
+          if (u.lastName) studentEnrolledTeacherNames.push(u.lastName.toLowerCase());
+          studentEnrolledTeacherNames.push(`${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase());
+        }
+        if (sub.package?.title) {
+          studentEnrolledBatchTitles.push(sub.package.title.toLowerCase());
+        }
+        sub.package?.courses?.forEach((pc: any) => {
+          if (pc.course?.title) {
+            studentEnrolledBatchTitles.push(pc.course.title.toLowerCase());
+          }
+        });
+      });
+    };
 
     if (userRole === 'STUDENT' && userId) {
       try {
@@ -108,61 +145,76 @@ export const getAnnouncements = async (
             },
           },
         });
-
-        if (studentProfile) {
-          const gradeMatch = (studentProfile.gradeLevel || '').match(/\d+/);
-          studentGradeNumber = gradeMatch ? gradeMatch[0] : null;
-
-          studentProfile.enrollments?.forEach((e: any) => {
-            if (e.course?.teacher?.user) {
-              const u = e.course.teacher.user;
-              if (u.firstName) studentEnrolledTeacherNames.push(u.firstName.toLowerCase());
-              if (u.lastName) studentEnrolledTeacherNames.push(u.lastName.toLowerCase());
-              studentEnrolledTeacherNames.push(`${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase());
-            }
-            if (e.course?.title) {
-              studentEnrolledBatchTitles.push(e.course.title.toLowerCase());
-            }
-          });
-
-          studentProfile.packageSubscriptions?.forEach((sub: any) => {
-            if (sub.package?.teacher?.user) {
-              const u = sub.package.teacher.user;
-              if (u.firstName) studentEnrolledTeacherNames.push(u.firstName.toLowerCase());
-              if (u.lastName) studentEnrolledTeacherNames.push(u.lastName.toLowerCase());
-              studentEnrolledTeacherNames.push(`${u.firstName || ''} ${u.lastName || ''}`.trim().toLowerCase());
-            }
-            if (sub.package?.title) {
-              studentEnrolledBatchTitles.push(sub.package.title.toLowerCase());
-            }
-            sub.package?.courses?.forEach((pc: any) => {
-              if (pc.course?.title) {
-                studentEnrolledBatchTitles.push(pc.course.title.toLowerCase());
-              }
-            });
-          });
-        }
+        collectStudentEnrollments(studentProfile);
       } catch (err) {
         console.warn('Error fetching student enrollment context for announcements:', err);
+      }
+    } else if ((userRole === 'PARENT' || role === 'PARENT') && userId) {
+      try {
+        const parentProfile = await prisma.parentProfile.findUnique({
+          where: { userId },
+          include: {
+            students: {
+              include: {
+                enrollments: {
+                  include: {
+                    course: {
+                      include: {
+                        teacher: {
+                          include: {
+                            user: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                packageSubscriptions: {
+                  where: { status: 'ACTIVE' },
+                  include: {
+                    package: {
+                      include: {
+                        teacher: {
+                          include: {
+                            user: true,
+                          },
+                        },
+                        courses: {
+                          include: {
+                            course: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+        parentProfile?.students?.forEach((child: any) => collectStudentEnrollments(child));
+      } catch (err) {
+        console.warn('Error fetching parent child enrollment context for announcements:', err);
       }
     }
 
     const eligibleRecords = records.filter((a) => {
-      if (userRole === 'STUDENT') {
+      if (userRole === 'STUDENT' || userRole === 'PARENT' || role === 'STUDENT' || role === 'PARENT') {
         const authorRole = (a.authorRole || '').toUpperCase();
         const isFromTeacher =
           authorRole === 'TEACHER' ||
           authorRole === 'TUTOR' ||
           authorRole.includes('TUTOR') ||
-          authorRole.includes('TEACHER');
+          authorRole.includes('TEACHER') ||
+          (a.authorName && a.authorName.toLowerCase().includes('tutor'));
         const audienceLower = (a.targetAudience || '').toLowerCase();
         const titleAndBody = `${a.title} ${a.content}`.toLowerCase();
 
         // 1. Grade-level filtering: If target audience or announcement explicitly names a grade
         const gradeMatchInAudience = audienceLower.match(/grade\s*(\d+)/i) || titleAndBody.match(/grade\s*(\d+)/i);
-        if (gradeMatchInAudience && studentGradeNumber) {
+        if (gradeMatchInAudience && studentGradeNumbers.length > 0) {
           const targetGradeNum = gradeMatchInAudience[1];
-          if (targetGradeNum !== studentGradeNumber) {
+          if (!studentGradeNumbers.includes(targetGradeNum)) {
             return false;
           }
         }
@@ -177,8 +229,7 @@ export const getAnnouncements = async (
             (title) => title && (audienceLower.includes(title) || title.includes(audienceLower))
           );
 
-          // If the teacher notice is targeted to a batch, course, or "All Enrolled Students":
-          // The student MUST be enrolled with this teacher or enrolled in this batch!
+          // The student/child MUST be enrolled with this teacher or enrolled in this batch!
           if (!isStudentOfTeacher && !isEnrolledInBatch) {
             return false;
           }

@@ -93,6 +93,8 @@ export function ConnectView() {
   const [students, setStudents] = useState<ConnectStudent[]>([]);
   const [studyGroups, setStudyGroups] = useState<ConnectStudyGroup[]>([]);
   const [purchases, setPurchases] = useState<ConnectPurchase[]>([]);
+  const [parentChildren, setParentChildren] = useState<any[]>([]);
+  const [selectedParentChildId, setSelectedParentChildId] = useState<string>("");
   const [isLoadingMarketplace, setIsLoadingMarketplace] = useState<boolean>(true);
 
   // Load live tutors and packages from backend Marketplace API
@@ -208,11 +210,23 @@ export function ConnectView() {
     };
   }, []);
 
-  // Load student's real purchases and active subscriptions from backend
+  // Load student's or parent's real purchases and active subscriptions from backend
   useEffect(() => {
     let isMounted = true;
-    async function loadStudentPurchases() {
+    async function loadPurchasesAndChildren() {
       try {
+        if (currentRole === "parent") {
+          const childRes = await api.parents.getMyChildren();
+          if (!isMounted) return;
+          if (childRes?.success && Array.isArray(childRes.data)) {
+            setParentChildren(childRes.data);
+            if (childRes.data.length > 0) {
+              setSelectedParentChildId((prev) => prev || childRes.data[0].id);
+            }
+          }
+          return;
+        }
+
         const res = await api.students.getMyPurchases();
         if (!isMounted) return;
         if (res?.success && Array.isArray(res.data)) {
@@ -225,11 +239,16 @@ export function ConnectView() {
         if (isMounted) setPurchases([]);
       }
     }
-    loadStudentPurchases();
+    loadPurchasesAndChildren();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentRole]);
+
+  const parentActiveChild = useMemo(() => {
+    if (parentChildren.length === 0) return null;
+    return parentChildren.find((c) => c.id === selectedParentChildId) || parentChildren[0];
+  }, [parentChildren, selectedParentChildId]);
 
   // Filters for Teachers tab
   const [selectedSubject, setSelectedSubject] = useState<string>("all");
@@ -612,49 +631,39 @@ export function ConnectView() {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-extrabold text-sm sm:text-base text-white">
-                  Parent Mode: Reviewing Teachers for <strong>Sathurjan K.</strong>
+                  {parentActiveChild ? (
+                    <>
+                      Parent Mode: Reviewing Teachers for <strong>{parentActiveChild.name}</strong>
+                    </>
+                  ) : (
+                    "Parent Mode: Reviewing Verified Teachers"
+                  )}
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-[#f3b738] text-slate-950 text-[10px] font-black uppercase">
-                  Grade 12 Physical Science
-                </span>
+                {parentActiveChild && (
+                  <span className="px-2 py-0.5 rounded-full bg-[#f3b738] text-slate-950 text-[10px] font-black uppercase">
+                    {parentActiveChild.admissionNo
+                      ? `${parentActiveChild.admissionNo} • ${parentActiveChild.grade}`
+                      : parentActiveChild.grade}
+                  </span>
+                )}
+                {parentChildren.length > 1 && (
+                  <select
+                    value={parentActiveChild?.id || ""}
+                    onChange={(e) => setSelectedParentChildId(e.target.value)}
+                    className="px-2.5 py-1 rounded-xl bg-white/15 border border-white/25 text-white text-xs font-bold focus:outline-none cursor-pointer"
+                  >
+                    {parentChildren.map((ch) => (
+                      <option key={ch.id} value={ch.id} className="text-slate-900">
+                        {ch.name} ({ch.admissionNo || ch.grade})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <p className="text-xs text-emerald-100/90 mt-0.5">
-                Browse verified solo teachers and monthly fee packages. Enrolling here immediately unlocks live Google Meet classes and monthly tutes in your child's student portal.
+                Browse verified teachers and monthly fee packages. Enrolling here immediately unlocks live online classes and course materials in your child&apos;s student portal.
               </p>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setSelectedSubject("Combined Mathematics")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                selectedSubject === "Combined Mathematics"
-                  ? "bg-[#f3b738] text-slate-950 font-black"
-                  : "bg-white/15 hover:bg-white/25 text-white"
-              }`}
-            >
-              Maths
-            </button>
-            <button
-              onClick={() => setSelectedSubject("Physics")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                selectedSubject === "Physics"
-                  ? "bg-[#f3b738] text-slate-950 font-black"
-                  : "bg-white/15 hover:bg-white/25 text-white"
-              }`}
-            >
-              Physics
-            </button>
-            <button
-              onClick={() => setSelectedSubject("all")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                selectedSubject === "all"
-                  ? "bg-[#f3b738] text-slate-950 font-black"
-                  : "bg-white/15 hover:bg-white/25 text-white"
-              }`}
-            >
-              All Subjects
-            </button>
           </div>
         </div>
       )}
@@ -1528,7 +1537,13 @@ export function ConnectView() {
                     <div>
                       <p className="font-extrabold text-xs">Parent Enrollment Confirmation</p>
                       <p className="text-[11px] text-emerald-800">
-                        Enrolling child: <strong>Sathurjan K. (Grade 12 - Physical Science)</strong>. All live links and materials will be automatically linked to their student profile.
+                        {parentActiveChild ? (
+                          <>
+                            Enrolling child: <strong>{parentActiveChild.name} ({parentActiveChild.admissionNo || parentActiveChild.grade})</strong>. All live links and materials will be automatically linked to their student profile.
+                          </>
+                        ) : (
+                          "All live links and materials will be automatically unlocked for your linked student profile."
+                        )}
                       </p>
                     </div>
                   </div>

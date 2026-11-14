@@ -1349,6 +1349,19 @@ export const api = {
       return res.json();
     },
 
+    async linkChild(studentIdentifier: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/parents/link-child`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ studentIdentifier }),
+      });
+      return res.json();
+    },
+
     async getDashboard(childId?: string) {
       const token = api.token.get();
       const query = childId ? `?childId=${encodeURIComponent(childId)}` : '';

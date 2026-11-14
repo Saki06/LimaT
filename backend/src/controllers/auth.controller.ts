@@ -416,6 +416,33 @@ if (
       include: { parentProfile: true },
     });
 
+    if (newUser.parentProfile && typeof childStudentId === 'string' && childStudentId.trim()) {
+      const cleanRef = childStudentId.trim();
+      const digitsOnly = cleanRef.replace(/\D/g, '');
+      const matchedStudent = await prisma.studentProfile.findFirst({
+        where: {
+          OR: [
+            { studentIdNo: { equals: cleanRef, mode: 'insensitive' } },
+            ...(digitsOnly.length >= 7
+              ? [
+                  { phoneNumber: { contains: digitsOnly.slice(-9) } },
+                  { phoneNumber: { equals: cleanRef } },
+                ]
+              : []),
+            { user: { email: { equals: cleanRef, mode: 'insensitive' } } },
+          ],
+        },
+        select: { id: true },
+      });
+
+      if (matchedStudent) {
+        await prisma.studentProfile.update({
+          where: { id: matchedStudent.id },
+          data: { guardianId: newUser.parentProfile.id },
+        });
+      }
+    }
+
     const token = jwt.sign(
       {
         userId: newUser.id,

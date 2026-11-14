@@ -432,7 +432,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
     { id: "dashboard", label: "Tuition Overview", icon: Home, group: "Parent Portal" },
     { id: "tuition_classes", label: "Enrolled Tutors", icon: GraduationCap, group: "Tuition & Academics" },
     { id: "fees", label: "Fees & Bank Slips", icon: CreditCard, group: "Tuition & Billing" },
-    { id: "progress", label: "Model Paper Marks", icon: Award, group: "Monitoring & Logs" },
+    { id: "progress", label: "Assignments & Marks", icon: Award, group: "Monitoring & Logs" },
     { id: "circulars", label: "Tutor Announcements", icon: Bell, group: "Communication" },
     {
       id: "connect",

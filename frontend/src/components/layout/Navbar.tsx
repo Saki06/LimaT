@@ -298,8 +298,9 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
         </div>
       </div>
 
-      {/* Center Search */}
-      <div className="hidden md:flex items-center max-w-sm w-full mx-6 relative">
+      {/* Center Search (Hidden in Parent Portal) */}
+      {currentRole !== "parent" && (
+        <div className="hidden md:flex items-center max-w-sm w-full mx-6 relative">
         <div className="relative w-full z-50">
           <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
@@ -380,7 +381,8 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
             </div>
           </>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Right controls */}
       <div className="flex items-center gap-3">
@@ -497,7 +499,7 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
                   <button
                     type="button"
                     onClick={() => {
-                      setCurrentView("announcements");
+                      setCurrentView(currentRole === "parent" ? "circulars" : "announcements");
                       setShowNotifications(false);
                     }}
                     className="text-xs font-bold text-[#0d5c4d] hover:text-[#083e34] hover:underline cursor-pointer"
@@ -599,7 +601,7 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
                   type="button"
                   onClick={() => {
                     setSelectedAnnouncementModal(null);
-                    setCurrentView("announcements");
+                    setCurrentView(currentRole === "parent" ? "circulars" : "announcements");
                   }}
                   className="text-xs font-bold text-[#0d5c4d] hover:underline cursor-pointer"
                 >
