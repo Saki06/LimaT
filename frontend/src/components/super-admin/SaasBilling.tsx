@@ -27,7 +27,7 @@ export function SaasBilling({ onSelectPlanForOnboard }: SaasBillingProps) {
                 Solo Creator Starter
               </Badge>
               <div>
-                <p className="text-2xl font-black text-[#0d2b26]">LKR 8,500</p>
+                <p className="text-2xl font-black text-[#0d2b26]">LKR 5,000</p>
                 <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Tutor License</p>
               </div>
               <ul className="space-y-1.5 text-xs text-slate-700">
@@ -54,7 +54,7 @@ export function SaasBilling({ onSelectPlanForOnboard }: SaasBillingProps) {
 
             <Button
               size="sm"
-              onClick={() => onSelectPlanForOnboard("starter", 8500)}
+              onClick={() => onSelectPlanForOnboard("starter", 5000)}
               className="w-full bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold cursor-pointer"
             >
               Onboard Starter Tutor
@@ -73,7 +73,7 @@ export function SaasBilling({ onSelectPlanForOnboard }: SaasBillingProps) {
                 </span>
               </div>
               <div>
-                <p className="text-2xl font-black text-[#0d2b26]">LKR 18,000</p>
+                <p className="text-2xl font-black text-[#0d2b26]">LKR 10,000</p>
                 <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Tutor License</p>
               </div>
               <ul className="space-y-1.5 text-xs text-slate-700">
@@ -100,7 +100,7 @@ export function SaasBilling({ onSelectPlanForOnboard }: SaasBillingProps) {
 
             <Button
               size="sm"
-              onClick={() => onSelectPlanForOnboard("pro", 18000)}
+              onClick={() => onSelectPlanForOnboard("pro", 10000)}
               className="w-full bg-[#0d5c4d] hover:bg-[#083e34] text-white text-xs font-bold cursor-pointer"
             >
               Onboard Pro Tutor
@@ -114,7 +114,7 @@ export function SaasBilling({ onSelectPlanForOnboard }: SaasBillingProps) {
                 Solo Masterclass Elite
               </Badge>
               <div>
-                <p className="text-2xl font-black text-[#0d2b26]">LKR 28,000</p>
+                <p className="text-2xl font-black text-[#0d2b26]">LKR 15,000</p>
                 <p className="text-[11px] text-slate-500 font-semibold">/ month &bull; 1 Tutor License</p>
               </div>
               <ul className="space-y-1.5 text-xs text-slate-700">
@@ -141,7 +141,7 @@ export function SaasBilling({ onSelectPlanForOnboard }: SaasBillingProps) {
 
             <Button
               size="sm"
-              onClick={() => onSelectPlanForOnboard("enterprise", 28000)}
+              onClick={() => onSelectPlanForOnboard("enterprise", 15000)}
               className="w-full bg-purple-800 hover:bg-purple-900 text-white text-xs font-bold cursor-pointer"
             >
               Onboard Masterclass Tutor

@@ -13,6 +13,37 @@ export const listTenants = async (req: Request, res: Response): Promise<void> =>
             id: true,
             title: true,
             code: true,
+            enrollments: {
+              select: {
+                studentId: true,
+              },
+            },
+          },
+        },
+        users: {
+          select: {
+            id: true,
+            role: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            teacherProfile: {
+              select: {
+                phone: true,
+                specialization: true,
+                address: true,
+                courses: {
+                  select: {
+                    id: true,
+                    enrollments: {
+                      select: {
+                        studentId: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
         _count: {
@@ -25,7 +56,70 @@ export const listTenants = async (req: Request, res: Response): Promise<void> =>
       orderBy: { createdAt: 'desc' },
     });
 
-    res.status(200).json({ success: true, data: tenants });
+    const enriched = tenants.map((t: any) => {
+      const settings =
+        t.settings && typeof t.settings === 'object' && !Array.isArray(t.settings)
+          ? { ...(t.settings as Record<string, any>) }
+          : {};
+      if (settings.pendingPlanRequest) {
+        // Do not ship the (large) slip image in the tenant directory listing
+        settings.pendingPlanRequest = { ...settings.pendingPlanRequest, slipImage: undefined };
+      }
+      const teacherUsers = Array.isArray(t.users)
+        ? t.users.filter((u: any) => u.role === 'TEACHER')
+        : [];
+      const enrolledStudentIds = new Set<string>();
+      if (Array.isArray(t.courses)) {
+        for (const course of t.courses) {
+          if (Array.isArray(course.enrollments)) {
+            for (const enrollment of course.enrollments) {
+              if (enrollment?.studentId) {
+                enrolledStudentIds.add(enrollment.studentId);
+              }
+            }
+          }
+        }
+      }
+      for (const teacherUser of teacherUsers) {
+        const teacherCourses = teacherUser?.teacherProfile?.courses;
+        if (Array.isArray(teacherCourses)) {
+          for (const course of teacherCourses) {
+            if (Array.isArray(course.enrollments)) {
+              for (const enrollment of course.enrollments) {
+                if (enrollment?.studentId) {
+                  enrolledStudentIds.add(enrollment.studentId);
+                }
+              }
+            }
+          }
+        }
+      }
+      const primaryTutor = teacherUsers[0];
+      const tutorFullName = primaryTutor
+        ? `${primaryTutor.firstName || ''} ${primaryTutor.lastName || ''}`.trim()
+        : '';
+
+      return {
+        ...t,
+        settings: {
+          ...settings,
+          adminName: settings.adminName || tutorFullName || t.name,
+          adminEmail: settings.adminEmail || primaryTutor?.email || '',
+          contactPhone: settings.contactPhone || primaryTutor?.teacherProfile?.phone || '',
+          address: settings.address || primaryTutor?.teacherProfile?.address || '',
+          studentCount: enrolledStudentIds.size,
+          teacherCount: teacherUsers.length || 1,
+          subjects:
+            Array.isArray(settings.subjects) && settings.subjects.length > 0
+              ? settings.subjects
+              : primaryTutor?.teacherProfile?.specialization
+              ? [primaryTutor.teacherProfile.specialization]
+              : [],
+        },
+      };
+    });
+
+    res.status(200).json({ success: true, data: enriched });
   } catch (error: any) {
     console.error('Error listing tenants:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });

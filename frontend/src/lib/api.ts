@@ -180,6 +180,85 @@ async function sportsRequest<T>(
 }
 
 export const api = {
+  // Tutor self-service subscription (plan view / change)
+  subscription: {
+    async getMine() {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const response = await fetch(`${API_BASE_URL}/subscription/me`, { method: 'GET', headers });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to load subscription');
+      }
+      return result;
+    },
+
+    async submitPayment(data: {
+      plan: 'starter' | 'pro' | 'enterprise';
+      paymentMethod?: 'CARD' | 'BANK_SLIP';
+      cardHolderName?: string;
+      cardNumber?: string;
+      cardExpiry?: string;
+      cardCvc?: string;
+      reference?: string;
+      transferDate?: string;
+      note?: string;
+      slipImage?: string | null;
+    }) {
+      return api.subscription._send('POST', '/subscription/me/payment-request', data);
+    },
+
+    async cancelPayment() {
+      return api.subscription._send('DELETE', '/subscription/me/payment-request');
+    },
+
+    async listRequests() {
+      return api.subscription._send('GET', '/subscription/requests');
+    },
+
+    async getBankDetails() {
+      return api.subscription._send('GET', '/subscription/bank-details');
+    },
+
+    async updateBankDetails(data: {
+      bankName: string;
+      accountName: string;
+      accountNumber: string;
+      branch: string;
+      branchCode?: string;
+    }) {
+      return api.subscription._send('PUT', '/subscription/bank-details', data);
+    },
+
+    async decideRequest(
+      tenantId: string,
+      decision: 'APPROVE' | 'REJECT',
+      reason?: string
+    ) {
+      return api.subscription._send('PATCH', `/subscription/requests/${tenantId}`, {
+        decision,
+        reason,
+      });
+    },
+
+    async _send(method: string, path: string, body?: unknown) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const response = await fetch(`${API_BASE_URL}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Request failed');
+      }
+      return result;
+    },
+  },
+
   // Super Admin - Tenant API
   tenants: {
     async getAll() {

@@ -25,7 +25,7 @@ export function CreateTenantModal({ isOpen, onClose, onAddTenant }: CreateTenant
     adminName: "",
     contactEmail: "",
     contactPhone: "",
-    monthlyFeeLkr: 18000,
+    monthlyFeeLkr: 10000,
     address: "",
     tagline: "",
     studentCount: 150,

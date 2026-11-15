@@ -4,3 +4,4 @@ export * from "./SyllabusBuilderView";
 export * from "./LiveScheduleView";
 export * from "./QuizBuilderModal";
 export * from "./ResourceUploadModal";
+export * from "./MySubscriptionView";

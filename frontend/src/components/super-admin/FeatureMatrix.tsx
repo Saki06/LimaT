@@ -112,30 +112,6 @@ export function FeatureMatrix({
             </select>
           </div>
         </div>
-
-        {/* 1-Click Preset Template Apply Buttons */}
-        <div className="space-y-2">
-          <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-            <Sparkles className="h-4 w-4 text-amber-500" /> 1-Click Feature Bundle Presets:
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {TENANT_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => onApplyPreset(preset.id)}
-                className="p-3 rounded-xl border border-slate-200 hover:border-[#0d5c4d] bg-slate-50/70 hover:bg-[#ecf8f5] text-left transition-all cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="font-extrabold text-xs text-[#0d2b26] group-hover:text-[#0d5c4d]">
-                    {preset.name}
-                  </p>
-                  <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-[#0d5c4d] transition-transform group-hover:translate-x-0.5" />
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{preset.description}</p>
-              </button>
-            ))}
-          </div>
-        </div>
       </Card>
 
       {/* Role Scope & Search Filter Bar */}

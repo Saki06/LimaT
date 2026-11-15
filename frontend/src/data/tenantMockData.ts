@@ -270,19 +270,38 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
         key: 'sub_brand_revenue_analytics',
         label: 'Monthly Tuition Revenue & Growth Analytics',
         description: 'Real-time metrics on active paying students, monthly recurring revenue, and student retention.'
+      },
+      {
+        key: 'sub_tutor_saas_subscription',
+        label: 'Tutor SaaS Subscription & Plan Upgrade Menu',
+        description: 'Show or hide the "My Subscription" billing menu in the Tutor Portal sidebar.'
+      },
+      {
+        key: 'sub_tutor_card_payment',
+        label: 'Tutor Subscription: Online Card Payment (Visa / Mastercard)',
+        description: 'Allow tutors to pay for SaaS plans via online card checkout with instant activation.'
+      },
+      {
+        key: 'sub_tutor_bank_slip_payment',
+        label: 'Tutor Subscription: Bank Slip Transfer Upload',
+        description: 'Allow tutors to pay for SaaS plans by uploading a bank transfer deposit slip.'
       }
     ]
   }
 ];
 
 // Helper to generate a flat map of all feature keys (parent + sub-options)
-const buildFullFeatures = (config: Record<string, boolean>): Record<string, boolean> => {
+export const buildFullFeatures = (config: Record<string, boolean>): Record<string, boolean> => {
   const result: Record<string, boolean> = {};
   HIERARCHICAL_MODULES.forEach((mod) => {
     const isParentEnabled = config[mod.key] ?? false;
     result[mod.key] = isParentEnabled;
     mod.subOptions.forEach((sub) => {
-      result[sub.key] = config[sub.key] !== undefined ? config[sub.key] : isParentEnabled;
+      if (sub.key === 'sub_tutor_saas_subscription') {
+        result[sub.key] = config[sub.key] ?? false;
+      } else {
+        result[sub.key] = config[sub.key] !== undefined ? config[sub.key] : isParentEnabled;
+      }
     });
   });
   return result;

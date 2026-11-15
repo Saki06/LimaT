@@ -3,3 +3,4 @@ export * from "./FeatureMatrix";
 export * from "./SaasBilling";
 export * from "./CreateTenantModal";
 export * from "./SuperAdminPortalView";
+export * from "./PaymentRequestsView";

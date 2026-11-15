@@ -1034,6 +1034,13 @@ if (savedProfile.preferredName) {
 
     const loadSavedAvatar = async () => {
       try {
+        if (!savedAvatarUrl.startsWith("/api/super-admin/avatars/")) {
+          if (!cancelled) {
+            setSavedAvatarImageUrl(savedAvatarUrl);
+          }
+          return;
+        }
+
         const blob = await api.superAdminProfile.getAvatarBlob(savedAvatarUrl);
 
         if (cancelled) return;

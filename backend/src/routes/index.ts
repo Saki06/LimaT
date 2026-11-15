@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
 import tenantRoutes from './tenant.routes';
+import subscriptionRoutes from './subscription.routes';
 import sportsRoutes from './sports.routes';
 import courseRoutes from './course.routes';
 import packageRoutes from './package.routes';
@@ -30,6 +31,7 @@ router.get('/health', (req, res) => {
 // Mounted sub-routes
 router.use('/auth', authRoutes);
 router.use('/tenants', tenantRoutes);
+router.use('/subscription', subscriptionRoutes);
 router.use('/sports', sportsRoutes);
 router.use('/courses', courseRoutes);
 router.use('/packages', packageRoutes);

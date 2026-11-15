@@ -20,11 +20,12 @@ import {
   TeacherViews,
   TeacherConnectView,
   SyllabusBuilderView,
-  LiveScheduleView
+  LiveScheduleView,
+  MySubscriptionView
 } from "@/components/teacher";
 import { ParentDashboardView } from "@/components/parent";
 import { AdminViews } from "@/components/admin";
-import { SuperAdminPortalView } from "@/components/super-admin";
+import { SuperAdminPortalView, PaymentRequestsView } from "@/components/super-admin";
 import { SportsView } from "@/components/sports";
 import {
   AnnouncementsView,
@@ -125,6 +126,8 @@ export default function HomePage() {
           return <LiveScheduleView />;
         case "profile":
           return <ProfileView />;
+        case "subscription":
+          return <MySubscriptionView />;
         case "connect":
           return <TeacherConnectView />;
         case "submissions":
@@ -203,6 +206,9 @@ export default function HomePage() {
         case "super_admin_matrix":
         case "feature_matrix":
           return <SuperAdminPortalView initialTab="feature_matrix" />;
+        case "super_admin_payments":
+        case "payments":
+          return <SuperAdminPortalView initialTab="payments" />;
         case "super_admin_pricing":
         case "pricing_plans":
           return <SuperAdminPortalView initialTab="pricing_plans" />;

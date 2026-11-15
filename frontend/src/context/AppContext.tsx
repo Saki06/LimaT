@@ -40,7 +40,7 @@ import {
   StoredAthleteRegistration,
 } from '@/components/sports/sportsRegistrationData';
 import { Tenant, TenantFeature, TenantType } from '@/types/tenant';
-import { TENANT_PRESETS } from '@/data/tenantMockData';
+import { TENANT_PRESETS, buildFullFeatures } from '@/data/tenantMockData';
 import { getTranslation } from '@/lib/i18n';
 import { api } from '@/lib/api';
 import { mapBackendTenant } from '@/lib/tenantMapper';
@@ -76,6 +76,7 @@ interface AppContextType {
   authToken: string | null;
   updateAuthUser: (updates: Record<string, any>) => void;
   refreshSuperAdminAvatar: () => void;
+  refreshMyTenant: () => void;
   loginUser: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   registerUser: (input: {
     role: 'student' | 'teacher' | 'parent';
@@ -479,7 +480,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!activeTenant || !activeTenant.enabledFeatures) {
-      return true;
+      return feature === 'sub_tutor_saas_subscription' ? false : true;
+    }
+
+    if (feature === 'sub_tutor_saas_subscription') {
+      return activeTenant.enabledFeatures[feature] ?? false;
     }
 
     return activeTenant.enabledFeatures[feature] ?? true;
@@ -496,6 +501,44 @@ const refreshSuperAdminAvatar = useCallback(() => {
   setSuperAdminAvatarUrl(null);
   setSuperAdminAvatarVersion((previous) => previous + 1);
 }, []);
+
+  // Load the tutor's own tenant (plan + enabled features) for Teacher / Admin portals
+  const [myTenantVersion, setMyTenantVersion] = useState(0);
+  const refreshMyTenant = useCallback(() => {
+    setMyTenantVersion((previous) => previous + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!authToken || (authUser?.role !== 'TEACHER' && authUser?.role !== 'ADMIN')) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadMyTenant = async () => {
+      try {
+        const result = await api.subscription.getMine();
+        if (cancelled || !result?.data?.tenant) return;
+
+        const mapped: Tenant = mapBackendTenant(result.data.tenant);
+        if (Object.keys(mapped.enabledFeatures || {}).length > 0) {
+          mapped.enabledFeatures = buildFullFeatures(mapped.enabledFeatures);
+        }
+        setTenants([mapped]);
+        setActiveTenantId(mapped.id);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Could not load tutor subscription:', error);
+        }
+      }
+    };
+
+    void loadMyTenant();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken, authUser?.role, myTenantVersion]);
 
   // Load real tenants for Super Admin
   useEffect(() => {
@@ -615,6 +658,11 @@ useEffect(() => {
 
       if (!avatarUrl) {
         setSuperAdminAvatarUrl(null);
+        return;
+      }
+
+      if (!avatarUrl.startsWith('/api/super-admin/avatars/')) {
+        setSuperAdminAvatarUrl(avatarUrl);
         return;
       }
 
@@ -3412,6 +3460,7 @@ useEffect(() => {
         authToken,
         updateAuthUser,
         refreshSuperAdminAvatar,
+        refreshMyTenant,
         loginUser,
         registerUser,
         logoutUser

@@ -19,12 +19,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { TenantSchools } from "./TenantSchools";
 import { FeatureMatrix } from "./FeatureMatrix";
 import { SaasBilling } from "./SaasBilling";
+import { PaymentRequestsView } from "./PaymentRequestsView";
 import { CreateTenantModal, EditTenantModal, DeleteTenantModal } from "./CreateTenantModal";
 import { api } from "@/lib/api";
 import { mapBackendTenant } from "@/lib/tenantMapper";
 import { TENANT_PRESETS } from "@/data/tenantMockData";
 
-type SuperAdminTab = "tenants" | "feature_matrix" | "pricing_plans";
+type SuperAdminTab = "tenants" | "feature_matrix" | "pricing_plans" | "payments";
 
 interface SuperAdminPortalViewProps {
   initialTab?: SuperAdminTab;
@@ -48,6 +49,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
   const getTabFromView = (view: string): SuperAdminTab => {
     if (view === "super_admin_matrix" || view === "feature_matrix") return "feature_matrix";
     if (view === "super_admin_pricing" || view === "pricing_plans") return "pricing_plans";
+    if (view === "super_admin_payments" || view === "payments") return "payments";
     return "tenants";
   };
 
@@ -69,6 +71,7 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
     if (tab === "tenants") setCurrentView("super_admin_tenants");
     else if (tab === "feature_matrix") setCurrentView("super_admin_matrix");
     else if (tab === "pricing_plans") setCurrentView("super_admin_pricing");
+    else if (tab === "payments") setCurrentView("super_admin_payments");
   };
 
   const [selectedTenantForMatrix, setSelectedTenantForMatrix] = useState<string>(activeTenantId);
@@ -497,6 +500,18 @@ const saveTenantFeatures = (
           <CreditCard className="h-4 w-4" />
           <span>SaaS Edition Presets &amp; Pricing</span>
         </button>
+
+        <button
+          onClick={() => handleTabChange("payments")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+            activeTab === "payments"
+              ? "bg-[#0d5c4d] text-white shadow-xs"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+          }`}
+        >
+          <DollarSign className="h-4 w-4" />
+          <span>Tutor Payments &amp; Slips</span>
+        </button>
       </div>
 
 
@@ -636,6 +651,11 @@ const saveTenantFeatures = (
             setIsAddModalOpen(true);
           }}
         />
+      )}
+
+      {/* TAB 4: TUTOR PAYMENTS & BANK SLIPS */}
+      {activeTab === "payments" && (
+        <PaymentRequestsView onPaymentProcessed={() => void handleReloadTenants()} />
       )}
 
       {/* MODALS */}

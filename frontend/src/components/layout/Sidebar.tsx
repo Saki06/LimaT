@@ -291,6 +291,9 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
         ]
       : []),
     // Personal Account & Studio Profile
+    ...(isFeatureEnabled("sub_tutor_saas_subscription")
+      ? [{ id: "subscription", label: "My Subscription", icon: CreditCard, group: "Personal Account" }]
+      : []),
     { id: "profile", label: "Tutor Profile & Studio", icon: User, group: "Personal Account" }
   ];
 
@@ -395,6 +398,13 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
       label: "SaaS Packages",
       icon: CreditCard,
       badge: "Pricing",
+      group: "Platform Owner"
+    },
+    {
+      id: "super_admin_payments",
+      label: "Payment Requests",
+      icon: CreditCard,
+      badge: "Verify",
       group: "Platform Owner"
     }
   ];

@@ -256,7 +256,7 @@ if (
 
 export const registerTutor = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { firstName, lastName, email, password, specialization, employeeNo, tenantId } = req.body;
+    const { firstName, lastName, email, password, phoneNumber, specialization, employeeNo, tenantId } = req.body;
 
     if (!email || !password || !firstName) {
       res.status(400).json({ success: false, message: 'Missing required tutor fields' });
@@ -274,13 +274,36 @@ export const registerTutor = async (req: Request, res: Response): Promise<void> 
 
     let selectedTenantId = tenantId;
     if (!selectedTenantId) {
-      const defaultTenant = await prisma.tenant.findFirst({
-  where: {
-    deletedAt: null,
-    status: { notIn: ['SUSPENDED', 'INACTIVE'] },
-  },
-});
-      selectedTenantId = defaultTenant?.id;
+      const fullTutorName = `${firstName} ${lastName || ''}`.trim();
+      const baseSlug =
+        fullTutorName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '') || 'tutor';
+      let candidateSlug = baseSlug;
+      const existingSlug = await prisma.tenant.findUnique({ where: { slug: candidateSlug } });
+      if (existingSlug) {
+        candidateSlug = `${baseSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+
+      const createdStudioTenant = await prisma.tenant.create({
+        data: {
+          name: fullTutorName,
+          slug: candidateSlug,
+          domain: `${candidateSlug}.newtoz.com`,
+          plan: 'PRO',
+          status: 'ACTIVE',
+          settings: {
+            adminName: fullTutorName,
+            adminEmail: normalizedEmail,
+            contactPhone: typeof phoneNumber === 'string' ? phoneNumber.trim() : '',
+            type: 'individual_teacher',
+            tagline: `${specialization || 'Science & Mathematics'} Educator Studio`,
+            subjects: [specialization || 'Science & Mathematics'],
+          },
+        },
+      });
+      selectedTenantId = createdStudioTenant.id;
     }
 
     if (!selectedTenantId) {
