@@ -287,6 +287,12 @@ export const registerTutor = async (req: Request, res: Response): Promise<void> 
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+      return;
+    }
+
     const existingUser = await prisma.user.findFirst({
       where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
     });
@@ -295,87 +301,97 @@ export const registerTutor = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    let selectedTenantId = tenantId;
-    if (!selectedTenantId) {
-      const fullTutorName = `${firstName} ${lastName || ''}`.trim();
-      const baseSlug =
-        fullTutorName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '') || 'tutor';
-      let candidateSlug = baseSlug;
-      const existingSlug = await prisma.tenant.findUnique({ where: { slug: candidateSlug } });
-      if (existingSlug) {
-        candidateSlug = `${baseSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
-      }
-
-      const createdStudioTenant = await prisma.tenant.create({
-        data: {
-          name: fullTutorName,
-          slug: candidateSlug,
-          domain: `${candidateSlug}.newtoz.com`,
-          plan: 'PRO',
-          status: 'ACTIVE',
-          settings: {
-            adminName: fullTutorName,
-            adminEmail: normalizedEmail,
-            contactPhone: typeof phoneNumber === 'string' ? phoneNumber.trim() : '',
-            type: 'individual_teacher',
-            tagline: `${specialization || 'Science & Mathematics'} Educator Studio`,
-            subjects: [specialization || 'Science & Mathematics'],
-          },
-        },
-      });
-      selectedTenantId = createdStudioTenant.id;
-    }
-
-    if (!selectedTenantId) {
-  res.status(400).json({
-    success: false,
-    message: 'No valid tenant found to register teacher.',
-  });
-  return;
-}
-
-const selectedTenant = await prisma.tenant.findUnique({
-  where: { id: selectedTenantId },
-  select: {
-  status: true,
-  deletedAt: true,
-},
-});
-
-if (
-  !selectedTenant ||
-  selectedTenant.deletedAt !== null ||
-  selectedTenant.status === 'SUSPENDED' ||
-  selectedTenant.status === 'INACTIVE'
-) {
-  res.status(403).json({
-    success: false,
-    message: 'Registration is unavailable for this organization.',
-  });
-  return;
-}
-
+    // Hash password before starting transaction
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const newUser = await prisma.user.create({
-      data: {
-        tenantId: selectedTenantId!,
-        email: normalizedEmail,
-        passwordHash,
-        role: Role.TEACHER,
-        firstName,
-        lastName: lastName || '',
-        teacherProfile: {
-          create: {
-            specialization: specialization || 'General Science',
-            employeeNo: employeeNo || 'FAC-' + Math.floor(1000 + Math.random() * 9000),
+    const fullTutorName = `${firstName} ${lastName || ''}`.trim();
+    const baseSlug =
+      fullTutorName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'tutor';
+
+    const newUser = await prisma.$transaction(async (tx) => {
+      // Re-check inside transaction to avoid race conditions
+      const userInTx = await tx.user.findFirst({
+        where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+      });
+      if (userInTx) {
+        const err: any = new Error('Email already registered.');
+        err.statusCode = 409;
+        throw err;
+      }
+
+      let selectedTenantId = tenantId;
+      if (!selectedTenantId) {
+        let candidateSlug = baseSlug;
+        const existingSlug = await tx.tenant.findUnique({ where: { slug: candidateSlug } });
+        if (existingSlug) {
+          candidateSlug = `${baseSlug}-${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+
+        const createdStudioTenant = await tx.tenant.create({
+          data: {
+            name: fullTutorName,
+            slug: candidateSlug,
+            domain: `${candidateSlug}.newtoz.com`,
+            plan: 'PRO',
+            status: 'ACTIVE',
+            settings: {
+              adminName: fullTutorName,
+              adminEmail: normalizedEmail,
+              contactPhone: typeof phoneNumber === 'string' ? phoneNumber.trim() : '',
+              type: 'individual_teacher',
+              tagline: `${specialization || 'Science & Mathematics'} Educator Studio`,
+              subjects: [specialization || 'Science & Mathematics'],
+            },
+          },
+        });
+        selectedTenantId = createdStudioTenant.id;
+      }
+
+      if (!selectedTenantId) {
+        const err: any = new Error('No valid tenant found to register teacher.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      const selectedTenant = await tx.tenant.findUnique({
+        where: { id: selectedTenantId },
+        select: {
+          status: true,
+          deletedAt: true,
+        },
+      });
+
+      if (
+        !selectedTenant ||
+        selectedTenant.deletedAt !== null ||
+        selectedTenant.status === 'SUSPENDED' ||
+        selectedTenant.status === 'INACTIVE'
+      ) {
+        const err: any = new Error('Registration is unavailable for this organization.');
+        err.statusCode = 403;
+        throw err;
+      }
+
+      return tx.user.create({
+        data: {
+          tenantId: selectedTenantId,
+          email: normalizedEmail,
+          passwordHash,
+          role: Role.TEACHER,
+          firstName,
+          lastName: lastName || '',
+          teacherProfile: {
+            create: {
+              specialization: specialization || 'General Science',
+              employeeNo: employeeNo || 'FAC-' + Math.floor(1000 + Math.random() * 9000),
+            },
           },
         },
-      },
-      include: { teacherProfile: true },
+        include: { teacherProfile: true },
+      });
     });
 
     const token = jwt.sign(
@@ -397,6 +413,14 @@ if (
     });
   } catch (error: any) {
     console.error('Register tutor error:', error);
+    if (error.statusCode === 409 || error.code === 'P2002') {
+      res.status(409).json({ success: false, message: 'Email already registered.' });
+      return;
+    }
+    if (error.statusCode === 403) {
+      res.status(403).json({ success: false, message: error.message });
+      return;
+    }
     res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
@@ -677,64 +701,77 @@ export const googleAuth = async (req: Request, res: Response): Promise<void> => 
       const generatedEmployeeNo = `TUT-${randomNum}`;
       const tutorSlug = `${firstName.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now().toString().slice(-4)}`;
 
-      const newTenant = await prisma.tenant.create({
-        data: {
-          name: `${firstName} ${lastName}`.trim() || 'Educator Studio',
-          slug: tutorSlug,
-          domain: `${tutorSlug}.newtoz.com`,
-          plan: 'PRO',
-          settings: {
-            adminName: `${firstName} ${lastName}`.trim(),
-            adminEmail: email,
-            contactPhone: '',
-            studentCount: 0,
-            teacherCount: 1,
-            subjects: ['General Academics'],
-            monthlyFeeLkr: 0,
-            type: 'individual_teacher',
-            enabledFeatures: {
-              batch_management: true,
-              tuition_subscriptions: true,
-              course_marketplace: true,
-              live_broadcast_studio: true,
-              syllabus_builder: true,
-              assignments_grading: true,
-              tutor_branding: false,
-            },
+      user = await prisma.$transaction(async (tx) => {
+        const existingTxUser = await tx.user.findFirst({
+          where: { email: { equals: email, mode: 'insensitive' } },
+          include: {
+            tenant: true,
+            studentProfile: true,
+            teacherProfile: true,
+            parentProfile: true,
           },
-        },
-      });
+        });
+        if (existingTxUser) return existingTxUser;
 
-      user = await prisma.user.create({
-        data: {
-          email,
-          passwordHash,
-          role: Role.TEACHER,
-          firstName,
-          lastName,
-          avatarUrl,
-          tenantId: newTenant.id,
-          teacherProfile: {
-            create: {
-              employeeNo: generatedEmployeeNo,
-              specialization: 'General Academics',
-              publicSlug: tutorSlug,
+        const newTenant = await tx.tenant.create({
+          data: {
+            name: `${firstName} ${lastName}`.trim() || 'Educator Studio',
+            slug: tutorSlug,
+            domain: `${tutorSlug}.newtoz.com`,
+            plan: 'PRO',
+            settings: {
+              adminName: `${firstName} ${lastName}`.trim(),
+              adminEmail: email,
+              contactPhone: '',
+              studentCount: 0,
+              teacherCount: 1,
+              subjects: ['General Academics'],
+              monthlyFeeLkr: 0,
+              type: 'individual_teacher',
+              enabledFeatures: {
+                batch_management: true,
+                tuition_subscriptions: true,
+                course_marketplace: true,
+                live_broadcast_studio: true,
+                syllabus_builder: true,
+                assignments_grading: true,
+                tutor_branding: false,
+              },
             },
           },
-        },
-        include: {
-          tenant: true,
-          studentProfile: true,
-          teacherProfile: {
-            select: {
-              id: true,
-              userId: true,
-              employeeNo: true,
-              specialization: true,
+        });
+
+        return tx.user.create({
+          data: {
+            email,
+            passwordHash,
+            role: Role.TEACHER,
+            firstName,
+            lastName,
+            avatarUrl,
+            tenantId: newTenant.id,
+            teacherProfile: {
+              create: {
+                employeeNo: generatedEmployeeNo,
+                specialization: 'General Academics',
+                publicSlug: tutorSlug,
+              },
             },
           },
-          parentProfile: true,
-        },
+          include: {
+            tenant: true,
+            studentProfile: true,
+            teacherProfile: {
+              select: {
+                id: true,
+                userId: true,
+                employeeNo: true,
+                specialization: true,
+              },
+            },
+            parentProfile: true,
+          },
+        });
       });
     } else if (targetRole === 'PARENT') {
       user = await prisma.user.create({

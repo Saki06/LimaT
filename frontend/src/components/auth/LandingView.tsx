@@ -40,7 +40,8 @@ import {
   MapPin,
   BarChart3,
   CreditCard,
-  Send
+  Send,
+  Loader2
 } from "lucide-react";
 import { TozyAnimatedMascot } from "@/components/tozy";
 
@@ -234,6 +235,8 @@ export function LandingView({
       ? "Enter valid 10-digit SL number (e.g. 0771234567)"
       : "";
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Pre-fill credentials based on role (Tutor Platform)
   const rolePresetCredentials: Record<SupportedRole, { name: string; email: string; detail: string; school: string }> = {
     student: {
@@ -340,6 +343,7 @@ export function LandingView({
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     if (selectedRole === "parent" && parentLoginMethod === "otp" && !parentOtpSent) {
       if (!loginEmail.trim()) {
@@ -380,6 +384,7 @@ export function LandingView({
     }
 
     // Try real backend authentication
+    setIsSubmitting(true);
     try {
       const res = await loginUser(loginEmail.trim().toLowerCase(), loginPassword, backendRoleMap[selectedRole]);
       if (res.success) {
@@ -401,11 +406,15 @@ export function LandingView({
         message: err?.message || "Failed to reach authentication server."
       });
       return;
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (signupPassword && signupConfirmPassword && signupPassword !== signupConfirmPassword) {
       addToast({
         type: "error",
@@ -456,6 +465,7 @@ export function LandingView({
       const email = signupEmail.trim();
       const pwd = signupPassword.trim() || "password123";
 
+      setIsSubmitting(true);
       try {
         const res = await registerUser({
           role: "parent",
@@ -485,6 +495,8 @@ export function LandingView({
           message: err?.message || "Failed to reach registration server."
         });
         return;
+      } finally {
+        setIsSubmitting(false);
       }
     }
 
@@ -523,6 +535,7 @@ export function LandingView({
     const pwd = signupPassword.trim() || "password123";
 
     if (email && (selectedRole === "student" || selectedRole === "teacher")) {
+      setIsSubmitting(true);
       try {
         const res = await registerUser({
           role: selectedRole,
@@ -557,6 +570,8 @@ export function LandingView({
           message: err?.message || "Failed to reach registration server."
         });
         return;
+      } finally {
+        setIsSubmitting(false);
       }
     }
 
@@ -712,7 +727,8 @@ export function LandingView({
 
               <button
                 type="submit"
-                className={`w-full text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1 ${
+                disabled={isSubmitting}
+                className={`w-full text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1 disabled:opacity-60 disabled:cursor-not-allowed ${
                   selectedRole === "parent"
                     ? "bg-[#1e3a5f] hover:bg-[#152a45]"
                     : selectedRole === "teacher"
@@ -724,19 +740,28 @@ export function LandingView({
                     : "bg-[#0d5c4d] hover:bg-[#083e34]"
                 }`}
               >
-                <LogIn className="h-4 w-4" />
-                <span>
-                  Sign In to{" "}
-                  {selectedRole === "student"
-                    ? "Student Portal"
-                    : selectedRole === "parent"
-                    ? "Parent Portal"
-                    : selectedRole === "admin"
-                    ? "Admin Desk"
-                    : selectedRole === "super_admin"
-                    ? "Super Admin Console"
-                    : "Teacher Portal"}
-                </span>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Signing In...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="h-4 w-4" />
+                    <span>
+                      Sign In to{" "}
+                      {selectedRole === "student"
+                        ? "Student Portal"
+                        : selectedRole === "parent"
+                        ? "Parent Portal"
+                        : selectedRole === "admin"
+                        ? "Admin Desk"
+                        : selectedRole === "super_admin"
+                        ? "Super Admin Console"
+                        : "Teacher Portal"}
+                    </span>
+                  </>
+                )}
               </button>
 
               {/* GOOGLE SIGN IN BUTTON FOR STUDENT / TUTOR / PARENT / ADMIN (NEVER FOR SUPER ADMIN) */}
@@ -974,10 +999,20 @@ export function LandingView({
 
               <button
                 type="submit"
-                className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer mt-2"
+                disabled={isSubmitting}
+                className="w-full bg-[#1e3a5f] hover:bg-[#152a45] text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <UserPlus className="h-4 w-4" />
-                <span>Complete Parent Registration & Link Student</span>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Registering Guardian...</span>
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-4 w-4" />
+                    <span>Complete Parent Registration & Link Student</span>
+                  </>
+                )}
               </button>
             </div>
           ) : (
@@ -1266,14 +1301,24 @@ export function LandingView({
 
               <button
                 type="submit"
-                className={`w-full text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1 ${
+                disabled={isSubmitting}
+                className={`w-full text-white font-black text-xs py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer mt-1 disabled:opacity-60 disabled:cursor-not-allowed ${
                   selectedRole === "teacher"
                     ? "bg-[#b47a16] hover:bg-[#96640f]"
                     : "bg-[#0d5c4d] hover:bg-[#083e34]"
                 }`}
               >
-                <UserPlus className="h-4 w-4" />
-                <span>Create Account & Join as {selectedRole === "student" ? "Student" : "Tutor"}</span>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Creating Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-4 w-4" />
+                    <span>Create Account & Join as {selectedRole === "student" ? "Student" : "Tutor"}</span>
+                  </>
+                )}
               </button>
             </>
           )}
