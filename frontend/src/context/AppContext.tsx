@@ -136,6 +136,7 @@ interface AppContextType {
   teams: SportsTeam[];
   fixtures: Fixture[];
   standings: SportsStandingRecord[];
+  standingsStatus: 'loading' | 'ready' | 'error';
   tournaments: Tournament[];
   events: SchoolEvent[];
   announcements: Announcement[];
@@ -392,6 +393,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [teams, setTeams] = useState<SportsTeam[]>([]);
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
   const [standings, setStandings] = useState<SportsStandingRecord[]>([]);
+  const [standingsStatus, setStandingsStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [events, setEvents] = useState<SchoolEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -1142,6 +1144,7 @@ useEffect(() => {
     setTeams([]);
     setFixtures([]);
     setStandings([]);
+    setStandingsStatus('loading');
     setTournaments([]);
     if (typeof window !== 'undefined') {
       localStorage.setItem('lms_is_landing', 'true');
@@ -1303,6 +1306,7 @@ useEffect(() => {
   }, [setSportsRegistrations]);
 
   const fetchSportsOperations = useCallback(async () => {
+    setStandingsStatus('loading');
     try {
       const [records, tournamentsData, fixturesData, standingsData] = await Promise.all([
         api.sports.getTeams(),
@@ -1359,8 +1363,10 @@ useEffect(() => {
           : {}),
       })));
       setStandings(standingsData);
+      setStandingsStatus('ready');
     } catch (err) {
       console.warn('Failed to load sports operations:', err);
+      setStandingsStatus('error');
     }
   }, []);
 
@@ -3309,6 +3315,7 @@ useEffect(() => {
         teams,
         fixtures,
         standings,
+        standingsStatus,
         tournaments,
         events,
         announcements,
