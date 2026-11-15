@@ -198,9 +198,6 @@ const ALL_PREDEFINED_GRADES = PREDEFINED_GRADE_GROUPS.flatMap((g) => g.grades);
 export function TeacherConnectView() {
   const { currentUser, t, fetchCourses, setCurrentView } = useApp();
   const hubSettings = useHubSettings();
-  if (!hubSettings.enabled) {
-    return <Card className="p-10 text-center"><p className="text-lg font-black text-[#0d2b26]">Tutor Connect Hub is currently disabled</p><p className="mt-2 text-sm text-slate-500">Please contact platform administration.</p></Card>;
-  }
 
   // Active tab inside Teacher Connect Hub - Default to Packages or restore from URL/localStorage
   const [activeTab, setActiveTab] = useState<TeacherConnectTab>("packages");

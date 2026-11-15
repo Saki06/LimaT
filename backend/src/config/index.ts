@@ -8,4 +8,5 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || 'fallback_secret_change_in_production',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   databaseUrl: process.env.DATABASE_URL || '',
+  googleClientId: process.env.GOOGLE_CLIENT_ID || '786252089709-nac7u469ercpt25hqjg1jkavga6d70hp.apps.googleusercontent.com',
 };

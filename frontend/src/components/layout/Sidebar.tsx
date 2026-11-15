@@ -159,7 +159,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
       ? [
           {
             id: "connect",
-            label: "Find Teachers",
+            label: "Connect",
             icon: GraduationCap,
             group: "Core Learning"
           }

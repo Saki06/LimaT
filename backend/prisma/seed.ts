@@ -58,6 +58,19 @@ async function main() {
     },
   });
 
+  // 2b. Create School Admin User
+  const schoolAdmin = await prisma.user.create({
+    data: {
+      tenantId: tenant1.id,
+      email: 'admin@apex.edu',
+      passwordHash,
+      role: Role.ADMIN,
+      firstName: 'Operations',
+      lastName: 'Admin',
+      avatarUrl: '/images/admin_brush_portrait.jpg',
+    },
+  });
+
   // 3. Create Teacher & TeacherProfile
   const teacherUser = await prisma.user.create({
     data: {

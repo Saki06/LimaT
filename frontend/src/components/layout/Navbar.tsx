@@ -104,7 +104,7 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
       currentRole === "student"
         ? [
             { id: "nav-dashboard", title: "Dashboard", subtitle: "Student Overview & Schedule", view: "dashboard" },
-            { id: "nav-connect", title: "Find Teachers & Tutors", subtitle: "Browse & Subscribe to Tutors", view: "connect" },
+            { id: "nav-connect", title: "Connect", subtitle: "Browse & Subscribe to Tutors", view: "connect" },
             { id: "nav-live", title: "Live Video Classes", subtitle: "Join Live & Upcoming Sessions", view: "live_schedule" },
             { id: "nav-courses", title: "Syllabus & Lessons", subtitle: "Enrolled Courses & Units", view: "courses" },
             { id: "nav-assignments", title: "Assignments", subtitle: "Homework & Submissions", view: "assignments" },

@@ -445,11 +445,24 @@ export const api = {
 
   // Auth API
   auth: {
-    async login(credentials: { email: string; password: string }): Promise<AuthResponse> {
+    async login(credentials: { email: string; password: string; expectedRole?: string }): Promise<AuthResponse> {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials),
+      });
+      return response.json();
+    },
+
+    async googleAuth(data: {
+      credential: string;
+      requestedRole?: 'student' | 'teacher' | 'parent' | 'admin' | 'super_admin';
+      tenantId?: string;
+    }): Promise<AuthResponse> {
+      const response = await fetch(`${API_BASE_URL}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
       });
       return response.json();
     },

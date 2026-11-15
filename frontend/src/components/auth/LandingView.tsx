@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import {
   GraduationCap,
@@ -78,7 +78,9 @@ export function LandingView({
   onEnterApp: () => void;
   initialPortal?: PortalType;
 }) {
-  const { setCurrentRole, addToast, schools, t, landingPortal, setLandingPortal, loginUser, registerUser } = useApp();
+  const { setCurrentRole, addToast, schools, t, landingPortal, setLandingPortal, loginUser, loginWithGoogle, registerUser } = useApp();
+
+  const GOOGLE_CLIENT_ID = "786252089709-nac7u469ercpt25hqjg1jkavga6d70hp.apps.googleusercontent.com";
 
   // Auto-rotate the student banner image every 3.5 seconds
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -109,6 +111,74 @@ export function LandingView({
   const [loginPassword, setLoginPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+
+  // Render Google Identity Services Button
+  useEffect(() => {
+    if (authMode === "closed" || selectedRole === "super_admin") return;
+
+    const renderGoogleBtn = () => {
+      const container = document.getElementById("google-signin-btn-login");
+      if (!container) return;
+
+      if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
+        try {
+          (window as any).google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: async (response: any) => {
+              if (response.credential) {
+                const targetRole =
+                  selectedRole === "parent"
+                    ? "parent"
+                    : selectedRole === "teacher"
+                    ? "teacher"
+                    : selectedRole === "admin"
+                    ? "admin"
+                    : "student";
+                const res = await loginWithGoogle(response.credential, targetRole);
+                if (res.success) {
+                  setAuthMode("closed");
+                  onEnterApp();
+                } else {
+                  addToast({
+                    type: "error",
+                    title: "Google Sign-In Failed",
+                    message: res.message || "Unable to sign in with Google",
+                  });
+                }
+              }
+            },
+          });
+
+          // Measure container width and fit neatly (between 260px and 380px)
+          const rect = container.getBoundingClientRect();
+          const targetWidth = Math.min(380, Math.max(260, Math.round(rect.width || 360)));
+
+          container.innerHTML = "";
+          (window as any).google.accounts.id.renderButton(container, {
+            theme: "outline",
+            size: "large",
+            width: targetWidth,
+            text: "continue_with",
+            shape: "rectangular",
+            logo_alignment: "center",
+          });
+        } catch (e) {
+          console.error("Google Auth render error:", e);
+        }
+      }
+    };
+
+    if (typeof window !== "undefined" && !(window as any).google) {
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.onload = renderGoogleBtn;
+      document.body.appendChild(script);
+    } else {
+      renderGoogleBtn();
+    }
+  }, [authMode, authTab, selectedRole, loginWithGoogle, onEnterApp, addToast]);
 
 
   // Sign Up Form State
@@ -226,11 +296,19 @@ export function LandingView({
     }
   };
 
+  const backendRoleMap: Record<SupportedRole, string> = {
+    student: "STUDENT",
+    teacher: "TEACHER",
+    parent: "PARENT",
+    admin: "ADMIN",
+    super_admin: "SUPER_ADMIN",
+  };
+
   const handle1ClickDemoLogin = async (role: SupportedRole) => {
     const creds = rolePresetCredentials[role];
     if (creds) {
       try {
-        const res = await loginUser(creds.email, "password123");
+        const res = await loginUser(creds.email, "password123", backendRoleMap[role]);
         if (res.success) {
           setAuthMode("closed");
           onEnterApp();
@@ -303,7 +381,7 @@ export function LandingView({
 
     // Try real backend authentication
     try {
-      const res = await loginUser(loginEmail.trim().toLowerCase(), loginPassword);
+      const res = await loginUser(loginEmail.trim().toLowerCase(), loginPassword, backendRoleMap[selectedRole]);
       if (res.success) {
         setAuthMode("closed");
         onEnterApp();
@@ -392,26 +470,22 @@ export function LandingView({
           setAuthMode("closed");
           onEnterApp();
           return;
-        } else if (res.message) {
+        } else {
           addToast({
-            type: "warning",
-            title: "Registration Note",
-            message: res.message
+            type: "error",
+            title: "Registration Failed",
+            message: res.message || "Could not complete registration. Please check your details and try again."
           });
+          return;
         }
-      } catch {
-        // Fallback gracefully
+      } catch (err: any) {
+        addToast({
+          type: "error",
+          title: "Registration Error",
+          message: err?.message || "Failed to reach registration server."
+        });
+        return;
       }
-
-      setCurrentRole("parent");
-      setAuthMode("closed");
-      addToast({
-        type: "success",
-        title: "Guardian Account Registered!",
-        message: `Welcome, ${parentTitle} ${signupName}! Account successfully linked with ${childPhoneOrId}.`
-      });
-      onEnterApp();
-      return;
     }
 
     // Student / Tutor Registration
@@ -664,6 +738,53 @@ export function LandingView({
                     : "Teacher Portal"}
                 </span>
               </button>
+
+              {/* GOOGLE SIGN IN BUTTON FOR STUDENT / TUTOR / PARENT / ADMIN (NEVER FOR SUPER ADMIN) */}
+              {selectedRole !== "super_admin" && (
+                <div className="pt-2">
+                  <div className="relative flex py-1.5 items-center">
+                    <div className="flex-grow border-t border-slate-200"></div>
+                    <span className="flex-shrink mx-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      Or continue with
+                    </span>
+                    <div className="flex-grow border-t border-slate-200"></div>
+                  </div>
+
+                  <div className="relative w-full group mt-1.5">
+                    {/* Modern Pixel-Perfect Google Sign-In Button Face */}
+                    <div className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-white group-hover:bg-slate-50/90 group-hover:border-slate-300 text-slate-700 group-hover:text-slate-900 font-bold text-xs flex items-center justify-center gap-2.5 shadow-xs group-hover:shadow-sm group-active:scale-[0.99] transition-all duration-200 select-none cursor-pointer">
+                      <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.04h3.86c2.26-2.09 3.685-5.17 3.685-9.14z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3.04c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.26v3.13C3.26 21.36 7.35 24 12 24z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.27 14.25c-.25-.72-.38-1.49-.38-2.25s.13-1.53.38-2.25V6.62H1.26C.46 8.23 0 10.06 0 12s.46 3.77 1.26 5.38l4.01-3.13z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.26 2.64 1.26 6.62l4.01 3.13c.95-2.85 3.6-4.96 6.73-4.96z"
+                        />
+                      </svg>
+                      <span className="tracking-tight text-[13px] font-semibold text-slate-700 group-hover:text-slate-900">
+                        Continue with Google
+                      </span>
+                    </div>
+
+                    {/* Official Google GSI Iframe (Hidden overlay to intercept clicks safely) */}
+                    <div
+                      id="google-signin-btn-login"
+                      className="absolute inset-0 w-full h-full opacity-0 overflow-hidden cursor-pointer z-10 [&>div]:!w-full [&>div>iframe]:!w-full [&>div>iframe]:!h-full [&>div>iframe]:!scale-125"
+                      title="Continue with Google"
+                    ></div>
+                  </div>
+                </div>
+              )}
             </>
           </form>
         </div>

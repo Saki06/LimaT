@@ -77,7 +77,8 @@ interface AppContextType {
   updateAuthUser: (updates: Record<string, any>) => void;
   refreshSuperAdminAvatar: () => void;
   refreshMyTenant: () => void;
-  loginUser: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  loginUser: (email: string, password: string, expectedRole?: string) => Promise<{ success: boolean; message?: string }>;
+  loginWithGoogle: (credential: string, requestedRole?: 'student' | 'teacher' | 'parent' | 'admin' | 'super_admin') => Promise<{ success: boolean; message?: string }>;
   registerUser: (input: {
     role: 'student' | 'teacher' | 'parent';
     firstName: string;
@@ -1052,9 +1053,9 @@ useEffect(() => {
     }
   };
 
-  const loginUser = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
+  const loginUser = async (email: string, password: string, expectedRole?: string): Promise<{ success: boolean; message?: string }> => {
     try {
-      const res = await api.auth.login({ email, password });
+      const res = await api.auth.login({ email, password, expectedRole });
       if (res.success && res.token && res.user) {
         api.token.set(res.token);
         api.user.set(res.user);
@@ -1086,6 +1087,46 @@ useEffect(() => {
       return { success: false, message: res.message || 'Invalid credentials' };
     } catch (err: any) {
       return { success: false, message: err.message || 'Failed to connect to backend server' };
+    }
+  };
+
+  const loginWithGoogle = async (
+    credential: string,
+    requestedRole?: 'student' | 'teacher' | 'parent' | 'admin' | 'super_admin'
+  ): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const res = await api.auth.googleAuth({ credential, requestedRole });
+      if (res.success && res.token && res.user) {
+        api.token.set(res.token);
+        api.user.set(res.user);
+        setEvents((prev) => prev.filter((event) => event.organizer !== sportsEventOrganizer));
+        setAuthToken(res.token);
+        setAuthUser(res.user);
+        const roleMap: Record<string, UserRole> = {
+          STUDENT: 'student',
+          TEACHER: 'teacher',
+          PARENT: 'parent',
+          ADMIN: 'admin',
+          SUPER_ADMIN: 'super_admin'
+        };
+        if (res.user.role && roleMap[res.user.role]) {
+          const mappedRole = roleMap[res.user.role];
+          setCurrentRole(mappedRole);
+          if (mappedRole === 'teacher') {
+            void refreshTeacherProfile();
+          }
+        }
+        setIsLanding(false);
+        addToast({
+          type: 'success',
+          title: 'Google Sign-In Successful',
+          message: `Welcome, ${res.user.firstName || 'User'}!`
+        });
+        return { success: true };
+      }
+      return { success: false, message: res.message || 'Google authentication failed' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to connect to Google authentication server' };
     }
   };
 
@@ -3462,6 +3503,7 @@ useEffect(() => {
         refreshSuperAdminAvatar,
         refreshMyTenant,
         loginUser,
+        loginWithGoogle,
         registerUser,
         logoutUser
       }}

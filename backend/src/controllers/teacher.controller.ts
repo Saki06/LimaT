@@ -664,7 +664,7 @@ export const getMyTeacherDashboard = async (req: AuthenticatedRequest, res: Resp
         assignment: {
           OR: [{ teacherId }, ...(tenantId ? [{ tenantId }] : [])],
         },
-        status: { in: ['SUBMITTED', 'LATE'] },
+        status: 'SUBMITTED',
       },
     });
 

@@ -101,7 +101,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
       ? [
           {
             id: "connect",
-            label: "Find Teachers",
+            label: "Connect",
             icon: GraduationCap,
             badge: "Tutors",
             badgeVariant: "gold" as const,

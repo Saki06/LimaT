@@ -61,7 +61,14 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
 
     setIsLoading(true);
     try {
-      const res = await loginUser(loginEmail.trim(), loginPassword);
+      const backendRoleMap: Record<SupportedRole, string> = {
+        student: "STUDENT",
+        teacher: "TEACHER",
+        parent: "PARENT",
+        admin: "ADMIN",
+        super_admin: "SUPER_ADMIN",
+      };
+      const res = await loginUser(loginEmail.trim(), loginPassword, backendRoleMap[selectedRole]);
       if (res.success) {
         onSuccess();
       } else {

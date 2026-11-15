@@ -101,11 +101,22 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [teacherHubs, setTeacherHubs] = useState<TeacherHub[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [hubFlags, setHubFlags] = useState<HubFlag[]>([]);
-  const [hubSettings, setHubSettings] = useState<HubSettings>({
-    schoolId: currentUser.schoolId || 'sch_apex_01',
-    enabled: false,
-    approvalRequired: true,
-    allowDirectMessages: false,
+  const [hubSettings, setHubSettings] = useState<HubSettings>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('lms_hub_settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return { ...parsed, enabled: parsed.enabled ?? true };
+        }
+      } catch {}
+    }
+    return {
+      schoolId: currentUser.schoolId || 'sch_apex_01',
+      enabled: true,
+      approvalRequired: false,
+      allowDirectMessages: true,
+    };
   });
   const [auditLog, setAuditLog] = useState<HubAuditEntry[]>([]);
   const schoolId = currentUser.schoolId || 'sch_apex_01';
@@ -304,6 +315,11 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     },
     updateHubSettings: (settings) => {
       setHubSettings({ ...settings, schoolId });
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('lms_hub_settings', JSON.stringify({ ...settings, schoolId }));
+        } catch {}
+      }
       setAuditLog((entries) => [...entries, { id: `audit_${Date.now()}`, schoolId, adminId: currentUser.id, action: 'settings_change', targetId: schoolId, createdAt: new Date().toISOString() }]);
     }
   }), [auditLog, currentUser.id, directory, hubFlags, hubSettings, isLoading, overviewData, schoolId, schoolSettings, staff, subscriptions, teacherHubs]);
