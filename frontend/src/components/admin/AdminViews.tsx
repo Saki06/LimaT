@@ -268,14 +268,14 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     classTeacherOf: z.string().optional(),
     medium: z.enum(["english", "tamil", "sinhala"]).optional(),
     sports: z.string().optional(),
-    teams: z.string().optional(),
+    teamIds: z.array(z.string()),
     certification: z.string().optional(),
     availability: z.string().optional()
   });
   type StaffFormValues = z.infer<typeof staffSchema>;
   const staffForm = useForm<StaffFormValues>({
     resolver: zodResolver(staffSchema),
-    defaultValues: { role: "teacher", gender: "other", status: "active", subjects: "", classes: "", sports: "", teams: "", medium: "english" }
+    defaultValues: { role: "teacher", gender: "other", status: "active", subjects: "", classes: "", sports: "", teamIds: [], medium: "english" }
   });
 
   // Settings & SaaS Platform Monetization State
@@ -423,7 +423,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     });
   };
 
-  const handleSaveAddTutor = (e: React.FormEvent) => {
+  const handleSaveAddTutor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTutorForm.name.trim()) return;
     const newTutor: ConnectTeacher = {
@@ -448,11 +448,10 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     setSoloTutors((prev) => [newTutor, ...prev]);
     setIsAddTutorModalOpen(false);
     setNewTutorForm(initialNewTutorForm);
-    addToast({ type: "success", title: "Tutor Registered!", message: `${newTutor.name} is now enrolled in the LMS.` });
 
     // Persist to backend database via createStaff
     const tutorEmail = `${newTutorForm.name.trim().toLowerCase().replace(/[^a-z0-9]/g, '.')}@limat-academy.lk`;
-    createStaff({
+    const result = await createStaff({
       name: newTutorForm.name.trim(),
       email: tutorEmail,
       role: "teacher",
@@ -465,10 +464,16 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       subjects: [newTutorForm.subject],
       classes: ["Grade 12", "Grade 13"],
       sports: [],
-      teams: [],
+      teamIds: [],
       medium: "english",
       status: "active",
     });
+    if (!result.ok) {
+      setSoloTutors((prev) => prev.filter((tutor) => tutor.id !== newTutor.id));
+      addToast({ type: "error", title: "Unable to save tutor account", message: result.error });
+      return;
+    }
+    addToast({ type: "success", title: "Tutor Registered!", message: `${newTutor.name} is now enrolled in the LMS.` });
   };
 
   const handleConfirmDeleteTutor = () => {
@@ -681,21 +686,23 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       joiningDate: member.joiningDate || "", status: member.status, qualification: member.qualification || "",
       subjects: member.subjects?.join(", ") || "", classes: member.classes?.join(", ") || "",
       classTeacherOf: member.classTeacherOf || "", medium: member.medium || "english",
-      sports: member.sport || "", teams: member.teams?.join(", ") || "",
+      sports: member.sports?.join(", ") || member.sport || "", teamIds: member.teamIds || [],
       certification: member.certification || "", availability: member.availability || ""
-    } : { role: staffRoleFilter, name: "", photo: "", staffId: "", email: "", phone: "", gender: "other", dateOfBirth: "", joiningDate: "", status: "active", qualification: "", subjects: "", classes: "", classTeacherOf: "", medium: "english", sports: "", teams: "", certification: "", availability: "" });
+    } : { role: staffRoleFilter, name: "", photo: "", staffId: "", email: "", phone: "", gender: "other", dateOfBirth: "", joiningDate: "", status: "active", qualification: "", subjects: "", classes: "", classTeacherOf: "", medium: "english", sports: "", teamIds: [], certification: "", availability: "" });
     setIsStaffModalOpen(true);
   };
 
-  const submitStaffForm = (values: StaffFormValues) => {
+  const submitStaffForm = async (values: StaffFormValues) => {
     const input: StaffInput = {
       ...values,
       subjects: values.subjects?.split(",").map((item) => item.trim()).filter(Boolean) || [],
       classes: values.classes?.split(",").map((item) => item.trim()).filter(Boolean) || [],
       sports: values.sports?.split(",").map((item) => item.trim()).filter(Boolean) || [],
-      teams: values.teams?.split(",").map((item) => item.trim()).filter(Boolean) || []
+      teamIds: values.teamIds
     };
-    const result = editingStaff ? updateStaff(editingStaff.id, input) : createStaff(input);
+    const result = editingStaff
+      ? await updateStaff(editingStaff.id, input)
+      : await createStaff(input);
     if (!result.ok) {
       addToast({ type: "error", title: "Unable to save staff", message: result.error });
       return;
@@ -837,10 +844,10 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 <div className="pt-2 border-t border-[#d8e9f8]">
                   <Button
                     size="sm"
-                    onClick={() => setCurrentView("sports_admin")}
+                    onClick={() => setCurrentView("sports_tournaments")}
                     className="w-full bg-[#1d6fa5] hover:bg-[#145077] text-white text-xs font-bold"
                   >
-                    Open Sports Admin →
+                    Manage Tournaments →
                   </Button>
                 </div>
               </CardContent>
@@ -2969,7 +2976,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             <div><label className="mb-1 block text-xs font-bold text-slate-700">Gender</label><select {...staffForm.register("gender")} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></div>
             <div><label className="mb-1 block text-xs font-bold text-slate-700">Status</label><select {...staffForm.register("status")} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"><option value="active">Active</option><option value="on_leave">On leave</option><option value="resigned">Resigned</option></select></div>
           </div>
-          <div className="rounded-xl bg-[#f8faf9] p-4"><p className="mb-3 text-xs font-black uppercase tracking-wide text-[#0d5c4d]">{staffRoleFilter === "coach" ? "Sports & teams" : "Subjects & classes"}</p><div className="grid gap-4 sm:grid-cols-2"><div><label className="mb-1 block text-xs font-bold text-slate-700">{staffRoleFilter === "coach" ? "Sports" : "Subjects"} <span className="font-normal text-slate-400">(comma separated)</span></label><input {...staffForm.register(staffRoleFilter === "coach" ? "sports" : "subjects")} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" /></div><div><label className="mb-1 block text-xs font-bold text-slate-700">Teams / Classes <span className="font-normal text-slate-400">(comma separated)</span></label><input {...staffForm.register(staffRoleFilter === "coach" ? "teams" : "classes")} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" /></div></div></div>
+          <div className="rounded-xl bg-[#f8faf9] p-4"><p className="mb-3 text-xs font-black uppercase tracking-wide text-[#0d5c4d]">{staffRoleFilter === "coach" ? "Sports & teams" : "Subjects & classes"}</p><div className="grid gap-4 sm:grid-cols-2"><div><label className="mb-1 block text-xs font-bold text-slate-700">{staffRoleFilter === "coach" ? "Sports" : "Subjects"} <span className="font-normal text-slate-400">(comma separated)</span></label><input {...staffForm.register(staffRoleFilter === "coach" ? "sports" : "subjects")} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" /></div>{staffRoleFilter === "coach" ? <div><label className="mb-1 block text-xs font-bold text-slate-700">Assigned sports teams</label><select multiple value={staffForm.watch("teamIds")} onChange={(event) => staffForm.setValue("teamIds", Array.from(event.currentTarget.selectedOptions, (option) => option.value), { shouldDirty: true })} className="min-h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" aria-label="Assigned sports teams">{teams.map((team) => <option key={team.id} value={team.id}>{team.name} - {team.sportName}</option>)}</select>{teams.length === 0 && <p className="mt-1 text-xs text-slate-500">Create a sports team before assigning one to this coach.</p>}</div> : <div><label className="mb-1 block text-xs font-bold text-slate-700">Classes <span className="font-normal text-slate-400">(comma separated)</span></label><input {...staffForm.register("classes")} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" /></div>}</div></div>
           <div className="grid gap-4 sm:grid-cols-2"><div><label className="mb-1 block text-xs font-bold text-slate-700">{staffRoleFilter === "coach" ? "Certification" : "Qualification"}</label><input {...staffForm.register(staffRoleFilter === "coach" ? "certification" : "qualification")} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" /></div><div><label className="mb-1 block text-xs font-bold text-slate-700">{staffRoleFilter === "coach" ? "Availability" : "Medium"}</label>{staffRoleFilter === "coach" ? <input {...staffForm.register("availability")} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" /> : <select {...staffForm.register("medium")} className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"><option value="english">English</option><option value="tamil">Tamil</option><option value="sinhala">Sinhala</option></select>}</div></div>
           <div className="flex justify-end gap-3 border-t border-slate-100 pt-4"><Button type="button" variant="outline" onClick={() => setIsStaffModalOpen(false)}>Cancel</Button><Button type="submit">{editingStaff ? "Save changes" : "Add staff"}</Button></div>
         </form>

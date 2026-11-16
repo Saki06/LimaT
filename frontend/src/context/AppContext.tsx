@@ -926,6 +926,10 @@ useEffect(() => {
   };
 
   const fetchClasses = async () => {
+    if (!authToken) {
+      setClasses([]);
+      return;
+    }
     try {
       const data = await api.admin.getClasses();
       if (Array.isArray(data)) {
@@ -937,6 +941,10 @@ useEffect(() => {
   };
 
   const fetchSubjects = async () => {
+    if (!authToken) {
+      setSubjects([]);
+      return;
+    }
     try {
       const data = await api.admin.getSubjects();
       if (Array.isArray(data)) {
@@ -955,17 +963,19 @@ useEffect(() => {
     fetchLibraryResources();
     fetchQuizzes();
     fetchTimetable();
-    fetchClasses();
-    fetchSubjects();
   }, [currentRole, activeTenantId, authToken]);
 
   useEffect(() => {
-    if (!authToken) return;
+    if (!authToken) {
+      setClasses([]);
+      setSubjects([]);
+      return;
+    }
     void syncSportsCalendarEvents(setEvents);
     void fetchTimetable();
     void fetchClasses();
     void fetchSubjects();
-  }, [authToken]);
+  }, [authToken, activeTenantId]);
 
   const createCourse = async (data: {
     title: string;
@@ -1320,7 +1330,7 @@ useEffect(() => {
         sportId: team.sportName,
         sportName: team.sportName,
         name: team.name,
-        coachId: '',
+        coachId: team.coachId || '',
         coachName: team.coachName,
         playersCount: team.playersCount,
         status: team.status,

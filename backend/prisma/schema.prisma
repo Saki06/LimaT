@@ -223,6 +223,7 @@ model User {
   parentProfile         ParentProfile?
   superAdminProfile     SuperAdminProfile?
   sportsRegistrations   SportsRegistration[]
+  coachedSportsTeams    SportsTeam[]          @relation("SportsTeamCoach")
   athleteProfile        AthleteProfile?       @relation("AthleteProfile")
   teamMemberships       SportsTeamMember[]    @relation("TeamMemberships")
   teamInvitations       SportsTeamInvitation[] @relation("TeamInvitations")
@@ -271,6 +272,8 @@ model TeacherProfile {
   postalCode        String?
   sltsRegNo         String?
   mediums           String[]           @default([])
+  sports            String[]           @default([])
+  isCoach           Boolean            @default(false)
   experienceYears   Int?               @default(0)
   qualifications    Json?              @default("[]")
   bankName          String?
@@ -410,6 +413,8 @@ model SportsTeam {
   sportName         String
   name              String
   coachName         String                 @default("")
+  coachId           String?
+  coach             User?                  @relation("SportsTeamCoach", fields: [coachId], references: [id], onDelete: SetNull)
   trainingSchedule  String                 @default("")
   status            String                 @default("active")
   playersCount      Int                    @default(0)
@@ -420,6 +425,7 @@ model SportsTeam {
   updatedAt         DateTime               @updatedAt
 
   @@index([tenantId, sportName])
+  @@index([coachId])
 }
 
 model SportsTournament {

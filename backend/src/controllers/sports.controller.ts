@@ -1027,18 +1027,31 @@ export const createSportsTeam = async (
   try {
     const tenantId = requireSportsManager(req, res);
     if (!tenantId) return;
-    const { sportName, name, coachName, trainingSchedule, status, players } = req.body;
+    const { sportName, name, coachId, coachName, trainingSchedule, status, players } = req.body;
     if (typeof sportName !== 'string' || !sportName.trim() || typeof name !== 'string' || !name.trim()) {
       res.status(400).json({ success: false, message: 'Sport and team names are required.' });
       return;
     }
+    const coach = typeof coachId === 'string' && coachId
+      ? await prisma.user.findFirst({
+          where: { id: coachId, tenantId, role: 'TEACHER' },
+          include: { teacherProfile: { select: { isCoach: true } } },
+        })
+      : null;
+    if (coachId && (!coach || !coach.teacherProfile?.isCoach)) {
+      res.status(400).json({ success: false, message: 'Select a coach from this school.' });
+      return;
+    }
     const roster = Array.isArray(players) ? players : [];
+    let resolvedCoachName = typeof coachName === 'string' ? coachName.trim() : '';
+    if (coach) resolvedCoachName = `${coach.firstName} ${coach.lastName}`.trim();
     const team = await prisma.sportsTeam.create({
       data: {
         tenantId,
         sportName: sportName.trim(),
         name: name.trim(),
-        coachName: typeof coachName === 'string' ? coachName.trim() : '',
+        coachId: coach?.id ?? null,
+        coachName: resolvedCoachName,
         trainingSchedule: typeof trainingSchedule === 'string' ? trainingSchedule.trim() : '',
         status: typeof status === 'string' ? status : 'active',
         playersCount: roster.length,
@@ -1060,11 +1073,27 @@ export const updateSportsTeam = async (
     const tenantId = requireSportsManager(req, res);
     if (!tenantId) return;
     const id = typeof req.params.id === 'string' ? req.params.id : '';
-    const { sportName, name, coachName, trainingSchedule, status, players } = req.body;
-    const data: Prisma.SportsTeamUpdateInput = {};
+    const { sportName, name, coachId, coachName, trainingSchedule, status, players } = req.body;
+    const data: Prisma.SportsTeamUncheckedUpdateManyInput = {};
     if (typeof sportName === 'string' && sportName.trim()) data.sportName = sportName.trim();
     if (typeof name === 'string' && name.trim()) data.name = name.trim();
-    if (typeof coachName === 'string') data.coachName = coachName.trim();
+    if (typeof coachId === 'string' && coachId) {
+      const coach = await prisma.user.findFirst({
+        where: { id: coachId, tenantId, role: 'TEACHER' },
+        include: { teacherProfile: { select: { isCoach: true } } },
+      });
+      if (!coach?.teacherProfile?.isCoach) {
+        res.status(400).json({ success: false, message: 'Select a coach from this school.' });
+        return;
+      }
+      data.coachId = coach.id;
+      data.coachName = `${coach.firstName} ${coach.lastName}`.trim();
+    } else if (coachId === null || coachId === '') {
+      data.coachId = null;
+      data.coachName = typeof coachName === 'string' ? coachName.trim() : '';
+    } else if (typeof coachName === 'string') {
+      data.coachName = coachName.trim();
+    }
     if (typeof trainingSchedule === 'string') data.trainingSchedule = trainingSchedule.trim();
     if (typeof status === 'string') data.status = status;
     if (Array.isArray(players)) {

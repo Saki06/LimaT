@@ -325,7 +325,9 @@ export interface AdminStaffRecord {
   subjects?: string[];
   classes?: string[];
   sport?: string;
+  sports?: string[];
   teams?: string[];
+  teamIds?: string[];
   status: AdminRecordStatus;
   workload: number;
   phone?: string;
@@ -358,7 +360,7 @@ export interface StaffInput {
   classTeacherOf?: string;
   medium?: SchoolMedium;
   sports: string[];
-  teams: string[];
+  teamIds: string[];
   certification?: string;
   availability?: string;
 }

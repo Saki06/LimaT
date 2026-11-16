@@ -83,6 +83,7 @@ export interface SportsTeamRecord {
   sportName: string;
   name: string;
   coachName: string;
+  coachId?: string | null;
   trainingSchedule: string;
   status: SportsTeamStatus;
   playersCount: number;
