@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import { useApp } from "@/context/AppContext";
+import { useStaff } from "@/context/AdminContext";
 import {
   Trophy,
   Calendar,
@@ -88,6 +89,7 @@ export function SportsView({
     addToast,
     t,
   } = useApp();
+  const sportsCoaches = useStaff().filter((member) => member.role === "coach");
 
   const [activeTab, setActiveTab] = useState<SportsTab>(initialTab);
 
@@ -367,6 +369,7 @@ export function SportsView({
   const [teamForm, setTeamForm] = useState({
     name: "",
     sportName: "Cricket",
+    coachId: "",
     coachName: "",
     trainingSchedule: "Tue & Thu 3:30 PM - 5:30 PM",
     status: "active" as "active" | "draft" | "completed",
@@ -622,10 +625,12 @@ export function SportsView({
         };
       });
 
+    const coach = sportsCoaches.find((member) => member.id === teamForm.coachId);
     await createSportsTeam({
       sportName: teamForm.sportName,
       name: teamForm.name,
-      coachName: teamForm.coachName,
+      coachId: coach?.id || null,
+      coachName: coach?.name || teamForm.coachName,
       trainingSchedule: teamForm.trainingSchedule,
       status: teamForm.status,
       players: playersList,
@@ -636,6 +641,7 @@ export function SportsView({
     setTeamForm({
       name: "",
       sportName: "Cricket",
+      coachId: "",
       coachName: "",
       trainingSchedule: "Tue & Thu 3:30 PM - 5:30 PM",
       status: "active",
@@ -2234,20 +2240,40 @@ export function SportsView({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Head Coach Name
+                  Head Coach
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Coach K. Selvarajah"
-                  value={teamForm.coachName}
-                  onChange={(e) =>
-                    setTeamForm({
-                      ...teamForm,
-                      coachName: e.target.value,
-                    })
-                  }
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
-                />
+                {currentRole === "admin" ? (
+                  <select
+                    value={teamForm.coachId}
+                    onChange={(e) =>
+                      setTeamForm({
+                        ...teamForm,
+                        coachId: e.target.value,
+                      })
+                    }
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+                  >
+                    <option value="">No coach assigned</option>
+                    {sportsCoaches.map((coach) => (
+                      <option key={coach.id} value={coach.id}>
+                        {coach.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Coach name"
+                    value={teamForm.coachName}
+                    onChange={(e) =>
+                      setTeamForm({
+                        ...teamForm,
+                        coachName: e.target.value,
+                      })
+                    }
+                    className="w-full h-10 px-3.5 rounded-xl bg-[#f8faf9] border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#0d5c4d]"
+                  />
+                )}
               </div>
 
               <div>

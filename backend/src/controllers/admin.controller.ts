@@ -3,26 +3,14 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../config/prisma';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
-/**
- * Helper to resolve the active tenant ID from request user, header, or default
- */
 export const resolveTenantId = async (req: AuthenticatedRequest): Promise<string> => {
-  const rawHeader = req.headers['x-tenant-id'];
-  const headerTenantId = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
-  if (headerTenantId) {
-    const existing = await prisma.tenant.findUnique({ where: { id: headerTenantId, deletedAt: null } });
-    if (existing) return existing.id;
-  }
-  if (req.user?.tenantId) {
-    const userTenant = await prisma.tenant.findUnique({ where: { id: req.user.tenantId, deletedAt: null } });
-    if (userTenant) return userTenant.id;
-  }
-  const defaultTenant = await prisma.tenant.findFirst({
-    where: { status: 'ACTIVE', deletedAt: null },
-    orderBy: { createdAt: 'asc' },
-  });
-  return defaultTenant?.id || '';
+  return req.user?.tenantId || '';
 };
+
+const normalizeStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? [...new Set(value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean))]
+    : [];
 
 export const getAdminOverview = async (
   req: AuthenticatedRequest,
@@ -148,6 +136,10 @@ export const getStaff = async (
       },
       include: {
         teacherProfile: true,
+        coachedSportsTeams: {
+          where: { tenantId },
+          select: { id: true, name: true },
+        },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -155,12 +147,13 @@ export const getStaff = async (
     const staffList = users.map((user) => {
       const isTeacher = user.role === 'TEACHER';
       const tp = user.teacherProfile;
+      const sports = tp?.sports || [];
       return {
         id: user.id,
         schoolId: tenantId,
         name: `${user.firstName} ${user.lastName}`.trim(),
         email: user.email,
-        role: isTeacher ? 'teacher' : 'administrator',
+        role: isTeacher ? (tp?.isCoach ? 'coach' : 'teacher') : 'administrator',
         staffId: tp?.employeeNo || `STAFF-${user.id.substring(0, 6).toUpperCase()}`,
         photo: user.avatarUrl || undefined,
         phone: tp?.phone || undefined,
@@ -171,8 +164,10 @@ export const getStaff = async (
         subjects: tp?.specialization ? [tp.specialization] : ['General Studies'],
         classes: ['Grade 12-A', 'Grade 13-A'],
         medium: (tp?.mediums && tp.mediums[0]) ? (tp.mediums[0].toLowerCase() as any) : 'english',
-        sports: [],
-        teams: [],
+        sports,
+        sport: sports[0],
+        teamIds: user.coachedSportsTeams.map((team) => team.id),
+        teams: user.coachedSportsTeams.map((team) => team.name),
         workload: 16,
         district: tp?.district || tp?.city || 'Colombo',
         createdAt: user.createdAt,
@@ -210,11 +205,24 @@ export const createStaff = async (
       subjects = [],
       classes = [],
       medium = 'english',
+      sports = [],
+      teamIds = [],
       status = 'active',
     } = req.body;
 
     if (!name || !email) {
       res.status(400).json({ success: false, message: 'Name and email are required.' });
+      return;
+    }
+    if (!['teacher', 'coach', 'administrator'].includes(role)) {
+      res.status(400).json({ success: false, message: 'A valid staff role is required.' });
+      return;
+    }
+
+    const normalizedSports = normalizeStringArray(sports);
+    const normalizedTeamIds = normalizeStringArray(teamIds);
+    if (role !== 'coach' && normalizedTeamIds.length > 0) {
+      res.status(400).json({ success: false, message: 'Only coaches can be assigned to sports teams.' });
       return;
     }
 
@@ -230,34 +238,54 @@ export const createStaff = async (
     const defaultPasswordHash = await bcrypt.hash('Staff@123', 10);
     const systemRole = role === 'administrator' ? 'ADMIN' : 'TEACHER';
 
-    const newUser = await prisma.user.create({
-      data: {
-        tenantId,
-        email,
-        passwordHash: defaultPasswordHash,
-        firstName,
-        lastName,
-        role: systemRole,
-        isActive: status === 'active',
-      },
-    });
-
     const employeeNo = staffId || `EMP-${Date.now().toString().slice(-6)}`;
     const specialization = Array.isArray(subjects) && subjects.length > 0 ? subjects.join(', ') : 'Educator';
+    const selectedTeams = normalizedTeamIds.length
+      ? await prisma.sportsTeam.findMany({
+          where: { id: { in: normalizedTeamIds }, tenantId },
+          select: { id: true, name: true },
+        })
+      : [];
+    if (selectedTeams.length !== normalizedTeamIds.length) {
+      res.status(400).json({ success: false, message: 'One or more selected sports teams are unavailable.' });
+      return;
+    }
 
-    if (systemRole === 'TEACHER') {
-      await prisma.teacherProfile.create({
+    const newUser = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
         data: {
-          userId: newUser.id,
-          employeeNo,
-          specialization,
-          phone: phone || '',
-          mediums: [medium.charAt(0).toUpperCase() + medium.slice(1)],
-          qualifications: qualification ? [{ degree: qualification, institution: 'Certified Institution' }] : [],
-          isVerified: true,
+          tenantId,
+          email,
+          passwordHash: defaultPasswordHash,
+          firstName,
+          lastName,
+          role: systemRole,
+          isActive: status === 'active',
         },
       });
-    }
+      if (systemRole === 'TEACHER') {
+        await tx.teacherProfile.create({
+          data: {
+            userId: createdUser.id,
+            employeeNo,
+            specialization,
+            phone: phone || '',
+            mediums: [medium.charAt(0).toUpperCase() + medium.slice(1)],
+            qualifications: qualification ? [{ degree: qualification, institution: 'Certified Institution' }] : [],
+            sports: normalizedSports,
+            isCoach: role === 'coach',
+            isVerified: true,
+          },
+        });
+      }
+      if (normalizedTeamIds.length > 0) {
+        await tx.sportsTeam.updateMany({
+          where: { id: { in: normalizedTeamIds }, tenantId },
+          data: { coachId: createdUser.id, coachName: `${firstName} ${lastName}`.trim() },
+        });
+      }
+      return createdUser;
+    });
 
     const createdStaff = {
       id: newUser.id,
@@ -272,8 +300,10 @@ export const createStaff = async (
       subjects: Array.isArray(subjects) ? subjects : [specialization],
       classes: Array.isArray(classes) ? classes : [],
       medium,
-      sports: [],
-      teams: [],
+      sports: normalizedSports,
+      sport: normalizedSports[0],
+      teamIds: selectedTeams.map((team) => team.id),
+      teams: selectedTeams.map((team) => team.name),
       workload: 12,
     };
 
@@ -308,19 +338,59 @@ export const updateStaff = async (
       subjects,
       classes,
       medium,
+      sports,
+      teamIds,
       status,
     } = req.body;
+    const tenantId = await resolveTenantId(req);
 
-    const user = await prisma.user.findUnique({
-      where: { id },
-      include: { teacherProfile: true },
+    const user = await prisma.user.findFirst({
+      where: { id, tenantId },
+      include: {
+        teacherProfile: true,
+        coachedSportsTeams: {
+          where: { tenantId },
+          select: { id: true, name: true },
+        },
+      },
     });
     if (!user) {
       res.status(404).json({ success: false, message: 'Staff member not found.' });
       return;
     }
+    if (role !== undefined && !['teacher', 'coach'].includes(role)) {
+      res.status(400).json({ success: false, message: 'A valid teacher or coach role is required.' });
+      return;
+    }
+    if (user.role !== 'TEACHER' || !user.teacherProfile) {
+      res.status(400).json({ success: false, message: 'Only teacher accounts can be managed as coaches.' });
+      return;
+    }
 
-    const updateUserData: any = {};
+    const normalizedSports = sports === undefined ? undefined : normalizeStringArray(sports);
+    let normalizedTeamIds: string[] | undefined;
+    if (teamIds === undefined) {
+      if (role === 'teacher') normalizedTeamIds = [];
+    } else {
+      normalizedTeamIds = normalizeStringArray(teamIds);
+    }
+    const isCoach = role === undefined ? user.teacherProfile.isCoach : role === 'coach';
+    if (!isCoach && normalizedTeamIds && normalizedTeamIds.length > 0) {
+      res.status(400).json({ success: false, message: 'Only coaches can be assigned to sports teams.' });
+      return;
+    }
+    const selectedTeams = normalizedTeamIds?.length
+      ? await prisma.sportsTeam.findMany({
+          where: { id: { in: normalizedTeamIds }, tenantId },
+          select: { id: true, name: true },
+        })
+      : [];
+    if (normalizedTeamIds && selectedTeams.length !== normalizedTeamIds.length) {
+      res.status(400).json({ success: false, message: 'One or more selected sports teams are unavailable.' });
+      return;
+    }
+
+    const updateUserData: Record<string, unknown> = {};
     if (name) {
       const parts = name.trim().split(' ');
       updateUserData.firstName = parts[0] || user.firstName;
@@ -333,38 +403,58 @@ export const updateStaff = async (
       updateUserData.isActive = status === 'active';
     }
 
-    if (Object.keys(updateUserData).length > 0) {
-      await prisma.user.update({
-        where: { id },
-        data: updateUserData,
+    const fullName = name ? String(name).trim() : `${user.firstName} ${user.lastName}`.trim();
+    const updateProfileData: Record<string, unknown> = { isCoach };
+    if (staffId) updateProfileData.employeeNo = staffId;
+    if (phone !== undefined) updateProfileData.phone = phone;
+    if (subjects !== undefined) {
+      updateProfileData.specialization = Array.isArray(subjects) ? subjects.join(', ') : String(subjects);
+    }
+    if (qualification !== undefined) {
+      updateProfileData.qualifications = qualification ? [{ degree: qualification }] : [];
+    }
+    if (medium) updateProfileData.mediums = [medium.charAt(0).toUpperCase() + medium.slice(1)];
+    if (normalizedSports !== undefined) updateProfileData.sports = normalizedSports;
+
+    await prisma.$transaction(async (tx) => {
+      if (Object.keys(updateUserData).length > 0) {
+        await tx.user.update({ where: { id }, data: updateUserData });
+      }
+      await tx.teacherProfile.update({
+        where: { id: user.teacherProfile!.id },
+        data: updateProfileData,
       });
-    }
-
-    if (user.teacherProfile) {
-      const updateProfileData: any = {};
-      if (staffId) updateProfileData.employeeNo = staffId;
-      if (phone) updateProfileData.phone = phone;
-      if (subjects) {
-        updateProfileData.specialization = Array.isArray(subjects) ? subjects.join(', ') : String(subjects);
-      }
-      if (qualification) {
-        updateProfileData.qualifications = [{ degree: qualification }];
-      }
-      if (medium) {
-        updateProfileData.mediums = [medium.charAt(0).toUpperCase() + medium.slice(1)];
-      }
-
-      if (Object.keys(updateProfileData).length > 0) {
-        await prisma.teacherProfile.update({
-          where: { id: user.teacherProfile.id },
-          data: updateProfileData,
+      if (normalizedTeamIds !== undefined) {
+        await tx.sportsTeam.updateMany({
+          where: {
+            tenantId,
+            coachId: id,
+            ...(normalizedTeamIds.length > 0 ? { id: { notIn: normalizedTeamIds } } : {}),
+          },
+          data: { coachId: null, coachName: '' },
         });
+        if (normalizedTeamIds.length > 0) {
+          await tx.sportsTeam.updateMany({
+            where: { id: { in: normalizedTeamIds }, tenantId },
+            data: { coachId: id, coachName: fullName },
+          });
+        }
       }
-    }
+    });
 
     res.status(200).json({
       success: true,
       message: 'Staff updated successfully.',
+      data: {
+        id,
+        role: isCoach ? 'coach' : 'teacher',
+        sports: normalizedSports ?? user.teacherProfile.sports,
+        sport: (normalizedSports ?? user.teacherProfile.sports)[0],
+        teamIds: normalizedTeamIds ?? user.coachedSportsTeams.map((team) => team.id),
+        teams: normalizedTeamIds === undefined
+          ? user.coachedSportsTeams.map((team) => team.name)
+          : selectedTeams.map((team) => team.name),
+      },
     });
   } catch (error: any) {
     console.error('Error updating staff:', error);
@@ -384,15 +474,16 @@ export const updateStaffStatus = async (
     const id = String(req.params.id);
     const { status } = req.body; // 'active' | 'inactive' | 'suspended'
 
-    const user = await prisma.user.findUnique({ where: { id } });
+    const tenantId = await resolveTenantId(req);
+    const user = await prisma.user.findFirst({ where: { id, tenantId } });
     if (!user) {
       res.status(404).json({ success: false, message: 'Staff member not found.' });
       return;
     }
 
     const isActive = status === 'active';
-    await prisma.user.update({
-      where: { id },
+    await prisma.user.updateMany({
+      where: { id, tenantId },
       data: { isActive },
     });
 
@@ -501,14 +592,15 @@ export const updateStudentStatus = async (
     const id = String(req.params.id);
     const { status } = req.body; // 'active' | 'inactive'
 
-    const user = await prisma.user.findUnique({ where: { id } });
+    const tenantId = await resolveTenantId(req);
+    const user = await prisma.user.findFirst({ where: { id, tenantId, role: 'STUDENT' } });
     if (!user) {
       res.status(404).json({ success: false, message: 'Student user not found.' });
       return;
     }
 
-    await prisma.user.update({
-      where: { id },
+    await prisma.user.updateMany({
+      where: { id, tenantId, role: 'STUDENT' },
       data: { isActive: status === 'active' },
     });
 
@@ -711,13 +803,20 @@ export const deleteUser = async (
 ): Promise<void> => {
   try {
     const id = String(req.params.id);
-    const user = await prisma.user.findUnique({ where: { id } });
+    const tenantId = await resolveTenantId(req);
+    const user = await prisma.user.findFirst({ where: { id, tenantId } });
     if (!user) {
       res.status(404).json({ success: false, message: 'User not found.' });
       return;
     }
 
-    await prisma.user.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.sportsTeam.updateMany({
+        where: { tenantId, coachId: id },
+        data: { coachId: null, coachName: '' },
+      }),
+      prisma.user.deleteMany({ where: { id, tenantId } }),
+    ]);
 
     res.status(200).json({
       success: true,

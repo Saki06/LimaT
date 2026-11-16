@@ -20,12 +20,17 @@ import {
   updateSubject,
   deleteSubject,
 } from '../controllers/admin.controller';
-import { optionalAuthenticateToken } from '../middlewares/auth.middleware';
+import { authenticateToken, requireRoles } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// Apply optional authentication so requests can authenticate via JWT or fallback gracefully in dev preview
-router.use(optionalAuthenticateToken);
+router.use(authenticateToken);
+
+// Academic metadata is tenant-scoped and needed by student and teacher views.
+router.get('/classes', getClasses);
+router.get('/subjects', getSubjects);
+
+router.use(requireRoles('ADMIN'));
 
 // 1. Overview KPIs & Activity
 router.get('/overview', getAdminOverview);
@@ -47,13 +52,11 @@ router.get('/settings', getSchoolSettings);
 router.put('/settings', updateSchoolSettings);
 
 // 5. Classes & Academic Streams Management
-router.get('/classes', getClasses);
 router.post('/classes', createClass);
 router.put('/classes/:id', updateClass);
 router.delete('/classes/:id', deleteClass);
 
 // 6. Curriculum & Subjects Management
-router.get('/subjects', getSubjects);
 router.post('/subjects', createSubject);
 router.put('/subjects/:id', updateSubject);
 router.delete('/subjects/:id', deleteSubject);

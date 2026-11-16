@@ -68,8 +68,8 @@ interface AdminContextValue {
   isLoading: boolean;
   refreshAdminData: () => Promise<void>;
   updateStaffStatus: (id: string, status: AdminRecordStatus) => void;
-  createStaff: (input: StaffInput) => { ok: boolean; error?: string };
-  updateStaff: (id: string, input: StaffInput) => { ok: boolean; error?: string };
+  createStaff: (input: StaffInput) => Promise<{ ok: boolean; error?: string }>;
+  updateStaff: (id: string, input: StaffInput) => Promise<{ ok: boolean; error?: string }>;
   teacherHubs: TeacherHub[];
   subscriptions: Subscription[];
   hubFlags: HubFlag[];
@@ -179,103 +179,88 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       });
     },
 
-    createStaff: (input) => {
+    createStaff: async (input) => {
       if (staff.some((record) => record.email.toLowerCase() === input.email.toLowerCase() || record.staffId.toLowerCase() === input.staffId.toLowerCase())) {
         return { ok: false, error: 'A staff member with this email or staff ID already exists.' };
       }
-      const newLocalRecord: AdminStaffRecord = {
-        id: `staff_${Date.now()}`,
-        schoolId,
-        name: input.name,
-        email: input.email,
-        role: input.role,
-        staffId: input.staffId,
-        photo: input.photo,
-        phone: input.phone,
-        gender: input.gender,
-        dateOfBirth: input.dateOfBirth,
-        joiningDate: input.joiningDate,
-        status: input.status,
-        qualification: input.qualification,
-        subjects: input.subjects,
-        classes: input.classes,
-        classTeacherOf: input.classTeacherOf,
-        medium: input.medium,
-        sport: input.sports?.[0],
-        teams: input.teams,
-        certification: input.certification,
-        availability: input.availability,
-        workload: 0,
-      };
-      setStaff((records) => [newLocalRecord, ...records]);
-
-      // Persist to backend
-      api.admin.createStaff({
-        name: input.name,
-        email: input.email,
-        role: input.role,
-        staffId: input.staffId,
-        phone: input.phone,
-        qualification: input.qualification,
-        subjects: input.subjects,
-        classes: input.classes,
-        medium: input.medium,
-        status: input.status,
-      }).then((saved) => {
-        if (saved?.id) {
-          setStaff((records) => records.map((r) => r.id === newLocalRecord.id ? { ...r, id: saved.id } : r));
-        }
-      }).catch((err) => {
-        console.error('Failed to create staff in backend:', err);
-      });
-
-      return { ok: true };
+      try {
+        const saved = await api.admin.createStaff({
+          name: input.name,
+          email: input.email,
+          role: input.role,
+          staffId: input.staffId,
+          phone: input.phone,
+          qualification: input.qualification,
+          subjects: input.subjects,
+          classes: input.classes,
+          medium: input.medium,
+          sports: input.sports,
+          teamIds: input.teamIds,
+          status: input.status,
+        });
+        const record: AdminStaffRecord = {
+          ...input,
+          ...saved,
+          id: saved.id,
+          schoolId,
+          role: input.role,
+          sport: input.sports[0],
+          sports: input.sports,
+          teamIds: input.teamIds,
+          teams: saved.teams || [],
+          workload: saved.workload ?? 0,
+        };
+        setStaff((records) => [record, ...records]);
+        return { ok: true };
+      } catch (error) {
+        console.error('Failed to create staff in backend:', error);
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Failed to create staff member.',
+        };
+      }
     },
 
-    updateStaff: (id, input) => {
+    updateStaff: async (id, input) => {
       const duplicate = staff.some((record) => record.id !== id && (record.email.toLowerCase() === input.email.toLowerCase() || record.staffId.toLowerCase() === input.staffId.toLowerCase()));
       if (duplicate) return { ok: false, error: 'A staff member with this email or staff ID already exists.' };
 
-      setStaff((records) => records.map((record) => record.id === id ? {
-        ...record,
-        name: input.name,
-        email: input.email,
-        role: input.role,
-        staffId: input.staffId,
-        photo: input.photo,
-        phone: input.phone,
-        gender: input.gender,
-        dateOfBirth: input.dateOfBirth,
-        joiningDate: input.joiningDate,
-        status: input.status,
-        qualification: input.qualification,
-        subjects: input.subjects,
-        classes: input.classes,
-        classTeacherOf: input.classTeacherOf,
-        medium: input.medium,
-        sport: input.sports?.[0],
-        teams: input.teams,
-        certification: input.certification,
-        availability: input.availability
-      } : record));
-
-      // Persist to backend
-      api.admin.updateStaff(id, {
-        name: input.name,
-        email: input.email,
-        role: input.role,
-        staffId: input.staffId,
-        phone: input.phone,
-        qualification: input.qualification,
-        subjects: input.subjects,
-        classes: input.classes,
-        medium: input.medium,
-        status: input.status,
-      }).catch((err) => {
-        console.error('Failed to update staff in backend:', err);
-      });
-
-      return { ok: true };
+      try {
+        const saved = await api.admin.updateStaff(id, {
+          name: input.name,
+          email: input.email,
+          role: input.role,
+          staffId: input.staffId,
+          phone: input.phone,
+          qualification: input.qualification,
+          subjects: input.subjects,
+          classes: input.classes,
+          medium: input.medium,
+          sports: input.sports,
+          teamIds: input.teamIds,
+          status: input.status,
+        });
+        setStaff((records) => records.map((record) =>
+          record.id === id
+            ? {
+                ...record,
+                ...input,
+                ...saved,
+                sport: input.sports[0],
+                sports: input.sports,
+                teamIds: input.teamIds,
+                teams: saved.teams || [],
+              }
+            : record
+        ));
+        return { ok: true };
+      } catch (error) {
+        console.error('Failed to update staff in backend:', error);
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Failed to update staff member.',
+        };
+      }
     },
 
     updateDirectoryStatus: (id, status) => {
