@@ -7,7 +7,15 @@ export const metadata: Metadata = {
   description:
     "Newtoz (newtoz.com) — Shape Your Future. Smart interactive learning ecosystem guided by Tozy, the friendly winged baby elephant student companion.",
   icons: {
-    icon: "/images/tozy_icon.jpg"
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/images/tozy_icon.png", type: "image/png" },
+      { url: "/images/tozy_icon.jpg" }
+    ],
+    shortcut: "/favicon.ico",
+    apple: [
+      { url: "/images/tozy_icon.png" }
+    ]
   }
 };
 
@@ -19,6 +27,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="h-full antialiased">
       <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/images/tozy_icon.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/images/tozy_icon.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

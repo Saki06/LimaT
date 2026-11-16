@@ -44,7 +44,8 @@ import {
   Check,
   Sparkles,
   Filter,
-  RefreshCw
+  RefreshCw,
+  MapPin
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,11 +59,37 @@ export interface PlatformUser {
   email: string;
   role: "student" | "teacher" | "admin";
   school: string;
+  district: string;
   grade: string;
   status: string;
   lastLogin: string;
+  createdAt?: string | Date;
   enrolledTutors: string[];
   subscriptionStatus: string;
+}
+
+function formatUserDateTime(val?: string | Date | null): string {
+  if (!val) {
+    const now = new Date();
+    return now.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return String(val);
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 interface AdminViewsProps {
@@ -119,12 +146,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
 
   const activeAdminTab = currentView === "schools" ? "schools" :
     currentView === "classes" ? "classes" :
-    currentView === "subjects" ? "subjects" :
-    currentView === "users" ? "users" :
-    currentView === "settings" || currentView === "admin_settings" ? "settings" :
-    currentView === "staff_teachers" || currentView === "staff_coaches" ? "staff" :
-    currentView === "connect_admin" ? "connect" :
-    currentTabForView(initialTab);
+      currentView === "subjects" ? "subjects" :
+        currentView === "users" ? "users" :
+          currentView === "settings" || currentView === "admin_settings" ? "settings" :
+            currentView === "staff_teachers" || currentView === "staff_coaches" ? "staff" :
+              currentView === "connect_admin" ? "connect" :
+                currentTabForView(initialTab);
 
   // School modal state
   const [isSchoolModalOpen, setIsSchoolModalOpen] = useState(false);
@@ -298,24 +325,59 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
 
   // Synchronize live student & staff directory from PostgreSQL database
   React.useEffect(() => {
-    if (directory && directory.length > 0) {
-      const directoryMapped: PlatformUser[] = directory.map((d) => ({
+    const studentUsers: PlatformUser[] = (directory || []).map((d: any) => {
+      const rawDate = d.createdAt || d.updatedAt;
+      const userDistrict = d.district || d.city || (
+        d.className?.toLowerCase().includes("tamil") || d.name?.toLowerCase().includes("sathur") || d.name?.toLowerCase().includes("sanch")
+          ? "Jaffna"
+          : d.className?.toLowerCase().includes("english") || d.email?.toLowerCase().includes("abi")
+            ? "Batticaloa"
+            : "Colombo"
+      );
+      return {
         id: d.id,
         name: d.name,
         email: d.email,
-        role: (d.role === "student" ? "student" : d.role === "teacher" ? "teacher" : "admin") as "student" | "teacher" | "admin",
-        school: overviewData?.school.name || "Apex Academy Global",
+        role: "student",
+        school: overviewData?.school.name && overviewData.school.name !== "sakith" ? overviewData.school.name : "Apex Science Academy",
+        district: userDistrict,
         grade: d.grade ? `${d.grade} (${d.className || 'General'})` : "Enrolled Student",
         status: d.status === "active" ? "Active" : "Inactive",
-        lastLogin: "Active Today",
+        lastLogin: formatUserDateTime(rawDate),
+        createdAt: rawDate,
+        enrolledTutors: d.enrolledTutors || [],
+        subscriptionStatus: "Enrolled Student",
+      };
+    });
+
+    const staffUsers: PlatformUser[] = (staff || []).map((s: any) => {
+      const rawDate = s.createdAt || s.updatedAt;
+      const isTeacher = s.role === "teacher";
+      const userDistrict = s.district || s.city || (
+        s.medium === "tamil" || s.name?.toLowerCase().includes("rajan") || s.name?.toLowerCase().includes("sathur")
+          ? "Jaffna"
+          : s.medium === "english"
+            ? "Colombo"
+            : "Kandy"
+      );
+      return {
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        role: (isTeacher ? "teacher" : "admin") as "student" | "teacher" | "admin",
+        school: overviewData?.school.name && overviewData.school.name !== "sakith" ? overviewData.school.name : "Apex Science Academy",
+        district: userDistrict,
+        grade: isTeacher ? (s.qualification || (s.subjects?.[0] ? `${s.subjects[0]} • Faculty` : "Academic Tutor")) : "Platform Administration",
+        status: s.status === "active" ? "Active" : "Inactive",
+        lastLogin: formatUserDateTime(rawDate),
+        createdAt: rawDate,
         enrolledTutors: [],
-        subscriptionStatus: d.role === "student" ? "Enrolled Student" : "Staff Member",
-      }));
-      setPlatformUsers(directoryMapped);
-    } else {
-      setPlatformUsers([]);
-    }
-  }, [directory, overviewData?.school.name]);
+        subscriptionStatus: isTeacher ? "Faculty Educator" : "System Administrator",
+      };
+    });
+
+    setPlatformUsers([...studentUsers, ...staffUsers]);
+  }, [directory, staff, overviewData?.school.name]);
 
   // Tutors Management State
   const [soloTutors, setSoloTutors] = useState<ConnectTeacher[]>([]);
@@ -514,9 +576,11 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       email: newStudentForm.email.trim(),
       role: "student" as const,
       school: newStudentForm.school,
+      district: "Jaffna",
       grade: newStudentForm.grade,
       status: "Active",
-      lastLogin: "Just now",
+      lastLogin: formatUserDateTime(new Date()),
+      createdAt: new Date().toISOString(),
       enrolledTutors: newStudentForm.enrolledTutor ? [newStudentForm.enrolledTutor] : [],
       subscriptionStatus: newStudentForm.enrolledTutor ? "Active Paid (1 Tutor)" : "Free Student"
     };
@@ -572,13 +636,13 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       prev.map((u) =>
         u.id === editingUser.id
           ? {
-              ...u,
-              name: editUserName,
-              email: editUserEmail,
-              role: editUserRole,
-              school: editUserSchool,
-              status: editUserStatus
-            }
+            ...u,
+            name: editUserName,
+            email: editUserEmail,
+            role: editUserRole,
+            school: editUserSchool,
+            status: editUserStatus
+          }
           : u
       )
     );
@@ -599,7 +663,10 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   };
 
   const filteredUsers = platformUsers.filter((u) => {
-    const matchesRole = userRoleFilter === "all" || u.role === userRoleFilter;
+    const matchesRole =
+      userRoleFilter === "all" ||
+      u.role === userRoleFilter ||
+      (userRoleFilter === "admin" && ((u.role as string) === "admin" || (u.role as string) === "administrator"));
     const matchesSearch =
       !userSearch ||
       u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
@@ -848,156 +915,154 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-          {/* KPI Cards */}
-          <div className="order-3 grid grid-cols-1 gap-3 lg:col-start-2 lg:row-start-1">
+            {/* KPI Cards */}
+            <div className="order-3 grid grid-cols-1 gap-3 lg:col-start-2 lg:row-start-1">
 
-            <Card className="border-[#e6ece8] bg-white shadow-2xs">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-500 font-semibold">Active Classes</p>
-                  <p className="text-2xl font-black text-[#0d5c4d] mt-1">{overviewData?.kpis.totalClasses ?? classes.length}</p>
-                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">Across {grades.length} grade levels</p>
-                </div>
-                <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
-                  <School className="h-5 w-5" />
-                </div>
-              </CardContent>
-            </Card>
+              <Card className="border-[#e6ece8] bg-white shadow-2xs">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500 font-semibold">Active Classes</p>
+                    <p className="text-2xl font-black text-[#0d5c4d] mt-1">{overviewData?.kpis.totalClasses ?? classes.length}</p>
+                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">Across {grades.length} grade levels</p>
+                  </div>
+                  <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
+                    <School className="h-5 w-5" />
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card className="border-[#e6ece8] bg-white shadow-2xs">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-500 font-semibold">Total Students</p>
-                  <p className="text-2xl font-black text-[#b47a16] mt-1">{overviewData?.kpis.totalStudents ?? totalStudents}</p>
-                  <p className="text-[10px] text-[#b47a16] font-bold mt-0.5">Enrolled across all streams</p>
-                </div>
-                <div className="h-11 w-11 rounded-xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center">
-                  <GraduationCap className="h-5 w-5" />
-                </div>
-              </CardContent>
-            </Card>
+              <Card className="border-[#e6ece8] bg-white shadow-2xs">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500 font-semibold">Total Students</p>
+                    <p className="text-2xl font-black text-[#b47a16] mt-1">{overviewData?.kpis.totalStudents ?? totalStudents}</p>
+                    <p className="text-[10px] text-[#b47a16] font-bold mt-0.5">Enrolled across all streams</p>
+                  </div>
+                  <div className="h-11 w-11 rounded-xl bg-[#fef7e6] text-[#b47a16] flex items-center justify-center">
+                    <GraduationCap className="h-5 w-5" />
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card className="border-[#e6ece8] bg-white shadow-2xs">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-500 font-semibold">Tutors & Faculty</p>
-                  <p className="text-2xl font-black text-[#0d5c4d] mt-1">{overviewData?.kpis.totalTeachers ?? soloTutors.length}</p>
-                  <p className="text-[10px] text-slate-400 font-bold mt-0.5">Active teaching faculty in database</p>
-                </div>
-                <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
-                  <UserCheck className="h-5 w-5" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              <Card className="border-[#e6ece8] bg-white shadow-2xs">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-500 font-semibold">Tutors & Faculty</p>
+                    <p className="text-2xl font-black text-[#0d5c4d] mt-1">{overviewData?.kpis.totalTeachers ?? soloTutors.length}</p>
+                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">Active teaching faculty in database</p>
+                  </div>
+                  <div className="h-11 w-11 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
+                    <UserCheck className="h-5 w-5" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Platform Health Summary */}
-          <div className="order-1 grid grid-cols-1 gap-6 lg:col-start-1 lg:row-start-1">
-            <Card className="border-[#e6ece8] bg-white shadow-2xs">
-              <CardHeader className="p-6 pb-2">
-                <CardTitle className="text-sm font-black text-[#0d2b26]">
-                  Platform Operational Status
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 space-y-3.5">
-                <div className="p-3.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
+            {/* Platform Health Summary */}
+            <div className="order-1 grid grid-cols-1 gap-6 lg:col-start-1 lg:row-start-1">
+              <Card className="border-[#e6ece8] bg-white shadow-2xs">
+                <CardHeader className="p-6 pb-2">
+                  <CardTitle className="text-sm font-black text-[#0d2b26]">
+                    Platform Operational Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-3.5">
+                  <div className="p-3.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <Activity className="h-4 w-4 text-[#0d5c4d]" />
+                      <div>
+                        <p className="text-xs font-bold text-[#0d5c4d]">System Uptime</p>
+                        <p className="text-[10px] text-slate-500">SLA: 99.9% compliance</p>
+                      </div>
+                    </div>
+                    <Badge variant="success">99.97%</Badge>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <Database className="h-4 w-4 text-slate-600" />
+                      <div>
+                        <p className="text-xs font-bold text-slate-700">Active Courses</p>
+                        <p className="text-[10px] text-slate-500">Courses published across all schools</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="font-mono">{courses.length}</Badge>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <Calendar className="h-4 w-4 text-slate-600" />
+                      <div>
+                        <p className="text-xs font-bold text-slate-700">Upcoming Events</p>
+                        <p className="text-[10px] text-slate-500">Events published for students</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="font-mono">
+                      {events.filter((e) => e.status === "published").length}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Quick Summary Tables Row */}
+            <div className="order-2 grid grid-cols-1 gap-6 md:grid-cols-2 lg:col-start-1 lg:row-start-2">
+              {/* Recent Announcements */}
+              <Card className="border-[#e6ece8] bg-white shadow-2xs">
+                <CardHeader className="p-5 pb-3 border-b border-[#e6ece8]">
+                  <CardTitle className="text-sm font-black text-[#0d2b26] flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-[#0d5c4d]" />
+                    Recent Announcements ({announcements.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {announcements.slice(0, 3).map((ann, i) => (
+                    <div
+                      key={ann.id}
+                      className={`flex items-center justify-between p-4 text-xs ${i < 2 ? "border-b border-[#e6ece8]" : ""
+                        } hover:bg-[#f8faf9]`}
+                    >
+                      <div>
+                        <p className="font-bold text-slate-900">{ann.title}</p>
+                        <p className="text-slate-500 mt-0.5">{ann.publishedAt} — {ann.targetAudience}</p>
+                      </div>
+                      <Badge variant={ann.priority === "high" ? "warning" : "success"} className="text-[10px]">
+                        {ann.priority === "high" ? "Urgent" : "Standard"}
+                      </Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Sports Teams Summary */}
+              <Card className="border-[#e6ece8] bg-white shadow-2xs">
+                <CardHeader className="p-5 pb-3 border-b border-[#e6ece8]">
+                  <CardTitle className="text-sm font-black text-[#0d2b26] flex items-center gap-2">
                     <Activity className="h-4 w-4 text-[#0d5c4d]" />
-                    <div>
-                      <p className="text-xs font-bold text-[#0d5c4d]">System Uptime</p>
-                      <p className="text-[10px] text-slate-500">SLA: 99.9% compliance</p>
+                    Active Sports Teams ({teams.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {teams.slice(0, 3).map((team, i) => (
+                    <div
+                      key={team.id}
+                      className={`flex items-center justify-between p-4 text-xs ${i < 2 ? "border-b border-[#e6ece8]" : ""
+                        } hover:bg-[#f8faf9]`}
+                    >
+                      <div>
+                        <p className="font-bold text-slate-900">{team.name}</p>
+                        <p className="text-slate-500 mt-0.5">Coach: {team.coachName} · {team.playersCount} Players</p>
+                      </div>
+                      <Badge variant={team.status === "active" ? "success" : "default"} className="text-[10px]">
+                        {team.status}
+                      </Badge>
                     </div>
-                  </div>
-                  <Badge variant="success">99.97%</Badge>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Database className="h-4 w-4 text-slate-600" />
-                    <div>
-                      <p className="text-xs font-bold text-slate-700">Active Courses</p>
-                      <p className="text-[10px] text-slate-500">Courses published across all schools</p>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="font-mono">{courses.length}</Badge>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#f8faf9] border border-[#e6ece8] flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <Calendar className="h-4 w-4 text-slate-600" />
-                    <div>
-                      <p className="text-xs font-bold text-slate-700">Upcoming Events</p>
-                      <p className="text-[10px] text-slate-500">Events published for students</p>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="font-mono">
-                    {events.filter((e) => e.status === "published").length}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Quick Summary Tables Row */}
-          <div className="order-2 grid grid-cols-1 gap-6 md:grid-cols-2 lg:col-start-1 lg:row-start-2">
-            {/* Recent Announcements */}
-            <Card className="border-[#e6ece8] bg-white shadow-2xs">
-              <CardHeader className="p-5 pb-3 border-b border-[#e6ece8]">
-                <CardTitle className="text-sm font-black text-[#0d2b26] flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-[#0d5c4d]" />
-                  Recent Announcements ({announcements.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {announcements.slice(0, 3).map((ann, i) => (
-                  <div
-                    key={ann.id}
-                    className={`flex items-center justify-between p-4 text-xs ${
-                      i < 2 ? "border-b border-[#e6ece8]" : ""
-                    } hover:bg-[#f8faf9]`}
-                  >
-                    <div>
-                      <p className="font-bold text-slate-900">{ann.title}</p>
-                      <p className="text-slate-500 mt-0.5">{ann.publishedAt} — {ann.targetAudience}</p>
-                    </div>
-                    <Badge variant={ann.priority === "high" ? "warning" : "success"} className="text-[10px]">
-                      {ann.priority === "high" ? "Urgent" : "Standard"}
-                    </Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Sports Teams Summary */}
-            <Card className="border-[#e6ece8] bg-white shadow-2xs">
-              <CardHeader className="p-5 pb-3 border-b border-[#e6ece8]">
-                <CardTitle className="text-sm font-black text-[#0d2b26] flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-[#0d5c4d]" />
-                  Active Sports Teams ({teams.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {teams.slice(0, 3).map((team, i) => (
-                  <div
-                    key={team.id}
-                    className={`flex items-center justify-between p-4 text-xs ${
-                      i < 2 ? "border-b border-[#e6ece8]" : ""
-                    } hover:bg-[#f8faf9]`}
-                  >
-                    <div>
-                      <p className="font-bold text-slate-900">{team.name}</p>
-                      <p className="text-slate-500 mt-0.5">Coach: {team.coachName} · {team.playersCount} Players</p>
-                    </div>
-                    <Badge variant={team.status === "active" ? "success" : "default"} className="text-[10px]">
-                      {team.status}
-                    </Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       {/* TAB: Schools Setup */}
@@ -1298,11 +1363,10 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             <button
               type="button"
               onClick={() => setStaffSubTab("solo_tutors")}
-              className={`rounded-full px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 ${
-                staffSubTab === "solo_tutors"
+              className={`rounded-full px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 ${staffSubTab === "solo_tutors"
                   ? "bg-[#0d5c4d] text-white shadow-xs"
                   : "bg-white text-slate-600 hover:bg-[#ecf8f5] border border-slate-200"
-              }`}
+                }`}
             >
               <Sparkles className="h-3.5 w-3.5" /> Tutors ({soloTutors.length})
             </button>
@@ -1313,11 +1377,10 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 setCurrentView("staff_coaches");
                 setStaffPage(1);
               }}
-              className={`rounded-full px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 ${
-                staffSubTab === "coaches"
+              className={`rounded-full px-4 py-2 text-xs font-bold transition flex items-center gap-1.5 ${staffSubTab === "coaches"
                   ? "bg-[#0d5c4d] text-white shadow-xs"
                   : "bg-white text-slate-600 hover:bg-[#ecf8f5] border border-slate-200"
-              }`}
+                }`}
             >
               <Trophy className="h-3.5 w-3.5" /> Sports Coaches ({staff.filter((m) => m.role === "coach").length})
             </button>
@@ -1467,11 +1530,10 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                             <td className="p-3.5">
                               <div className="space-y-1">
                                 <span
-                                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    tutor.verified
+                                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${tutor.verified
                                       ? "bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0]"
                                       : "bg-slate-100 text-slate-500"
-                                  }`}
+                                    }`}
                                 >
                                   {tutor.verified ? "Verified ✓" : "Pending"}
                                 </span>
@@ -1499,9 +1561,8 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleToggleTutorVerification(tutor.id)}
-                                  className={`h-7 px-2 text-[11px] font-bold ${
-                                    tutor.verified ? "text-amber-700 hover:text-amber-800" : "text-[#0d5c4d] hover:text-[#083e34]"
-                                  }`}
+                                  className={`h-7 px-2 text-[11px] font-bold ${tutor.verified ? "text-amber-700 hover:text-amber-800" : "text-[#0d5c4d] hover:text-[#083e34]"
+                                    }`}
                                   title={tutor.verified ? "Remove Verification Badge" : "Grant Verified Badge"}
                                 >
                                   <Check className="h-3 w-3 mr-1" />
@@ -1512,9 +1573,8 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleToggleTutorSuspension(tutor.id)}
-                                  className={`h-7 px-2 text-[11px] font-bold ${
-                                    isSuspended ? "text-[#0d5c4d]" : "text-rose-600"
-                                  }`}
+                                  className={`h-7 px-2 text-[11px] font-bold ${isSuspended ? "text-[#0d5c4d]" : "text-rose-600"
+                                    }`}
                                   title={isSuspended ? "Re-activate Tutor" : "Suspend Tutor"}
                                 >
                                   {isSuspended ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
@@ -1661,8 +1721,8 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                               member.status === "active"
                                 ? "success"
                                 : member.status === "on_leave"
-                                ? "warning"
-                                : "destructive"
+                                  ? "warning"
+                                  : "destructive"
                             }
                           >
                             <span className="mr-1">●</span>
@@ -1829,11 +1889,10 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   <button
                     key={role}
                     onClick={() => setUserRoleFilter(role)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all capitalize ${
-                      userRoleFilter === role
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all capitalize ${userRoleFilter === role
                         ? "bg-[#0d5c4d] text-white shadow-xs"
                         : "text-slate-600 hover:text-[#0d5c4d]"
-                    }`}
+                      }`}
                   >
                     {role === "teacher" ? "Tutors" : role}
                   </button>
@@ -1873,7 +1932,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 </div>
                 <div>
                   <p className="text-xl font-black text-[#0d2b26]">
-                    {soloTutors.length}
+                    {platformUsers.filter((u) => u.role === "teacher").length}
                   </p>
                   <p className="text-[10px] text-slate-500 font-bold">Tutors</p>
                 </div>
@@ -1901,7 +1960,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 <thead>
                   <tr className="border-b border-[#e6ece8] bg-[#f8faf9] text-slate-500 uppercase text-[10px] font-bold tracking-wider">
                     <th className="p-4">User Profile</th>
-                    <th className="p-4">Stream & School</th>
+                    <th className="p-4">Stream & District / City</th>
                     <th className="p-4">Role & Subscription</th>
                     <th className="p-4">Enrolled Tutors</th>
                     <th className="p-4">Status</th>
@@ -1909,188 +1968,195 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#e6ece8]">
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-[#fbfcfb] transition-colors">
-                      <td className="p-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-8 w-8 rounded-full bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center font-bold text-xs shrink-0">
-                            {user.name.charAt(0)}
-                          </div>
-                          <div>
-                            <span className="font-bold text-slate-900 block">{user.name}</span>
-                            <span className="text-[11px] text-slate-400 font-mono">{user.email}</span>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="p-4">
-                        <p className="font-semibold text-slate-800">{user.grade || "General Stream"}</p>
-                        <p className="text-[11px] text-slate-500">{user.school}</p>
-                      </td>
-
-                      <td className="p-4">
-                        <div className="space-y-1">
-                          <Badge
-                            variant={
-                              user.role === "admin"
-                                ? "default"
-                                : user.role === "teacher"
-                                ? "warning"
-                                : "success"
-                            }
-                            className="text-[10px] capitalize"
-                          >
-                            {user.role === "teacher" ? "Tutor" : user.role}
-                          </Badge>
-                          {user.subscriptionStatus && (
-                            <span
-                              className={`block text-[10px] font-bold ${
-                                user.subscriptionStatus.includes("Active Paid")
-                                  ? "text-[#0d5c4d]"
-                                  : "text-slate-500"
-                              }`}
-                            >
-                              {user.subscriptionStatus}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="p-4">
-                        {user.role === "student" ? (
-                          user.enrolledTutors && user.enrolledTutors.length > 0 ? (
-                            <div className="flex flex-wrap gap-1 max-w-xs">
-                              {user.enrolledTutors.map((tName, idx) => (
-                                <Badge
-                                  key={idx}
-                                  variant="outline"
-                                  className="text-[10px] border-[#c4e9e0] bg-[#ecf8f5] text-[#0d5c4d] font-semibold"
-                                >
-                                  {tName}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-[11px] text-slate-400 italic">No enrolled tutors</span>
-                          )
-                        ) : (
-                          <span className="text-[11px] text-slate-400">—</span>
-                        )}
-                      </td>
-
-                      <td className="p-4">
-                        <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-bold ${
-                            user.status === "Active" ? "text-[#0d5c4d]" : "text-slate-400"
-                          }`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              user.status === "Active" ? "bg-[#0d5c4d]" : "bg-slate-300"
-                            }`}
-                          ></span>
-                          {user.status}
-                        </span>
-                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">{user.lastLogin}</p>
-                      </td>
-
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {user.role === "student" && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setSelectedStudentForEnroll(user)}
-                                className="h-7 px-2 text-[11px] font-bold text-[#0d5c4d] border-[#c4e9e0] hover:bg-[#ecf8f5]"
-                                title="Enroll student in Tutor class"
-                              >
-                                <Plus className="h-3 w-3 mr-1" /> Enroll
-                              </Button>
-
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setSelectedStudentForDossier(user)}
-                                className="h-7 px-2 text-[11px] font-bold text-slate-700"
-                                title="View Student Dossier & Subscription history"
-                              >
-                                <Eye className="h-3 w-3 mr-1" /> Dossier
-                              </Button>
-                            </>
-                          )}
-
-                          {/* 3-Dot Action Menu */}
-                          <div className="relative inline-block text-left">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenUserMenuId(openUserMenuId === user.id ? null : user.id);
-                              }}
-                              className="h-7 w-7 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
-                              title="User actions"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </button>
-
-                            {openUserMenuId === user.id && (
-                              <>
-                                <div
-                                  className="fixed inset-0 z-20"
-                                  onClick={() => setOpenUserMenuId(null)}
-                                />
-
-                                <div className="absolute right-0 top-8 z-30 w-36 rounded-xl bg-white border border-[#e2eae5] shadow-lg py-1.5 animate-in fade-in zoom-in-95 duration-150 text-left">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenUserMenuId(null);
-                                      if (user.role === "student") {
-                                        setSelectedStudentForDossier(user);
-                                      } else {
-                                        setViewingUser(user);
-                                      }
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] transition-colors cursor-pointer"
-                                  >
-                                    <Eye className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                                    <span>View Profile</span>
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenUserMenuId(null);
-                                      handleOpenEditUser(user);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] transition-colors cursor-pointer"
-                                  >
-                                    <Edit className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                                    <span>Edit</span>
-                                  </button>
-
-                                  <div className="h-px bg-slate-100 my-1" />
-
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenUserMenuId(null);
-                                      setDeletingUser(user);
-                                    }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5 text-rose-500" />
-                                    <span>Delete</span>
-                                  </button>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-12 text-center text-slate-400 font-medium">
+                        No {userRoleFilter === "all" ? "users" : userRoleFilter === "teacher" ? "tutors" : `${userRoleFilter}s`} found.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredUsers.map((user) => (
+                      <tr key={user.id} className="hover:bg-[#fbfcfb] transition-colors">
+                        <td className="p-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-full bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center font-bold text-xs shrink-0">
+                              {user.name.charAt(0)}
+                            </div>
+                            <div>
+                              <span className="font-bold text-slate-900 block">{user.name}</span>
+                              <span className="text-[11px] text-slate-400 font-mono">{user.email}</span>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="p-4">
+                          <p className="font-semibold text-slate-800">{user.grade || "General Stream"}</p>
+                          <p className="text-[11px] text-[#0d5c4d] font-semibold flex items-center gap-1 mt-0.5">
+                            <MapPin className="h-3 w-3 text-[#0d5c4d] shrink-0" />
+                            <span>{user.district || "Jaffna"}</span>
+                          </p>
+                        </td>
+
+                        <td className="p-4">
+                          <div className="space-y-1">
+                            <Badge
+                              variant={
+                                user.role === "admin"
+                                  ? "default"
+                                  : user.role === "teacher"
+                                    ? "warning"
+                                    : "success"
+                              }
+                              className="text-[10px] capitalize"
+                            >
+                              {user.role === "teacher" ? "Tutor" : user.role}
+                            </Badge>
+                            {user.subscriptionStatus && (
+                              <span
+                                className={`block text-[10px] font-bold ${user.subscriptionStatus.includes("Active Paid")
+                                    ? "text-[#0d5c4d]"
+                                    : "text-slate-500"
+                                  }`}
+                              >
+                                {user.subscriptionStatus}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="p-4">
+                          {user.role === "student" ? (
+                            user.enrolledTutors && user.enrolledTutors.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 max-w-xs">
+                                {user.enrolledTutors.map((tName, idx) => (
+                                  <Badge
+                                    key={idx}
+                                    variant="outline"
+                                    className="text-[10px] border-[#c4e9e0] bg-[#ecf8f5] text-[#0d5c4d] font-semibold"
+                                  >
+                                    {tName}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">No enrolled tutors</span>
+                            )
+                          ) : (
+                            <span className="text-[11px] text-slate-400">—</span>
+                          )}
+                        </td>
+
+                        <td className="p-4">
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] font-bold ${user.status === "Active" ? "text-[#0d5c4d]" : "text-slate-400"
+                              }`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${user.status === "Active" ? "bg-[#0d5c4d]" : "bg-slate-300"
+                                }`}
+                            ></span>
+                            {user.status}
+                          </span>
+                          <p className="text-[10px] text-slate-500 font-mono mt-0.5 whitespace-nowrap">{user.lastLogin}</p>
+                        </td>
+
+                        <td className="p-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {user.role === "student" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setSelectedStudentForEnroll(user)}
+                                  className="h-7 px-2 text-[11px] font-bold text-[#0d5c4d] border-[#c4e9e0] hover:bg-[#ecf8f5]"
+                                  title="Enroll student in Tutor class"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" /> Enroll
+                                </Button>
+
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setSelectedStudentForDossier(user)}
+                                  className="h-7 px-2 text-[11px] font-bold text-slate-700"
+                                  title="View Student Dossier & Subscription history"
+                                >
+                                  <Eye className="h-3 w-3 mr-1" /> Dossier
+                                </Button>
+                              </>
+                            )}
+
+                            {/* 3-Dot Action Menu */}
+                            <div className="relative inline-block text-left">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenUserMenuId(openUserMenuId === user.id ? null : user.id);
+                                }}
+                                className="h-7 w-7 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+                                title="User actions"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+
+                              {openUserMenuId === user.id && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-20"
+                                    onClick={() => setOpenUserMenuId(null)}
+                                  />
+
+                                  <div className="absolute right-0 top-8 z-30 w-36 rounded-xl bg-white border border-[#e2eae5] shadow-lg py-1.5 animate-in fade-in zoom-in-95 duration-150 text-left">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenUserMenuId(null);
+                                        if (user.role === "student") {
+                                          setSelectedStudentForDossier(user);
+                                        } else {
+                                          setViewingUser(user);
+                                        }
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] transition-colors cursor-pointer"
+                                    >
+                                      <Eye className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                                      <span>View Profile</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenUserMenuId(null);
+                                        handleOpenEditUser(user);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-700 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] transition-colors cursor-pointer"
+                                    >
+                                      <Edit className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                                      <span>Edit</span>
+                                    </button>
+
+                                    <div className="h-px bg-slate-100 my-1" />
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenUserMenuId(null);
+                                        setDeletingUser(user);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                                      <span>Delete</span>
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )))}
                 </tbody>
               </table>
             </div>
@@ -2268,14 +2334,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 <button
                   type="button"
                   onClick={() => setAllowOnlineCardPayment(!allowOnlineCardPayment)}
-                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${
-                    allowOnlineCardPayment ? "bg-[#0d5c4d]" : "bg-slate-300"
-                  }`}
+                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${allowOnlineCardPayment ? "bg-[#0d5c4d]" : "bg-slate-300"
+                    }`}
                 >
                   <div
-                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                      allowOnlineCardPayment ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${allowOnlineCardPayment ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -2291,14 +2355,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 <button
                   type="button"
                   onClick={() => setAllowDirectBankSlip(!allowDirectBankSlip)}
-                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${
-                    allowDirectBankSlip ? "bg-[#0d5c4d]" : "bg-slate-300"
-                  }`}
+                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${allowDirectBankSlip ? "bg-[#0d5c4d]" : "bg-slate-300"
+                    }`}
                 >
                   <div
-                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                      allowDirectBankSlip ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${allowDirectBankSlip ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -2364,14 +2426,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 <button
                   type="button"
                   onClick={() => setAllowTutorSelfRegistration(!allowTutorSelfRegistration)}
-                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${
-                    allowTutorSelfRegistration ? "bg-[#0d5c4d]" : "bg-slate-300"
-                  }`}
+                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${allowTutorSelfRegistration ? "bg-[#0d5c4d]" : "bg-slate-300"
+                    }`}
                 >
                   <div
-                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                      allowTutorSelfRegistration ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${allowTutorSelfRegistration ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -2389,14 +2449,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 <button
                   type="button"
                   onClick={() => setRequirePackageApproval(!requirePackageApproval)}
-                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${
-                    requirePackageApproval ? "bg-[#0d5c4d]" : "bg-slate-300"
-                  }`}
+                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${requirePackageApproval ? "bg-[#0d5c4d]" : "bg-slate-300"
+                    }`}
                 >
                   <div
-                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                      requirePackageApproval ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${requirePackageApproval ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -2454,14 +2512,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 <button
                   type="button"
                   onClick={() => setEnrollmentOpen(!enrollmentOpen)}
-                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${
-                    enrollmentOpen ? "bg-[#0d5c4d]" : "bg-slate-300"
-                  }`}
+                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${enrollmentOpen ? "bg-[#0d5c4d]" : "bg-slate-300"
+                    }`}
                 >
                   <div
-                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                      enrollmentOpen ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${enrollmentOpen ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -2477,14 +2533,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 <button
                   type="button"
                   onClick={() => setMaintenanceMode(!maintenanceMode)}
-                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${
-                    maintenanceMode ? "bg-rose-500" : "bg-slate-300"
-                  }`}
+                  className={`h-7 w-13 rounded-full p-1 transition-colors cursor-pointer ${maintenanceMode ? "bg-rose-500" : "bg-slate-300"
+                    }`}
                 >
                   <div
-                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                      maintenanceMode ? "translate-x-6" : "translate-x-0"
-                    }`}
+                    className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${maintenanceMode ? "translate-x-6" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -3005,8 +3059,8 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   viewingUser.role === "admin"
                     ? "default"
                     : viewingUser.role === "teacher"
-                    ? "warning"
-                    : "success"
+                      ? "warning"
+                      : "success"
                 }
                 className="ml-auto capitalize text-xs font-bold"
               >
@@ -3016,8 +3070,11 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Assigned Institution</p>
-                <p className="font-bold text-slate-900 mt-0.5">{viewingUser.school}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">District / City</p>
+                <p className="font-bold text-slate-900 mt-0.5 flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                  <span>{viewingUser.district || viewingUser.school || "Jaffna"}</span>
+                </p>
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <p className="text-[10px] font-bold text-slate-400 uppercase">Account Status</p>

@@ -3111,70 +3111,8 @@ if (savedProfile.preferredName) {
             </div>
           )}
 
-          {/* NEXT OF KIN & EMERGENCY LIAISON CARD (Teacher) / PARENT & GUARDIAN CARD (Student) / PLATFORM CLOUD OPERATIONS (Super Admin) */}
-          {currentRole === "super_admin" ? (
-            <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-              <div className="pb-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-[#0d5c4d]" />
-                    <span>Multi-Tenant Cloud Operations &amp; Infrastructure</span>
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Root infrastructure health, live tenant nodes, and platform-level master management.
-                  </p>
-                </div>
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 self-start sm:self-auto">
-                  Cluster Status: Optimal (99.98% SLA)
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Primary Cloud Region</p>
-                  <p className="text-sm font-extrabold text-slate-900">AWS Colombo &amp; Singapore</p>
-                  <p className="text-[11px] text-slate-500">Cloudflare Edge CDN Active</p>
-                </div>
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Security Clearance</p>
-                  <p className="text-sm font-extrabold text-[#0d5c4d]">Tier-1 Root Authority</p>
-                  <p className="text-[11px] text-slate-500">2FA Master Key Enforced</p>
-                </div>
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Engine Version</p>
-                  <p className="text-sm font-extrabold text-slate-900">v2.4.0 Multi-Tenant Engine</p>
-                  <p className="text-[11px] text-slate-500">Automated Daily Backups</p>
-                </div>
-              </div>
-
-              <div className="pt-2 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView("super_admin_tenants")}
-                  className="px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer"
-                >
-                  <Building2 className="h-4 w-4" />
-                  <span>Open Client Tenants Directory</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentView("super_admin_matrix")}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
-                >
-                  <Sliders className="h-4 w-4" />
-                  <span>Configure Granular Feature Matrix</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentView("super_admin_pricing")}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
-                >
-                  <CreditCard className="h-4 w-4" />
-                  <span>SaaS Packages &amp; Pricing</span>
-                </button>
-              </div>
-            </div>
-          ) : currentRole === "teacher" ? null : (
+          {/* PARENT & GUARDIAN CARD (Student only) */}
+          {currentRole === "student" && (
             <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
               <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
                 <div>

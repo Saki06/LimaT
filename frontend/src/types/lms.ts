@@ -383,8 +383,13 @@ export interface AdminDirectoryUser {
   role: UserRole | 'coach';
   grade?: string;
   className?: string;
+  district?: string;
+  city?: string;
   status: AdminRecordStatus;
   phone?: string;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+  lastLogin?: string;
 }
 
 export type LibraryResourceType = 'book' | 'tute' | 'past_paper';
