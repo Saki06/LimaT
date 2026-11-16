@@ -516,6 +516,33 @@ export const api = {
       });
       return response.json();
     },
+
+    async forgotPassword(email: string): Promise<{ success: boolean; message: string; otp?: string; resetToken?: string }> {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      return response.json();
+    },
+
+    async verifyResetCode(email: string, otp: string): Promise<{ success: boolean; message: string }> {
+      const response = await fetch(`${API_BASE_URL}/auth/verify-reset-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+      return response.json();
+    },
+
+    async resetPassword(data: { email: string; otp: string; newPassword: string }): Promise<{ success: boolean; message: string }> {
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return response.json();
+    },
   },
 
   // Courses & Subjects API

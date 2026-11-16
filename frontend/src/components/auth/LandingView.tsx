@@ -44,6 +44,7 @@ import {
   Loader2
 } from "lucide-react";
 import { TozyAnimatedMascot } from "@/components/tozy";
+import { ForgotPasswordModal } from "./ForgotPasswordModal";
 
 type SupportedRole = "student" | "parent" | "teacher" | "admin" | "super_admin";
 type AuthDisplayMode = "closed" | "drawer" | "fullpage";
@@ -112,6 +113,7 @@ export function LandingView({
   const [loginPassword, setLoginPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   // Render Google Identity Services Button
   useEffect(() => {
@@ -678,20 +680,16 @@ export function LandingView({
                   <label className="text-xs font-bold text-slate-700">
                     Password
                   </label>
-                  <a
-                    href="#"
+                  <button
+                    type="button"
                     onClick={(e) => {
                       e.preventDefault();
-                      addToast({
-                        type: "info",
-                        title: "Password Reset Code",
-                        message: "Enter your registered mobile number or email to receive a password reset OTP code."
-                      });
+                      setIsForgotModalOpen(true);
                     }}
-                    className="text-[11px] font-bold text-[#0d5c4d] hover:underline"
+                    className="text-[11px] font-bold text-[#0d5c4d] hover:underline cursor-pointer"
                   >
                     Forgot password?
-                  </a>
+                  </button>
                 </div>
                 <div className="relative">
                   <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -2782,6 +2780,21 @@ export function LandingView({
           </div>
         </div>
       )}
+
+      {/* Interactive Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+        defaultEmail={loginEmail}
+        onPasswordResetSuccess={(email) => {
+          setLoginEmail(email);
+          addToast({
+            type: "success",
+            title: "Password Updated",
+            message: "You can now log in with your new password.",
+          });
+        }}
+      />
     </div>
   );
 }

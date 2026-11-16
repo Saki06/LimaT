@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Phone, Mail, Lock, Eye, EyeOff, LogIn, Loader2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { SupportedRole } from "./types";
+import { ForgotPasswordModal } from "./ForgotPasswordModal";
 
 interface LoginFormProps {
   selectedRole: SupportedRole;
@@ -18,6 +19,7 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   // Sri Lankan Parent OTP login states
   const [parentLoginMethod, setParentLoginMethod] = useState<"password" | "otp">("password");
@@ -230,23 +232,13 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-bold text-slate-700">Password</label>
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    addToast({
-                      type: "info",
-                      title: "Password Reset Code",
-                      message:
-                        selectedRole === "parent"
-                          ? "Use SMS OTP Login to sign in instantly, or enter your mobile to receive a reset code."
-                          : "Enter your registered mobile number or email to receive a password reset OTP code."
-                    });
-                  }}
-                  className="text-[11px] font-bold text-[#0d5c4d] hover:underline"
+                <button
+                  type="button"
+                  onClick={() => setIsForgotModalOpen(true)}
+                  className="text-[11px] font-bold text-[#0d5c4d] hover:underline cursor-pointer"
                 >
                   Forgot password?
-                </a>
+                </button>
               </div>
               <div className="relative">
                 <Lock className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -323,6 +315,20 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
           </>
         )}
       </form>
+
+      <ForgotPasswordModal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+        defaultEmail={loginEmail}
+        onPasswordResetSuccess={(email) => {
+          setLoginEmail(email);
+          addToast({
+            type: "success",
+            title: "Password Updated",
+            message: "You can now log in with your new password.",
+          });
+        }}
+      />
     </div>
   );
 }

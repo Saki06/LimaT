@@ -9,4 +9,12 @@ export const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   databaseUrl: process.env.DATABASE_URL || '',
   googleClientId: process.env.GOOGLE_CLIENT_ID || '786252089709-nac7u469ercpt25hqjg1jkavga6d70hp.apps.googleusercontent.com',
+  smtp: {
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 465,
+    secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465' || !process.env.SMTP_PORT,
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || (process.env.SMTP_USER ? `"Newtoz LMS" <${process.env.SMTP_USER}>` : '"Newtoz LMS Support" <no-reply@newtoz.com>'),
+  },
 };
