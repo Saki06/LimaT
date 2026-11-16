@@ -1482,7 +1482,8 @@ if (savedProfile.preferredName) {
     if (!clean) return;
     setPublicSlug(clean);
     setIsEditingSlug(false);
-    addToast({ type: "success", title: "Public Studio URL Updated", message: `New URL: https://limat.lk/tutors/${clean}` });
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://lms-navy-psi.vercel.app";
+    addToast({ type: "success", title: "Public Studio URL Updated", message: `New URL: ${origin}/tutors/${clean}` });
     if (currentRole === "teacher") {
       updateTeacherProfile({ publicSlug: clean });
     }
@@ -3785,14 +3786,27 @@ if (savedProfile.preferredName) {
                   Manage your shareable student-facing studio URL slug, video lectures, and community channels.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowPublicPreview(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-bold text-xs shadow-xs transition-colors cursor-pointer self-start sm:self-auto"
-              >
-                <Eye className="h-3.5 w-3.5 text-purple-600" />
-                <span>Preview Public Page</span>
-              </button>
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const origin = typeof window !== "undefined" ? window.location.origin : "https://lms-navy-psi.vercel.app";
+                    window.open(`${origin}/tutors/${publicSlug}`, "_blank");
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 text-emerald-700" />
+                  <span>Open Live Page</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPublicPreview(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  <Eye className="h-3.5 w-3.5 text-purple-600" />
+                  <span>Preview Modal</span>
+                </button>
+              </div>
             </div>
 
             {/* Public URL Slug Card */}
@@ -3833,7 +3847,9 @@ if (savedProfile.preferredName) {
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <div className="flex-1 flex items-center h-10 rounded-xl border border-slate-300 bg-white overflow-hidden px-3">
-                  <span className="text-xs text-slate-400 font-mono select-none">https://limat.lk/tutors/</span>
+                  <span className="text-xs text-slate-400 font-mono select-none">
+                    {typeof window !== "undefined" ? `${window.location.origin}/tutors/` : "https://lms-navy-psi.vercel.app/tutors/"}
+                  </span>
                   {isEditingSlug ? (
                     <input
                       type="text"
@@ -3850,11 +3866,13 @@ if (savedProfile.preferredName) {
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard?.writeText(`https://limat.lk/tutors/${publicSlug}`);
+                    const origin = typeof window !== "undefined" ? window.location.origin : "https://lms-navy-psi.vercel.app";
+                    const fullUrl = `${origin}/tutors/${publicSlug}`;
+                    navigator.clipboard?.writeText(fullUrl);
                     addToast({
                       type: "info",
                       title: "Studio Link Copied",
-                      message: `https://limat.lk/tutors/${publicSlug} copied to clipboard.`
+                      message: `${fullUrl} copied to clipboard.`
                     });
                   }}
                   className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
@@ -4717,9 +4735,15 @@ if (savedProfile.preferredName) {
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
                   Public Visitor Preview
                 </span>
-                <span className="text-xs text-slate-300 hidden sm:inline">
-                  • https://limat.lk/tutors/{publicSlug}
-                </span>
+                <a
+                  href={`${typeof window !== "undefined" ? window.location.origin : "https://lms-navy-psi.vercel.app"}/tutors/${publicSlug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-slate-300 hover:text-white underline hidden sm:inline-flex items-center gap-1"
+                >
+                  <span>• {typeof window !== "undefined" ? window.location.origin : "https://lms-navy-psi.vercel.app"}/tutors/{publicSlug}</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
               </div>
               <button
                 type="button"
