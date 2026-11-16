@@ -1,0 +1,22 @@
+﻿{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": ".test-build",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "scripts/tenantFeatures.test.ts",
+    "src/lib/tenantFeatures.ts",
+    "src/data/tenantMockData.ts",
+    "src/types/tenant.ts"
+  ]
+}

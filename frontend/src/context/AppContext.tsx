@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -41,6 +41,7 @@ import {
 } from '@/components/sports/sportsRegistrationData';
 import { Tenant, TenantFeature, TenantType } from '@/types/tenant';
 import { INITIAL_TENANTS, TENANT_PRESETS } from '@/data/tenantMockData';
+import { isTenantFeatureEnabled } from '@/lib/tenantFeatures';
 import {
   mockUsers,
   initialGrades,
@@ -470,15 +471,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isFeatureEnabled = (feature: string): boolean => {
-    if (authUser?.role === 'SUPER_ADMIN' && !activeTenant) {
+    if (!activeTenant || !activeTenant.enabledFeatures) {
       return false;
     }
 
-    if (!activeTenant || !activeTenant.enabledFeatures) {
-      return true;
-    }
-
-    return activeTenant.enabledFeatures[feature] ?? true;
+    return isTenantFeatureEnabled(activeTenant.enabledFeatures, feature);
   };
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -1760,7 +1757,7 @@ useEffect(() => {
     setQuizzes((prev) => [newQuiz, ...prev]);
     addToast({
       type: 'success',
-      title: 'Quiz Published Successfully! 🎯',
+      title: 'Quiz Published Successfully! ðŸŽ¯',
       message: `"${newQuiz.title}" is now available (${newQuiz.totalQuestions} questions, ${newQuiz.totalMarks} marks).`
     });
 
@@ -1809,7 +1806,7 @@ useEffect(() => {
     );
     addToast({
       type: 'success',
-      title: 'Quiz Updated! 📝',
+      title: 'Quiz Updated! ðŸ“',
       message: 'Questions and evaluation parameters saved successfully.'
     });
 
@@ -3009,7 +3006,7 @@ useEffect(() => {
     addToast({
       type: 'success',
       title: newRes.status === 'published' ? 'Resource Published!' : 'Draft Saved!',
-      message: `"${newRes.title}" is now added (${newRes.visibility === 'subscribers_only' ? '🔒 Subscribers Only' : '🌐 Public'}).`
+      message: `"${newRes.title}" is now added (${newRes.visibility === 'subscribers_only' ? 'ðŸ”’ Subscribers Only' : 'ðŸŒ Public'}).`
     });
 
     // Asynchronous backend sync
@@ -3114,7 +3111,7 @@ useEffect(() => {
     addToast({
       type: 'success',
       title: 'Download Initiated',
-      message: `Downloading "${target.title}" (${target.fileSize} · ${target.fileType}).`
+      message: `Downloading "${target.title}" (${target.fileSize} Â· ${target.fileType}).`
     });
     api.resources.recordDownload(id).catch(() => { });
   };
@@ -3348,3 +3345,4 @@ export function useApp() {
   }
   return context;
 }
+

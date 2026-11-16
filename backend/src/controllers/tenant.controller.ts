@@ -1,5 +1,6 @@
-import { Request, Response } from 'express';
+﻿import { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
+import { validateTenantFeatures } from '../constants/tenantFeatures';
 
 export const listTenants = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -92,22 +93,28 @@ if (
   return;
 }
 
-if (
-  enabledFeatures !== undefined &&
-  (
+if (enabledFeatures !== undefined) {
+  if (
     enabledFeatures === null ||
     typeof enabledFeatures !== 'object' ||
-    Array.isArray(enabledFeatures) ||
-    Object.values(enabledFeatures).some(
-      value => typeof value !== 'boolean'
-    )
-  )
-) {
-  res.status(400).json({
-    success: false,
-    message: 'Invalid enabledFeatures. Expected an object with boolean values.',
-  });
-  return;
+    Array.isArray(enabledFeatures)
+  ) {
+    res.status(400).json({
+      success: false,
+      message: 'Invalid enabledFeatures. Expected an object with boolean values.',
+    });
+    return;
+  }
+
+  const featureValidation = validateTenantFeatures(enabledFeatures);
+
+  if (!featureValidation.valid) {
+    res.status(400).json({
+      success: false,
+      message: featureValidation.message,
+    });
+    return;
+  }
 }
 
     const slug = subdomain.toLowerCase().replace(/[^a-z0-9]/g, '-');
@@ -170,12 +177,21 @@ if (typeof id !== 'string' || !id.trim()) {
     if (
       !enabledFeatures ||
       typeof enabledFeatures !== 'object' ||
-      Array.isArray(enabledFeatures) ||
-      Object.values(enabledFeatures).some(value => typeof value !== 'boolean')
+      Array.isArray(enabledFeatures)
     ) {
       res.status(400).json({
         success: false,
         message: 'Valid enabledFeatures object is required'
+      });
+      return;
+    }
+
+    const featureValidation = validateTenantFeatures(enabledFeatures);
+
+    if (!featureValidation.valid) {
+      res.status(400).json({
+        success: false,
+        message: featureValidation.message,
       });
       return;
     }
@@ -599,3 +615,4 @@ export const restoreTenant = async (
     });
   }
 };
+

@@ -1,4 +1,4 @@
-import { Tenant, TenantModuleConfig, TenantPreset } from '@/types/tenant';
+﻿import { Tenant, TenantFeature, TenantModuleConfig, TenantPreset } from '@/types/tenant';
 
 export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
   // =========================================================================
@@ -276,16 +276,20 @@ export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
 ];
 
 // Helper to generate a flat map of all feature keys (parent + sub-options)
-const buildFullFeatures = (config: Record<string, boolean>): Record<string, boolean> => {
+const buildFullFeatures = (config: Record<string, boolean>): Record<TenantFeature, boolean> => {
   const result: Record<string, boolean> = {};
+
   HIERARCHICAL_MODULES.forEach((mod) => {
-    const isParentEnabled = config[mod.key] ?? false;
+    const isParentEnabled = config[mod.key] === true;
     result[mod.key] = isParentEnabled;
+
     mod.subOptions.forEach((sub) => {
-      result[sub.key] = config[sub.key] !== undefined ? config[sub.key] : isParentEnabled;
+      result[sub.key] =
+        isParentEnabled && (config[sub.key] ?? true);
     });
   });
-  return result;
+
+  return result as Record<TenantFeature, boolean>;
 };
 
 // Presets for 1-click tenant setup
@@ -422,3 +426,4 @@ export const INITIAL_TENANTS: Tenant[] = [
     enabledFeatures: { ...TENANT_PRESETS[1].features }
   }
 ];
+
