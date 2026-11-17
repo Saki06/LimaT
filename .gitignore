@@ -17,6 +17,9 @@ dist/
 # Testing & Coverage
 coverage/
 
+# Test build output
+frontend/.test-build/
+
 # Misc & OS
 .DS_Store
 *.pem

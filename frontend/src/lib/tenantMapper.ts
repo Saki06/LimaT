@@ -1,4 +1,5 @@
 import type { Tenant } from '@/types/tenant';
+import { normalizeTenantFeatures } from '@/lib/tenantFeatures';
 
 interface BackendTenant {
   id: string;
@@ -49,7 +50,7 @@ export function mapBackendTenant(data: BackendTenant): Tenant {
     studentCount: settings.studentCount ?? 0,
     teacherCount: settings.teacherCount ?? 0,
     monthlyFeeLkr: settings.monthlyFeeLkr ?? 0,
-    enabledFeatures: settings.enabledFeatures ?? {},
+    enabledFeatures: normalizeTenantFeatures(settings.enabledFeatures),
     createdAt: data.createdAt,
     renewalDate: settings.renewalDate ?? '',
     primaryColor: settings.primaryColor,

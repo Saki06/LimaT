@@ -40,8 +40,14 @@ import {
   StoredAthleteRegistration,
 } from '@/components/sports/sportsRegistrationData';
 import { Tenant, TenantFeature, TenantType } from '@/types/tenant';
-import { INITIAL_TENANTS, TENANT_PRESETS } from '@/data/tenantMockData';
-import { isTenantFeatureEnabled } from '@/lib/tenantFeatures';
+import {
+  INITIAL_TENANTS,
+  HIERARCHICAL_MODULES,
+} from '@/data/tenantMockData';
+import {
+  isTenantFeatureEnabled,
+  normalizeTenantFeatures,
+} from '@/lib/tenantFeatures';
 import {
   mockUsers,
   initialGrades,
@@ -234,10 +240,18 @@ interface AppContextType {
   activeTenantId: string;
   activeTenant: Tenant;
   setActiveTenantId: (id: string) => void;
-  updateTenantFeature: (tenantId: string, feature: string, enabled: boolean) => void;
-  applyTenantPreset: (tenantId: string, presetId: string) => void;
+  updateTenantFeature: (tenantId: string, feature: string, enabled: boolean) => Promise<boolean>;
+  updateTenantFeatures: (
+  tenantId: string,
+  changes: Record<string, boolean>,
+  replace?: boolean
+) => Promise<boolean>;
   addTenant: (tenant: Tenant) => void;
   updateTenant: (tenant: Tenant) => void;
+  updateTenantFeaturesLocally: (
+  tenantId: string,
+  features: Record<string, boolean>
+) => void;
   deleteTenant: (tenantId: string) => void;
   isFeatureEnabled: (feature: string) => boolean;
 
@@ -408,42 +422,208 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const activeTenant = tenants.find((t) => t.id === activeTenantId) || tenants[0];
 
-  const updateTenantFeature = (tenantId: string, feature: string, enabled: boolean) => {
-    setTenants((prev) =>
-      prev.map((t) => {
-        if (t.id === tenantId) {
-          return {
-            ...t,
-            enabledFeatures: {
-              ...t.enabledFeatures,
-              [feature]: enabled
-            }
-          };
-        }
-        return t;
-      })
-    );
-  };
+  const featureUpdateQueues = useRef(
+  new Map<string, Promise<boolean>>()
+);
 
-  const applyTenantPreset = (tenantId: string, presetId: string) => {
-    const preset = TENANT_PRESETS.find((p) => p.id === presetId);
-    if (!preset) return;
-    setTenants((prev) =>
-      prev.map((t) => {
-        if (t.id === tenantId) {
-          return {
-            ...t,
-            type: preset.type,
-            enabledFeatures: { ...preset.features }
-          };
-        }
-        return t;
-      })
-    );
-  };
+const archivedTenantIds = useRef(new Set<string>());
 
+const latestFeatureConfigs = useRef<
+  Record<string, Record<string, boolean>>
+>({});
+
+const updateTenantFeature = async (
+  tenantId: string,
+  feature: string,
+  enabled: boolean
+): Promise<boolean> => {
+  if (currentRole !== 'super_admin') {
+    console.error('Only Super Admin can update tenant features.');
+    return false;
+  }
+
+  const previousRequest =
+    featureUpdateQueues.current.get(tenantId) ??
+    Promise.resolve(true);
+
+  const currentRequest = previousRequest
+    .catch(() => false)
+    .then(async () => {
+      if (archivedTenantIds.current.has(tenantId)) {
+  throw new Error('Archived tenant cannot be updated.');
+}
+      const tenant = tenants.find((item) => item.id === tenantId);
+
+if (!tenant) {
+  throw new Error('Tenant not found.');
+}
+
+      const currentFeatures =
+  latestFeatureConfigs.current[tenantId] ??
+  normalizeTenantFeatures(tenant.enabledFeatures);
+
+const updatedFeatures = {
+  ...currentFeatures,
+  [feature]: enabled,
+};
+
+      const parentModule = HIERARCHICAL_MODULES.find(
+        (module) => module.key === feature
+      );
+
+      if (parentModule && !enabled) {
+  // Parent OFF: disable all child features
+  parentModule.subOptions.forEach((sub) => {
+    updatedFeatures[sub.key] = false;
+  });
+} else if (enabled) {
+  // Child ON: automatically enable its parent
+  const childParent = HIERARCHICAL_MODULES.find(
+    (module) =>
+      module.subOptions.some((sub) => sub.key === feature)
+  );
+
+  if (childParent) {
+    updatedFeatures[childParent.key] = true;
+  }
+}
+
+      const result = await api.tenants.updateFeatures(
+  tenantId,
+  updatedFeatures
+);
+
+if (archivedTenantIds.current.has(tenantId)) {
+  delete latestFeatureConfigs.current[tenantId];
+  return false;
+}
+
+const savedTenant = result.data
+  ? mapBackendTenant(result.data)
+  : null;
+
+const savedFeatures = savedTenant?.enabledFeatures ?? updatedFeatures;
+
+latestFeatureConfigs.current[tenantId] = savedFeatures;
+
+      setTenants((prev) =>
+        prev.map((item) =>
+          item.id === tenantId
+            ? {
+                ...item,
+                enabledFeatures: savedFeatures,
+              }
+            : item
+        )
+      );
+
+      return true;
+    })
+    .catch((error) => {
+      console.error('Failed to update tenant feature:', error);
+      return false;
+    });
+
+  featureUpdateQueues.current.set(tenantId, currentRequest);
+
+  try {
+    return await currentRequest;
+  } finally {
+    if (
+      featureUpdateQueues.current.get(tenantId) === currentRequest
+    ) {
+      featureUpdateQueues.current.delete(tenantId);
+    }
+  }
+};
+
+const updateTenantFeatures = async (
+  tenantId: string,
+  changes: Record<string, boolean>,
+  replace = false
+): Promise<boolean> => {
+  if (currentRole !== 'super_admin') {
+    console.error('Only Super Admin can update tenant features.');
+    return false;
+  }
+
+  const previousRequest =
+    featureUpdateQueues.current.get(tenantId) ??
+    Promise.resolve(true);
+
+  const currentRequest = previousRequest
+    .catch(() => false)
+    .then(async () => {
+      if (archivedTenantIds.current.has(tenantId)) {
+        throw new Error('Archived tenant cannot be updated.');
+      }
+
+      const tenant = tenants.find((item) => item.id === tenantId);
+
+      if (!tenant) {
+        throw new Error('Tenant not found.');
+      }
+
+      const currentFeatures =
+  latestFeatureConfigs.current[tenantId] ??
+  normalizeTenantFeatures(tenant.enabledFeatures);
+
+const mergedFeatures = replace
+  ? { ...changes }
+  : { ...currentFeatures, ...changes };
+
+const updatedFeatures = normalizeTenantFeatures(mergedFeatures);
+
+      const result = await api.tenants.updateFeatures(
+        tenantId,
+        updatedFeatures
+      );
+
+      if (archivedTenantIds.current.has(tenantId)) {
+        delete latestFeatureConfigs.current[tenantId];
+        return false;
+      }
+
+      const savedTenant = result.data
+        ? mapBackendTenant(result.data)
+        : null;
+
+      const savedFeatures =
+        savedTenant?.enabledFeatures ?? updatedFeatures;
+
+      latestFeatureConfigs.current[tenantId] = savedFeatures;
+
+      setTenants((prev) =>
+        prev.map((item) =>
+          item.id === tenantId
+            ? { ...item, enabledFeatures: savedFeatures }
+            : item
+        )
+      );
+
+      return true;
+    })
+    .catch((error) => {
+      console.error('Failed to update tenant features:', error);
+      return false;
+    });
+
+  featureUpdateQueues.current.set(tenantId, currentRequest);
+
+  try {
+    return await currentRequest;
+  } finally {
+    if (featureUpdateQueues.current.get(tenantId) === currentRequest) {
+      featureUpdateQueues.current.delete(tenantId);
+    }
+  }
+};
 
   const addTenant = (tenant: Tenant) => {
+archivedTenantIds.current.delete(tenant.id);
+    latestFeatureConfigs.current[tenant.id] =
+  normalizeTenantFeatures(tenant.enabledFeatures);
+
     setTenants((prev) => {
       const existingTenant = prev.find((t) => t.id === tenant.id);
 
@@ -459,16 +639,60 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
   const updateTenant = (updated: Tenant) => {
-    setTenants((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-  };
+  const normalizedFeatures = normalizeTenantFeatures(
+    updated.enabledFeatures
+  );
+
+  latestFeatureConfigs.current[updated.id] = normalizedFeatures;
+
+  setTenants((prev) =>
+    prev.map((tenant) =>
+      tenant.id === updated.id
+        ? {
+            ...tenant,
+            ...updated,
+            enabledFeatures: normalizedFeatures,
+          }
+        : tenant
+    )
+  );
+};
+
+const updateTenantFeaturesLocally = (
+  tenantId: string,
+  features: Record<string, boolean>
+) => {
+  const normalizedFeatures = normalizeTenantFeatures(features);
+
+if (archivedTenantIds.current.has(tenantId)) return;
+  latestFeatureConfigs.current[tenantId] = normalizedFeatures;
+
+  setTenants((prev) =>
+    prev.map((tenant) =>
+      tenant.id === tenantId
+        ? {
+            ...tenant,
+            enabledFeatures: normalizedFeatures,
+          }
+        : tenant
+    )
+  );
+};
 
   const deleteTenant = (tenantId: string) => {
-    setTenants((prev) => prev.filter((t) => t.id !== tenantId));
-    if (activeTenantId === tenantId && tenants.length > 1) {
-      const remaining = tenants.filter((t) => t.id !== tenantId);
-      setActiveTenantId(remaining[0].id);
-    }
-  };
+  archivedTenantIds.current.add(tenantId);
+  delete latestFeatureConfigs.current[tenantId];
+
+  setTenants((prev) => {
+    const remaining = prev.filter((t) => t.id !== tenantId);
+
+    if (activeTenantId === tenantId) {
+  setActiveTenantId(remaining[0]?.id ?? '');
+}
+
+    return remaining;
+  });
+};
 
   const isFeatureEnabled = (feature: string): boolean => {
     if (!activeTenant || !activeTenant.enabledFeatures) {
@@ -507,6 +731,10 @@ const refreshSuperAdminAvatar = useCallback(() => {
         if (result?.data && Array.isArray(result.data)) {
           const realTenants: Tenant[] = result.data.map(mapBackendTenant);
           if (realTenants.length > 0) {
+                        realTenants.forEach((tenant) => {
+              latestFeatureConfigs.current[tenant.id] =
+                normalizeTenantFeatures(tenant.enabledFeatures);
+            });
             setTenants(realTenants);
             if (!realTenants.some((t) => t.id === activeTenantId)) {
               setActiveTenantId(realTenants[0]?.id ?? '');
@@ -3315,10 +3543,11 @@ useEffect(() => {
         activeTenantId,
         activeTenant,
         setActiveTenantId,
-        updateTenantFeature,
-        applyTenantPreset,
+                updateTenantFeature,
+        updateTenantFeatures,
         addTenant,
         updateTenant,
+        updateTenantFeaturesLocally,
         deleteTenant,
         isFeatureEnabled,
         toasts,

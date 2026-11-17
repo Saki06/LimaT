@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { Tenant, FeatureCategory } from "@/types/tenant";
 import { HIERARCHICAL_MODULES } from "@/data/tenantMockData";
@@ -36,11 +36,10 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
     activeTenantId,
     activeTenant,
     setActiveTenantId,
-    updateTenantFeature,
-    applyTenantPreset,
-    addTenant,
-    updateTenant,
-    deleteTenant,
+updateTenantFeatures,
+addTenant,
+updateTenant,
+deleteTenant,
     currentView,
     setCurrentView
   } = useApp();
@@ -188,78 +187,29 @@ const handleRestoreTenant = async (tenantId: string) => {
 
   const [isSavingFeatures, setIsSavingFeatures] = useState(false);
 
-const featureSaveQueue = useRef<Promise<void>>(Promise.resolve());
-
-const latestFeatures = useRef<
-  Record<string, Record<string, boolean>>
->({});
-
-const saveTenantFeatures = (
+const saveTenantFeatures = async (
   tenant: Tenant,
   changes: Record<string, boolean>,
   replace = false
 ) => {
-  const currentFeatures =
-    latestFeatures.current[tenant.id] ?? tenant.enabledFeatures;
-
-  const updatedFeatures = replace
-    ? { ...changes }
-    : { ...currentFeatures, ...changes };
-
-  latestFeatures.current[tenant.id] = updatedFeatures;
-
   setIsSavingFeatures(true);
 
-  featureSaveQueue.current = featureSaveQueue.current
-    .catch(() => {})
-    .then(async () => {
-      try {
-        await api.tenants.updateFeatures(
-          tenant.id,
-          updatedFeatures
-        );
+try {
+  const saved = await updateTenantFeatures(
+    tenant.id,
+    changes,
+    replace
+  );
 
-        updateTenant({
-          ...tenant,
-          enabledFeatures: updatedFeatures,
-        });
+    if (!saved) {
+      showToast(`Failed to save feature settings for ${tenant.name}`);
+      return;
+    }
 
-        showToast(`Feature settings saved for ${tenant.name}`);
-      } catch (error) {
-        console.error("Feature save failed:", error);
-
-        alert(
-          error instanceof Error
-            ? error.message
-            : "Failed to save feature settings"
-        );
-
-        // Reload the authoritative database state after failure.
-        try {
-          const result = await api.tenants.getAll();
-          const savedTenant = result.data.find(
-            (item: { id: string }) => item.id === tenant.id
-          );
-
-          if (savedTenant) {
-            const settings = savedTenant.settings ?? {};
-            const savedFeatures = settings.enabledFeatures ?? {};
-
-            latestFeatures.current[tenant.id] = savedFeatures;
-
-            updateTenant({
-              ...tenant,
-              enabledFeatures: savedFeatures,
-            });
-          }
-        } catch (reloadError) {
-          console.error("Failed to reload features:", reloadError);
-        }
-      }
-    })
-    .finally(() => {
-      setIsSavingFeatures(false);
-    });
+    showToast(`Feature settings saved for ${tenant.name}`);
+  } finally {
+    setIsSavingFeatures(false);
+  }
 };
 
   // Platform Metrics
@@ -311,9 +261,13 @@ const saveTenantFeatures = (
 
   const changes: Record<string, boolean> = {};
 
-  targetModule.subOptions.forEach((sub) => {
-    changes[sub.key] = enable;
-  });
+if (enable) {
+  changes[targetModule.key] = true;
+}
+
+targetModule.subOptions.forEach((sub) => {
+  changes[sub.key] = enable;
+});
 
   void saveTenantFeatures(matrixTenant, changes);
 };

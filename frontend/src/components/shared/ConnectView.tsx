@@ -356,21 +356,31 @@ export function ConnectView() {
   };
 
   // Handle toggling feature on the active tenant
-  const handleToggleFeature = (featureKey: string, currentVal: boolean, label: string) => {
-    if (!activeTenant) return;
-    const nextVal = !currentVal;
-    updateTenantFeature(activeTenant.id, featureKey, nextVal);
-    // If enabling sub-option but parent module is disabled, enable parent module too
-    if (nextVal && !isConnectModuleEnabled && featureKey !== "find_teachers") {
-      updateTenantFeature(activeTenant.id, "find_teachers", true);
-      updateTenantFeature(activeTenant.id, "tuition_subscriptions", true);
-    }
-    addToast({
-      type: nextVal ? "success" : "info",
-      title: nextVal ? "Feature Enabled" : "Feature Disabled",
-      message: `"${label}" has been ${nextVal ? "ENABLED" : "DISABLED"} for ${activeTenant.name}.`
-    });
-  };
+ const handleToggleFeature = async (
+  featureKey: string,
+  currentVal: boolean,
+  label: string
+) => {
+  if (!activeTenant || currentRole !== "super_admin") return;
+
+  const nextVal = !currentVal;
+
+  const saved = await updateTenantFeature(
+    activeTenant.id,
+    featureKey,
+    nextVal
+  );
+
+  addToast({
+    type: saved ? (nextVal ? "success" : "info") : "error",
+    title: saved
+      ? (nextVal ? "Feature Enabled" : "Feature Disabled")
+      : "Update Failed",
+    message: saved
+      ? `"${label}" has been ${nextVal ? "ENABLED" : "DISABLED"} for ${activeTenant.name}.`
+      : `Could not update "${label}". Please try again.`,
+  });
+};
 
   // Keep all hooks above these role-specific returns so hook order never changes.
   if (currentRole === "teacher") {
@@ -379,46 +389,61 @@ export function ConnectView() {
 
   // If Find Teachers module is globally disabled by Super Admin or Tenant Config
   if (!hubSettings.enabled || !isConnectModuleEnabled) {
-    return (
-      <div className="space-y-6 max-w-4xl mx-auto py-8">
-        <div className="rounded-3xl border border-[#c4e9e0] bg-white p-8 sm:p-12 text-center shadow-xs">
-          <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200 shadow-xs">
-            <Lock className="w-8 h-8" />
-          </div>
-          <h2 className="text-2xl font-black text-[#0d2b26]">Find Teachers Option is Currently Disabled</h2>
-          <p className="mt-2 text-xs text-slate-500 max-w-lg mx-auto">
-            The Find Teachers &amp; Tuition Connect module is turned off for <strong>{activeTenant?.name || "this workspace"}</strong>. You can re-enable it from the Super Admin Sub-Feature Matrix or click the button below.
-          </p>
+  return (
+    <div className="space-y-6 max-w-4xl mx-auto py-8">
+      <div className="rounded-3xl border border-[#c4e9e0] bg-white p-8 sm:p-12 text-center shadow-xs">
+        <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200 shadow-xs">
+          <Lock className="w-8 h-8" />
+        </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <h2 className="text-2xl font-black text-[#0d2b26]">
+          Find Teachers Option is Currently Disabled
+        </h2>
+
+        <p className="mt-2 text-xs text-slate-500 max-w-lg mx-auto">
+          The Find Teachers &amp; Tuition Connect module is turned off for{" "}
+          <strong>{activeTenant?.name || "this workspace"}</strong>.
+          You can re-enable it from the Super Admin Sub-Feature Matrix.
+        </p>
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          {currentRole === "super_admin" && (
             <button
-              onClick={() => {
-                if (activeTenant) {
-                  updateTenantFeature(activeTenant.id, "find_teachers", true);
-                  updateTenantFeature(activeTenant.id, "tuition_subscriptions", true);
-                  addToast({
-                    type: "success",
-                    title: "Feature Re-Enabled",
-                    message: `Find Teachers option re-enabled for ${activeTenant.name}!`
-                  });
-                }
+              onClick={async () => {
+                if (!activeTenant) return;
+
+                const saved = await updateTenantFeature(
+                  activeTenant.id,
+                  "find_teachers",
+                  true
+                );
+
+                addToast({
+                  type: saved ? "success" : "error",
+                  title: saved ? "Feature Re-Enabled" : "Update Failed",
+                  message: saved
+                    ? `Find Teachers option re-enabled for ${activeTenant.name}!`
+                    : "Could not re-enable Find Teachers. Please try again.",
+                });
               }}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#093f34] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
             >
               <Power className="w-4 h-4 text-emerald-300" />
               <span>Enable Find Teachers Option Now</span>
             </button>
-            <button
-              onClick={() => setCurrentView("dashboard")}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer"
-            >
-              <span>Back to Dashboard</span>
-            </button>
-          </div>
+          )}
+
+          <button
+            onClick={() => setCurrentView("dashboard")}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+          >
+            <span>Back to Dashboard</span>
+          </button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-16">
@@ -566,26 +591,29 @@ export function ConnectView() {
           </div>
 
           {/* Quick Toggle Controller Button */}
-          <button
-            onClick={() => setShowFeatureControls((prev) => !prev)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer shrink-0 ${
-              showFeatureControls
-                ? "bg-[#0d5c4d] text-white border-[#0d5c4d] shadow-xs"
-                : "bg-white text-slate-700 border-[#c4e9e0] hover:bg-slate-50 shadow-2xs"
-            }`}
-          >
-            <Sliders className="h-3.5 w-3.5" />
-            <span>Configure Options</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-extrabold ${
-              showFeatureControls ? "bg-white/20 text-white" : "bg-amber-100 text-amber-900 border border-amber-200"
-            }`}>
-              4 Switches
-            </span>
-          </button>
-        </div>
-
+{currentRole === "super_admin" && (
+  <button
+    onClick={() => setShowFeatureControls((prev) => !prev)}
+    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer shrink-0 ${
+      showFeatureControls
+        ? "bg-[#0d5c4d] text-white border-[#0d5c4d] shadow-xs"
+        : "bg-white text-slate-700 border-[#c4e9e0] hover:bg-slate-50 shadow-2xs"
+    }`}
+  >
+    <Sliders className="h-3.5 w-3.5" />
+    <span>Configure Options</span>
+    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
+      showFeatureControls
+        ? "bg-white/20 text-white"
+        : "bg-amber-100 text-amber-900 border border-amber-200"
+    }`}>
+      4 Switches
+    </span>
+  </button>
+)}
+</div>
         {/* Feature Controls Dropdown Panel */}
-        {showFeatureControls && (
+        {currentRole === "super_admin" && showFeatureControls && (
           <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-[#0d2b26] text-white shadow-xl border border-slate-700 animate-in fade-in slide-in-from-top-2 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-700/80 mb-3">
               <div className="flex items-center gap-2">
@@ -751,8 +779,9 @@ export function ConnectView() {
                 Option 1 (Find Teachers), Option 2 (Subscriptions), and Option 3 (Study Groups) are currently disabled. You can re-enable any of them using the buttons below:
               </p>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-              <button
+            {currentRole === "super_admin" && (
+  <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+    <button
                 onClick={() => handleToggleFeature("sub_connect_find_teachers", false, "Option 1: Find Teachers Tab")}
                 className="px-3.5 py-2 rounded-xl bg-[#0d5c4d] text-white text-xs font-bold shadow-xs cursor-pointer hover:bg-[#093f34]"
               >
@@ -771,6 +800,7 @@ export function ConnectView() {
                 + Enable Option 3 (Study Groups)
               </button>
             </div>
+            )}
           </div>
         )}
 
