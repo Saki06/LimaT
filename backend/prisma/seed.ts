@@ -1,5 +1,6 @@
 import { PrismaClient, Role, TenantStatus, EventStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { validatePasswordStrength } from '../src/utils/passwordPolicy';
 
 const prisma = new PrismaClient();
 
@@ -18,7 +19,14 @@ async function main() {
   await prisma.user.deleteMany();
   await prisma.tenant.deleteMany();
 
-  const passwordHash = await bcrypt.hash('password123', 10);
+  const seedPassword = process.env.SEED_PASSWORD;
+  const passwordValidation = seedPassword
+    ? validatePasswordStrength(seedPassword)
+    : { valid: false as const, message: 'SEED_PASSWORD is required.' };
+  if (!passwordValidation.valid) {
+    throw new Error(passwordValidation.message);
+  }
+  const passwordHash = await bcrypt.hash(seedPassword, 12);
 
   // 1. Create Tenants (Schools)
   const tenant1 = await prisma.tenant.create({

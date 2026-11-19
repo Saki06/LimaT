@@ -660,7 +660,7 @@ export const getMyTeacherDashboard = async (req: AuthenticatedRequest, res: Resp
         assignment: {
           OR: [{ teacherId }, ...(tenantId ? [{ tenantId }] : [])],
         },
-        status: { in: ['SUBMITTED', 'LATE'] },
+        status: 'SUBMITTED',
       },
     });
 
@@ -764,6 +764,106 @@ export const getMyTeacherDashboard = async (req: AuthenticatedRequest, res: Resp
   } catch (error: any) {
     console.error('Error fetching teacher dashboard:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
+/**
+ * GET /api/teachers/me/classes
+ * Read-only: Fetch classes belonging to the authenticated teacher's tenant
+ */
+export const getMyTeacherClasses = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+
+    if (!tenantId) {
+      res.status(403).json({
+        success: false,
+        message: 'Organization access required.',
+      });
+      return;
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { settings: true },
+    });
+
+    if (!tenant) {
+      res.status(404).json({
+        success: false,
+        message: 'Organization not found.',
+      });
+      return;
+    }
+
+    const settings = (tenant.settings as Record<string, any>) || {};
+    const classes = Array.isArray(settings.classes)
+      ? settings.classes
+      : [];
+
+    res.status(200).json({
+      success: true,
+      data: classes,
+    });
+  } catch (error) {
+    console.error('Error fetching teacher classes:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch classes.',
+    });
+  }
+};
+
+/**
+ * GET /api/teachers/me/subjects
+ * Read-only: Fetch subjects belonging to the authenticated teacher's tenant
+ */
+export const getMyTeacherSubjects = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+
+    if (!tenantId) {
+      res.status(403).json({
+        success: false,
+        message: 'Organization access required.',
+      });
+      return;
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { settings: true },
+    });
+
+    if (!tenant) {
+      res.status(404).json({
+        success: false,
+        message: 'Organization not found.',
+      });
+      return;
+    }
+
+    const settings = (tenant.settings as Record<string, any>) || {};
+    const subjects = Array.isArray(settings.subjects)
+      ? settings.subjects
+      : [];
+
+    res.status(200).json({
+      success: true,
+      data: subjects,
+    });
+  } catch (error) {
+    console.error('Error fetching teacher subjects:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch subjects.',
+    });
   }
 };
 

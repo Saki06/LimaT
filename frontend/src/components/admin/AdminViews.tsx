@@ -93,7 +93,8 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     deleteSubject,
     currentUser,
     setCurrentView,
-    addToast
+    addToast,
+    activeTenantId
   } = useApp();
   const staff = useStaff();
   const teacherHubs = useTeacherHubs();
@@ -536,7 +537,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       name: newStud.name,
       email: newStud.email,
       grade: newStud.grade,
-    }).then((created: any) => {
+    },activeTenantId).then((created: any) => {
       if (created?.id) {
         setPlatformUsers((prev) => prev.map((u) => u.id === newStud.id ? { ...u, id: created.id } : u));
       }
@@ -593,7 +594,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     setDeletingUser(null);
     addToast({ type: "info", title: "User Account Removed Successfully" });
 
-    api.admin.deleteUser(userToDelete.id).catch((err: any) => {
+    api.admin.deleteUser(userToDelete.id, activeTenantId).catch((err: any) => {
       console.warn("Backend user deletion skipped:", err);
     });
   };

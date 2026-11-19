@@ -93,7 +93,15 @@ export function useHubSettings() { return useAdmin().hubSettings; }
 const AdminContext = createContext<AdminContextValue | undefined>(undefined);
 
 export function AdminProvider({ children }: { children: React.ReactNode }) {
-  const { currentUser, addToast } = useApp();
+  const {
+  currentUser,
+  addToast,
+  activeTenantId,
+  authUser,
+  isSessionLoaded,
+} = useApp();
+const adminTenantId =
+  authUser?.role === 'SUPER_ADMIN' ? activeTenantId : undefined;
   const [staff, setStaff] = useState<AdminStaffRecord[]>([]);
   const [directory, setDirectory] = useState<AdminDirectoryUser[]>([]);
   const [overviewData, setOverviewData] = useState<AdminOverviewData | null>(null);
@@ -105,41 +113,75 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [hubFlags, setHubFlags] = useState<HubFlag[]>([]);
   const [hubSettings, setHubSettings] = useState(initialHubSettings);
   const [auditLog, setAuditLog] = useState<HubAuditEntry[]>([]);
-  const schoolId = currentUser.schoolId || 'sch_apex_01';
+  const isSuperAdmin = authUser?.role === 'SUPER_ADMIN';
+
+const schoolId = isSuperAdmin
+  ? activeTenantId
+  : authUser?.tenantId || '';
 
   // Fetch live staff, students directory, overview KPIs, and settings from backend
   const fetchAllAdminData = async () => {
-    setIsLoading(true);
-    try {
-      const [staffRes, studentsRes, overviewRes, settingsRes] = await Promise.allSettled([
-        api.admin.getStaff(),
-        api.admin.getStudents(),
-        api.admin.getOverview(),
-        api.admin.getSettings(),
+  const isAdmin =
+    authUser?.role === 'ADMIN' ||
+    authUser?.role === 'SUPER_ADMIN';
+
+  // Never call admin APIs for other roles or before session verification.
+  if (
+    !isSessionLoaded ||
+    authUser?.mustChangePassword ||
+    !isAdmin
+  ) {
+    setStaff([]);
+    setDirectory([]);
+    setOverviewData(null);
+    setSchoolSettings(null);
+    setIsLoading(false);
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    const tenantId = schoolId || undefined;
+
+    const [staffRes, studentsRes, overviewRes, settingsRes] =
+      await Promise.allSettled([
+        api.admin.getStaff(tenantId),
+        api.admin.getStudents(undefined, tenantId),
+        api.admin.getOverview(tenantId),
+        api.admin.getSettings(tenantId),
       ]);
 
-      if (staffRes.status === 'fulfilled' && Array.isArray(staffRes.value)) {
-        setStaff(staffRes.value);
-      }
-      if (studentsRes.status === 'fulfilled' && Array.isArray(studentsRes.value)) {
-        setDirectory(studentsRes.value);
-      }
-      if (overviewRes.status === 'fulfilled' && overviewRes.value) {
-        setOverviewData(overviewRes.value);
-      }
-      if (settingsRes.status === 'fulfilled' && settingsRes.value) {
-        setSchoolSettings(settingsRes.value);
-      }
-    } catch (err) {
-      console.error('Failed to sync admin data from backend:', err);
-    } finally {
-      setIsLoading(false);
+    if (staffRes.status === 'fulfilled' && Array.isArray(staffRes.value)) {
+      setStaff(staffRes.value);
     }
-  };
 
-  useEffect(() => {
-    fetchAllAdminData();
-  }, [schoolId]);
+    if (studentsRes.status === 'fulfilled' && Array.isArray(studentsRes.value)) {
+      setDirectory(studentsRes.value);
+    }
+
+    if (overviewRes.status === 'fulfilled' && overviewRes.value) {
+      setOverviewData(overviewRes.value);
+    }
+
+    if (settingsRes.status === 'fulfilled' && settingsRes.value) {
+      setSchoolSettings(settingsRes.value);
+    }
+  } catch (err) {
+    console.error('Failed to sync admin data from backend:', err);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+ useEffect(() => {
+  void fetchAllAdminData();
+}, [
+  schoolId,
+  authUser?.role,
+  authUser?.mustChangePassword,
+  isSessionLoaded,
+]);
 
   const value = useMemo<AdminContextValue>(() => ({
     schoolId,
@@ -160,7 +202,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       // Optimistic state update
       setStaff((records) => records.map((record) => record.id === id ? { ...record, status } : record));
       // Persist to backend database
-      api.admin.updateStaffStatus(id, status).catch((err) => {
+      api.admin.updateStaffStatus(id, status, adminTenantId).catch((err) => {
         console.error('Error persisting staff status:', err);
       });
     },
@@ -207,7 +249,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         classes: input.classes,
         medium: input.medium,
         status: input.status,
-      }).then((saved) => {
+}, adminTenantId).then((saved) => {
         if (saved?.id) {
           setStaff((records) => records.map((r) => r.id === newLocalRecord.id ? { ...r, id: saved.id } : r));
         }
@@ -257,7 +299,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         classes: input.classes,
         medium: input.medium,
         status: input.status,
-      }).catch((err) => {
+}, adminTenantId).catch((err) => {
         console.error('Failed to update staff in backend:', err);
       });
 
@@ -266,14 +308,14 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
     updateDirectoryStatus: (id, status) => {
       setDirectory((users) => users.map((user) => user.id === id ? { ...user, status } : user));
-      api.admin.updateStudentStatus(id, status).catch((err) => {
+      api.admin.updateStudentStatus(id, status, adminTenantId).catch((err) => {
         console.error('Failed to update student status in backend:', err);
       });
     },
 
     saveSchoolSettings: async (settingsData) => {
       try {
-        const saved = await api.admin.updateSettings(settingsData);
+        const saved = await api.admin.updateSettings(settingsData, adminTenantId);
         if (saved) {
           setSchoolSettings((prev) => ({ ...(prev || {}), ...saved } as SchoolSettingsData));
           addToast({ type: 'success', title: 'School settings saved to cloud successfully.' });

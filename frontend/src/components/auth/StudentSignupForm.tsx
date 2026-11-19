@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { User as UserIcon, Phone, Mail, Lock, UserPlus, GraduationCap, Loader2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/lib/api";
+import { validatePasswordStrength } from "@/lib/passwordPolicy";
 
 interface StudentSignupFormProps {
   onSuccess: () => void;
@@ -22,6 +23,12 @@ export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const passwordError = validatePasswordStrength(signupPassword);
+    if (passwordError) {
+      addToast({ type: "error", title: "Invalid Password", message: passwordError });
+      return;
+    }
 
     if (signupPassword && signupConfirmPassword && signupPassword !== signupConfirmPassword) {
       addToast({

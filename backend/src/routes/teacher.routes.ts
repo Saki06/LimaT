@@ -1,12 +1,17 @@
 import { Router } from 'express';
 import {
-  getMyTeacherProfile,
+   getMyTeacherProfile,
   updateMyTeacherProfile,
   getPublicTutorProfile,
   getTutorsMarketplace,
   getMyTeacherDashboard,
+  getMyTeacherClasses,
+  getMyTeacherSubjects,
 } from '../controllers/teacher.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import {
+  authenticateToken,
+  requireRoles,
+} from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -21,4 +26,17 @@ router.get('/me/dashboard', authenticateToken, getMyTeacherDashboard);
 router.get('/me', authenticateToken, getMyTeacherProfile);
 router.put('/me', authenticateToken, updateMyTeacherProfile);
 
+router.get(
+  '/me/classes',
+  authenticateToken,
+  requireRoles('TEACHER'),
+  getMyTeacherClasses
+);
+
+router.get(
+  '/me/subjects',
+  authenticateToken,
+  requireRoles('TEACHER'),
+  getMyTeacherSubjects
+);
 export default router;

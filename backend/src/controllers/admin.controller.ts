@@ -2,26 +2,101 @@ import { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../config/prisma';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
+import { generateSetupToken, hashSetupToken } from '../utils/setupToken';
+import { config } from '../config';
 
 /**
  * Helper to resolve the active tenant ID from request user, header, or default
  */
-export const resolveTenantId = async (req: AuthenticatedRequest): Promise<string> => {
-  const rawHeader = req.headers['x-tenant-id'];
-  const headerTenantId = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
-  if (headerTenantId) {
-    const existing = await prisma.tenant.findUnique({ where: { id: headerTenantId, deletedAt: null } });
-    if (existing) return existing.id;
+
+export class TenantResolutionError extends Error {
+  constructor(
+    public readonly status: 400 | 403 | 404,
+    message: string
+  ) {
+    super(message);
   }
-  if (req.user?.tenantId) {
-    const userTenant = await prisma.tenant.findUnique({ where: { id: req.user.tenantId, deletedAt: null } });
-    if (userTenant) return userTenant.id;
+}
+
+const sendTenantResolutionError = (
+  res: Response,
+  error: unknown
+): boolean => {
+  if (!(error instanceof TenantResolutionError)) {
+    return false;
   }
-  const defaultTenant = await prisma.tenant.findFirst({
-    where: { status: 'ACTIVE', deletedAt: null },
-    orderBy: { createdAt: 'asc' },
+
+  let message =
+    error.status === 404
+      ? 'Organization not found.'
+      : error.status === 400
+        ? 'Tenant selection is required.'
+        : 'Access denied.';
+
+  if (error.message === 'Class not found') message = 'Class not found.';
+  if (error.message === 'Subject not found') message = 'Subject not found.';
+
+  res.status(error.status).json({ success: false, message });
+  return true;
+};
+
+export const resolveTenantId = async (
+  req: AuthenticatedRequest
+): Promise<string> => {
+  const user = req.user;
+
+  if (!user) {
+    throw new TenantResolutionError(403, 'Authentication required');
+  }
+
+  let tenantId: string;
+
+  if (user.role === 'SUPER_ADMIN') {
+    const rawHeader = req.headers['x-tenant-id'];
+    const headerTenantId = Array.isArray(rawHeader)
+      ? rawHeader[0]
+      : rawHeader;
+
+    if (!headerTenantId) {
+      throw new TenantResolutionError(400, 'Super Admin tenant selection required');
+    }
+
+    tenantId = headerTenantId;
+  } else {
+    if (user.role !== 'ADMIN') {
+      throw new TenantResolutionError(403, 'Admin access required');
+    }
+
+    if (!user.tenantId) {
+      throw new TenantResolutionError(403, 'User is not assigned to a tenant');
+    }
+
+    const rawHeader = req.headers['x-tenant-id'];
+    const headerTenantId = Array.isArray(rawHeader)
+      ? rawHeader[0]
+      : rawHeader;
+
+    if (headerTenantId && headerTenantId !== user.tenantId) {
+      throw new TenantResolutionError(403, 'Cross-tenant access denied');
+    }
+
+    tenantId = user.tenantId;
+  }
+
+  const tenant = await prisma.tenant.findFirst({
+    where: {
+      id: tenantId,
+      deletedAt: null,
+      status: 'ACTIVE',
+    },
+    select: { id: true },
   });
-  return defaultTenant?.id || '';
+
+  if (!tenant) {
+    throw new TenantResolutionError(404, 'Tenant not found or inactive');
+  }
+
+  return tenant.id;
 };
 
 export const getAdminOverview = async (
@@ -126,6 +201,7 @@ export const getAdminOverview = async (
     });
   } catch (error: any) {
     console.error('Error fetching admin overview:', error);
+    if (sendTenantResolutionError(res, error)) return;
     res.status(500).json({ success: false, message: 'Failed to load school admin overview' });
   }
 };
@@ -183,6 +259,7 @@ export const getStaff = async (
     });
   } catch (error: any) {
     console.error('Error fetching school staff:', error);
+    if (sendTenantResolutionError(res, error)) return;
     res.status(500).json({ success: false, message: 'Failed to fetch staff members' });
   }
 };
@@ -215,7 +292,27 @@ export const createStaff = async (
       return;
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (!['teacher', 'administrator'].includes(role)) {
+  res.status(400).json({
+    success: false,
+    message: 'Invalid staff role.',
+  });
+  return;
+}
+
+if (!['active', 'inactive'].includes(status)) {
+  res.status(400).json({
+    success: false,
+    message: 'Invalid staff status.',
+  });
+  return;
+}
+
+    const cleanEmail = String(email).trim().toLowerCase();
+
+const existingUser = await prisma.user.findUnique({
+  where: { email: cleanEmail },
+});
     if (existingUser) {
       res.status(400).json({ success: false, message: 'A user with this email already exists.' });
       return;
@@ -224,37 +321,63 @@ export const createStaff = async (
     const nameParts = name.trim().split(' ');
     const firstName = nameParts[0] || 'Staff';
     const lastName = nameParts.slice(1).join(' ') || 'Member';
-    const defaultPasswordHash = await bcrypt.hash('Staff@123', 10);
     const systemRole = role === 'administrator' ? 'ADMIN' : 'TEACHER';
-
-    const newUser = await prisma.user.create({
-      data: {
-        tenantId,
-        email,
-        passwordHash: defaultPasswordHash,
-        firstName,
-        lastName,
-        role: systemRole,
-        isActive: status === 'active',
-      },
-    });
-
     const employeeNo = staffId || `EMP-${Date.now().toString().slice(-6)}`;
     const specialization = Array.isArray(subjects) && subjects.length > 0 ? subjects.join(', ') : 'Educator';
 
-    if (systemRole === 'TEACHER') {
-      await prisma.teacherProfile.create({
+    const setupToken = generateSetupToken();
+    const setupTokenHash = hashSetupToken(setupToken);
+    const passwordHash = await bcrypt.hash(setupToken, 12);
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    let newUser: any;
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Tenant"
+        WHERE "id" = ${tenantId}
+        FOR UPDATE
+      `;
+
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) throw new TenantResolutionError(404, 'Organization not found');
+
+      newUser = await tx.user.create({
         data: {
-          userId: newUser.id,
-          employeeNo,
-          specialization,
-          phone: phone || '',
-          mediums: [medium.charAt(0).toUpperCase() + medium.slice(1)],
-          qualifications: qualification ? [{ degree: qualification, institution: 'Certified Institution' }] : [],
-          isVerified: true,
+          tenantId,
+          email: cleanEmail,
+          passwordHash,
+          mustChangePassword: true,
+          firstName,
+          lastName,
+          role: systemRole,
+          isActive: status === 'active',
         },
       });
-    }
+
+      if (systemRole === 'TEACHER') {
+        await tx.teacherProfile.create({
+          data: {
+            userId: newUser.id,
+            employeeNo,
+            specialization,
+            phone: phone || '',
+            mediums: [medium.charAt(0).toUpperCase() + medium.slice(1)],
+            qualifications: qualification ? [{ degree: qualification, institution: 'Certified Institution' }] : [],
+            isVerified: true,
+          },
+        });
+      }
+
+      await tx.setupToken.create({
+        data: {
+          userId: newUser.id,
+          tenantId,
+          tokenHash: setupTokenHash,
+          expiresAt,
+          createdAt: new Date(),
+        },
+      });
+    });
 
     const createdStaff = {
       id: newUser.id,
@@ -281,6 +404,7 @@ export const createStaff = async (
     });
   } catch (error: any) {
     console.error('Error creating staff:', error);
+    if (sendTenantResolutionError(res, error)) return;
     res.status(500).json({ success: false, message: 'Failed to create staff member.' });
   }
 };
@@ -294,11 +418,11 @@ export const updateStaff = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = await resolveTenantId(req);
     const id = String(req.params.id);
     const {
       name,
       email,
-      role,
       staffId,
       phone,
       qualification,
@@ -308,10 +432,14 @@ export const updateStaff = async (
       status,
     } = req.body;
 
-    const user = await prisma.user.findUnique({
-      where: { id },
-      include: { teacherProfile: true },
-    });
+    const user = await prisma.user.findFirst({
+  where: {
+    id,
+    tenantId,
+    role: { in: ['TEACHER', 'ADMIN'] },
+  },
+  include: { teacherProfile: true },
+});
     if (!user) {
       res.status(404).json({ success: false, message: 'Staff member not found.' });
       return;
@@ -324,18 +452,48 @@ export const updateStaff = async (
       updateUserData.lastName = parts.slice(1).join(' ') || user.lastName;
     }
     if (email && email !== user.email) {
-      updateUserData.email = email;
-    }
+  const normalizedEmail = String(email).trim().toLowerCase();
+
+  const existingEmailUser = await prisma.user.findFirst({
+    where: {
+      email: normalizedEmail,
+      id: { not: id },
+    },
+    select: { id: true },
+  });
+
+  if (existingEmailUser) {
+    res.status(409).json({
+      success: false,
+      message: 'This email is already in use.',
+    });
+    return;
+  }
+
+  updateUserData.email = normalizedEmail;
+}
     if (status !== undefined) {
       updateUserData.isActive = status === 'active';
     }
 
     if (Object.keys(updateUserData).length > 0) {
-      await prisma.user.update({
-        where: { id },
-        data: updateUserData,
-      });
-    }
+  const updateResult = await prisma.user.updateMany({
+    where: {
+      id,
+      tenantId,
+      role: { in: ['TEACHER', 'ADMIN'] },
+    },
+    data: updateUserData,
+  });
+
+  if (updateResult.count !== 1) {
+    res.status(404).json({
+      success: false,
+      message: 'Staff member not found or access denied.',
+    });
+    return;
+  }
+}
 
     if (user.teacherProfile) {
       const updateProfileData: any = {};
@@ -365,6 +523,7 @@ export const updateStaff = async (
     });
   } catch (error: any) {
     console.error('Error updating staff:', error);
+    if (sendTenantResolutionError(res, error)) return;
     res.status(500).json({ success: false, message: 'Failed to update staff member.' });
   }
 };
@@ -378,20 +537,39 @@ export const updateStaffStatus = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = await resolveTenantId(req);
     const id = String(req.params.id);
     const { status } = req.body; // 'active' | 'inactive' | 'suspended'
 
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await prisma.user.findFirst({
+  where: {
+    id,
+    tenantId,
+    role: { in: ['TEACHER', 'ADMIN'] },
+  },
+});
     if (!user) {
       res.status(404).json({ success: false, message: 'Staff member not found.' });
       return;
     }
 
     const isActive = status === 'active';
-    await prisma.user.update({
-      where: { id },
-      data: { isActive },
-    });
+    const updateResult = await prisma.user.updateMany({
+  where: {
+    id,
+    tenantId,
+    role: { in: ['TEACHER', 'ADMIN'] },
+  },
+  data: { isActive },
+});
+
+if (updateResult.count !== 1) {
+  res.status(404).json({
+    success: false,
+    message: 'Staff member not found or access denied.',
+  });
+  return;
+}
 
     res.status(200).json({
       success: true,
@@ -400,6 +578,7 @@ export const updateStaffStatus = async (
     });
   } catch (error: any) {
     console.error('Error updating staff status:', error);
+    if (sendTenantResolutionError(res, error)) return;
     res.status(500).json({ success: false, message: 'Failed to update status.' });
   }
 };
@@ -461,6 +640,7 @@ export const getStudents = async (
     });
   } catch (error: any) {
     console.error('Error fetching students:', error);
+    if (sendTenantResolutionError(res, error)) return;
     res.status(500).json({ success: false, message: 'Failed to fetch student directory.' });
   }
 };
@@ -474,19 +654,38 @@ export const updateStudentStatus = async (
   res: Response
 ): Promise<void> => {
   try {
+    const tenantId = await resolveTenantId(req);
     const id = String(req.params.id);
     const { status } = req.body; // 'active' | 'inactive'
 
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await prisma.user.findFirst({
+  where: {
+    id,
+    tenantId,
+    role: 'STUDENT',
+  },
+});
     if (!user) {
       res.status(404).json({ success: false, message: 'Student user not found.' });
       return;
     }
 
-    await prisma.user.update({
-      where: { id },
-      data: { isActive: status === 'active' },
-    });
+    const updateResult = await prisma.user.updateMany({
+  where: {
+    id,
+    tenantId,
+    role: 'STUDENT',
+  },
+  data: { isActive: status === 'active' },
+});
+
+if (updateResult.count !== 1) {
+  res.status(404).json({
+    success: false,
+    message: 'Student not found or access denied.',
+  });
+  return;
+}
 
     res.status(200).json({
       success: true,
@@ -495,6 +694,7 @@ export const updateStudentStatus = async (
     });
   } catch (error: any) {
     console.error('Error updating student status:', error);
+    if (sendTenantResolutionError(res, error)) return;
     res.status(500).json({ success: false, message: 'Failed to update student status.' });
   }
 };
@@ -544,6 +744,7 @@ export const getSchoolSettings = async (
     });
   } catch (error: any) {
     console.error('Error fetching school settings:', error);
+    if (sendTenantResolutionError(res, error)) return;
     res.status(500).json({ success: false, message: 'Failed to load school settings.' });
   }
 };
@@ -600,6 +801,7 @@ export const updateSchoolSettings = async (
     });
   } catch (error: any) {
     console.error('Error updating school settings:', error);
+    if (sendTenantResolutionError(res, error)) return;
     res.status(500).json({ success: false, message: 'Failed to save school settings.' });
   }
 };
@@ -633,28 +835,56 @@ export const createStudent = async (
 
     const [firstName, ...restName] = String(name).trim().split(' ');
     const lastName = restName.join(' ') || 'Student';
-    const defaultPasswordHash = await bcrypt.hash('Student@123', 10);
     const idNo = studentIdNo || `STU-${Math.floor(10000 + Math.random() * 90000)}`;
 
-    const user = await prisma.user.create({
-      data: {
-        tenantId,
-        email: cleanEmail,
-        passwordHash: defaultPasswordHash,
-        firstName,
-        lastName,
-        role: 'STUDENT',
-        isActive: true,
-      },
-    });
+    const setupToken = generateSetupToken();
+    const setupTokenHash = hashSetupToken(setupToken);
+    const passwordHash = await bcrypt.hash(setupToken, 12);
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-    const profile = await prisma.studentProfile.create({
-      data: {
-        userId: user.id,
-        studentIdNo: idNo,
-        gradeLevel: grade || 'Grade 12',
-        section: section || 'Physical Science',
-      },
+    let user: any;
+    let profile: any;
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Tenant"
+        WHERE "id" = ${tenantId}
+        FOR UPDATE
+      `;
+
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) throw new TenantResolutionError(404, 'Organization not found');
+
+      user = await tx.user.create({
+        data: {
+          tenantId,
+          email: cleanEmail,
+          passwordHash,
+          mustChangePassword: true,
+          firstName,
+          lastName,
+          role: 'STUDENT',
+          isActive: true,
+        },
+      });
+
+      profile = await tx.studentProfile.create({
+        data: {
+          userId: user.id,
+          studentIdNo: idNo,
+          gradeLevel: grade || 'Grade 12',
+          section: section || 'Physical Science',
+        },
+      });
+
+      await tx.setupToken.create({
+        data: {
+          userId: user.id,
+          tenantId,
+          tokenHash: setupTokenHash,
+          expiresAt,
+          createdAt: new Date(),
+        },
+      });
     });
 
     res.status(201).json({
@@ -673,7 +903,67 @@ export const createStudent = async (
     });
   } catch (error: any) {
     console.error('Error creating student in admin:', error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to create student.' });
+    if (sendTenantResolutionError(res, error)) return;
+    res.status(500).json({ success: false, message: 'Failed to create student.' });
+  }
+};
+
+export const deliverSetupLink = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenantId = await resolveTenantId(req);
+    const userId = String(req.params.id);
+    const setupToken = generateSetupToken();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+
+    const created = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.findFirst({
+        where: {
+          id: userId,
+          tenantId,
+          isActive: true,
+          role: { in: ['ADMIN', 'TEACHER', 'STUDENT'] },
+        },
+        select: { id: true },
+      });
+
+      if (!user) return null;
+
+      await tx.setupToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: now },
+      });
+
+      return tx.setupToken.create({
+        data: {
+          userId: user.id,
+          tenantId,
+          tokenHash: hashSetupToken(setupToken),
+          expiresAt,
+        },
+        select: { expiresAt: true },
+      });
+    });
+
+    if (!created) {
+      res.status(404).json({ success: false, message: 'Active user not found.' });
+      return;
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).json({
+      success: true,
+      message: 'One-time setup link generated. Deliver it through your approved secure channel.',
+      setupLink: `${config.frontendUrl}/setup-password#token=${encodeURIComponent(setupToken)}&tenantId=${encodeURIComponent(tenantId)}`,
+      expiresAt: created.expiresAt,
+    });
+  } catch (error: any) {
+    console.error('Error generating setup link:', error);
+    if (sendTenantResolutionError(res, error)) return;
+    res.status(500).json({ success: false, message: 'Failed to generate setup link.' });
   }
 };
 
@@ -687,7 +977,15 @@ export const deleteUser = async (
 ): Promise<void> => {
   try {
     const id = String(req.params.id);
-    const user = await prisma.user.findUnique({ where: { id } });
+    const tenantId = await resolveTenantId(req);
+
+const user = await prisma.user.findFirst({
+  where: {
+    id,
+    tenantId,
+    role: { in: ['STUDENT', 'TEACHER', 'ADMIN'] },
+  },
+});
     if (!user) {
       res.status(404).json({ success: false, message: 'User not found.' });
       return;
@@ -701,7 +999,8 @@ export const deleteUser = async (
     });
   } catch (error: any) {
     console.error('Error deleting user in admin:', error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to delete user.' });
+    if (sendTenantResolutionError(res, error)) return;
+    res.status(500).json({ success: false, message: 'Failed to delete user.' });
   }
 };
 
@@ -715,20 +1014,17 @@ export const getClasses = async (
 ): Promise<void> => {
   try {
     const tenantId = await resolveTenantId(req);
-    if (!tenantId) {
-      res.status(200).json({ success: true, data: [] });
-      return;
-    }
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) {
-      res.status(200).json({ success: true, data: [] });
+      res.status(404).json({ success: false, message: 'Organization not found.' });
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
     const classes = Array.isArray(settings.classes) ? settings.classes : [];
     res.status(200).json({ success: true, data: classes });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in getClasses:', error);
+    if (sendTenantResolutionError(res, error)) return;
     res.status(500).json({ success: false, message: 'Failed to fetch classes.' });
   }
 };
@@ -743,18 +1039,11 @@ export const createClass = async (
 ): Promise<void> => {
   try {
     const tenantId = await resolveTenantId(req);
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) {
-      res.status(404).json({ success: false, message: 'School tenant not found.' });
-      return;
-    }
     const { name, gradeId, gradeName, classTeacherId, classTeacherName, studentCount } = req.body;
-    if (!name) {
+    if (typeof name !== 'string' || name.trim().length === 0) {
       res.status(400).json({ success: false, message: 'Class name is required.' });
       return;
     }
-    const settings = (tenant.settings as Record<string, any>) || {};
-    const existingClasses: any[] = Array.isArray(settings.classes) ? settings.classes : [];
 
     const newClass = {
       id: `cls_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -766,15 +1055,27 @@ export const createClass = async (
       studentCount: typeof studentCount === 'number' ? studentCount : 35,
     };
 
-    const updatedClasses = [newClass, ...existingClasses];
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Tenant"
+        WHERE "id" = ${tenantId}
+        FOR UPDATE
+      `;
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) throw new TenantResolutionError(404, 'Organization not found');
+
+      const settings = (tenant.settings as Record<string, any>) || {};
+      const existingClasses: any[] = Array.isArray(settings.classes) ? settings.classes : [];
+
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: {
         settings: {
           ...settings,
-          classes: updatedClasses,
+          classes: [newClass, ...existingClasses],
         },
-      },
+        },
+      });
     });
 
     res.status(201).json({
@@ -782,9 +1083,10 @@ export const createClass = async (
       message: 'Class created successfully.',
       data: newClass,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in createClass:', error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to create class.' });
+    if (sendTenantResolutionError(res, error)) return;
+    res.status(500).json({ success: false, message: 'Failed to create class.' });
   }
 };
 
@@ -799,35 +1101,45 @@ export const updateClass = async (
   try {
     const tenantId = await resolveTenantId(req);
     const classId = String(req.params.id);
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) {
-      res.status(404).json({ success: false, message: 'School tenant not found.' });
-      return;
-    }
-    const settings = (tenant.settings as Record<string, any>) || {};
-    const existingClasses: any[] = Array.isArray(settings.classes) ? settings.classes : [];
+    const { name, gradeId, gradeName, classTeacherId, classTeacherName, studentCount } = req.body;
 
-    const index = existingClasses.findIndex((c) => c.id === classId);
-    if (index === -1) {
-      res.status(404).json({ success: false, message: 'Class not found.' });
-      return;
-    }
+    let updatedItem: Record<string, any> | undefined;
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Tenant"
+        WHERE "id" = ${tenantId}
+        FOR UPDATE
+      `;
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) throw new TenantResolutionError(404, 'Organization not found');
 
-    const updatedItem = {
-      ...existingClasses[index],
-      ...req.body,
-      id: classId,
-    };
-    existingClasses[index] = updatedItem;
+      const settings = (tenant.settings as Record<string, any>) || {};
+      const existingClasses: any[] = Array.isArray(settings.classes) ? settings.classes : [];
+      const index = existingClasses.findIndex((c) => c.id === classId);
+      if (index === -1) throw new TenantResolutionError(404, 'Class not found');
 
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        settings: {
-          ...settings,
-          classes: existingClasses,
+      updatedItem = {
+        ...existingClasses[index],
+        ...(name !== undefined && { name: String(name).trim() }),
+        ...(gradeId !== undefined && { gradeId }),
+        ...(gradeName !== undefined && { gradeName }),
+        ...(classTeacherId !== undefined && { classTeacherId }),
+        ...(classTeacherName !== undefined && { classTeacherName }),
+        ...(studentCount !== undefined && { studentCount }),
+        id: classId,
+      };
+      const updatedClasses = [...existingClasses];
+      updatedClasses[index] = updatedItem;
+
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: {
+          settings: {
+            ...settings,
+            classes: updatedClasses,
+          },
         },
-      },
+      });
     });
 
     res.status(200).json({
@@ -835,9 +1147,10 @@ export const updateClass = async (
       message: 'Class updated successfully.',
       data: updatedItem,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in updateClass:', error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to update class.' });
+    if (sendTenantResolutionError(res, error)) return;
+    res.status(500).json({ success: false, message: 'Failed to update class.' });
   }
 };
 
@@ -852,24 +1165,30 @@ export const deleteClass = async (
   try {
     const tenantId = await resolveTenantId(req);
     const classId = String(req.params.id);
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) {
-      res.status(404).json({ success: false, message: 'School tenant not found.' });
-      return;
-    }
-    const settings = (tenant.settings as Record<string, any>) || {};
-    const existingClasses: any[] = Array.isArray(settings.classes) ? settings.classes : [];
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Tenant"
+        WHERE "id" = ${tenantId}
+        FOR UPDATE
+      `;
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) throw new TenantResolutionError(404, 'Organization not found');
 
-    const filtered = existingClasses.filter((c) => c.id !== classId);
+      const settings = (tenant.settings as Record<string, any>) || {};
+      const existingClasses: any[] = Array.isArray(settings.classes) ? settings.classes : [];
+      if (!existingClasses.some((c) => c.id === classId)) {
+        throw new TenantResolutionError(404, 'Class not found');
+      }
 
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        settings: {
-          ...settings,
-          classes: filtered,
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: {
+          settings: {
+            ...settings,
+            classes: existingClasses.filter((c) => c.id !== classId),
+          },
         },
-      },
+      });
     });
 
     res.status(200).json({
@@ -877,9 +1196,10 @@ export const deleteClass = async (
       message: 'Class removed successfully.',
       data: { id: classId },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in deleteClass:', error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to delete class.' });
+    if (sendTenantResolutionError(res, error)) return;
+    res.status(500).json({ success: false, message: 'Failed to delete class.' });
   }
 };
 
@@ -893,20 +1213,17 @@ export const getSubjects = async (
 ): Promise<void> => {
   try {
     const tenantId = await resolveTenantId(req);
-    if (!tenantId) {
-      res.status(200).json({ success: true, data: [] });
-      return;
-    }
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) {
-      res.status(200).json({ success: true, data: [] });
+      res.status(404).json({ success: false, message: 'Organization not found.' });
       return;
     }
     const settings = (tenant.settings as Record<string, any>) || {};
     const subjects = Array.isArray(settings.subjects) ? settings.subjects : [];
     res.status(200).json({ success: true, data: subjects });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in getSubjects:', error);
+    if (sendTenantResolutionError(res, error)) return;
     res.status(500).json({ success: false, message: 'Failed to fetch subjects.' });
   }
 };
@@ -921,37 +1238,42 @@ export const createSubject = async (
 ): Promise<void> => {
   try {
     const tenantId = await resolveTenantId(req);
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) {
-      res.status(404).json({ success: false, message: 'School tenant not found.' });
-      return;
-    }
     const { name, code, gradeId, gradeName, color } = req.body;
-    if (!name) {
+    if (typeof name !== 'string' || name.trim().length === 0) {
       res.status(400).json({ success: false, message: 'Subject name is required.' });
       return;
     }
-    const settings = (tenant.settings as Record<string, any>) || {};
-    const existingSubjects: any[] = Array.isArray(settings.subjects) ? settings.subjects : [];
 
-    const newSub = {
-      id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      name: String(name).trim(),
-      code: String(code || `SUB-${existingSubjects.length + 1}`).trim().toUpperCase(),
-      gradeId: gradeId || 'grd_12',
-      gradeName: gradeName || 'Grade 12 (A/L)',
-      color: color || 'from-blue-600 to-indigo-700',
-    };
+    let newSub: Record<string, any> | undefined;
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Tenant"
+        WHERE "id" = ${tenantId}
+        FOR UPDATE
+      `;
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) throw new TenantResolutionError(404, 'Organization not found');
 
-    const updated = [newSub, ...existingSubjects];
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        settings: {
-          ...settings,
-          subjects: updated,
+      const settings = (tenant.settings as Record<string, any>) || {};
+      const existingSubjects: any[] = Array.isArray(settings.subjects) ? settings.subjects : [];
+      newSub = {
+        id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: String(name).trim(),
+        code: String(code || `SUB-${existingSubjects.length + 1}`).trim().toUpperCase(),
+        gradeId: gradeId || 'grd_12',
+        gradeName: gradeName || 'Grade 12 (A/L)',
+        color: color || 'from-blue-600 to-indigo-700',
+      };
+
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: {
+          settings: {
+            ...settings,
+            subjects: [newSub, ...existingSubjects],
+          },
         },
-      },
+      });
     });
 
     res.status(201).json({
@@ -959,9 +1281,10 @@ export const createSubject = async (
       message: 'Subject added to curriculum successfully.',
       data: newSub,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in createSubject:', error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to create subject.' });
+    if (sendTenantResolutionError(res, error)) return;
+    res.status(500).json({ success: false, message: 'Failed to create subject.' });
   }
 };
 
@@ -976,35 +1299,44 @@ export const updateSubject = async (
   try {
     const tenantId = await resolveTenantId(req);
     const subjectId = String(req.params.id);
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) {
-      res.status(404).json({ success: false, message: 'School tenant not found.' });
-      return;
-    }
-    const settings = (tenant.settings as Record<string, any>) || {};
-    const existingSubjects: any[] = Array.isArray(settings.subjects) ? settings.subjects : [];
+    const { name, code, gradeId, gradeName, color } = req.body;
+    let updatedItem: Record<string, any> | undefined;
 
-    const index = existingSubjects.findIndex((s) => s.id === subjectId);
-    if (index === -1) {
-      res.status(404).json({ success: false, message: 'Subject not found.' });
-      return;
-    }
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Tenant"
+        WHERE "id" = ${tenantId}
+        FOR UPDATE
+      `;
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) throw new TenantResolutionError(404, 'Organization not found');
 
-    const updatedItem = {
-      ...existingSubjects[index],
-      ...req.body,
-      id: subjectId,
-    };
-    existingSubjects[index] = updatedItem;
+      const settings = (tenant.settings as Record<string, any>) || {};
+      const existingSubjects: any[] = Array.isArray(settings.subjects) ? settings.subjects : [];
+      const index = existingSubjects.findIndex((s) => s.id === subjectId);
+      if (index === -1) throw new TenantResolutionError(404, 'Subject not found');
 
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        settings: {
-          ...settings,
-          subjects: existingSubjects,
+      updatedItem = {
+        ...existingSubjects[index],
+        ...(name !== undefined && { name: String(name).trim() }),
+        ...(code !== undefined && { code: String(code).trim().toUpperCase() }),
+        ...(gradeId !== undefined && { gradeId }),
+        ...(gradeName !== undefined && { gradeName }),
+        ...(color !== undefined && { color }),
+        id: subjectId,
+      };
+      const updatedSubjects = [...existingSubjects];
+      updatedSubjects[index] = updatedItem;
+
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: {
+          settings: {
+            ...settings,
+            subjects: updatedSubjects,
+          },
         },
-      },
+      });
     });
 
     res.status(200).json({
@@ -1012,9 +1344,10 @@ export const updateSubject = async (
       message: 'Subject details updated successfully.',
       data: updatedItem,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in updateSubject:', error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to update subject.' });
+    if (sendTenantResolutionError(res, error)) return;
+    res.status(500).json({ success: false, message: 'Failed to update subject.' });
   }
 };
 
@@ -1029,24 +1362,30 @@ export const deleteSubject = async (
   try {
     const tenantId = await resolveTenantId(req);
     const subjectId = String(req.params.id);
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) {
-      res.status(404).json({ success: false, message: 'School tenant not found.' });
-      return;
-    }
-    const settings = (tenant.settings as Record<string, any>) || {};
-    const existingSubjects: any[] = Array.isArray(settings.subjects) ? settings.subjects : [];
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Tenant"
+        WHERE "id" = ${tenantId}
+        FOR UPDATE
+      `;
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) throw new TenantResolutionError(404, 'Organization not found');
 
-    const filtered = existingSubjects.filter((s) => s.id !== subjectId);
+      const settings = (tenant.settings as Record<string, any>) || {};
+      const existingSubjects: any[] = Array.isArray(settings.subjects) ? settings.subjects : [];
+      if (!existingSubjects.some((s) => s.id === subjectId)) {
+        throw new TenantResolutionError(404, 'Subject not found');
+      }
 
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        settings: {
-          ...settings,
-          subjects: filtered,
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: {
+          settings: {
+            ...settings,
+            subjects: existingSubjects.filter((s) => s.id !== subjectId),
+          },
         },
-      },
+      });
     });
 
     res.status(200).json({
@@ -1054,8 +1393,9 @@ export const deleteSubject = async (
       message: 'Subject removed from curriculum successfully.',
       data: { id: subjectId },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in deleteSubject:', error);
-    res.status(500).json({ success: false, message: error.message || 'Failed to delete subject.' });
+    if (sendTenantResolutionError(res, error)) return;
+    res.status(500).json({ success: false, message: 'Failed to delete subject.' });
   }
 };

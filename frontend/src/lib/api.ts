@@ -1,4 +1,4 @@
-﻿export const API_BASE_URL =
+export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 export interface AuthResponse {
@@ -9,6 +9,7 @@ export interface AuthResponse {
     id: string;
     email: string;
     role: 'STUDENT' | 'TEACHER' | 'PARENT' | 'ADMIN' | 'SUPER_ADMIN';
+    mustChangePassword: boolean;
     firstName: string;
     lastName: string;
     avatarUrl?: string | null;
@@ -169,6 +170,17 @@ async function sportsRequest<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(result.message || 'Sports request failed');
   }
   return result.data;
+}
+
+
+function adminHeaders(tenantId?: string): Record<string, string> {
+  const token = api.token.get();
+
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+  };
 }
 
 export const api = {
@@ -366,6 +378,73 @@ export const api = {
       });
       return response.json();
     },
+
+    async getSession(): Promise<{
+  success: boolean;
+  message?: string;
+  user?: AuthResponse['user'] & {
+    tenantId?: string;
+    isActive?: boolean;
+    mustChangePassword: boolean;
+  };
+}> {
+  const token = api.token.get();
+
+  const response = await fetch(`${API_BASE_URL}/auth/session`, {
+    method: 'GET',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    cache: 'no-store',
+  });
+
+  return response.json();
+},
+
+async changePassword(data: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}): Promise<AuthResponse> {
+  const token = api.token.get();
+
+  const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(data),
+  });
+
+  return response.json();
+},
+
+async validateSetupToken(data: {
+  setupToken: string;
+  tenantId?: string;
+}): Promise<{ success: boolean; message?: string; data?: { user: { email: string; firstName: string; lastName: string }; tenantId: string; expiresAt: string } }> {
+  const response = await fetch(`${API_BASE_URL}/auth/setup-token/validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return response.json();
+},
+
+async setupPassword(data: {
+  setupToken: string;
+  newPassword: string;
+  confirmPassword: string;
+  tenantId?: string;
+}): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/auth/setup-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return response.json();
+},
 
     async registerStudent(data: {
       firstName: string;
@@ -1047,6 +1126,43 @@ export const api = {
 
   // Teacher Studio Profile & Payout APIs
   teachers: {
+
+async getMyClasses() {
+  const token = api.token.get();
+
+  const res = await fetch(`${API_BASE_URL}/teachers/me/classes`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to fetch teacher classes');
+  }
+
+  return data.data;
+},
+
+async getMySubjects() {
+  const token = api.token.get();
+
+  const res = await fetch(`${API_BASE_URL}/teachers/me/subjects`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to fetch teacher subjects');
+  }
+
+  return data.data;
+},
+
     async getDashboard() {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/teachers/me/dashboard`, {
@@ -2024,230 +2140,217 @@ export const api = {
 
   // School Admin Workspace APIs
   admin: {
-    async getOverview() {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/overview`, { headers });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch admin overview');
-      return data.data;
-    },
-    async getStaff() {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/staff`, { headers });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch staff');
-      return data.data;
-    },
-    async createStaff(input: any) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/staff`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(input),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create staff');
-      return data.data;
-    },
-    async updateStaff(id: string, input: any) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/staff/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(input),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update staff');
-      return data.data;
-    },
-    async updateStaffStatus(id: string, status: string) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/staff/${encodeURIComponent(id)}/status`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ status }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update staff status');
-      return data.data;
-    },
-    async getStudents(search?: string) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const url = new URL(`${API_BASE_URL}/admin/students`);
-      if (search) url.searchParams.set('search', search);
-      const res = await fetch(url.toString(), { headers });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch students');
-      return data.data;
-    },
-    async createStudent(input: { name: string; email: string; grade?: string; section?: string; studentIdNo?: string }) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/students`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(input),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create student');
-      return data.data;
-    },
-    async deleteUser(id: string) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/users/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-        headers,
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete user');
-      return data;
-    },
-    async updateStudentStatus(id: string, status: string) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/students/${encodeURIComponent(id)}/status`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ status }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update student status');
-      return data.data;
-    },
-    async getSettings() {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/settings`, { headers });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch settings');
-      return data.data;
-    },
-    async updateSettings(settingsData: any) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/settings`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(settingsData),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to save settings');
-      return data.data;
-    },
-    async getClasses() {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/classes`, { headers });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch classes');
-      return data.data;
-    },
-    async createClass(classData: any) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/classes`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(classData),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create class');
-      return data.data;
-    },
-    async updateClass(id: string, classData: any) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/classes/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(classData),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update class');
-      return data.data;
-    },
-    async deleteClass(id: string) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/classes/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-        headers,
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete class');
-      return data.data;
-    },
-    async getSubjects() {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/subjects`, { headers });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch subjects');
-      return data.data;
-    },
-    async createSubject(subjectData: any) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/subjects`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(subjectData),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create subject');
-      return data.data;
-    },
-    async updateSubject(id: string, subjectData: any) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/subjects/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(subjectData),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update subject');
-      return data.data;
-    },
-    async deleteSubject(id: string) {
-      const token = api.token.get();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`${API_BASE_URL}/admin/subjects/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-        headers,
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete subject');
-      return data.data;
-    },
-  },
+    async getOverview(tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/overview`, { headers });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch admin overview');
+  return data.data;
+},
+    async getStaff(tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/staff`, { headers });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch staff');
+  return data.data;
+},
 
+async getStudents(search?: string, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const url = new URL(`${API_BASE_URL}/admin/students`);
+  if (search) url.searchParams.set('search', search);
+
+  const res = await fetch(url.toString(), { headers });
+  const data = await res.json();
+
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to fetch students');
+  }
+
+  return data.data;
+},
+
+async createStaff(input: any, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/staff`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(input),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create staff');
+  return data.data;
+},
+
+async updateStaff(id: string, input: any, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/staff/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(input),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update staff');
+  return data.data;
+},
+
+async updateStaffStatus(id: string, status: string, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/staff/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ status }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update staff status');
+  return data.data;
+},
+
+async createStudent(input: { name: string; email: string; grade?: string; section?: string; studentIdNo?: string }, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/students`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(input),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create student');
+  return data.data;
+},
+
+async deleteUser(id: string, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/users/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers,
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete user');
+  return data;
+},
+
+async updateStudentStatus(id: string, status: string, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/students/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ status }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update student status');
+  return data.data;
+},
+
+async getSettings(tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/settings`, { headers });
+  const data = await res.json();
+
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to fetch settings');
+  }
+
+  return data.data;
+},
+
+async updateSettings(settingsData: any, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/settings`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(settingsData),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to save settings');
+  return data.data;
+},
+
+async getClasses(tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/classes`, { headers });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch classes');
+  return data.data;
+},
+
+async createClass(classData: any, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/classes`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(classData),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create class');
+  return data.data;
+},
+
+async updateClass(id: string, classData: any, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/classes/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(classData),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update class');
+  return data.data;
+},
+
+async deleteClass(id: string, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/classes/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers,
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete class');
+  return data.data;
+},
+
+async getSubjects(tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/subjects`, { headers });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch subjects');
+  return data.data;
+},
+
+async createSubject(subjectData: any, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/subjects`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(subjectData),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create subject');
+  return data.data;
+},
+
+async updateSubject(id: string, subjectData: any, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/subjects/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(subjectData),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update subject');
+  return data.data;
+},
+
+async deleteSubject(id: string, tenantId?: string) {
+  const headers = adminHeaders(tenantId);
+  const res = await fetch(`${API_BASE_URL}/admin/subjects/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers,
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete subject');
+  return data.data;
+  },
+},
   // Token and Local Storage Helpers
 
   token: {

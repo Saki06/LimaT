@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useApp } from "@/context/AppContext";
+import { validatePasswordStrength } from "@/lib/passwordPolicy";
 import {
   GraduationCap,
   School,
@@ -76,7 +77,7 @@ export function LandingView({
   onEnterApp: () => void;
   initialPortal?: PortalType;
 }) {
-  const { setCurrentRole, addToast, schools, t, landingPortal, setLandingPortal, loginUser, registerUser } = useApp();
+  const { addToast, schools, t, landingPortal, setLandingPortal, loginUser, registerUser } = useApp();
 
   // Auto-rotate the student banner image every 3.5 seconds
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -175,10 +176,10 @@ export function LandingView({
     setAuthMode(mode);
     if (role === "admin") {
       setLoginEmail("admin@apex.edu");
-      setLoginPassword("password123");
+      setLoginPassword("");
     } else if (role === "super_admin") {
       setLoginEmail("superadmin@apex.edu");
-      setLoginPassword("password123");
+      setLoginPassword("");
     }
   };
 
@@ -193,78 +194,15 @@ export function LandingView({
     }
   };
 
-  const handle1ClickDemoLogin = async (role: SupportedRole) => {
-    const creds = rolePresetCredentials[role];
-    if (creds) {
-      try {
-        const res = await loginUser(creds.email, "password123");
-        if (res.success) {
-          setAuthMode("closed");
-          onEnterApp();
-          return;
-        }
-      } catch {
-        // Fallback below
-      }
-    }
-    setCurrentRole(role);
-    setAuthMode("closed");
-    addToast({
-      type: "success",
-      title: `Signed in as ${
-        role === "student"
-          ? "Student"
-          : role === "parent"
-          ? "Parent"
-          : role === "teacher"
-          ? "Tutor"
-          : role === "super_admin"
-          ? "Super Admin"
-          : "Admin"
-      }`,
-      message: `Welcome back, ${rolePresetCredentials[role].name}!`
-    });
-    onEnterApp();
-  };
-
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (selectedRole === "parent" && parentLoginMethod === "otp" && !parentOtpSent) {
-      if (!loginEmail.trim()) {
-        addToast({
-          type: "error",
-          title: "Mobile Number Required",
-          message: "Please enter your registered mobile number to receive your SMS OTP."
-        });
-        return;
-      }
-      setParentOtpSent(true);
+    if (selectedRole === "parent" && parentLoginMethod === "otp") {
       addToast({
-        type: "success",
-        title: "SMS OTP Dispatched",
-        message: `A 6-digit verification code has been sent via SMS to ${loginEmail}.`
+        type: "error",
+        title: "OTP Login Unavailable",
+        message: "SMS OTP authentication is not available. Please use password login."
       });
-      return;
-    }
-
-    if (selectedRole === "parent" && parentLoginMethod === "otp" && parentOtpSent) {
-      if (parentOtpCode.trim().length !== 6) {
-        addToast({
-          type: "error",
-          title: "Invalid OTP Code",
-          message: "Please enter the complete 6-digit SMS verification code."
-        });
-        return;
-      }
-      setCurrentRole("parent");
-      setAuthMode("closed");
-      addToast({
-        type: "success",
-        title: "Login Successful",
-        message: "Welcome to Parent Guardian Desk! Live attendance and fee receipts loaded."
-      });
-      onEnterApp();
       return;
     }
 
@@ -295,6 +233,11 @@ export function LandingView({
 
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const passwordError = validatePasswordStrength(signupPassword);
+    if (passwordError) {
+      addToast({ type: "error", title: "Invalid Password", message: passwordError });
+      return;
+    }
     if (signupPassword && signupConfirmPassword && signupPassword !== signupConfirmPassword) {
       addToast({
         type: "error",
@@ -328,7 +271,7 @@ export function LandingView({
       const lastName = nameParts.slice(1).join(" ") || parentTitle;
       const cleanPhone = parentPhone.trim().replace(/[^0-9]/g, "");
       const email = signupEmail.trim() || `guardian_${cleanPhone || Date.now()}@parent.local`;
-      const pwd = signupPassword.trim() || "password123";
+      const pwd = signupPassword;
 
       try {
         const res = await registerUser({
@@ -351,18 +294,13 @@ export function LandingView({
             message: res.message
           });
         }
-      } catch {
-        // Fallback gracefully
+      } catch (err: any) {
+        addToast({
+          type: "error",
+          title: "Registration Error",
+          message: err?.message || "Failed to reach registration server.",
+        });
       }
-
-      setCurrentRole("parent");
-      setAuthMode("closed");
-      addToast({
-        type: "success",
-        title: "Guardian Account Registered!",
-        message: `Welcome, ${parentTitle} ${signupName}! Account successfully linked with ${childName}.`
-      });
-      onEnterApp();
       return;
     }
 
@@ -371,7 +309,7 @@ export function LandingView({
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(" ");
     const email = signupEmail.trim();
-    const pwd = signupPassword.trim() || "password123";
+    const pwd = signupPassword;
 
     if (email && (selectedRole === "student" || selectedRole === "teacher")) {
       try {
@@ -407,14 +345,11 @@ export function LandingView({
       }
     }
 
-    setCurrentRole(selectedRole);
-    setAuthMode("closed");
     addToast({
-      type: "success",
-      title: "Account Created Successfully!",
-      message: `Welcome, ${signupName || rolePresetCredentials[selectedRole].name}! Your ${selectedRole === "student" ? "Student" : selectedRole === "teacher" ? "Tutor" : selectedRole} profile has been initialized.`
+      type: "error",
+      title: "Registration Failed",
+      message: "The account could not be registered.",
     });
-    onEnterApp();
   };
 
   // =========================================================================

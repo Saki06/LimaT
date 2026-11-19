@@ -86,6 +86,11 @@ interface AppContextType {
   authUser: any | null;
   authToken: string | null;
   updateAuthUser: (updates: Record<string, any>) => void;
+  changePassword: (data: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}) => Promise<{ success: boolean; message?: string }>;
   refreshSuperAdminAvatar: () => void;
   loginUser: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   registerUser: (input: {
@@ -705,6 +710,8 @@ if (archivedTenantIds.current.has(tenantId)) return;
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState<any | null>(null);
+  const adminTenantId =
+  authUser?.role === 'SUPER_ADMIN' ? activeTenantId : undefined;
 
   const [superAdminAvatarUrl, setSuperAdminAvatarUrl] = useState<string | null>(null);
 const [superAdminAvatarVersion, setSuperAdminAvatarVersion] = useState(0);
@@ -870,71 +877,91 @@ useEffect(() => {
   superAdminAvatarVersion
 ]);
 
-  // Restore session & navigation state from URL query or localStorage on initial load
+  // Restore and verify session with backend on initial load
   useEffect(() => {
-    let resolvedRole: UserRole | null = null;
-    let resolvedView: string | null = null;
-    let resolvedIsLanding: boolean = true;
+    const restoreSession = async () => {
+      let resolvedView: string | null = null;
 
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const urlPortal = params.get('portal');
-      const urlView = params.get('view');
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const urlView = params.get('view');
+        const savedView = localStorage.getItem('lms_current_view');
 
-      const savedIsLanding = localStorage.getItem('lms_is_landing');
-      const savedRole = localStorage.getItem('lms_current_role') as UserRole | null;
-      const savedView = localStorage.getItem('lms_current_view');
-
-      const validRoles: UserRole[] = ['student', 'teacher', 'parent', 'admin', 'super_admin'];
-
-      if (urlPortal && validRoles.includes(urlPortal as UserRole)) {
-        resolvedRole = urlPortal as UserRole;
         resolvedView = urlView || savedView || 'dashboard';
-        resolvedIsLanding = false;
-      } else if (savedIsLanding === 'false' && savedRole && validRoles.includes(savedRole)) {
-        resolvedRole = savedRole;
-        resolvedView = urlView || savedView || 'dashboard';
-        resolvedIsLanding = false;
-      } else if (urlView || savedView) {
-        resolvedView = urlView || savedView;
       }
-    }
 
-    const token = api.token.get();
-    const user = api.user.get();
-    if (token && user) {
-      setAuthToken(token);
-      setAuthUser(user);
-      const roleMap: Record<string, UserRole> = {
-        STUDENT: 'student',
-        TEACHER: 'teacher',
-        PARENT: 'parent',
-        ADMIN: 'admin',
-        SUPER_ADMIN: 'super_admin'
-      };
-      if (!resolvedRole && user.role && roleMap[user.role]) {
-        resolvedRole = roleMap[user.role];
+      const token = api.token.get();
+
+      if (!token) {
+        api.user.remove();
+        setAuthToken(null);
+        setAuthUser(null);
+        setIsLanding(true);
+        setIsSessionLoaded(true);
+
+        fetchCourses();
+        fetchAnnouncements();
+        fetchAssignments();
+        fetchSubmissions();
+        return;
       }
-      if (!resolvedView) {
-        const savedView = typeof window !== 'undefined' ? localStorage.getItem('lms_current_view') : null;
-        resolvedView = savedView || 'dashboard';
-      }
-      resolvedIsLanding = false;
-    }
 
-    if (resolvedRole) {
-      setCurrentRole(resolvedRole);
-    }
-    if (resolvedView) {
-      setCurrentView(resolvedView);
-    }
-    setIsLanding(resolvedIsLanding);
-    setIsSessionLoaded(true);
+      try {
+        const session = await api.auth.getSession();
 
-    fetchCourses();
-    fetchAnnouncements();
-    fetchAssignments();
+        if (!session.success || !session.user) {
+          throw new Error('Invalid session');
+        }
+
+        const user = session.user;
+
+        // Trust the backend role, not localStorage navigation data
+        const roleMap: Record<string, UserRole> = {
+          STUDENT: 'student',
+          TEACHER: 'teacher',
+          PARENT: 'parent',
+          ADMIN: 'admin',
+          SUPER_ADMIN: 'super_admin'
+        };
+
+        const verifiedRole = roleMap[user.role];
+
+        if (!verifiedRole) {
+          throw new Error('Invalid user role');
+        }
+
+        api.user.set(user);
+        setAuthToken(token);
+        setAuthUser(user);
+        setCurrentRole(verifiedRole);
+        setCurrentView(resolvedView || 'dashboard');
+        setIsLanding(false);
+
+        // Do not load dashboard data before mandatory password change
+        if (!user.mustChangePassword) {
+  fetchCourses();
+  fetchAnnouncements();
+  fetchAssignments();
+
+  if (verifiedRole === 'teacher') {
     fetchSubmissions();
+  }
+}
+      } catch (error) {
+        console.error('Session restoration failed:', error);
+
+        api.token.remove();
+        api.user.remove();
+
+        setAuthToken(null);
+        setAuthUser(null);
+        setIsLanding(true);
+      } finally {
+        setIsSessionLoaded(true);
+      }
+    };
+
+    void restoreSession();
   }, []);
 
   // Synchronize active portal & view to localStorage and URL search params seamlessly
@@ -1135,45 +1162,93 @@ useEffect(() => {
   };
 
   const fetchClasses = async () => {
-    try {
-      const data = await api.admin.getClasses();
-      if (Array.isArray(data)) {
-        setClasses(data);
-      }
-    } catch (err) {
-      console.warn('Could not load classes from backend:', err);
+  try {
+    let data: any[] = [];
+
+    if (authUser?.role === 'TEACHER') {
+      data = await api.teachers.getMyClasses();
+    } else if (
+      authUser?.role === 'ADMIN' ||
+      authUser?.role === 'SUPER_ADMIN'
+    ) {
+      data = await api.admin.getClasses(adminTenantId);
+    } else {
+      setClasses([]);
+      return;
     }
-  };
+
+    if (Array.isArray(data)) {
+      setClasses(data);
+    }
+  } catch (err) {
+    console.warn('Could not load classes from backend:', err);
+  }
+};
 
   const fetchSubjects = async () => {
-    try {
-      const data = await api.admin.getSubjects();
-      if (Array.isArray(data)) {
-        setSubjects(data);
-      }
-    } catch (err) {
-      console.warn('Could not load subjects from backend:', err);
+  try {
+    let data: any[] = [];
+
+    if (authUser?.role === 'TEACHER') {
+      data = await api.teachers.getMySubjects();
+    } else if (
+      authUser?.role === 'ADMIN' ||
+      authUser?.role === 'SUPER_ADMIN'
+    ) {
+      data = await api.admin.getSubjects(adminTenantId);
+    } else {
+      setSubjects([]);
+      return;
     }
-  };
 
-  useEffect(() => {
-    fetchAssignments();
-    fetchSubmissions();
-    fetchCourses();
-    fetchLibraryResources();
-    fetchQuizzes();
-    fetchTimetable();
-    fetchClasses();
-    fetchSubjects();
-  }, [currentRole, activeTenantId]);
+    if (Array.isArray(data)) {
+      setSubjects(data);
+    }
+  } catch (err) {
+    console.warn('Could not load subjects from backend:', err);
+  }
+};
 
-  useEffect(() => {
-    if (!authToken) return;
-    void syncSportsCalendarEvents(setEvents);
-    void fetchTimetable();
-    void fetchClasses();
-    void fetchSubjects();
-  }, [authToken]);
+  // Dashboard data loading
+useEffect(() => {
+  if (!isSessionLoaded || authUser?.mustChangePassword) return;
+
+  fetchAssignments();
+
+if (currentRole === 'teacher') {
+  fetchSubmissions();
+}
+
+fetchCourses();
+  fetchLibraryResources();
+  fetchQuizzes();
+  fetchTimetable();
+  fetchClasses();
+  fetchSubjects();
+}, [
+  isSessionLoaded,
+  authUser?.mustChangePassword,
+  currentRole,
+  activeTenantId
+]);
+
+// Authenticated user data loading
+useEffect(() => {
+  if (
+    !isSessionLoaded ||
+    !authToken ||
+    authUser?.mustChangePassword
+  ) {
+    return;
+  }
+
+  void syncSportsCalendarEvents(setEvents);
+  void fetchTimetable();
+}, [
+  isSessionLoaded,
+  authToken,
+  authUser?.mustChangePassword
+]);
 
   const createCourse = async (data: {
     title: string;
@@ -1216,11 +1291,6 @@ useEffect(() => {
     try {
       const res = await api.auth.login({ email, password });
       if (res.success && res.token && res.user) {
-        api.token.set(res.token);
-        api.user.set(res.user);
-        setEvents((prev) => prev.filter((event) => event.organizer !== sportsEventOrganizer));
-        setAuthToken(res.token);
-        setAuthUser(res.user);
         const roleMap: Record<string, UserRole> = {
           STUDENT: 'student',
           TEACHER: 'teacher',
@@ -1228,12 +1298,19 @@ useEffect(() => {
           ADMIN: 'admin',
           SUPER_ADMIN: 'super_admin'
         };
-        if (res.user.role && roleMap[res.user.role]) {
-          const mappedRole = roleMap[res.user.role];
-          setCurrentRole(mappedRole);
-          if (mappedRole === 'teacher') {
-            void refreshTeacherProfile();
-          }
+        const mappedRole = roleMap[res.user.role];
+        if (!mappedRole) {
+          return { success: false, message: 'Invalid account role' };
+        }
+
+        api.token.set(res.token);
+        api.user.set(res.user);
+        setEvents((prev) => prev.filter((event) => event.organizer !== sportsEventOrganizer));
+        setAuthToken(res.token);
+        setAuthUser(res.user);
+        setCurrentRole(mappedRole);
+        if (mappedRole === 'teacher') {
+          void refreshTeacherProfile();
         }
         setIsLanding(false);
         addToast({
@@ -1292,11 +1369,6 @@ useEffect(() => {
       }
 
       if (res && res.success && res.token && res.user) {
-        api.token.set(res.token);
-        api.user.set(res.user);
-        setEvents((prev) => prev.filter((event) => event.organizer !== sportsEventOrganizer));
-        setAuthToken(res.token);
-        setAuthUser(res.user);
         const roleMap: Record<string, UserRole> = {
           STUDENT: 'student',
           TEACHER: 'teacher',
@@ -1304,12 +1376,19 @@ useEffect(() => {
           ADMIN: 'admin',
           SUPER_ADMIN: 'super_admin'
         };
-        if (res.user.role && roleMap[res.user.role]) {
-          const mappedRole = roleMap[res.user.role];
-          setCurrentRole(mappedRole);
-          if (mappedRole === 'teacher') {
-            void refreshTeacherProfile();
-          }
+        const mappedRole = roleMap[res.user.role];
+        if (!mappedRole) {
+          return { success: false, message: 'Invalid account role' };
+        }
+
+        api.token.set(res.token);
+        api.user.set(res.user);
+        setEvents((prev) => prev.filter((event) => event.organizer !== sportsEventOrganizer));
+        setAuthToken(res.token);
+        setAuthUser(res.user);
+        setCurrentRole(mappedRole);
+        if (mappedRole === 'teacher') {
+          void refreshTeacherProfile();
         }
         setIsLanding(false);
         addToast({
@@ -1365,6 +1444,43 @@ useEffect(() => {
       return updated;
     });
   };
+
+  const changePassword = async (data: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}): Promise<{ success: boolean; message?: string }> => {
+  try {
+    const res = await api.auth.changePassword(data);
+
+    if (res.success && res.token && res.user) {
+      // Save the new authentication token and user
+      api.token.set(res.token);
+      api.user.set(res.user);
+
+      setAuthToken(res.token);
+      setAuthUser(res.user);
+
+      addToast({
+        type: 'success',
+        title: 'Password Changed',
+        message: 'Your password has been changed successfully.'
+      });
+
+      return { success: true, message: res.message };
+    }
+
+    return {
+      success: false,
+      message: res.message || 'Password change failed.'
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Unable to change password.'
+    };
+  }
+};
 
   // Teacher Studio Profile & Payout State
   const [teacherProfile, setTeacherProfile] = useState<TeacherProfileData | null>(null);
@@ -2557,7 +2673,7 @@ useEffect(() => {
 
   const createClass = async (cls: Partial<SchoolClass>) => {
     try {
-      const newCls = await api.admin.createClass(cls);
+      const newCls = await api.admin.createClass(cls, adminTenantId);
       if (newCls) {
         setClasses((prev) => [newCls, ...prev.filter((c) => c.id !== newCls.id)]);
       }
@@ -2580,7 +2696,7 @@ useEffect(() => {
 
   const updateClass = async (id: string, updates: Partial<SchoolClass>) => {
     try {
-      const updated = await api.admin.updateClass(id, updates);
+      const updated = await api.admin.updateClass(id, updates, adminTenantId);
       setClasses((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
       addToast({ type: 'success', title: 'Class Updated Successfully!' });
     } catch (error: any) {
@@ -2592,7 +2708,7 @@ useEffect(() => {
 
   const deleteClass = async (id: string) => {
     try {
-      await api.admin.deleteClass(id);
+      await api.admin.deleteClass(id, adminTenantId);
       setClasses((prev) => prev.filter((c) => c.id !== id));
       addToast({ type: 'info', title: 'Class Removed Successfully' });
     } catch (error: any) {
@@ -2604,7 +2720,7 @@ useEffect(() => {
 
   const createSubject = async (sub: Partial<Subject>) => {
     try {
-      const newSub = await api.admin.createSubject(sub);
+      const newSub = await api.admin.createSubject(sub, adminTenantId);
       if (newSub) {
         setSubjects((prev) => [newSub, ...prev.filter((s) => s.id !== newSub.id)]);
       }
@@ -2626,7 +2742,7 @@ useEffect(() => {
 
   const updateSubject = async (id: string, updates: Partial<Subject>) => {
     try {
-      const updated = await api.admin.updateSubject(id, updates);
+      const updated = await api.admin.updateSubject(id, updates, adminTenantId);
       setSubjects((prev) =>
         prev.map((s) => (s.id === id ? { ...s, ...updated } : s))
       );
@@ -2642,7 +2758,7 @@ useEffect(() => {
 
   const deleteSubject = async (id: string) => {
     try {
-      await api.admin.deleteSubject(id);
+      await api.admin.deleteSubject(id, adminTenantId);
       setSubjects((prev) => prev.filter((s) => s.id !== id));
       addToast({ type: 'info', title: 'Subject Removed from Curriculum' });
     } catch (error: any) {
@@ -3554,12 +3670,13 @@ useEffect(() => {
         addToast,
         removeToast,
         authUser,
-        authToken,
-        updateAuthUser,
-        refreshSuperAdminAvatar,
-        loginUser,
-        registerUser,
-        logoutUser
+authToken,
+updateAuthUser,
+changePassword,
+refreshSuperAdminAvatar,
+loginUser,
+registerUser,
+logoutUser
       }}
     >
       {children}

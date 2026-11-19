@@ -8,11 +8,29 @@ export interface AuthUserPayload {
   email: string;
   role: 'STUDENT' | 'TEACHER' | 'PARENT' | 'ADMIN' | 'SUPER_ADMIN';
   tenantId: string | null;
+  mustChangePassword?: boolean;
+  tokenVersion: number;
 }
 
 export interface AuthenticatedRequest extends Request {
   user?: AuthUserPayload;
 }
+
+const isAllowedPasswordRoute = (req: Request): boolean => {
+  const allowedRoutes = [
+    { method: 'POST', path: '/change-password' },
+    { method: 'GET', path: '/session' },
+  ];
+
+  return (
+    req.baseUrl === '/api/auth' &&
+    allowedRoutes.some(
+      (route) =>
+        req.method === route.method &&
+        req.path === route.path
+    )
+  );
+};
 
 export const authenticateToken = async (
   req: AuthenticatedRequest,
@@ -54,6 +72,8 @@ export const authenticateToken = async (
         role: true,
         tenantId: true,
         isActive: true,
+        mustChangePassword: true,
+        tokenVersion: true,
       },
     });
 
@@ -61,6 +81,17 @@ export const authenticateToken = async (
       res.status(403).json({
         success: false,
         message: 'Account is inactive or does not exist.',
+      });
+      return;
+    }
+
+    if (
+      typeof decoded.tokenVersion !== 'number' ||
+      decoded.tokenVersion !== user.tokenVersion
+    ) {
+      res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token.',
       });
       return;
     }
@@ -103,7 +134,20 @@ if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      mustChangePassword: user.mustChangePassword,
+      tokenVersion: user.tokenVersion,
     };
+
+    const isPasswordRoute = isAllowedPasswordRoute(req);
+
+    if (user.mustChangePassword && !isPasswordRoute) {
+      res.status(403).json({
+        success: false,
+        code: 'PASSWORD_CHANGE_REQUIRED',
+        message: 'You must change your temporary password before accessing this resource.',
+      });
+      return;
+    }
 
     next();
   } catch (error) {
@@ -159,10 +203,20 @@ export const optionalAuthenticateToken = async (
         role: true,
         tenantId: true,
         isActive: true,
+        mustChangePassword: true,
+        tokenVersion: true,
       },
     });
 
     if (!user || !user.isActive) {
+      next();
+      return;
+    }
+
+    if (
+      typeof decoded.tokenVersion !== 'number' ||
+      decoded.tokenVersion !== user.tokenVersion
+    ) {
       next();
       return;
     }
@@ -205,6 +259,8 @@ if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      mustChangePassword: user.mustChangePassword,
+      tokenVersion: user.tokenVersion,
     };
 
     next();

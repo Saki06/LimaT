@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 import {
   getAdminOverview,
@@ -9,6 +10,7 @@ import {
   createStudent,
   updateStudentStatus,
   deleteUser,
+  deliverSetupLink,
   getSchoolSettings,
   updateSchoolSettings,
   getClasses,
@@ -20,12 +22,16 @@ import {
   updateSubject,
   deleteSubject,
 } from '../controllers/admin.controller';
-import { optionalAuthenticateToken } from '../middlewares/auth.middleware';
+import {
+  authenticateToken,
+  requireRoles,
+} from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// Apply optional authentication so requests can authenticate via JWT or fallback gracefully in dev preview
-router.use(optionalAuthenticateToken);
+// All admin routes require authentication and an authorized role.
+router.use(authenticateToken);
+router.use(requireRoles('ADMIN', 'SUPER_ADMIN'));
 
 // 1. Overview KPIs & Activity
 router.get('/overview', getAdminOverview);
@@ -41,6 +47,7 @@ router.get('/students', getStudents);
 router.post('/students', createStudent);
 router.patch('/students/:id/status', updateStudentStatus);
 router.delete('/users/:id', deleteUser);
+router.post('/users/:id/setup-link', deliverSetupLink);
 
 // 4. School Settings & Tenant Branding
 router.get('/settings', getSchoolSettings);

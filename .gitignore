@@ -50,3 +50,7 @@ next-env.d.ts
 
 # User-uploaded files
 /backend/uploads/
+
+# Local credentials and database backups
+backend/parent-test-credentials.txt
+*.dump
