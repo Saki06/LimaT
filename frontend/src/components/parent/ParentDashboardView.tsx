@@ -423,7 +423,7 @@ export function ParentDashboardView() {
               </div>
               <div className="mt-3">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-[#0d2b26]">LKR {activeChild.monthlyInvestmentLkr.toLocaleString()}</span>
+                  <span className="text-3xl font-black text-[#0d2b26]">LKR {Number(activeChild.monthlyInvestmentLkr ?? 0).toLocaleString()}</span>
                   <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
                     / month
                   </span>
