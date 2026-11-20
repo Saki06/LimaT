@@ -1,31 +1,84 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { config } from './config';
 import apiRoutes from './routes';
 
 const app = express();
 
-// Security and CORS middleware
+// HTTP Security Headers & X-Powered-By removal (VULN-09 fix)
+app.disable('x-powered-by');
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc:
+          config.nodeEnv === 'production'
+            ? ["'self'", config.frontendUrl, 'https:']
+            : ["'self'", 'http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5000', 'https:'],
+        frameAncestors: ["'self'"],
+        objectSrc: ["'none'"],
+      },
+    },
+    frameguard: { action: 'sameorigin' },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+
+// Security and CORS middleware (VULN-05 fix: explicit origin allowlist, never reflect untrusted origins)
+const isProduction = config.nodeEnv === 'production';
+
+const extraAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+// Reject wildcard and localhost in production CORS
+if (isProduction) {
+  if (extraAllowedOrigins.includes('*') || extraAllowedOrigins.includes("'*'")) {
+    throw new Error(
+      'FATAL CONFIGURATION ERROR: Wildcard origin ("*") is strictly prohibited in production CORS.'
+    );
+  }
+  const hasLocalhost = extraAllowedOrigins.some(
+    (origin) =>
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1') ||
+      origin.includes('0.0.0.0') ||
+      origin.includes('::1')
+  );
+  if (hasLocalhost) {
+    throw new Error(
+      'FATAL CONFIGURATION ERROR: Localhost origins are strictly prohibited in production CORS_ALLOWED_ORIGINS.'
+    );
+  }
+}
+
+// Preserve localhost origins only in local development / test environments
+const localDevOrigins = isProduction
+  ? []
+  : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5000'];
+
 const allowedOrigins = new Set(
   [
     config.frontendUrl,
-    'http://localhost:3000',
-    'https://lms-navy-psi.vercel.app',
-    'https://lms-sakiththiayans-projects.vercel.app',
+    ...localDevOrigins,
+    ...extraAllowedOrigins,
   ].filter(Boolean)
 );
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (
-        !origin ||
-        allowedOrigins.has(origin) ||
-        origin.endsWith('.vercel.app')
-      ) {
+      // Allow non-browser / server-to-server requests without Origin header, or explicitly allowlisted origins
+      if (!origin || allowedOrigins.has(origin)) {
         callback(null, true);
       } else {
-        callback(null, true);
+        callback(null, false);
       }
     },
     credentials: true,

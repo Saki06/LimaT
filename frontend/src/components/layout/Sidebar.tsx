@@ -1,21 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { useApp } from "@/context/AppContext";
 import {
   Home,
   BookOpen,
   FileText,
-  HelpCircle,
   Award,
   Trophy,
   Calendar,
   Bell,
-  Users,
   User,
   Layers,
-  Settings,
-  School,
   ClipboardCheck,
   Building2,
   Library,
@@ -27,13 +24,9 @@ import {
   Flame,
   PanelLeftClose,
   PanelLeftOpen,
-  CheckCircle2,
-  Bookmark,
-  Link2,
   Video,
   Sliders,
   CreditCard,
-  Shield,
   Package,
   UserCheck,
   Globe,
@@ -135,9 +128,18 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
     (s) => s.status === "submitted"
   ).length;
 
-  const activeLiveClassesCount = timetable.filter(
-    (entry: any) => String(entry?.status || "").toUpperCase() === "LIVE"
-  ).length;
+  const activeLiveClassesCount = timetable.filter((entry) => Boolean(entry.isLiveNow)).length;
+
+  useEffect(() => {
+    if (!isMobileOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onCloseMobile();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isMobileOpen, onCloseMobile]);
 
   const handleNavClick = (view: string) => {
     setCurrentView(view);
@@ -488,8 +490,10 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
 
               {/* Close Button (Mobile Drawer) */}
               <button
+                type="button"
+                aria-label="Close navigation menu"
                 onClick={onCloseMobile}
-                className="lg:hidden p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+                className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-[#0d5c4d] transition-colors"
                 title="Close Sidebar"
               >
                 <X className="h-4 w-4" />
@@ -527,7 +531,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                       <div key={item.id} className="space-y-1 pt-0.5">
                         <button
                           onClick={() => toggleGroup(item.id)}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all group ${
+                          className={`w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] lg:min-h-0 lg:py-2 rounded-xl text-xs font-bold transition-all group ${
                             isChildActive
                               ? "bg-[#ecf8f5]/80 text-[#0d5c4d]"
                               : "text-slate-600 hover:text-[#0d5c4d] hover:bg-[#f6f9f7]"
@@ -566,7 +570,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                                 <button
                                   key={child.id}
                                   onClick={() => handleNavClick(child.id)}
-                                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all relative ${
+                                  className={`w-full flex items-center justify-between px-2.5 py-2.5 min-h-[44px] lg:min-h-0 lg:py-1.5 rounded-lg text-xs font-semibold transition-all relative ${
                                     isSubActive
                                       ? "bg-[#ecf8f5] text-[#0d5c4d] font-bold shadow-xs border border-[#c4e9e0]"
                                       : "text-slate-500 hover:text-[#0d5c4d] hover:bg-[#f6f9f7]"
@@ -610,7 +614,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                         }
                       }}
                       className={`w-full flex items-center text-left ${
-                        isCollapsed ? "justify-center p-2.5" : "justify-between px-2.5 py-2"
+                        isCollapsed ? "justify-center p-2.5" : "justify-between px-2.5 py-2.5 min-h-[44px] lg:min-h-0 lg:py-2"
                       } rounded-xl text-xs font-bold transition-all group relative ${
                         isActive
                           ? "bg-gradient-to-r from-[#ecf8f5] to-white text-[#0d5c4d] border border-[#b2e5d9] shadow-[0_2px_10px_rgba(13,92,77,0.06)]"
@@ -686,7 +690,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                       <button
                         type="button"
                         onClick={() => setIsCalendarOpen(true)}
-                        className="px-2 py-1 rounded-lg text-[10px] font-bold text-[#0d5c4d] bg-white border border-[#c4e9e0] hover:bg-[#ecf8f5] transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                        className="px-2.5 py-2 min-h-[44px] lg:min-h-0 lg:py-1 lg:px-2 rounded-lg text-[10px] font-bold text-[#0d5c4d] bg-white border border-[#c4e9e0] hover:bg-[#ecf8f5] transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
                         title="Expand Calendar"
                       >
                         <Calendar className="h-3 w-3" />
@@ -830,12 +834,15 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                         setIsLanding(true);
                         setLandingPortal("gateway");
                       }}
-                      className="flex items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity"
+                      className="flex items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity min-h-[44px] lg:min-h-0 py-1"
                       title="Return to All Portals (Landing Page)"
                     >
-                      <img
+                      <Image
                         src="/images/tozy_icon.jpg"
                         alt="Tozy"
+                        width={20}
+                        height={20}
+                        unoptimized
                         className="w-5 h-5 rounded-full object-cover ring-1 ring-emerald-400"
                       />
                       <p className="font-black text-xs text-[#0d2b26]">

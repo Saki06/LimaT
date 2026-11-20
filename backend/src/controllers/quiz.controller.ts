@@ -386,6 +386,12 @@ export const createQuiz = async (req: AuthenticatedRequest, res: Response): Prom
       return;
     }
 
+    const numericDuration = Number(durationMinutes);
+    if (!Number.isFinite(numericDuration) || numericDuration <= 0 || numericDuration > 600) {
+      res.status(400).json({ success: false, message: 'Quiz durationMinutes must be a positive number (1-600 minutes).' });
+      return;
+    }
+
     let tenantId = user.tenantId;
     if (!tenantId) {
       const firstTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
@@ -603,43 +609,24 @@ export const submitQuizAttempt = async (
       return;
     }
 
-    const id = String(req.params.id);
+    const id = typeof req.params.id === 'string' ? req.params.id.trim() : '';
+    if (!id) {
+      res.status(400).json({ success: false, message: 'Invalid quiz ID' });
+      return;
+    }
+
     const { answers = {}, timeSpentSeconds = 0 } = req.body;
 
-    let quiz = await prisma.assignment.findUnique({
+    const quiz = await prisma.assignment.findUnique({
       where: { id },
       include: { course: true },
     });
 
-    if (!quiz || quiz.topicName !== 'ONLINE_QUIZ') {
-      quiz = await prisma.assignment.findFirst({
-        where: {
-          topicName: 'ONLINE_QUIZ',
-          OR: [
-            { id: { contains: id } },
-            { title: { contains: id.replace(/^qz_/, '').replace(/_/g, ' '), mode: 'insensitive' } },
-          ],
-        },
-        include: { course: true },
-      });
-    }
-
-    if (!quiz || quiz.topicName !== 'ONLINE_QUIZ') {
-      let tenantId = user.tenantId;
-      if (!tenantId) {
-        const firstTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
-        tenantId = firstTenant?.id || null;
-      }
-      quiz = await prisma.assignment.findFirst({
-        where: {
-          topicName: 'ONLINE_QUIZ',
-          ...(tenantId ? { tenantId } : {}),
-        },
-        include: { course: true },
-      });
-    }
-
-    if (!quiz || quiz.topicName !== 'ONLINE_QUIZ') {
+    if (
+      !quiz ||
+      quiz.topicName !== 'ONLINE_QUIZ' ||
+      (user.tenantId && quiz.tenantId !== user.tenantId)
+    ) {
       res.status(404).json({ success: false, message: 'Quiz not found' });
       return;
     }

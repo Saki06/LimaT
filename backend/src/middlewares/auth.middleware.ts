@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { prisma } from '../config/prisma';
+import { isTokenRevoked } from '../controllers/auth/auth.utils';
 
 export interface AuthUserPayload {
   userId: string;
@@ -46,16 +47,33 @@ export const authenticateToken = async (
       return;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        tenantId: true,
-        isActive: true,
-      },
-    });
+    const [revoked, user] = await Promise.all([
+      isTokenRevoked(token),
+      prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          tenantId: true,
+          isActive: true,
+          tenant: {
+            select: {
+              status: true,
+              deletedAt: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    if (revoked) {
+      res.status(401).json({
+        success: false,
+        message: 'Session has been logged out or token revoked. Please sign in again.',
+      });
+      return;
+    }
 
     if (!user || !user.isActive) {
       res.status(403).json({
@@ -66,37 +84,31 @@ export const authenticateToken = async (
     }
 
     // Only global Super Admin can operate without a tenant
-if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
-  res.status(403).json({
-    success: false,
-    message: 'Your account is not assigned to an organization.',
-  });
-  return;
-}
+    if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
+      res.status(403).json({
+        success: false,
+        message: 'Your account is not assigned to an organization.',
+      });
+      return;
+    }
 
     // Block access for users belonging to suspended or inactive tenants (except Super Admin)
     if (user.tenantId && user.role !== 'SUPER_ADMIN') {
-      const tenant = await prisma.tenant.findUnique({
-  where: { id: user.tenantId },
-  select: {
-    status: true,
-    deletedAt: true,
-  },
-});
+      const tenant = user.tenant;
 
-  if (
-  !tenant ||
-  tenant.deletedAt !== null ||
-  tenant.status === 'SUSPENDED' ||
-  tenant.status === 'INACTIVE'
-) {
-    res.status(403).json({
-      success: false,
-      message: 'Your organization is currently inactive or suspended.',
-    });
-    return;
-  }
-}
+      if (
+        !tenant ||
+        tenant.deletedAt !== null ||
+        tenant.status === 'SUSPENDED' ||
+        tenant.status === 'INACTIVE'
+      ) {
+        res.status(403).json({
+          success: false,
+          message: 'Your organization is currently inactive or suspended.',
+        });
+        return;
+      }
+    }
 
     req.user = {
       userId: user.id,
@@ -151,54 +163,57 @@ export const optionalAuthenticateToken = async (
       return;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        tenantId: true,
-        isActive: true,
-      },
-    });
+    const [revoked, user] = await Promise.all([
+      isTokenRevoked(token),
+      prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          tenantId: true,
+          isActive: true,
+          tenant: {
+            select: {
+              status: true,
+              deletedAt: true,
+            },
+          },
+        },
+      }),
+    ]);
 
-    if (!user || !user.isActive) {
+    if (revoked || !user || !user.isActive) {
       next();
       return;
     }
 
     // Only global Super Admin can operate without a tenant
-if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
-  res.status(403).json({
-    success: false,
-    message: 'Your account is not assigned to an organization.',
-  });
-  return;
-}
+    if (!user.tenantId && user.role !== 'SUPER_ADMIN') {
+      res.status(403).json({
+        success: false,
+        message: 'Your account is not assigned to an organization.',
+      });
+      return;
+    }
 
     // Block suspended or inactive tenant users (except Super Admin)
     if (user.tenantId && user.role !== 'SUPER_ADMIN') {
-      const tenant = await prisma.tenant.findUnique({
-    where: { id: user.tenantId },
-    select: {
-  status: true,
-  deletedAt: true,
-},
-  });
+      const tenant = user.tenant;
 
-  if (
-  !tenant ||
-  tenant.deletedAt !== null ||
-  tenant.status === 'SUSPENDED' ||
-  tenant.status === 'INACTIVE'
-) {
-    res.status(403).json({
-      success: false,
-      message: 'Your organization is currently inactive or suspended.',
-    });
-    return;
-  }
-}
+      if (
+        !tenant ||
+        tenant.deletedAt !== null ||
+        tenant.status === 'SUSPENDED' ||
+        tenant.status === 'INACTIVE'
+      ) {
+        res.status(403).json({
+          success: false,
+          message: 'Your organization is currently inactive or suspended.',
+        });
+        return;
+      }
+    }
 
     req.user = {
       userId: user.id,

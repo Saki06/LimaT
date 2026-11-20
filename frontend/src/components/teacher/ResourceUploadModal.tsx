@@ -1,24 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import Image from "next/image";
 import {
-  BookOpen,
   FileText,
   UploadCloud,
-  CheckCircle2,
-  Lock,
-  Globe,
-  Layers,
   Save,
   X,
   FileCheck,
-  Paperclip,
-  Check,
   ImagePlus
 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Course, LibraryResource, LibraryResourceType } from "@/types/lms";
 import { useApp } from "@/context/AppContext";
 
@@ -175,61 +168,84 @@ export function ResourceUploadModal({
   const [markingSchemeNotes, setMarkingSchemeNotes] = useState("");
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const allSubjectsRef = useRef(allSubjects);
+
+  useEffect(() => {
+    allSubjectsRef.current = allSubjects;
+  }, [allSubjects]);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    setCustomCoverPreview(null);
-    setMaterialFileUrl(resourceToEdit?.fileUrl);
-    setMaterialFileName(resourceToEdit?.fileName || "");
+    let cancelled = false;
 
-    if (resourceToEdit) {
-      setTitle(resourceToEdit.title);
-      setResourceType(resourceToEdit.resourceType);
-      setSubject(resourceToEdit.subject);
-      setTopic(resourceToEdit.topic || "");
-      setDescription(resourceToEdit.description || "");
-      setVisibility(resourceToEdit.visibility === "subscribers_only" ? "subscribers_only" : "public");
-      setCoverImage(resourceToEdit.coverImage || COVER_PRESETS[0].url);
-      setFileType(resourceToEdit.fileType || "PDF");
-      setFileSize(resourceToEdit.fileSize || "4.5 MB");
-      setPageCount(resourceToEdit.pageCount || 20);
-      setAllowDownload(resourceToEdit.allowDownload !== false);
+    Promise.resolve().then(() => {
+      if (cancelled) return;
 
-      if (resourceToEdit.year) setYear(resourceToEdit.year);
-      if (resourceToEdit.medium) setMedium(resourceToEdit.medium);
-      if (resourceToEdit.examType) setExamType(resourceToEdit.examType);
-      if (resourceToEdit.paperPart) setPaperPart(resourceToEdit.paperPart);
-      if (resourceToEdit.hasMarkingScheme !== undefined) setHasMarkingScheme(resourceToEdit.hasMarkingScheme);
-      if (resourceToEdit.markingSchemeNotes) setMarkingSchemeNotes(resourceToEdit.markingSchemeNotes);
-    } else {
-      setTitle("");
-      setResourceType("tute");
-      setSubject(allSubjects[0] || "");
-      setTopic("");
-      setDescription("");
-      setVisibility("public");
-      setCoverImage(COVER_PRESETS[0].url);
-      setFileType("PDF");
-      setFileSize("");
-      setPageCount(0);
-      setAllowDownload(true);
-      setYear(2025);
-      setMedium("Tamil");
-      setExamType("G.C.E. Advanced Level");
-      setPaperPart("Complete Set (Paper I + II)");
-      setHasMarkingScheme(true);
-      setMarkingSchemeNotes("Official marking rubrics with step-by-step mark allocations.");
-    }
-    setErrorMsg(null);
+      setCustomCoverPreview(null);
+      setMaterialFileUrl(resourceToEdit?.fileUrl);
+      setMaterialFileName(resourceToEdit?.fileName || "");
+
+      if (resourceToEdit) {
+        setTitle(resourceToEdit.title);
+        setResourceType(resourceToEdit.resourceType);
+        setSubject(resourceToEdit.subject);
+        setTopic(resourceToEdit.topic || "");
+        setDescription(resourceToEdit.description || "");
+        setVisibility(resourceToEdit.visibility === "subscribers_only" ? "subscribers_only" : "public");
+        setCoverImage(resourceToEdit.coverImage || COVER_PRESETS[0].url);
+        setFileType(resourceToEdit.fileType || "PDF");
+        setFileSize(resourceToEdit.fileSize || "4.5 MB");
+        setPageCount(resourceToEdit.pageCount || 20);
+        setAllowDownload(resourceToEdit.allowDownload !== false);
+
+        if (resourceToEdit.year) setYear(resourceToEdit.year);
+        if (resourceToEdit.medium) setMedium(resourceToEdit.medium);
+        if (resourceToEdit.examType) setExamType(resourceToEdit.examType);
+        if (resourceToEdit.paperPart) setPaperPart(resourceToEdit.paperPart);
+        if (resourceToEdit.hasMarkingScheme !== undefined) setHasMarkingScheme(resourceToEdit.hasMarkingScheme);
+        if (resourceToEdit.markingSchemeNotes) setMarkingSchemeNotes(resourceToEdit.markingSchemeNotes);
+      } else {
+        setTitle("");
+        setResourceType("tute");
+        setSubject(allSubjectsRef.current[0] || "");
+        setTopic("");
+        setDescription("");
+        setVisibility("public");
+        setCoverImage(COVER_PRESETS[0].url);
+        setFileType("PDF");
+        setFileSize("");
+        setPageCount(0);
+        setAllowDownload(true);
+        setYear(2025);
+        setMedium("Tamil");
+        setExamType("G.C.E. Advanced Level");
+        setPaperPart("Complete Set (Paper I + II)");
+        setHasMarkingScheme(true);
+        setMarkingSchemeNotes("Official marking rubrics with step-by-step mark allocations.");
+      }
+      setErrorMsg(null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [resourceToEdit, isOpen]);
 
   // When subjects load late (profile fetched async), auto-select the first one for new uploads
   useEffect(() => {
     if (!isOpen || resourceToEdit) return;
+    let cancelled = false;
     if (allSubjects.length > 0 && !allSubjects.includes(subject)) {
-      setSubject(allSubjects[0]);
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setSubject(allSubjects[0]);
+        }
+      });
     }
+    return () => {
+      cancelled = true;
+    };
   }, [allSubjects, isOpen, resourceToEdit, subject]);
 
   const handleSubmit = (publish: boolean) => {
@@ -347,7 +363,7 @@ export function ResourceUploadModal({
               <label className="text-xs font-bold text-slate-700">Access Mode</label>
               <select
                 value={visibility}
-                onChange={(e) => setVisibility(e.target.value as any)}
+                onChange={(e) => setVisibility(e.target.value as "public" | "subscribers_only")}
                 className="w-full text-xs p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0d5c4d] bg-white font-semibold text-slate-800"
               >
                 <option value="public">🌐 Public (Free for all Students)</option>
@@ -423,7 +439,7 @@ export function ResourceUploadModal({
                 <label className="text-[11px] font-bold text-slate-700">Language Medium</label>
                 <select
                   value={medium}
-                  onChange={(e) => setMedium(e.target.value as any)}
+                  onChange={(e) => setMedium(e.target.value as "Tamil" | "English" | "Sinhala" | "Trilingual")}
                   className="w-full text-xs p-2 rounded-lg border border-slate-300 bg-white"
                 >
                   <option value="Tamil">Tamil (தமிழ்)</option>
@@ -437,7 +453,7 @@ export function ResourceUploadModal({
                 <label className="text-[11px] font-bold text-slate-700">Exam Level</label>
                 <select
                   value={examType}
-                  onChange={(e) => setExamType(e.target.value as any)}
+                  onChange={(e) => setExamType(e.target.value as "G.C.E. Advanced Level" | "G.C.E. Ordinary Level" | "Provincial Term Test" | "School Model Paper")}
                   className="w-full text-xs p-2 rounded-lg border border-slate-300 bg-white"
                 >
                   <option value="G.C.E. Advanced Level">G.C.E. A/L</option>
@@ -451,7 +467,7 @@ export function ResourceUploadModal({
                 <label className="text-[11px] font-bold text-slate-700">Paper Component</label>
                 <select
                   value={paperPart}
-                  onChange={(e) => setPaperPart(e.target.value as any)}
+                  onChange={(e) => setPaperPart(e.target.value as "Complete Set (Paper I + II)" | "Paper I (MCQ)" | "Paper II (Structured & Essay)")}
                   className="w-full text-xs p-2 rounded-lg border border-slate-300 bg-white"
                 >
                   <option value="Complete Set (Paper I + II)">Complete Set (I + II)</option>
@@ -579,7 +595,7 @@ export function ResourceUploadModal({
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-700">Cover Thumbnail</label>
               {coverImage && (
-                <img src={coverImage} alt="Selected cover" className="h-8 w-12 rounded-lg object-cover border border-slate-200 shadow-sm" />
+                <Image src={coverImage} alt="Selected cover" width={48} height={32} unoptimized className="h-8 w-12 rounded-lg object-cover border border-slate-200 shadow-sm" />
               )}
             </div>
 
@@ -598,7 +614,7 @@ export function ResourceUploadModal({
                         : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <img src={preset.url} alt={preset.label} className="h-6 w-8 rounded object-cover" />
+                    <Image src={preset.url} alt={preset.label} width={32} height={24} unoptimized className="h-6 w-8 rounded object-cover" />
                     <span>{preset.label}</span>
                   </button>
                 );
@@ -625,7 +641,7 @@ export function ResourceUploadModal({
               >
                 {customCoverPreview ? (
                   <>
-                    <img src={customCoverPreview} alt="Custom cover" className="h-6 w-8 rounded object-cover" />
+                    <Image src={customCoverPreview} alt="Custom cover" width={32} height={24} unoptimized className="h-6 w-8 rounded object-cover" />
                     <span>Custom Image Selected ✓ — Click to Change</span>
                   </>
                 ) : (

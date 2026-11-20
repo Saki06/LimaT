@@ -40,7 +40,7 @@ export const createCourse = async (req: AuthenticatedRequest, res: Response): Pr
       return;
     }
 
-    if (!title || !code) {
+    if (!title || !code || typeof title !== 'string' || !title.trim() || typeof code !== 'string' || !code.trim()) {
       res.status(400).json({
         success: false,
         message: 'Course title and course code are required',

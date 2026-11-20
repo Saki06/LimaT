@@ -19,6 +19,7 @@ export function ForgotPasswordModal({
 }: ForgotPasswordModalProps) {
   const [step, setStep] = useState<"email" | "otp" | "success">("email");
   const [email, setEmail] = useState(defaultEmail);
+  const [prevDefaultEmail, setPrevDefaultEmail] = useState(defaultEmail);
   const [otp, setOtp] = useState("");
   const [demoCode, setDemoCode] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -27,12 +28,13 @@ export function ForgotPasswordModal({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Sync defaultEmail when modal opens
-  React.useEffect(() => {
+  // Sync defaultEmail when prop changes
+  if (defaultEmail !== prevDefaultEmail) {
+    setPrevDefaultEmail(defaultEmail);
     if (defaultEmail) {
       setEmail(defaultEmail);
     }
-  }, [defaultEmail]);
+  }
 
   if (!isOpen) return null;
 
@@ -55,8 +57,8 @@ export function ForgotPasswordModal({
       } else {
         setErrorMsg(res.message || "Failed to generate reset code. Please check your email.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Network error. Please try again.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Network error. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -92,8 +94,8 @@ export function ForgotPasswordModal({
       } else {
         setErrorMsg(res.message || "Failed to reset password. Please check the code.");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "Network error. Please try again.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Network error. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -123,6 +125,7 @@ export function ForgotPasswordModal({
         <button
           onClick={onClose}
           type="button"
+          aria-label="Close forgot password dialog"
           className="absolute top-5 right-5 h-8 w-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
         >
           <X className="h-4 w-4" />
@@ -254,6 +257,7 @@ export function ForgotPasswordModal({
                     />
                     <button
                       type="button"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                     >

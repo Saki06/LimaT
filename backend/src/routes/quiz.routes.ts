@@ -31,6 +31,6 @@ router.put('/:id', authenticateToken, requireRoles('TEACHER', 'ADMIN', 'SUPER_AD
 router.delete('/:id', authenticateToken, requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'), deleteQuiz);
 
 // 6. Submit student quiz attempt & auto-grade
-router.post('/:id/attempt', authenticateToken, submitQuizAttempt);
+router.post('/:id/attempt', authenticateToken, requireRoles('STUDENT'), submitQuizAttempt);
 
 export default router;

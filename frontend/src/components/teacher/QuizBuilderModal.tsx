@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   HelpCircle,
   Plus,
@@ -9,16 +9,12 @@ import {
   Clock,
   BookOpen,
   AlertCircle,
-  Layers,
   Save,
-  Check,
-  RotateCcw,
   Copy
 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Course, Quiz, QuizQuestion } from "@/types/lms";
+import { Course, Quiz, QuizQuestion, QuizQuestionType } from "@/types/lms";
 
 interface QuizBuilderModalProps {
   isOpen: boolean;
@@ -54,49 +50,64 @@ export function QuizBuilderModal({
   const [durationMinutes, setDurationMinutes] = useState(15);
   const [dueDate, setDueDate] = useState("2026-11-15 23:59");
   const [status, setStatus] = useState<"draft" | "published">("published");
-  const [questions, setQuestions] = useState<QuizQuestion[]>([
+  const [questions, setQuestions] = useState<QuizQuestion[]>(() => [
     { ...DEFAULT_NEW_QUESTION, id: `q_${Date.now()}_1` }
   ]);
   const [activeQuestionIdx, setActiveQuestionIdx] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const coursesRef = useRef(courses);
+
+  useEffect(() => {
+    coursesRef.current = courses;
+  }, [courses]);
 
   // Populate form if editing
   useEffect(() => {
     if (!isOpen) return;
+    let cancelled = false;
 
-    if (quizToEdit) {
-      setTitle(quizToEdit.title);
-      setCourseId(quizToEdit.courseId);
-      setSubjectName(quizToEdit.subjectName);
-      setInstructions(quizToEdit.instructions);
-      setDurationMinutes(quizToEdit.durationMinutes);
-      setDueDate(quizToEdit.dueDate);
-      setStatus(quizToEdit.status);
-      setQuestions(
-        quizToEdit.questions.length > 0
-          ? quizToEdit.questions.map((q) => ({
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+
+      if (quizToEdit) {
+        setTitle(quizToEdit.title);
+        setCourseId(quizToEdit.courseId);
+        setSubjectName(quizToEdit.subjectName);
+        setInstructions(quizToEdit.instructions);
+        setDurationMinutes(quizToEdit.durationMinutes);
+        setDueDate(quizToEdit.dueDate);
+        setStatus(quizToEdit.status);
+        setQuestions(
+          quizToEdit.questions.length > 0
+            ? quizToEdit.questions.map((q) => ({
               ...q,
               options: q.options || ["", "", "", ""]
             }))
-          : [{ ...DEFAULT_NEW_QUESTION, id: `q_${Date.now()}_1` }]
-      );
-      setActiveQuestionIdx(0);
-    } else {
-      // Defaults for new quiz
-      setTitle("");
-      setCourseId(courses[0]?.id || "");
-      setSubjectName(courses[0]?.title || "");
-      setInstructions("All questions are mandatory. Please read each question carefully.");
-      setDurationMinutes(15);
-      setDueDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
-      setStatus("published");
-      setQuestions([
-        { ...DEFAULT_NEW_QUESTION, id: `q_${Date.now()}_1` }
-      ]);
-      setActiveQuestionIdx(0);
-    }
-    setErrorMsg(null);
-  }, [quizToEdit, isOpen, courses]);
+            : [{ ...DEFAULT_NEW_QUESTION, id: `q_${Date.now()}_1` }]
+        );
+        setActiveQuestionIdx(0);
+      } else {
+        // Defaults for new quiz
+        const defaultCourse = coursesRef.current[0];
+        setTitle("");
+        setCourseId(defaultCourse?.id || "");
+        setSubjectName(defaultCourse?.title || "");
+        setInstructions("All questions are mandatory. Please read each question carefully.");
+        setDurationMinutes(15);
+        setDueDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
+        setStatus("published");
+        setQuestions([
+          { ...DEFAULT_NEW_QUESTION, id: `q_${Date.now()}_1` }
+        ]);
+        setActiveQuestionIdx(0);
+      }
+      setErrorMsg(null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quizToEdit, isOpen]);
 
   const totalCalculatedMarks = questions.reduce(
     (sum, q) => sum + (Number(q.marks) || 10),
@@ -104,7 +115,10 @@ export function QuizBuilderModal({
   );
 
   // Update question field
-  const handleUpdateCurrentQuestion = (field: keyof QuizQuestion, value: any) => {
+  const handleUpdateCurrentQuestion = <K extends keyof QuizQuestion>(
+    field: K,
+    value: QuizQuestion[K]
+  ) => {
     setQuestions((prev) =>
       prev.map((q, idx) => {
         if (idx !== activeQuestionIdx) return q;
@@ -399,11 +413,10 @@ export function QuizBuilderModal({
                   key={q.id || idx}
                   type="button"
                   onClick={() => setActiveQuestionIdx(idx)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                    activeQuestionIdx === idx
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${activeQuestionIdx === idx
                       ? "bg-[#0d5c4d] text-white shadow-xs"
                       : "bg-[#f8faf9] text-slate-600 hover:bg-slate-200 border border-slate-200"
-                  }`}
+                    }`}
                 >
                   <span>Q{idx + 1}</span>
                   <span className="text-[10px] opacity-80">({q.marks}m)</span>
@@ -434,7 +447,7 @@ export function QuizBuilderModal({
                   <select
                     value={currentQ.type}
                     onChange={(e) => {
-                      const nextType = e.target.value as any;
+                      const nextType = e.target.value as QuizQuestionType;
                       handleUpdateCurrentQuestion("type", nextType);
                       if (nextType === "true_false") {
                         handleUpdateCurrentQuestion("options", ["True", "False"]);
@@ -533,12 +546,12 @@ export function QuizBuilderModal({
                     {currentQ.type === "mcq"
                       ? "Answer Choices (Select radio button for the single correct answer)"
                       : currentQ.type === "multi_select"
-                      ? "Answer Choices (Check all options that are correct)"
-                      : currentQ.type === "true_false"
-                      ? "Designate Correct Answer"
-                      : currentQ.type === "short_answer"
-                      ? "Expected Answer Key (Text / Term)"
-                      : "Expected Numeric Value"}
+                        ? "Answer Choices (Check all options that are correct)"
+                        : currentQ.type === "true_false"
+                          ? "Designate Correct Answer"
+                          : currentQ.type === "short_answer"
+                            ? "Expected Answer Key (Text / Term)"
+                            : "Expected Numeric Value"}
                   </span>
                   <span className="text-[11px] font-normal text-emerald-700">
                     ✓ Evaluated automatically upon student submission
@@ -555,11 +568,10 @@ export function QuizBuilderModal({
                         return (
                           <div
                             key={optIdx}
-                            className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
-                              isCorrect
+                            className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${isCorrect
                                 ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs"
                                 : "bg-white border-slate-200 hover:border-slate-300"
-                            }`}
+                              }`}
                           >
                             <label className="cursor-pointer flex items-center gap-2 shrink-0">
                               <input
@@ -570,11 +582,10 @@ export function QuizBuilderModal({
                                 className="h-4 w-4 text-[#0d5c4d] focus:ring-[#0d5c4d] cursor-pointer"
                               />
                               <span
-                                className={`text-xs font-black px-2 py-0.5 rounded-lg ${
-                                  isCorrect
+                                className={`text-xs font-black px-2 py-0.5 rounded-lg ${isCorrect
                                     ? "bg-[#0d5c4d] text-white"
                                     : "bg-slate-100 text-slate-600"
-                                }`}
+                                  }`}
                               >
                                 {String.fromCharCode(65 + optIdx)}
                               </span>
@@ -646,11 +657,10 @@ export function QuizBuilderModal({
                         return (
                           <div
                             key={optIdx}
-                            className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
-                              isChecked
+                            className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${isChecked
                                 ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs"
                                 : "bg-white border-slate-200 hover:border-slate-300"
-                            }`}
+                              }`}
                           >
                             <label className="cursor-pointer flex items-center gap-2 shrink-0">
                               <input
@@ -668,11 +678,10 @@ export function QuizBuilderModal({
                                 className="h-4 w-4 rounded text-[#0d5c4d] focus:ring-[#0d5c4d] cursor-pointer"
                               />
                               <span
-                                className={`text-xs font-black px-2 py-0.5 rounded-lg ${
-                                  isChecked
+                                className={`text-xs font-black px-2 py-0.5 rounded-lg ${isChecked
                                     ? "bg-[#0d5c4d] text-white"
                                     : "bg-slate-100 text-slate-600"
-                                }`}
+                                  }`}
                               >
                                 {String.fromCharCode(65 + optIdx)}
                               </span>
@@ -734,11 +743,10 @@ export function QuizBuilderModal({
                             key={optText}
                             type="button"
                             onClick={() => handleUpdateCurrentQuestion("correctAnswer", tfIdx)}
-                            className={`p-3 rounded-xl border font-bold text-xs flex items-center justify-between cursor-pointer transition-all ${
-                              isCorrect
+                            className={`p-3 rounded-xl border font-bold text-xs flex items-center justify-between cursor-pointer transition-all ${isCorrect
                                 ? "bg-[#ecf8f5] border-[#0d5c4d] text-[#0d5c4d] ring-2 ring-[#0d5c4d]"
                                 : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                            }`}
+                              }`}
                           >
                             <span>{optText}</span>
                             {isCorrect && <CheckCircle2 className="h-4 w-4 text-[#0d5c4d]" />}

@@ -3,19 +3,11 @@
 import React, { useState, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import {
-  TrendingUp,
   Award,
-  CheckCircle2,
-  Clock,
   Target,
   Flame,
-  Zap,
   BookOpen,
-  Calendar,
   Sparkles,
-  ChevronRight,
-  Star,
-  Layers,
   ArrowUpRight,
   Activity,
   Check,
@@ -38,6 +30,84 @@ import {
   CartesianGrid,
   Legend
 } from "recharts";
+
+const DEFAULT_SUBJECT_MILESTONES = [
+  {
+    id: "c1",
+    name: "Combined Mathematics",
+    code: "MATH-AL-12",
+    icon: "📐",
+    progress: 84,
+    totalTopics: 18,
+    completedTopics: 15,
+    studyHours: 42,
+    status: "Ahead of Schedule",
+    statusColor: "success",
+    topics: [
+      { title: "Differential Calculus & Tangents", status: "completed", score: "96%" },
+      { title: "Integral Calculus & Areas", status: "completed", score: "92%" },
+      { title: "Trigonometric Identities & Equations", status: "completed", score: "90%" },
+      { title: "Vector Algebra & 3D Geometry", status: "in_progress", progress: 65 },
+      { title: "Dynamics & Relative Motion", status: "upcoming", progress: 0 }
+    ]
+  },
+  {
+    id: "c2",
+    name: "Physics (Theory & Practical)",
+    code: "PHYS-AL-12",
+    icon: "⚡",
+    progress: 76,
+    totalTopics: 16,
+    completedTopics: 12,
+    studyHours: 38,
+    status: "On Track",
+    statusColor: "default",
+    topics: [
+      { title: "Newtonian Mechanics & Momentum", status: "completed", score: "94%" },
+      { title: "Wave Optics & Oscillations", status: "completed", score: "88%" },
+      { title: "Thermodynamics & Heat Engines", status: "in_progress", progress: 70 },
+      { title: "Current Electricity & Circuits", status: "in_progress", progress: 40 },
+      { title: "Atomic & Nuclear Physics", status: "upcoming", progress: 0 }
+    ]
+  },
+  {
+    id: "c3",
+    name: "Chemistry",
+    code: "CHEM-AL-12",
+    icon: "🧪",
+    progress: 68,
+    totalTopics: 15,
+    completedTopics: 10,
+    studyHours: 32,
+    status: "Needs Revision",
+    statusColor: "warning",
+    topics: [
+      { title: "Atomic Structure & Periodic Trends", status: "completed", score: "88%" },
+      { title: "Chemical Equilibrium & Le Chatelier", status: "completed", score: "82%" },
+      { title: "Organic Functional Groups & Synthesis", status: "in_progress", progress: 55 },
+      { title: "Electrochemistry & Redox Cells", status: "upcoming", progress: 0 },
+      { title: "Inorganic Coordination Compounds", status: "upcoming", progress: 0 }
+    ]
+  },
+  {
+    id: "c4",
+    name: "Information & Communication Tech",
+    code: "ICT-AL-12",
+    icon: "💻",
+    progress: 92,
+    totalTopics: 14,
+    completedTopics: 13,
+    studyHours: 45,
+    status: "Mastery Level",
+    statusColor: "success",
+    topics: [
+      { title: "Relational Database Design & SQL", status: "completed", score: "98%" },
+      { title: "Data Structures & Python Algorithms", status: "completed", score: "95%" },
+      { title: "Web Development & HTTP Protocol", status: "completed", score: "94%" },
+      { title: "Computer Networks & Security", status: "in_progress", progress: 85 }
+    ]
+  }
+];
 
 export function StudentProgressView() {
   const {
@@ -116,88 +186,9 @@ export function StudentProgressView() {
     return { name: sorted[0].fullName, score: sorted[0].studentScore };
   }, [subjectAnalyticsChartData]);
 
-  // Subject syllabus milestone data
-  const subjectMilestones = [
-    {
-      id: "c1",
-      name: "Combined Mathematics",
-      code: "MATH-AL-12",
-      icon: "📐",
-      progress: 84,
-      totalTopics: 18,
-      completedTopics: 15,
-      studyHours: 42,
-      status: "Ahead of Schedule",
-      statusColor: "success",
-      topics: [
-        { title: "Differential Calculus & Tangents", status: "completed", score: "96%" },
-        { title: "Integral Calculus & Areas", status: "completed", score: "92%" },
-        { title: "Trigonometric Identities & Equations", status: "completed", score: "90%" },
-        { title: "Vector Algebra & 3D Geometry", status: "in_progress", progress: 65 },
-        { title: "Dynamics & Relative Motion", status: "upcoming", progress: 0 }
-      ]
-    },
-    {
-      id: "c2",
-      name: "Physics (Theory & Practical)",
-      code: "PHYS-AL-12",
-      icon: "⚡",
-      progress: 76,
-      totalTopics: 16,
-      completedTopics: 12,
-      studyHours: 38,
-      status: "On Track",
-      statusColor: "default",
-      topics: [
-        { title: "Newtonian Mechanics & Momentum", status: "completed", score: "94%" },
-        { title: "Wave Optics & Oscillations", status: "completed", score: "88%" },
-        { title: "Thermodynamics & Heat Engines", status: "in_progress", progress: 70 },
-        { title: "Current Electricity & Circuits", status: "in_progress", progress: 40 },
-        { title: "Atomic & Nuclear Physics", status: "upcoming", progress: 0 }
-      ]
-    },
-    {
-      id: "c3",
-      name: "Chemistry",
-      code: "CHEM-AL-12",
-      icon: "🧪",
-      progress: 68,
-      totalTopics: 15,
-      completedTopics: 10,
-      studyHours: 32,
-      status: "Needs Revision",
-      statusColor: "warning",
-      topics: [
-        { title: "Atomic Structure & Periodic Trends", status: "completed", score: "88%" },
-        { title: "Chemical Equilibrium & Le Chatelier", status: "completed", score: "82%" },
-        { title: "Organic Functional Groups & Synthesis", status: "in_progress", progress: 55 },
-        { title: "Electrochemistry & Redox Cells", status: "upcoming", progress: 0 },
-        { title: "Inorganic Coordination Compounds", status: "upcoming", progress: 0 }
-      ]
-    },
-    {
-      id: "c4",
-      name: "Information & Communication Tech",
-      code: "ICT-AL-12",
-      icon: "💻",
-      progress: 92,
-      totalTopics: 14,
-      completedTopics: 13,
-      studyHours: 45,
-      status: "Mastery Level",
-      statusColor: "success",
-      topics: [
-        { title: "Relational Database Design & SQL", status: "completed", score: "98%" },
-        { title: "Data Structures & Python Algorithms", status: "completed", score: "95%" },
-        { title: "Web Development & HTTP Protocol", status: "completed", score: "94%" },
-        { title: "Computer Networks & Security", status: "in_progress", progress: 85 }
-      ]
-    }
-  ];
-
   // Dynamic Syllabus Progress computed from real database courses & completed lessons
   const effectiveSubjectMilestones = useMemo(() => {
-    if (!courses || courses.length === 0) return subjectMilestones;
+    if (!courses || courses.length === 0) return DEFAULT_SUBJECT_MILESTONES;
 
     const iconList = ["📐", "⚡", "🧪", "💻", "📚", "🔬"];
     return courses.map((course, idx) => {
@@ -206,7 +197,7 @@ export function StudentProgressView() {
       const totalLessonsCount = allLessons.length;
 
       const completedCount = allLessons.filter(
-        (l) => l.completedByStudentIds?.includes(currentUser.id)
+        (l) => l.completedByStudentIds?.includes(currentUser?.id)
       ).length || course.completedLessons || 0;
 
       const progressPct = totalLessonsCount > 0
@@ -217,7 +208,7 @@ export function StudentProgressView() {
       const mappedTopics = allTopics.slice(0, 5).map((t, tIdx) => {
         const topicLessons = t.lessons || [];
         const isTopicDone = topicLessons.length > 0 && topicLessons.every(
-          (l) => l.completedByStudentIds?.includes(currentUser.id)
+          (l) => l.completedByStudentIds?.includes(currentUser?.id)
         );
         return {
           title: t.title,
@@ -238,7 +229,7 @@ export function StudentProgressView() {
         studyHours: Math.max(12, Math.round(completedCount * 2.5)),
         status: progressPct >= 80 ? "Ahead of Schedule" : progressPct >= 60 ? "On Track" : "Needs Revision",
         statusColor: progressPct >= 80 ? "success" : progressPct >= 60 ? "default" : "warning",
-        topics: mappedTopics.length > 0 ? mappedTopics : subjectMilestones[0].topics
+        topics: mappedTopics.length > 0 ? mappedTopics : DEFAULT_SUBJECT_MILESTONES[0].topics
       };
     });
   }, [courses, currentUser?.id]);
@@ -523,10 +514,10 @@ export function StudentProgressView() {
                       color: "#fff",
                       fontSize: "12px"
                     }}
-                    formatter={(val: any, name: any) => [`${val}%`, name === "studentScore" ? "Your Mastery Score" : "Grade Benchmark"]}
-                    labelFormatter={(label: any) => {
-                      const item = subjectAnalyticsChartData.find((d: any) => d.subject === label);
-                      return item?.fullName || label;
+                    formatter={(val, name) => [`${val ?? 0}%`, name === "studentScore" ? "Your Mastery Score" : "Grade Benchmark"]}
+                    labelFormatter={(label) => {
+                      const item = subjectAnalyticsChartData.find((d) => d.subject === String(label));
+                      return item?.fullName || String(label);
                     }}
                   />
                   <Legend

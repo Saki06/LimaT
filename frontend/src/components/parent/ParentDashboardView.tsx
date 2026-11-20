@@ -10,51 +10,23 @@ import type {
   ParentChildProfile
 } from "@/types/parent";
 import {
-  Users,
   GraduationCap,
-  Calendar,
   Award,
-  BookOpen,
   FileText,
   Clock,
-  CheckCircle2,
-  AlertCircle,
   MessageSquare,
-  Send,
   Download,
   Printer,
   ChevronRight,
-  ShieldCheck,
-  Building,
-  Phone,
-  Mail,
-  FileCheck,
   PlusCircle,
   ExternalLink,
   Sparkles,
-  Search,
-  Bell,
-  CheckCheck,
-  MapPin,
-  FileSpreadsheet,
-  History,
-  TrendingUp,
-  Layers,
-  Star,
   Video,
   CreditCard,
   UploadCloud,
   Check,
-  X,
-  Share2,
-  Radio,
-  FileUp,
-  ArrowRight,
-  Table,
-  LayoutGrid,
   RefreshCw
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { api } from "@/lib/api";
 
@@ -135,7 +107,7 @@ export function ParentDashboardView() {
   const [linkStudentInput, setLinkStudentInput] = useState<string>("");
   const [isLinkingStudent, setIsLinkingStudent] = useState<boolean>(false);
 
-  const fetchParentData = async (showToast = false) => {
+  const fetchParentData = React.useCallback(async (showToast = false) => {
     try {
       setIsLoading(true);
       setLoadError(null);
@@ -168,9 +140,9 @@ export function ParentDashboardView() {
       });
 
       setChildrenList(children);
-      if (!children.some((child) => child.id === selectedChildId)) {
-        setSelectedChildId(children[0]?.id || "");
-      }
+      setSelectedChildId((prev) =>
+        children.some((child) => child.id === prev) ? prev : children[0]?.id || ""
+      );
       if (showToast) {
         addToast({
           type: "success",
@@ -184,11 +156,19 @@ export function ParentDashboardView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [addToast]);
 
   React.useEffect(() => {
-    fetchParentData(false);
-  }, []);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        void fetchParentData(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchParentData]);
 
   const handleLinkChildSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,11 +237,18 @@ export function ParentDashboardView() {
 
   // Sync when sidebar currentView changes externally
   React.useEffect(() => {
-    if (["tuition_classes", "fees", "progress", "circulars"].includes(currentView)) {
-      setActiveTab(currentView as ParentTab);
-    } else if (currentView === "dashboard") {
-      setActiveTab("overview");
-    }
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      if (["tuition_classes", "fees", "progress", "circulars"].includes(currentView)) {
+        setActiveTab(currentView as ParentTab);
+      } else if (currentView === "dashboard") {
+        setActiveTab("overview");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [currentView]);
 
   const handleTabChange = (tab: ParentTab) => {
@@ -295,7 +282,6 @@ export function ParentDashboardView() {
 
   // Paper Marks View & Filter States
   const [paperSubjectFilter, setPaperSubjectFilter] = useState<string>("all");
-  const [paperViewMode, setPaperViewMode] = useState<"table" | "cards">("table");
 
   // Dynamic subjects list for paper marks filter
   const availablePaperSubjects = useMemo(() => {
@@ -326,23 +312,30 @@ export function ParentDashboardView() {
   const [depositBranch, setDepositBranch] = useState("");
   const [depositRefNumber, setDepositRefNumber] = useState("");
   const [depositDate, setDepositDate] = useState(todayIsoStr);
-  const [slipFileName, setSlipFileName] = useState("Bank_Deposit_Slip_Receipt.jpg");
+  const [slipFileName] = useState("Bank_Deposit_Slip_Receipt.jpg");
 
   // Invoices list state (allow live additions when parent uploads bank slip)
   const [invoices, setInvoices] = useState<TuitionInvoice[]>(activeChild.invoices || []);
 
   // Sync invoices when active child changes
   React.useEffect(() => {
-    setInvoices(activeChild.invoices || []);
-    if ((activeChild.enrolments || []).length > 0) {
-      setDepositTutor(activeChild.enrolments[0].teacherName);
-      setDepositAmount(activeChild.enrolments[0].monthlyFeeLkr);
-      setLeaveTutor(activeChild.enrolments[0].teacherName);
-    } else {
-      setDepositTutor("");
-      setDepositAmount(0);
-      setLeaveTutor("");
-    }
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setInvoices(activeChild.invoices || []);
+      if ((activeChild.enrolments || []).length > 0) {
+        setDepositTutor(activeChild.enrolments[0].teacherName);
+        setDepositAmount(activeChild.enrolments[0].monthlyFeeLkr);
+        setLeaveTutor(activeChild.enrolments[0].teacherName);
+      } else {
+        setDepositTutor("");
+        setDepositAmount(0);
+        setLeaveTutor("");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [activeChild]);
 
   // Handle Bank Slip Submission
@@ -570,9 +563,9 @@ export function ParentDashboardView() {
       {childrenList.length === 0 && !isLoading && (
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#c4e9e0] shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <h3 className="text-base font-black text-[#0d2b26]">
+            <h2 className="text-base font-black text-[#0d2b26]">
               No Student Account Linked Yet
-            </h3>
+            </h2>
             <p className="text-xs text-slate-600 max-w-xl">
               Link your child&apos;s student profile using their unique Student ID (e.g., <code className="font-mono font-bold text-[#0d5c4d]">STU-1234</code>), mobile number, or email address to view their real enrolled tutors, live classes, fee invoices, and paper marks.
             </p>
@@ -716,7 +709,7 @@ export function ParentDashboardView() {
           <div className="bg-white rounded-3xl p-6 border border-[#e6ece8] shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <h3 className="text-base font-black text-[#0d2b26]">Upcoming Live Online Classes for {activeChild.name}</h3>
+                <h2 className="text-base font-black text-[#0d2b26]">Upcoming Live Online Classes for {activeChild.name}</h2>
                 <p className="text-xs text-slate-500">Live lecture schedule with 1-click meeting access and WhatsApp updates</p>
               </div>
               <button
@@ -754,7 +747,7 @@ export function ParentDashboardView() {
                     </div>
 
                     <div>
-                      <h4 className="font-extrabold text-sm text-[#0d2b26]">{enrol.teacherName}</h4>
+                      <h3 className="font-extrabold text-sm text-[#0d2b26]">{enrol.teacherName}</h3>
                       <p className="text-xs text-slate-600 font-medium mt-0.5 line-clamp-1">{enrol.nextSessionTopic}</p>
                     </div>
 
@@ -787,7 +780,7 @@ export function ParentDashboardView() {
           <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#e6ece8] shadow-xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div>
-                <h3 className="text-lg font-black text-[#0d2b26]">Enrolled Tuition Masterclasses</h3>
+                <h2 className="text-lg font-black text-[#0d2b26]">Enrolled Tuition Masterclasses</h2>
                 <p className="text-xs text-slate-500">Current course packages, fees, and clearance status</p>
               </div>
               <button
@@ -823,7 +816,7 @@ export function ParentDashboardView() {
                           {enrol.initials}
                         </div>
                         <div>
-                          <h4 className="font-extrabold text-sm text-[#0d2b26]">{enrol.teacherName}</h4>
+                          <h3 className="font-extrabold text-sm text-[#0d2b26]">{enrol.teacherName}</h3>
                           <p className="text-xs font-semibold text-slate-500">{enrol.subject}</p>
                         </div>
                       </div>
@@ -1576,11 +1569,11 @@ export function ParentDashboardView() {
               <label className="block text-xs font-bold text-slate-700 mb-1">Reason</label>
               <select
                 value={leaveReason}
-                onChange={(e) => setLeaveReason(e.target.value as any)}
+                onChange={(e) => setLeaveReason(e.target.value as ParentLeaveRequest["reason"])}
                 className="w-full h-10 px-3 rounded-xl bg-[#f6f9f7] border border-[#e2e8e4] text-xs text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
               >
                 <option value="School Exam Clashing">School Exam Clashing</option>
-                <option value="Medical Illness">Medical Illness / Doctor's Rest</option>
+                <option value="Medical Illness">Medical Illness / Doctor&apos;s Rest</option>
                 <option value="Family Emergency">Family Emergency</option>
                 <option value="Religious Observation">Religious Observance</option>
                 <option value="Other">Other Personal Reasons</option>

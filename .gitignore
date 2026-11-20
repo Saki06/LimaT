@@ -14,8 +14,23 @@ out/
 build/
 dist/
 
-# Testing & Coverage
+# Testing & QA
 coverage/
+playwright-report/
+test-results/
+frontend/tests/
+frontend/playwright.config.ts
+backend/scripts/
+backend/prisma/seed-test.ts
+__tests__/
+
+# Documentation & QA Reports
+docs/
+
+# AI Agent files
+AGENTS.md
+**/AGENTS.md
+CLAUDE.md
 
 # Misc & OS
 .DS_Store
@@ -47,3 +62,4 @@ next-env.d.ts
 
 # User-uploaded files
 /backend/uploads/
+

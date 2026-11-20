@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { User as UserIcon, Phone, Mail, Lock, UserPlus, GraduationCap, Loader2, ChevronDown, Globe, MapPin, BookOpen } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { api } from "@/lib/api";
 
 const GRADE_OPTIONS = [
   "Grade 6",
@@ -182,11 +181,11 @@ export function StudentSignupForm({ onSuccess }: StudentSignupFormProps) {
           message: res.message || "Could not complete student registration."
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       addToast({
         type: "error",
         title: "Connection Error",
-        message: err.message || "Could not reach registration server."
+        message: err instanceof Error ? err.message : "Could not reach registration server."
       });
     } finally {
       setIsLoading(false);

@@ -110,6 +110,48 @@ export const createResource = async (req: AuthenticatedRequest, res: Response): 
       return;
     }
 
+    // Validate file extension, MIME type, and sanitize fileName
+    const ALLOWED_EXTENSIONS = new Set([
+      'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'png', 'jpg', 'jpeg', 'webp', 'mp4',
+    ]);
+    const sanitizedFileName = fileName
+      ? String(fileName).replace(/(\.\.[/\\])+/g, '').replace(/[/\\]/g, '').trim()
+      : `${title.trim().replace(/\s+/g, '_')}.pdf`;
+    const extFromName = sanitizedFileName.includes('.')
+      ? sanitizedFileName.split('.').pop()?.toLowerCase() || ''
+      : '';
+    const resolvedExt = String(fileType || extFromName || 'pdf').toLowerCase().replace(/^\./, '');
+
+    if (
+      (extFromName && !ALLOWED_EXTENSIONS.has(extFromName)) ||
+      (resolvedExt && !ALLOWED_EXTENSIONS.has(resolvedExt))
+    ) {
+      res.status(400).json({
+        success: false,
+        message: 'Unsupported file format. Allowed formats: PDF, Office documents, images (PNG/JPG/WebP), TXT, MP4.',
+      });
+      return;
+    }
+
+    if (typeof fileUrl === 'string' && fileUrl.trim()) {
+      const trimmedUrl = fileUrl.trim();
+      if (/^javascript:/i.test(trimmedUrl)) {
+        res.status(400).json({ success: false, message: 'Invalid file URL scheme.' });
+        return;
+      }
+      if (trimmedUrl.startsWith('data:')) {
+        const allowedDataMime =
+          /^data:(application\/pdf|image\/(png|jpeg|jpg|webp)|text\/plain|application\/vnd\.openxmlformats|application\/msword|video\/mp4);base64,/i;
+        if (!allowedDataMime.test(trimmedUrl)) {
+          res.status(400).json({
+            success: false,
+            message: 'Unsupported file MIME type. Allowed: PDF, PNG, JPEG, WebP, TXT, Office docs, MP4.',
+          });
+          return;
+        }
+      }
+    }
+
     const teacher = await getOrCreateTeacherProfile(user.userId);
     if (!teacher) {
       res.status(404).json({ success: false, message: 'Teacher profile not found' });
@@ -151,7 +193,7 @@ export const createResource = async (req: AuthenticatedRequest, res: Response): 
         examType: examType || 'G.C.E. A/L',
         paperPart: paperPart || 'Part I & II (Combined)',
         fileUrl: fileUrl || null,
-        fileName: fileName || `${title.replace(/\s+/g, '_')}.pdf`,
+        fileName: sanitizedFileName || `${title.trim().replace(/\s+/g, '_')}.pdf`,
         fileSize: fileSize || '2.4 MB',
         fileType: fileType || 'pdf',
         coverImage: coverImage || null,

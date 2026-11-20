@@ -13,6 +13,7 @@ export interface User {
   avatar?: string;
   grade?: string;
   class?: string;
+  indexNumber?: string;
   schoolId: string;
   schoolName: string;
 }
@@ -189,7 +190,7 @@ export interface QuizAttemptRecord {
   grade: 'A' | 'B' | 'C' | 'S' | 'F';
   timeSpentSeconds: number;
   submittedAt: string;
-  answers: Record<string, any>;
+  answers: Record<string, string | number | boolean | (string | number)[]>;
 }
 
 export interface Quiz {
@@ -747,7 +748,7 @@ export interface TeacherProfileData {
   avatarUrl?: string;
   rating?: number;
   isVerified?: boolean;
-  packages?: any[];
+  packages?: TutorPackage[];
   user?: {
     id: string;
     email: string;

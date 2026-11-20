@@ -2,27 +2,15 @@
 
 import React, { useState, useMemo } from "react";
 import {
-  Users,
   Trophy,
-  Building2,
-  MapPin,
-  CheckCircle2,
-  Clock,
   Download,
-  Filter,
   Search,
   Eye,
   Check,
   X,
-  AlertCircle,
   Plus,
-  Printer,
-  FileSpreadsheet,
-  Layers,
-  ChevronDown,
-  Edit3
+  Printer
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
@@ -61,7 +49,7 @@ export function AdminSportsRegistrationsDesk({
   const [selectedAgeFilter, setSelectedAgeFilter] = useState("All");
   const [selectedGenderFilter, setSelectedGenderFilter] = useState("All");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("All");
-  const [selectedPaymentFilter, setSelectedPaymentFilter] = useState("All");
+  const [selectedPaymentFilter] = useState("All");
 
   // Selected registration for modal detail view
   const [selectedRegistration, setSelectedRegistration] = useState<StoredAthleteRegistration | null>(
@@ -79,7 +67,10 @@ export function AdminSportsRegistrationsDesk({
   const [newSportIsTeam, setNewSportIsTeam] = useState(false);
 
   // New Event Form
-  const [targetSportId, setTargetSportId] = useState(sportsList[0]?.id || "");
+  const [selectedTargetSportId, setTargetSportId] = useState(sportsList[0]?.id || "");
+  const targetSportId = sportsList.some((sport) => sport.id === selectedTargetSportId)
+    ? selectedTargetSportId
+    : sportsList[0]?.id || "";
   const [newEventName, setNewEventName] = useState("");
   const [newEventAge, setNewEventAge] = useState<"U12" | "U14" | "U16" | "U18" | "Open">("U16");
   const [newEventGender, setNewEventGender] = useState<"Boys" | "Girls" | "Mixed" | "All">("Boys");
@@ -310,12 +301,6 @@ export function AdminSportsRegistrationsDesk({
     }
   };
 
-  React.useEffect(() => {
-    if (!sportsList.some((sport) => sport.id === targetSportId)) {
-      setTargetSportId(sportsList[0]?.id || "");
-    }
-  }, [sportsList, targetSportId]);
-
   return (
     <div className="space-y-6">
       {/* KPI METRIC CARDS */}
@@ -495,7 +480,7 @@ export function AdminSportsRegistrationsDesk({
           <div>
             <select
               value={selectedTypeFilter}
-              onChange={(e) => setSelectedTypeFilter(e.target.value as any)}
+              onChange={(e) => setSelectedTypeFilter(e.target.value as "All" | "Squads" | "Individual")}
               className="w-full h-9 px-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-[#fbfcfb]"
             >
               <option value="All">All Entry Types</option>
@@ -1003,7 +988,7 @@ export function AdminSportsRegistrationsDesk({
                 <label className="font-bold text-slate-700 block mb-1">Age Bracket</label>
                 <select
                   value={newEventAge}
-                  onChange={(e) => setNewEventAge(e.target.value as any)}
+                  onChange={(e) => setNewEventAge(e.target.value as "U12" | "U14" | "U16" | "U18" | "Open")}
                   className="w-full h-10 px-2 rounded-xl border border-slate-200 text-xs font-bold"
                 >
                   <option value="U12">Under-12</option>
@@ -1018,7 +1003,7 @@ export function AdminSportsRegistrationsDesk({
                 <label className="font-bold text-slate-700 block mb-1">Gender Restriction</label>
                 <select
                   value={newEventGender}
-                  onChange={(e) => setNewEventGender(e.target.value as any)}
+                  onChange={(e) => setNewEventGender(e.target.value as "Boys" | "Girls" | "Mixed" | "All")}
                   className="w-full h-10 px-2 rounded-xl border border-slate-200 text-xs font-bold"
                 >
                   <option value="Boys">Boys Only</option>

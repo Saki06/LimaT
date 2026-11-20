@@ -10,19 +10,46 @@ import {
   FileText,
   Award,
   Download,
-  CheckCircle2,
   ShieldCheck,
   Printer,
-  Sparkles,
-  UploadCloud,
-  Check,
-  Send,
-  AlertCircle
+  Send
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+interface BackendExamAssignmentItem {
+  id: string;
+  title: string;
+  subjectName?: string | null;
+  dueDate?: string | null;
+  teacherName?: string | null;
+  maxMarks?: number | null;
+  mySubmission?: unknown;
+  instructions?: string | null;
+  attachmentName?: string | null;
+  attachmentUrl?: string | null;
+}
+
+interface BackendExamResultItem {
+  id: string;
+  assignmentTitle: string;
+  subjectName?: string | null;
+  grade: string;
+  designation?: string | null;
+  marksObtained: number;
+  maxMarks: number;
+  percentage: number;
+  markedAt?: string | null;
+  teacherFeedback?: string | null;
+}
+
+interface BackendExamSummary {
+  totalEvaluated?: number;
+  averageScore?: number;
+  distinctionsCount?: number;
+}
+
 export function ExamViews() {
-  const { currentUser, t, addToast } = useApp();
+  const { currentUser, authUser, addToast } = useApp();
 
   const [activeTab, setActiveTab] = useState<"timetable" | "hall" | "results">("timetable");
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
@@ -31,25 +58,28 @@ export function ExamViews() {
   const [isExamSubmitted, setIsExamSubmitted] = useState(false);
   const [isHallTicketModalOpen, setIsHallTicketModalOpen] = useState(false);
 
-  const [backendAssignments, setBackendAssignments] = useState<any[]>([]);
-  const [backendResults, setBackendResults] = useState<any[]>([]);
-  const [backendSummary, setBackendSummary] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [backendAssignments, setBackendAssignments] = useState<BackendExamAssignmentItem[]>([]);
+  const [backendResults, setBackendResults] = useState<BackendExamResultItem[]>([]);
+  const [backendSummary, setBackendSummary] = useState<BackendExamSummary | null>(null);
+
+  const studentProfileMeta = authUser?.studentProfile as
+    | { studentIdNo?: string; indexNumber?: string; gradeLevel?: string }
+    | null
+    | undefined;
 
   const candidateIndexNo =
-    (currentUser as any)?.studentIdNo ||
-    (currentUser as any)?.indexNumber ||
+    studentProfileMeta?.studentIdNo ||
+    studentProfileMeta?.indexNumber ||
     `STU-${(currentUser?.id || "9904").slice(0, 6).toUpperCase()}`;
 
   const studentGrade =
-    (currentUser as any)?.gradeLevel ||
+    studentProfileMeta?.gradeLevel ||
     currentUser?.grade ||
     "Academic Evaluation";
 
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
-      setIsLoading(true);
       try {
         const [asgRes, resRes] = await Promise.all([
           api.assignments.getAll(),
@@ -70,8 +100,6 @@ export function ExamViews() {
         }
       } catch (err) {
         console.warn("Could not load exam data:", err);
-      } finally {
-        if (isMounted) setIsLoading(false);
       }
     }
     loadData();
@@ -156,11 +184,11 @@ export function ExamViews() {
         title: "Examination Script Submitted! 🚀",
         message: "Your official answers have been registered and sealed for faculty review."
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       addToast({
         type: "error",
         title: "Submission Error",
-        message: e.message || "Failed to submit examination script."
+        message: e instanceof Error ? e.message : "Failed to submit examination script."
       });
     }
   };

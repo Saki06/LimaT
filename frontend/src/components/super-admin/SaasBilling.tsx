@@ -14,7 +14,7 @@ export function SaasBilling({ onSelectPlanForOnboard }: SaasBillingProps) {
   return (
     <div className="space-y-6">
       <Card className="border-[#c4e9e0] bg-white shadow-2xs p-6 space-y-4">
-        <h3 className="text-lg font-black text-[#0d2b26]">Commercial SaaS Packaging &amp; Licensing</h3>
+        <h2 className="text-lg font-black text-[#0d2b26]">Commercial SaaS Packaging &amp; Licensing</h2>
         <p className="text-xs text-slate-600 max-w-3xl">
           We offer 3 standardized SaaS editions tailored to distinct customer market segments in Sri Lanka:
         </p>

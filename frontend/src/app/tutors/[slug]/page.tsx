@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import {
   GraduationCap,
@@ -12,7 +13,6 @@ import {
   Star,
   Award,
   CheckCircle,
-  Clock,
   Sparkles,
   ArrowRight,
   Share2,
@@ -110,26 +110,29 @@ export default function TutorPublicStudioPage() {
     if (!slug) return;
 
     let isMounted = true;
-    setLoading(true);
-    setError(null);
+    Promise.resolve().then(() => {
+      if (!isMounted) return;
+      setLoading(true);
+      setError(null);
 
-    api.teachers
-      .getPublicProfile(slug)
-      .then((res: any) => {
-        if (!isMounted) return;
-        if (res?.success && res?.data) {
-          setTutor(res.data);
-        } else {
-          setError(res?.error || "Tutor profile not found.");
-        }
-      })
-      .catch((err: any) => {
-        if (!isMounted) return;
-        setError(err?.message || "Failed to load tutor profile.");
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
+      api.teachers
+        .getPublicProfile(slug)
+        .then((res: { success?: boolean; data?: PublicTutorData; error?: string } | null | undefined) => {
+          if (!isMounted) return;
+          if (res?.success && res?.data) {
+            setTutor(res.data);
+          } else {
+            setError(res?.error || "Tutor profile not found.");
+          }
+        })
+        .catch((err: unknown) => {
+          if (!isMounted) return;
+          setError(err instanceof Error ? err.message : "Failed to load tutor profile.");
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+    });
 
     return () => {
       isMounted = false;
@@ -262,9 +265,12 @@ export default function TutorPublicStudioPage() {
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
           {/* Cover Banner */}
           <div className="relative h-48 sm:h-64 w-full bg-slate-900">
-            <img
+            <Image
               src={coverImage}
               alt="Studio Cover"
+              width={1200}
+              height={256}
+              unoptimized
               className="h-full w-full object-cover opacity-85"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
@@ -294,7 +300,7 @@ export default function TutorPublicStudioPage() {
               <div className="flex items-end gap-4">
                 <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-[#0d5c4d] to-[#147a66] border-4 border-white text-white flex items-center justify-center text-3xl font-black shadow-xl overflow-hidden shrink-0">
                   {tutor.avatarUrl ? (
-                    <img src={tutor.avatarUrl} alt={tutor.name} className="h-full w-full object-cover" />
+                    <Image src={tutor.avatarUrl} alt={tutor.name} width={96} height={96} unoptimized className="h-full w-full object-cover" />
                   ) : (
                     tutor.name.charAt(0)
                   )}

@@ -347,7 +347,9 @@ export const createAnnouncement = async (
   try {
     const { title, message, content, targetAudience, priority, isPinned } = req.body;
 
-    if (!title || (!message && !content)) {
+    const cleanTitle = typeof title === 'string' ? title.trim() : '';
+    const cleanBody = typeof (message || content) === 'string' ? String(message || content).trim() : '';
+    if (!cleanTitle || !cleanBody) {
       res.status(400).json({ success: false, message: 'Title and message are required' });
       return;
     }
@@ -436,9 +438,21 @@ export const updateAnnouncement = async (
     const id = String(req.params.id);
     const { title, message, content, targetAudience, priority, isPinned, authorName, authorRole } = req.body;
 
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
     const existing = await prisma.announcement.findUnique({ where: { id } });
     if (!existing) {
       res.status(404).json({ success: false, message: 'Announcement not found' });
+      return;
+    }
+
+    // Tenant ownership authorization (VULN-02 fix)
+    if (user.role !== 'SUPER_ADMIN' && (!user.tenantId || existing.tenantId !== user.tenantId)) {
+      res.status(403).json({ success: false, message: 'Forbidden: Cross-tenant announcement access denied' });
       return;
     }
 
@@ -498,9 +512,21 @@ export const deleteAnnouncement = async (
 ): Promise<void> => {
   try {
     const id = String(req.params.id);
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
     const existing = await prisma.announcement.findUnique({ where: { id } });
     if (!existing) {
       res.status(404).json({ success: false, message: 'Announcement not found' });
+      return;
+    }
+
+    // Tenant ownership authorization (VULN-02 fix)
+    if (user.role !== 'SUPER_ADMIN' && (!user.tenantId || existing.tenantId !== user.tenantId)) {
+      res.status(403).json({ success: false, message: 'Forbidden: Cross-tenant announcement access denied' });
       return;
     }
 
@@ -526,9 +552,21 @@ export const togglePinAnnouncement = async (
 ): Promise<void> => {
   try {
     const id = String(req.params.id);
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
     const existing = await prisma.announcement.findUnique({ where: { id } });
     if (!existing) {
       res.status(404).json({ success: false, message: 'Announcement not found' });
+      return;
+    }
+
+    // Tenant ownership authorization (VULN-02 fix)
+    if (user.role !== 'SUPER_ADMIN' && (!user.tenantId || existing.tenantId !== user.tenantId)) {
+      res.status(403).json({ success: false, message: 'Forbidden: Cross-tenant announcement access denied' });
       return;
     }
 

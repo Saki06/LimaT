@@ -62,6 +62,18 @@ export const createLiveClass = async (req: AuthenticatedRequest, res: Response):
       return;
     }
 
+    const parsedStartTime = new Date(startTime);
+    if (Number.isNaN(parsedStartTime.getTime())) {
+      res.status(400).json({ success: false, message: 'Invalid class start time format' });
+      return;
+    }
+
+    const numericDuration = Number(durationMinutes);
+    if (!Number.isFinite(numericDuration) || numericDuration <= 0 || numericDuration > 1440) {
+      res.status(400).json({ success: false, message: 'Duration must be a positive number (1-1440 minutes)' });
+      return;
+    }
+
     let candidateTenantId = user.tenantId;
     if (!candidateTenantId) {
       const activeTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
@@ -406,6 +418,18 @@ export const updateLiveClass = async (req: AuthenticatedRequest, res: Response):
       return;
     }
 
+    // Tenant & teacher ownership authorization (VULN-01 fix)
+    if (user.role !== 'SUPER_ADMIN') {
+      if (!user.tenantId || existing.tenantId !== user.tenantId) {
+        res.status(403).json({ success: false, message: 'Forbidden: Cross-tenant access denied' });
+        return;
+      }
+      if (user.role === 'TEACHER' && existing.teacher?.userId !== user.userId) {
+        res.status(403).json({ success: false, message: 'Forbidden: You can only update your own live classes' });
+        return;
+      }
+    }
+
     const updateData: any = {};
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
@@ -470,6 +494,12 @@ export const updateLiveClass = async (req: AuthenticatedRequest, res: Response):
 export const updateLiveClassStatus = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
     const { status } = req.body; // SCHEDULED, LIVE, COMPLETED, CANCELLED
 
     if (!['SCHEDULED', 'LIVE', 'COMPLETED', 'CANCELLED'].includes(status)) {
@@ -478,6 +508,28 @@ export const updateLiveClassStatus = async (req: AuthenticatedRequest, res: Resp
         message: 'Invalid status. Must be SCHEDULED, LIVE, COMPLETED, or CANCELLED',
       });
       return;
+    }
+
+    const existing = await prisma.liveClassSession.findUnique({
+      where: { id },
+      include: { teacher: true },
+    });
+
+    if (!existing) {
+      res.status(404).json({ success: false, message: 'Live class session not found' });
+      return;
+    }
+
+    // Tenant & teacher ownership authorization (VULN-01 fix)
+    if (user.role !== 'SUPER_ADMIN') {
+      if (!user.tenantId || existing.tenantId !== user.tenantId) {
+        res.status(403).json({ success: false, message: 'Forbidden: Cross-tenant access denied' });
+        return;
+      }
+      if (user.role === 'TEACHER' && existing.teacher?.userId !== user.userId) {
+        res.status(403).json({ success: false, message: 'Forbidden: You can only manage your own live classes' });
+        return;
+      }
     }
 
     const updated = await prisma.liveClassSession.update({
@@ -520,6 +572,33 @@ export const updateLiveClassStatus = async (req: AuthenticatedRequest, res: Resp
 export const deleteLiveClass = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const existing = await prisma.liveClassSession.findUnique({
+      where: { id },
+      include: { teacher: true },
+    });
+
+    if (!existing) {
+      res.status(404).json({ success: false, message: 'Live class session not found' });
+      return;
+    }
+
+    // Tenant & teacher ownership authorization (VULN-01 fix)
+    if (user.role !== 'SUPER_ADMIN') {
+      if (!user.tenantId || existing.tenantId !== user.tenantId) {
+        res.status(403).json({ success: false, message: 'Forbidden: Cross-tenant access denied' });
+        return;
+      }
+      if (user.role === 'TEACHER' && existing.teacher?.userId !== user.userId) {
+        res.status(403).json({ success: false, message: 'Forbidden: You can only delete your own live classes' });
+        return;
+      }
+    }
 
     await prisma.liveClassSession.delete({
       where: { id },

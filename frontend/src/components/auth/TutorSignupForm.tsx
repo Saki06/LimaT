@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { User as UserIcon, Phone, Mail, Lock, UserPlus, Sparkles, BookOpen, Loader2 } from "lucide-react";
+import { User as UserIcon, Phone, Mail, Lock, Sparkles, BookOpen, Loader2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { api } from "@/lib/api";
 
 interface TutorSignupFormProps {
   onSuccess: () => void;
@@ -68,11 +67,11 @@ export function TutorSignupForm({ onSuccess }: TutorSignupFormProps) {
           message: res.message || "Could not complete tutor registration."
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       addToast({
         type: "error",
         title: "Connection Error",
-        message: err.message || "Could not complete tutor registration."
+        message: err instanceof Error ? err.message : "Could not complete tutor registration."
       });
     } finally {
       setIsLoading(false);

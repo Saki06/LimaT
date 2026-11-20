@@ -9,23 +9,18 @@ import {
   User,
   Phone,
   Mail,
-  Calendar,
   Building2,
   Trophy,
   ShieldCheck,
-  CreditCard,
   Printer,
-  Sparkles,
   Check,
   Edit2,
   X,
   FileText,
-  Download,
   Users,
   Plus,
   Trash2,
-  Key,
-  Hash
+  Key
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -96,11 +91,9 @@ export function SportsRegistrationWizard({
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
 
   // STEP 7: Team Sport Squad Roster States
-  const [isTeamInterest, setIsTeamInterest] = useState(false);
   const [teamRegistrationMode, setTeamRegistrationMode] = useState<"captain" | "join_code" | "individual">("captain");
   const [teamName, setTeamName] = useState("");
   const [teamCoachName, setTeamCoachName] = useState("");
-  const [teamCoachPhone, setTeamCoachPhone] = useState("");
   const [enteredTeamCode, setEnteredTeamCode] = useState("");
   const [squadPlayers, setSquadPlayers] = useState<SquadPlayer[]>(() => {
     const fullName = `${firstName} ${lastName}`.trim();
@@ -169,8 +162,6 @@ export function SportsRegistrationWizard({
 
   // STEP 10: Payment Simulation & Confirmed Registration ID
   const [confirmedRecord, setConfirmedRecord] = useState<StoredAthleteRegistration | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionError, setSubmissionError] = useState("");
 
   // Find all chosen events objects
   const allChosenEvents = useMemo(() => {
@@ -295,8 +286,6 @@ export function SportsRegistrationWizard({
 
   // Final Submission Handler
   const handleConfirmRegistration = async () => {
-    setIsSubmitting(true);
-    setSubmissionError("");
     const generatedTeamCode =
       teamRegistrationMode === "captain"
         ? `TEAM-${(selectedSchool || "SCH").slice(0, 3).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`
@@ -308,7 +297,7 @@ export function SportsRegistrationWizard({
             teamName: teamName.trim() || `${selectedSchool} Squad`,
             teamCode: generatedTeamCode,
             coachName: teamCoachName.trim() || undefined,
-            coachPhone: teamCoachPhone.trim() || undefined,
+            coachPhone: undefined,
             isCaptainRegistration: teamRegistrationMode === "captain",
             players: teamRegistrationMode === "captain" ? squadPlayers : []
           }
@@ -345,22 +334,17 @@ export function SportsRegistrationWizard({
       createdAt: new Date().toISOString().split("T")[0]
     };
 
-    try {
-      const result = await onRegistrationComplete(newRecord);
-      if (!result.success || !result.registrationNumber) {
-        setSubmissionError(result.message || "Unable to submit your registration.");
-        return;
-      }
-      setConfirmedRecord({
-        ...newRecord,
-        id: result.registrationNumber,
-        registrationNumber: result.registrationNumber,
-        totalAmount: result.totalAmount ?? newRecord.totalAmount,
-      });
-      setCurrentStep(10);
-    } finally {
-      setIsSubmitting(false);
+    const result = await onRegistrationComplete(newRecord);
+    if (!result.success || !result.registrationNumber) {
+      return;
     }
+    setConfirmedRecord({
+      ...newRecord,
+      id: result.registrationNumber,
+      registrationNumber: result.registrationNumber,
+      totalAmount: result.totalAmount ?? newRecord.totalAmount,
+    });
+    setCurrentStep(10);
   };
 
   const stepsList = [
@@ -950,7 +934,6 @@ export function SportsRegistrationWizard({
                 <div
                   onClick={() => {
                     setTeamRegistrationMode("captain");
-                    setIsTeamInterest(false);
                   }}
                   className={`p-3.5 rounded-2xl border-2 cursor-pointer select-none transition-all ${
                     teamRegistrationMode === "captain"
@@ -973,7 +956,6 @@ export function SportsRegistrationWizard({
                 <div
                   onClick={() => {
                     setTeamRegistrationMode("join_code");
-                    setIsTeamInterest(false);
                   }}
                   className={`p-3.5 rounded-2xl border-2 cursor-pointer select-none transition-all ${
                     teamRegistrationMode === "join_code"
@@ -996,7 +978,6 @@ export function SportsRegistrationWizard({
                 <div
                   onClick={() => {
                     setTeamRegistrationMode("individual");
-                    setIsTeamInterest(true);
                   }}
                   className={`p-3.5 rounded-2xl border-2 cursor-pointer select-none transition-all ${
                     teamRegistrationMode === "individual"
@@ -1145,6 +1126,7 @@ export function SportsRegistrationWizard({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
+                                aria-label={`Remove squad player ${player.name || player.jerseyNumber || idx + 1}`}
                                 onClick={() => handleRemoveSquadPlayer(player.id)}
                                 className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 rounded-lg cursor-pointer"
                               >

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { useApp } from "@/context/AppContext";
 import { useStaff } from "@/context/AdminContext";
 import { TimetableDay, TimetableEntry } from "@/types/lms";
@@ -22,13 +22,11 @@ import {
   RefreshCw,
   LayoutGrid,
   List,
-  CheckCircle2,
-  AlertCircle,
   Search,
   School,
   Radio
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { api } from "@/lib/api";
@@ -118,7 +116,7 @@ export function TimetableView() {
 
   const isAdmin = currentRole === "admin" || currentRole === "super_admin";
 
-  const fetchTimetable = async () => {
+  const fetchTimetable = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await api.students.getMyTimetable();
@@ -130,11 +128,19 @@ export function TimetableView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchTimetable();
-  }, []);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        void fetchTimetable();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchTimetable]);
 
   const combinedTimetable = useMemo(() => {
     if (backendEntries.length === 0) return timetable;
@@ -381,7 +387,7 @@ export function TimetableView() {
                 <p className="text-xl font-black text-white mt-0.5">{totalPeriods} <span className="text-xs font-normal text-emerald-200">Classes</span></p>
               </div>
               <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
-                <p className="text-[11px] uppercase tracking-wider text-emerald-300/80 font-medium">Today's Routine</p>
+                <p className="text-[11px] uppercase tracking-wider text-emerald-300/80 font-medium">Today&apos;s Routine</p>
                 <p className="text-xl font-black text-emerald-300 mt-0.5">{todayClassesCount} <span className="text-xs font-normal text-white">Periods</span></p>
               </div>
               <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
@@ -700,6 +706,7 @@ export function TimetableView() {
                             type="button"
                             variant="outline"
                             size="sm"
+                            aria-label={`Edit timetable entry ${entry.subjectName}`}
                             onClick={() => openEdit(entry)}
                             className="h-8 rounded-xl px-2.5 text-xs text-slate-600"
                           >
@@ -709,6 +716,7 @@ export function TimetableView() {
                             type="button"
                             variant="destructive"
                             size="sm"
+                            aria-label={`Delete timetable entry ${entry.subjectName}`}
                             onClick={() => setEntryToDelete(entry)}
                             className="h-8 rounded-xl px-2.5 text-xs"
                           >
@@ -772,9 +780,7 @@ export function TimetableView() {
                             >
                               {periodsInSlot.length > 0 ? (
                                 <div className="space-y-1.5">
-                                  {periodsInSlot.map((p) => {
-                                    const badge = getPeriodBadge(p.periodType);
-                                    return (
+                                  {periodsInSlot.map((p) => (
                                       <div
                                         key={p.id}
                                         className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm hover:border-emerald-300 transition-colors"
@@ -798,8 +804,7 @@ export function TimetableView() {
                                           <span className="truncate">{p.room}</span>
                                         </p>
                                       </div>
-                                    );
-                                  })}
+                                  ))}
                                 </div>
                               ) : (
                                 <div className="h-full min-h-[50px] flex items-center justify-center text-slate-300 text-[11px]">

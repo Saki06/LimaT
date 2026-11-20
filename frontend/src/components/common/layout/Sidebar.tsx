@@ -6,16 +6,12 @@ import {
   Home,
   BookOpen,
   FileText,
-  HelpCircle,
   Award,
   Trophy,
   Calendar,
   Bell,
-  Users,
   User,
   Layers,
-  Settings,
-  School,
   ClipboardCheck,
   Building2,
   Library,
@@ -27,13 +23,9 @@ import {
   Flame,
   PanelLeftClose,
   PanelLeftOpen,
-  CheckCircle2,
-  Bookmark,
-  Link2,
   Video,
   Sliders,
   CreditCard,
-  Shield,
   Package,
   UserCheck,
   Globe,
@@ -74,7 +66,6 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
   });
   const [selectedStreakDate, setSelectedStreakDate] = useState<number>(2);
   const [miniCalMonth, setMiniCalMonth] = useState<number>(9); // 9 = October
-  const [miniCalYear, setMiniCalYear] = useState<number>(2026);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const pendingSubmissionsCount = submissions.filter(
@@ -99,15 +90,15 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
     { id: "dashboard", label: t.nav.dashboard, icon: Home, group: "Core Learning" },
     ...(isFeatureEnabled("tuition_subscriptions") && isFeatureEnabled("find_teachers")
       ? [
-          {
-            id: "connect",
-            label: "Connect",
-            icon: GraduationCap,
-            badge: "Tutors",
-            badgeVariant: "gold" as const,
-            group: "Core Learning"
-          }
-        ]
+        {
+          id: "connect",
+          label: "Connect",
+          icon: GraduationCap,
+          badge: "Tutors",
+          badgeVariant: "gold" as const,
+          group: "Core Learning"
+        }
+      ]
       : []),
     {
       id: "my_learning",
@@ -120,38 +111,38 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
           : []),
         ...(isFeatureEnabled("assignments_grading")
           ? [
-              {
-                id: "assignments",
-                label: t.nav.assignments,
-                icon: FileText,
-                badge: "2 Active"
-              },
-              { id: "quizzes", label: t.nav.quizzes, icon: GraduationCap }
-            ]
+            {
+              id: "assignments",
+              label: t.nav.assignments,
+              icon: FileText,
+              badge: "2 Active"
+            },
+            { id: "quizzes", label: t.nav.quizzes, icon: GraduationCap }
+          ]
           : []),
         ...(isFeatureEnabled("past_papers_library")
           ? [
-              {
-                id: "past_papers",
-                label: t.nav.pastPapers || "Past Papers",
-                icon: Layers,
-                badge: "Archive"
-              }
-            ]
+            {
+              id: "past_papers",
+              label: t.nav.pastPapers || "Past Papers",
+              icon: Layers,
+              badge: "Archive"
+            }
+          ]
           : [])
       ]
     },
     ...(isFeatureEnabled("past_papers_library")
       ? [
-          {
-            id: "library",
-            label: t.nav.library || "Library",
-            icon: Library,
-            badge: "Hub",
-            badgeVariant: "default" as const,
-            group: "Core Learning"
-          }
-        ]
+        {
+          id: "library",
+          label: t.nav.library || "Library",
+          icon: Library,
+          badge: "Hub",
+          badgeVariant: "default" as const,
+          group: "Core Learning"
+        }
+      ]
       : []),
 
     // Sports & Tournaments with Sub-headings
@@ -201,55 +192,55 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
 
     ...(isFeatureEnabled("live_broadcast_studio")
       ? [
-          {
-            id: "live_schedule",
-            label: "Live Video Classes",
-            icon: Video,
-            badge: "Live",
-            badgeVariant: "default" as const,
-            group: "Teaching Studio"
-          }
-        ]
+        {
+          id: "live_schedule",
+          label: "Live Video Classes",
+          icon: Video,
+          badge: "Live",
+          badgeVariant: "default" as const,
+          group: "Teaching Studio"
+        }
+      ]
       : []),
     ...(isFeatureEnabled("tuition_subscriptions") || isFeatureEnabled("bank_slip_approvals")
       ? [
-          {
-            id: "connect",
-            label: "Packages & Subscribers",
-            icon: Package,
-            badge: "Packages",
-            badgeVariant: "gold" as const,
-            group: "Teaching Studio"
-          }
-        ]
+        {
+          id: "connect",
+          label: "Packages & Subscribers",
+          icon: Package,
+          badge: "Packages",
+          badgeVariant: "gold" as const,
+          group: "Teaching Studio"
+        }
+      ]
       : []),
     ...(isFeatureEnabled("syllabus_builder")
       ? [{ id: "syllabus", label: "Packages & Syllabus", icon: Layers, group: "Teaching Studio" }]
       : []),
     ...(isFeatureEnabled("assignments_grading")
       ? [
-          { id: "assignments", label: t.nav.assignments, icon: FileText, group: "Assessments & Review" },
-          {
-            id: "submissions",
-            label: t.nav.submissions,
-            icon: ClipboardCheck,
-            badge: pendingSubmissionsCount > 0 ? `${pendingSubmissionsCount} Pending` : undefined,
-            badgeVariant: "warning" as const,
-            group: "Assessments & Review"
-          }
-        ]
+        { id: "assignments", label: t.nav.assignments, icon: FileText, group: "Assessments & Review" },
+        {
+          id: "submissions",
+          label: t.nav.submissions,
+          icon: ClipboardCheck,
+          badge: pendingSubmissionsCount > 0 ? `${pendingSubmissionsCount} Pending` : undefined,
+          badgeVariant: "warning" as const,
+          group: "Assessments & Review"
+        }
+      ]
       : []),
     ...(isFeatureEnabled("past_papers_library")
       ? [
-          {
-            id: "library",
-            label: "Past Papers & Tutes",
-            icon: Library,
-            badge: "Author",
-            badgeVariant: "gold" as const,
-            group: "Assessments & Review"
-          }
-        ]
+        {
+          id: "library",
+          label: "Past Papers & Tutes",
+          icon: Library,
+          badge: "Author",
+          badgeVariant: "gold" as const,
+          group: "Assessments & Review"
+        }
+      ]
       : []),
     // Personal Account & Studio Profile
     { id: "profile", label: "Tutor Profile & Studio", icon: User, group: "Personal Account" }
@@ -259,43 +250,43 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
     { id: "dashboard", label: "Tutor Admin Overview", icon: Home, group: "Tutor Operations" },
     ...(isFeatureEnabled("batch_management")
       ? [
-          {
-            id: "announcements",
-            label: "Class Notices & Alerts",
-            icon: Bell,
-            group: "Tutor Operations"
-          }
-        ]
+        {
+          id: "announcements",
+          label: "Class Notices & Alerts",
+          icon: Bell,
+          group: "Tutor Operations"
+        }
+      ]
       : []),
     ...(isFeatureEnabled("tuition_subscriptions")
       ? [
-          {
-            id: "users",
-            label: "Student Directory & Billing",
-            icon: UserCheck,
-            badge: "Paid",
-            badgeVariant: "default" as const,
-            group: "Tuition & Billing"
-          },
-          {
-            id: "connect_admin",
-            label: "Tuition Fees & Bank Slips",
-            icon: CreditCard,
-            group: "Tuition & Billing"
-          }
-        ]
+        {
+          id: "users",
+          label: "Student Directory & Billing",
+          icon: UserCheck,
+          badge: "Paid",
+          badgeVariant: "default" as const,
+          group: "Tuition & Billing"
+        },
+        {
+          id: "connect_admin",
+          label: "Tuition Fees & Bank Slips",
+          icon: CreditCard,
+          group: "Tuition & Billing"
+        }
+      ]
       : []),
     ...(isFeatureEnabled("tutor_branding")
       ? [
-          {
-            id: "admin_settings",
-            label: "Branding, Domain & WhatsApp",
-            icon: Globe,
-            badge: "Custom Domain",
-            badgeVariant: "gold" as const,
-            group: "Tutor Branding"
-          }
-        ]
+        {
+          id: "admin_settings",
+          label: "Branding, Domain & WhatsApp",
+          icon: Globe,
+          badge: "Custom Domain",
+          badgeVariant: "gold" as const,
+          group: "Tutor Branding"
+        }
+      ]
       : []),
     // Sports & Championship Registrations Admin Desk
     {
@@ -407,9 +398,8 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
 
       {/* FLOATING GLASS ISLAND ASIDE - Full Length & No Cramped Scrolling */}
       <aside
-        className={`fixed lg:static inset-y-0 lg:inset-auto left-0 z-50 lg:z-30 flex flex-col transition-all duration-300 ease-in-out shrink-0 ${
-          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        } ${isCollapsed ? "w-20" : "w-[285px]"} h-full py-0 lg:py-2.5 pl-0 lg:pl-3 pr-0`}
+        className={`fixed lg:static inset-y-0 lg:inset-auto left-0 z-50 lg:z-30 flex flex-col transition-all duration-300 ease-in-out shrink-0 ${isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          } ${isCollapsed ? "w-20" : "w-[285px]"} h-full py-0 lg:py-2.5 pl-0 lg:pl-3 pr-0`}
       >
         <div className="h-full w-full rounded-none lg:rounded-3xl bg-white border-r lg:border border-[#e2eae5] shadow-[0_16px_40px_-12px_rgba(13,92,77,0.12),0_2px_8px_rgba(0,0,0,0.04)] ring-1 ring-black/5 flex flex-col overflow-hidden relative transition-all">
           {/* Top Glass Header & Collapse / Close Toggle */}
@@ -427,9 +417,8 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
               {/* Collapse / Expand Toggle Button (Desktop) */}
               <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className={`hidden lg:flex p-1.5 rounded-xl hover:bg-[#ecf8f5] text-slate-400 hover:text-[#0d5c4d] transition-colors ${
-                  isCollapsed ? "mx-auto" : ""
-                }`}
+                className={`hidden lg:flex p-1.5 rounded-xl hover:bg-[#ecf8f5] text-slate-400 hover:text-[#0d5c4d] transition-colors ${isCollapsed ? "mx-auto" : ""
+                  }`}
                 title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
               >
                 {isCollapsed ? (
@@ -480,17 +469,15 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                       <div key={item.id} className="space-y-1 pt-0.5">
                         <button
                           onClick={() => toggleGroup(item.id)}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all group ${
-                            isChildActive
-                              ? "bg-[#ecf8f5]/80 text-[#0d5c4d]"
-                              : "text-slate-600 hover:text-[#0d5c4d] hover:bg-[#f6f9f7]"
-                          }`}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all group ${isChildActive
+                            ? "bg-[#ecf8f5]/80 text-[#0d5c4d]"
+                            : "text-slate-600 hover:text-[#0d5c4d] hover:bg-[#f6f9f7]"
+                            }`}
                         >
                           <div className="flex items-center gap-2.5">
                             <Icon
-                              className={`h-4 w-4 transition-transform group-hover:scale-110 ${
-                                isChildActive ? "text-[#0d5c4d]" : "text-slate-400 group-hover:text-[#0d5c4d]"
-                              }`}
+                              className={`h-4 w-4 transition-transform group-hover:scale-110 ${isChildActive ? "text-[#0d5c4d]" : "text-slate-400 group-hover:text-[#0d5c4d]"
+                                }`}
                             />
                             <span>{item.label}</span>
                           </div>
@@ -519,20 +506,18 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                                 <button
                                   key={child.id}
                                   onClick={() => handleNavClick(child.id)}
-                                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all relative ${
-                                    isSubActive
-                                      ? "bg-[#ecf8f5] text-[#0d5c4d] font-bold shadow-xs border border-[#c4e9e0]"
-                                      : "text-slate-500 hover:text-[#0d5c4d] hover:bg-[#f6f9f7]"
-                                  }`}
+                                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all relative ${isSubActive
+                                    ? "bg-[#ecf8f5] text-[#0d5c4d] font-bold shadow-xs border border-[#c4e9e0]"
+                                    : "text-slate-500 hover:text-[#0d5c4d] hover:bg-[#f6f9f7]"
+                                    }`}
                                 >
                                   <div className="flex items-center gap-2 truncate">
                                     <span className="text-slate-300 text-[10px] font-mono select-none">
                                       {isLast ? "└──" : "├──"}
                                     </span>
                                     <ChildIcon
-                                      className={`h-3.5 w-3.5 transition-colors shrink-0 ${
-                                        isSubActive ? "text-[#0d5c4d]" : "text-slate-400"
-                                      }`}
+                                      className={`h-3.5 w-3.5 transition-colors shrink-0 ${isSubActive ? "text-[#0d5c4d]" : "text-slate-400"
+                                        }`}
                                     />
                                     <span className="truncate">{child.label}</span>
                                   </div>
@@ -562,13 +547,11 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                           handleNavClick(item.id);
                         }
                       }}
-                      className={`w-full flex items-center text-left ${
-                        isCollapsed ? "justify-center p-2.5" : "justify-between px-2.5 py-2"
-                      } rounded-xl text-xs font-bold transition-all group relative ${
-                        isActive
+                      className={`w-full flex items-center text-left ${isCollapsed ? "justify-center p-2.5" : "justify-between px-2.5 py-2"
+                        } rounded-xl text-xs font-bold transition-all group relative ${isActive
                           ? "bg-gradient-to-r from-[#ecf8f5] to-white text-[#0d5c4d] border border-[#b2e5d9] shadow-[0_2px_10px_rgba(13,92,77,0.06)]"
                           : "text-slate-600 hover:text-[#0d5c4d] hover:bg-[#f6f9f7] hover:translate-x-0.5 border border-transparent"
-                      }`}
+                        }`}
                       title={isCollapsed ? item.label : undefined}
                     >
                       {/* Active Indicator Bar on the Left */}
@@ -578,11 +561,10 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
 
                       <div className="flex items-center gap-2.5 min-w-0 text-left">
                         <Icon
-                          className={`h-4 w-4 shrink-0 transition-all group-hover:scale-110 ${
-                            isActive
-                              ? "text-[#0d5c4d]"
-                              : "text-slate-400 group-hover:text-[#0d5c4d]"
-                          }`}
+                          className={`h-4 w-4 shrink-0 transition-all group-hover:scale-110 ${isActive
+                            ? "text-[#0d5c4d]"
+                            : "text-slate-400 group-hover:text-[#0d5c4d]"
+                            }`}
                         />
                         {!isCollapsed && (
                           <span className="text-left font-bold leading-tight">
@@ -594,13 +576,12 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                       {/* Badge if present and not collapsed */}
                       {!isCollapsed && item.badge && (
                         <span
-                          className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-1.5 whitespace-nowrap ${
-                            item.badgeVariant === "warning"
-                              ? "bg-[#fef7e6] text-[#b47a16] border border-[#fde4af]"
-                              : item.badgeVariant === "gold"
+                          className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-1.5 whitespace-nowrap ${item.badgeVariant === "warning"
+                            ? "bg-[#fef7e6] text-[#b47a16] border border-[#fde4af]"
+                            : item.badgeVariant === "gold"
                               ? "bg-[#fff9e6] text-[#92600b] border border-[#fae59e]"
                               : "bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0]"
-                          }`}
+                            }`}
                         >
                           {item.badge}
                         </span>
@@ -723,15 +704,14 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
                               onClick={() => {
                                 setSelectedStreakDate(d);
                               }}
-                              className={`h-5 w-full rounded-md flex flex-col items-center justify-center text-[9.5px] transition-all relative group cursor-pointer ${
-                                isToday
-                                  ? "bg-[#0d5c4d] text-white font-black shadow-xs ring-1 ring-[#0d5c4d]/30"
-                                  : isSelected
+                              className={`h-5 w-full rounded-md flex flex-col items-center justify-center text-[9.5px] transition-all relative group cursor-pointer ${isToday
+                                ? "bg-[#0d5c4d] text-white font-black shadow-xs ring-1 ring-[#0d5c4d]/30"
+                                : isSelected
                                   ? "bg-[#d8efe8] text-[#0d5c4d] font-bold"
                                   : hasStreak
-                                  ? "bg-[#ecf8f5] text-[#0d5c4d] font-semibold hover:bg-[#def3ed]"
-                                  : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
-                              }`}
+                                    ? "bg-[#ecf8f5] text-[#0d5c4d] font-semibold hover:bg-[#def3ed]"
+                                    : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"
+                                }`}
                               title={`October ${d}, 2026 ${isToday ? "(Today)" : ""} ${hasStreak ? "• 2+ Hrs Studied" : ""} ${hasEvent ? "• Event Scheduled" : ""}`}
                             >
                               <span>{d}</span>

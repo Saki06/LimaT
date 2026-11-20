@@ -37,8 +37,6 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
     activeTenantId,
     activeTenant,
     setActiveTenantId,
-    updateTenantFeature,
-    applyTenantPreset,
     addTenant,
     updateTenant,
     deleteTenant,
@@ -57,14 +55,14 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
     if (initialTab) return initialTab;
     return getTabFromView(currentView);
   });
+  const [prevInitialTab, setPrevInitialTab] = useState<SuperAdminTab | undefined>(initialTab);
+  const [prevCurrentView, setPrevCurrentView] = useState<string>(currentView);
 
-  React.useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    } else {
-      setActiveTab(getTabFromView(currentView));
-    }
-  }, [currentView, initialTab]);
+  if (initialTab !== prevInitialTab || currentView !== prevCurrentView) {
+    setPrevInitialTab(initialTab);
+    setPrevCurrentView(currentView);
+    setActiveTab(initialTab ?? getTabFromView(currentView));
+  }
 
   const handleTabChange = (tab: SuperAdminTab) => {
     setActiveTab(tab);
@@ -107,8 +105,8 @@ const handleReloadTenants = async () => {
       mapped.forEach((t: Tenant) => addTenant(t));
       showToast("Live tenants reloaded from database.");
     }
-  } catch (e: any) {
-    showToast(e.message || "Failed to reload tenants");
+  } catch (e: unknown) {
+    showToast(e instanceof Error ? e.message : "Failed to reload tenants");
   } finally {
     setIsReloadingTenants(false);
   }
@@ -189,7 +187,7 @@ const handleRestoreTenant = async (tenantId: string) => {
   // Current tenant for matrix
   const matrixTenant = tenants.find((t) => t.id === selectedTenantForMatrix) || activeTenant;
 
-  const [isSavingFeatures, setIsSavingFeatures] = useState(false);
+  const [, setIsSavingFeatures] = useState(false);
 
 const featureSaveQueue = useRef<Promise<void>>(Promise.resolve());
 
@@ -332,6 +330,8 @@ const saveTenantFeatures = (
             <p className="text-slate-100">{toastMessage}</p>
           </div>
           <button
+            type="button"
+            aria-label="Dismiss notification"
             onClick={() => setToastMessage(null)}
             className="p-1 hover:bg-white/20 rounded-lg text-white/80 cursor-pointer ml-2"
           >
@@ -390,12 +390,13 @@ const saveTenantFeatures = (
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-slate-600 hidden sm:inline">Switch Workspace:</span>
           <select
+            aria-label="Switch Workspace"
             value={activeTenantId}
             onChange={(e) => {
               const t = tenants.find((item) => item.id === e.target.value);
               if (t) handleSimulateTenant(t);
             }}
-            className="p-2 rounded-xl border-2 border-[#0d5c4d] bg-white text-xs font-bold text-[#0d2b26] cursor-pointer focus:outline-hidden"
+            className="min-h-[44px] md:min-h-0 p-2 rounded-xl border-2 border-[#0d5c4d] bg-white text-xs font-bold text-[#0d2b26] cursor-pointer focus:outline-hidden"
           >
             {tenants.map((t) => (
               <option key={t.id} value={t.id}>
@@ -407,7 +408,7 @@ const saveTenantFeatures = (
             type="button"
             onClick={handleReloadTenants}
             disabled={isReloadingTenants}
-            className="p-2 rounded-xl border border-slate-200 hover:border-[#0d5c4d] bg-white text-slate-700 hover:text-[#0d5c4d] transition-all cursor-pointer flex items-center justify-center shrink-0"
+            className="min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 p-2 rounded-xl border border-slate-200 hover:border-[#0d5c4d] bg-white text-slate-700 hover:text-[#0d5c4d] transition-all cursor-pointer flex items-center justify-center shrink-0"
             title="Reload Tenants from Database"
           >
             <RefreshCw className={`h-4 w-4 ${isReloadingTenants ? "animate-spin text-[#0d5c4d]" : ""}`} />
@@ -461,7 +462,7 @@ const saveTenantFeatures = (
       <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-white border border-[#c4e9e0] shadow-xs">
         <button
           onClick={() => handleTabChange("tenants")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+          className={`min-h-[44px] md:min-h-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === "tenants"
               ? "bg-[#0d5c4d] text-white shadow-xs"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -476,7 +477,7 @@ const saveTenantFeatures = (
 
         <button
           onClick={() => handleTabChange("feature_matrix")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+          className={`min-h-[44px] md:min-h-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === "feature_matrix"
               ? "bg-[#0d5c4d] text-white shadow-xs"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -491,7 +492,7 @@ const saveTenantFeatures = (
 
         <button
           onClick={() => handleTabChange("pricing_plans")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+          className={`min-h-[44px] md:min-h-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === "pricing_plans"
               ? "bg-[#0d5c4d] text-white shadow-xs"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -503,7 +504,7 @@ const saveTenantFeatures = (
 
         <button
           onClick={() => handleTabChange("payments")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+          className={`min-h-[44px] md:min-h-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
             activeTab === "payments"
               ? "bg-[#0d5c4d] text-white shadow-xs"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -562,9 +563,9 @@ const saveTenantFeatures = (
       />
     ) : (
       <div className="rounded-2xl border border-[#e6ece8] bg-white p-5 space-y-4">
-        <h3 className="text-lg font-bold text-[#0d2b26]">
+        <h2 className="text-lg font-bold text-[#0d2b26]">
           Archived Tenants
-        </h3>
+        </h2>
 
         {isLoadingArchived ? (
           <p className="text-sm text-slate-500">

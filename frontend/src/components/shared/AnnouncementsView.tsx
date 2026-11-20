@@ -14,29 +14,34 @@ import {
   MoreVertical,
   Eye,
   Search,
-  Filter,
   Users,
   GraduationCap,
-  Building2,
   AlertTriangle,
   AlertCircle,
   Megaphone,
-  Radio,
   FileText,
-  ShieldCheck,
   Send,
   Lock,
-  Sparkles,
   Clock,
   Globe,
   RotateCw,
   X
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Announcement } from "@/types/lms";
+
+interface EnrolledCourseItem {
+  title?: string;
+  packageName?: string;
+  teacher?: {
+    user?: {
+      firstName?: string;
+      lastName?: string;
+    };
+  };
+}
 
 // Helper function to detect audience scope
 export function getAudienceCategory(targetAudience: string): "all" | "teachers" | "students" {
@@ -79,9 +84,8 @@ export function getAnnouncementCategory(a: Announcement): "exam" | "holiday" | "
 }
 
 export function AnnouncementsView() {
-  const { announcements, t, currentRole, currentUser, createAnnouncement, updateAnnouncement, deleteAnnouncement, fetchAnnouncements } = useApp();
+  const { announcements, currentRole, currentUser, createAnnouncement, updateAnnouncement, deleteAnnouncement, fetchAnnouncements } = useApp();
   const isAdmin = currentRole === "admin";
-  const isTeacher = currentRole === "teacher";
   const isStudent = currentRole === "student";
 
   // Search & Filter state
@@ -166,7 +170,7 @@ export function AnnouncementsView() {
   };
 
   // Student enrolled courses for subscription & batch verification
-  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourseItem[]>([]);
 
   useEffect(() => {
     if (isStudent) {
@@ -184,9 +188,12 @@ export function AnnouncementsView() {
   // Student eligibility filter
   const studentEligibleAnnouncements = useMemo(() => {
     if (!isStudent) return announcements;
+    const userWithProfile = currentUser as (NonNullable<typeof currentUser> & {
+      studentProfile?: { gradeLevel?: string | number | null } | null;
+    }) | null;
     const studentGradeStr = String(
-      (currentUser as any)?.studentProfile?.gradeLevel ||
-      (currentUser as any)?.grade ||
+      userWithProfile?.studentProfile?.gradeLevel ||
+      userWithProfile?.grade ||
       ""
     );
     const studentGradeNum = studentGradeStr.match(/\d+/)?.[0];
@@ -519,6 +526,8 @@ export function AnnouncementsView() {
             />
             {searchQuery && (
               <button
+                type="button"
+                aria-label="Clear announcement search"
                 onClick={() => setSearchQuery("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
@@ -613,16 +622,16 @@ export function AnnouncementsView() {
         <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Notice Category:</span>
 
-          {[
+          {([
             { id: "all", label: "All Categories" },
             { id: "exam", label: "📝 Exams & Timetables" },
             { id: "holiday", label: "🏖️ Holidays & Closures" },
             { id: "academic", label: "📚 Academic Masterclasses" },
             { id: "sports", label: "🏆 Sports & Athletics" },
-          ].map((cat) => (
+          ] as const).map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setSelectedCategory(cat.id as any)}
+              onClick={() => setSelectedCategory(cat.id)}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 selectedCategory === cat.id
                   ? "bg-[#0d5c4d] text-white shadow-xs"
@@ -644,7 +653,7 @@ export function AnnouncementsView() {
             <div className="h-12 w-12 rounded-full bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center mx-auto">
               <Megaphone className="h-6 w-6" />
             </div>
-            <h3 className="text-base font-bold text-[#0d2b26]">No Announcements Found</h3>
+            <h2 className="text-base font-bold text-[#0d2b26]">No Announcements Found</h2>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
               No announcements match your current search query or filter criteria. Try adjusting the audience or priority filter.
             </p>

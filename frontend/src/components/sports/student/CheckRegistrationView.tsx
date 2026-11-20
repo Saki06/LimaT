@@ -4,17 +4,10 @@ import React, { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import {
   Search,
-  CheckCircle2,
-  Clock,
   AlertCircle,
-  FileText,
   Printer,
   Trophy,
-  Building2,
-  Phone,
-  User,
-  ArrowRight,
-  Users
+  ArrowRight
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

@@ -17,12 +17,13 @@ import {
   getMyTimetable,
   getMyLibraryResources,
 } from '../controllers/student.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import { authenticateToken, requireRoles } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// All student routes require authentication
+// All student routes require authentication and STUDENT role (BUG-P9-01 fix)
 router.use(authenticateToken);
+router.use(requireRoles('STUDENT'));
 
 // 1. Student Profile
 router.get('/me', getMyStudentProfile);

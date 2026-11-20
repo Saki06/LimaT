@@ -11,7 +11,8 @@ interface SendPasswordResetParams {
  * Creates and returns a configured nodemailer transporter
  */
 const getTransporter = () => {
-  if (!config.smtp.user || !config.smtp.pass) {
+  // Safety guard: Never send real emails in test mode or when MOCK_EMAIL is true
+  if (process.env.MOCK_EMAIL === 'true' || process.env.NODE_ENV === 'test' || !config.smtp.user || !config.smtp.pass) {
     return null;
   }
 

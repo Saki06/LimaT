@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/lib/api";
+import type { Assignment } from "@/types/lms";
 import {
   FileText,
   UploadCloud,
@@ -18,19 +19,13 @@ import {
   Copy,
   Check,
   RefreshCw,
-  Sparkles,
   GraduationCap,
   Paperclip,
   X,
-  FileCode,
-  ShieldCheck,
-  HelpCircle,
-  ExternalLink,
-  ChevronRight
+  FileCode
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,6 +37,26 @@ const submissionSchema = z.object({
 });
 
 type SubmissionFormData = z.infer<typeof submissionSchema>;
+
+interface BackendAssignmentSubmission {
+  id: string;
+  studentId?: string;
+  status?: string;
+  marksObtained?: number;
+  teacherFeedback?: string;
+  submittedAt?: string;
+  markedAt?: string;
+  textContent?: string;
+  fileAttachmentName?: string;
+  fileAttachmentUrl?: string;
+}
+
+interface AssignmentWithMySubmission extends Assignment {
+  course?: { id?: string; title?: string } | null;
+  mySubmission?: BackendAssignmentSubmission | null;
+  attachmentUrl?: string | null;
+  teacherName?: string | null;
+}
 
 export function AssignmentViews() {
   const {
@@ -56,7 +71,7 @@ export function AssignmentViews() {
     t
   } = useApp();
 
-  const [backendAssignments, setBackendAssignments] = useState<any[]>([]);
+  const [backendAssignments, setBackendAssignments] = useState<AssignmentWithMySubmission[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"all" | "pending" | "submitted" | "graded">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -71,7 +86,7 @@ export function AssignmentViews() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load assignments from live backend API
-  const fetchAssignments = async () => {
+  const fetchAssignments = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await api.assignments.getAll();
@@ -84,14 +99,22 @@ export function AssignmentViews() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchAssignments();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        void fetchAssignments();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchAssignments]);
+
   // Use live backend data
-  const combinedAssignments = useMemo(() => {
+  const combinedAssignments = useMemo<AssignmentWithMySubmission[]>(() => {
     if (isLoaded) return backendAssignments;
     return assignments.length > 0 ? assignments : backendAssignments;
   }, [isLoaded, backendAssignments, assignments]);
@@ -105,7 +128,7 @@ export function AssignmentViews() {
   }, [combinedAssignments, selectedAssignmentId]);
 
   // Helper to resolve student submission for an assignment
-  const getSubmissionForAssignment = (asg: any) => {
+  const getSubmissionForAssignment = useCallback((asg: AssignmentWithMySubmission | null) => {
     if (!asg) return null;
     // 1. From backend assignment's mySubmission
     if (asg.mySubmission) {
@@ -130,11 +153,11 @@ export function AssignmentViews() {
       (s) => s.assignmentId === asg.id && (s.studentId === currentStudentId || !s.studentId)
     );
     return contextSub || null;
-  };
+  }, [currentUser?.id, authUser?.userId, submissions]);
 
   const currentSubmission = useMemo(() => {
     return getSubmissionForAssignment(currentAssignment);
-  }, [currentAssignment, submissions]);
+  }, [currentAssignment, getSubmissionForAssignment]);
 
   // Filtered list
   const filteredAssignments = useMemo(() => {
@@ -167,7 +190,7 @@ export function AssignmentViews() {
 
       return true;
     });
-  }, [combinedAssignments, activeFilter, searchQuery, submissions]);
+  }, [combinedAssignments, activeFilter, searchQuery, getSubmissionForAssignment]);
 
   // Metrics
   const totalCount = combinedAssignments.length;
@@ -209,14 +232,7 @@ export function AssignmentViews() {
     if (!currentAssignment) return;
     setIsSubmitting(true);
     try {
-      // 1. Send to backend API
-      await api.assignments.submit(currentAssignment.id, {
-        textContent: data.textContent,
-        fileAttachmentName: selectedFileName,
-        fileAttachmentUrl: selectedFileDataUrl || undefined
-      });
-
-      // 2. Update context state
+      // Single submission entry point via AppContext (handles validation, API, and state sync)
       await submitAssignment(
         currentAssignment.id,
         data.textContent,
@@ -224,22 +240,17 @@ export function AssignmentViews() {
         selectedFileDataUrl || undefined
       );
 
-      // 3. Re-fetch fresh live assignments
+      // Re-fetch fresh live assignments
       await fetchAssignments();
 
       setIsSubmitModalOpen(false);
       reset();
-      addToast({
-        type: "success",
-        title: "Assignment Submitted Successfully! 🚀",
-        message: "Your coursework and solution sheet have been received by your instructor."
-      });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Submission error:", err);
       addToast({
         type: "error",
         title: "Submission Error",
-        message: err.message || "Failed to submit assignment. Please try again."
+        message: err instanceof Error ? err.message : "Failed to submit assignment. Please try again."
       });
     } finally {
       setIsSubmitting(false);
@@ -331,7 +342,7 @@ export function AssignmentViews() {
               <span>Coursework &amp; Assessments</span>
               <span className="h-1 w-1 rounded-full bg-emerald-400" />
               <span className="text-emerald-300 font-bold">
-                {(currentUser as any)?.gradeLevel || currentUser?.grade || "Academic Portal"}
+                {authUser?.studentProfile?.gradeLevel || currentUser?.grade || "Academic Portal"}
               </span>
             </div>
 
@@ -495,7 +506,7 @@ export function AssignmentViews() {
                 }
 
                 // Format Due Date
-                let dueFormatted = asg.dueDate
+                const dueFormatted = asg.dueDate
                   ? new Date(asg.dueDate).toLocaleDateString("en-GB", {
                       month: "short",
                       day: "numeric",
@@ -658,10 +669,10 @@ export function AssignmentViews() {
                               <div className="rounded-xl bg-white p-4 border border-emerald-200/80 shadow-2xs space-y-2">
                                 <div className="flex items-center gap-2 text-xs font-bold text-[#0d5c4d]">
                                   <MessageSquare className="h-4 w-4 text-emerald-600" />
-                                  <span>Instructor's Feedback:</span>
+                                  <span>Instructor&apos;s Feedback:</span>
                                 </div>
                                 <blockquote className="text-xs text-slate-700 italic leading-relaxed pl-3 border-l-2 border-emerald-500">
-                                  "{currentSubmission.teacherFeedback}"
+                                  &ldquo;{currentSubmission.teacherFeedback}&rdquo;
                                 </blockquote>
                               </div>
                             )}
@@ -744,7 +755,7 @@ export function AssignmentViews() {
                     </div>
                     <div>
                       <h4 className="text-sm font-extrabold text-[#0d2b26]">
-                        You haven't submitted your response for this assignment yet.
+                        You haven&apos;t submitted your response for this assignment yet.
                       </h4>
                       <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
                         Type your solution working or upload your handwritten answer sheet before the deadline to receive certified faculty grading.
@@ -828,6 +839,7 @@ export function AssignmentViews() {
                   </label>
                   <button
                     type="button"
+                    aria-label="Remove selected file"
                     onClick={() => {
                       setSelectedFileName("");
                       setSelectedFileSize("");
@@ -868,7 +880,7 @@ export function AssignmentViews() {
               className="mt-0.5 rounded text-[#0d5c4d] focus:ring-[#0d5c4d]"
             />
             <label htmlFor="honorCode" className="text-[11px] text-slate-700 cursor-pointer leading-tight">
-              I declare that this submitted response represents my own authentic academic work, prepared in accordance with the institution's examination ethics code.
+              I declare that this submitted response represents my own authentic academic work, prepared in accordance with the institution&apos;s examination ethics code.
             </label>
           </div>
 

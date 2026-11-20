@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useApp } from "@/context/AppContext";
+import type { QuizAttemptRecord } from "@/types/lms";
 import {
   HelpCircle,
   Clock,
   CheckCircle2,
   XCircle,
-  Award,
   ArrowRight,
   RotateCcw,
   Sparkles,
@@ -24,7 +24,7 @@ export function QuizViews() {
   const currentQuiz = quizzes.find((q) => q.id === selectedQuizId) || quizzes[0] || null;
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, any>>({});
+  const [selectedAnswers, setSelectedAnswers] = useState<QuizAttemptRecord["answers"]>({});
   const [secondsRemaining, setSecondsRemaining] = useState(600);
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   const [evaluationResult, setEvaluationResult] = useState<{
@@ -36,20 +36,45 @@ export function QuizViews() {
   const activeQuestion = questions[currentQuestionIndex] || null;
   const isLastQuestion = questions.length > 0 && currentQuestionIndex === questions.length - 1;
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying && secondsRemaining > 0) {
-      interval = setInterval(() => {
-        setSecondsRemaining((prev) => {
-          if (prev <= 1) {
-            handleAutoSubmit();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+  const handleAutoSubmit = useCallback(async () => {
+    if (!currentQuiz) return;
+    setIsPlaying(false);
+    try {
+      const score = await submitQuizAttempt(currentQuiz.id, selectedAnswers);
+      setEvaluationResult({
+        score,
+        totalMarks: currentQuiz.totalMarks
+      });
+      setIsResultModalOpen(true);
+    } catch {
+      // Error notification already handled by submitQuizAttempt
     }
+  }, [currentQuiz, selectedAnswers, submitQuizAttempt]);
+
+  const handleAutoSubmitRef = useRef(handleAutoSubmit);
+  useEffect(() => {
+    handleAutoSubmitRef.current = handleAutoSubmit;
+  }, [handleAutoSubmit]);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      setSecondsRemaining((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
     return () => clearInterval(interval);
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (!isPlaying || secondsRemaining > 0) return;
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        handleAutoSubmitRef.current();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [isPlaying, secondsRemaining]);
 
   const handleStartQuiz = () => {
@@ -75,17 +100,6 @@ export function QuizViews() {
       ...prev,
       [questionId]: optionIndex
     }));
-  };
-
-  const handleAutoSubmit = () => {
-    if (!currentQuiz) return;
-    setIsPlaying(false);
-    const score = submitQuizAttempt(currentQuiz.id, selectedAnswers);
-    setEvaluationResult({
-      score,
-      totalMarks: currentQuiz.totalMarks
-    });
-    setIsResultModalOpen(true);
   };
 
   const formatTimer = (totalSeconds: number) => {
@@ -260,7 +274,7 @@ export function QuizViews() {
               <>
                 <div className="flex items-center justify-between">
                   <Badge variant="success" className="uppercase text-[10px]">
-                    {activeQuestion.type.replace("_", " ")}
+                    {(activeQuestion.type || "mcq").replace("_", " ")}
                   </Badge>
               <span className="text-xs font-bold text-slate-500">
                 {activeQuestion.marks} Marks
@@ -464,7 +478,7 @@ export function QuizViews() {
                   ? q.correctAnswer.map(String).sort()
                   : [String(q.correctAnswer)];
                 const studentArr = Array.isArray(studentVal)
-                  ? (studentVal as any[]).map(String).sort()
+                  ? studentVal.map(String).sort()
                   : [String(studentVal)];
                 isQuestionCorrect =
                   studentArr.length === correctArr.length &&
@@ -480,7 +494,7 @@ export function QuizViews() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-500">
-                      Question {idx + 1} ({q.type.toUpperCase()})
+                      Question {idx + 1} ({(q.type || "mcq").toUpperCase()})
                     </span>
                     <Badge
                       variant={isQuestionCorrect ? "success" : "secondary"}

@@ -85,6 +85,12 @@ export const createAssignment = async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
+    const numericMaxMarks = Number(maxMarks);
+    if (!Number.isFinite(numericMaxMarks) || numericMaxMarks <= 0 || numericMaxMarks > 10000) {
+      res.status(400).json({ success: false, message: 'Assignment maxMarks must be a positive number (1-10000).' });
+      return;
+    }
+
     const teacher = await getOrCreateTeacherProfile(user.userId);
 
     // Validate courseId if provided
@@ -104,9 +110,11 @@ export const createAssignment = async (req: AuthenticatedRequest, res: Response)
     let parsedDueDate: Date | null = null;
     if (dueDate) {
       const d = new Date(dueDate);
-      if (!isNaN(d.getTime())) {
-        parsedDueDate = d;
+      if (isNaN(d.getTime())) {
+        res.status(400).json({ success: false, message: 'Invalid dueDate format.' });
+        return;
       }
+      parsedDueDate = d;
     }
 
     const assignment = await prisma.assignment.create({
@@ -592,49 +600,23 @@ export const submitAssignment = async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
-    const id = req.params.id as string;
+    const id = typeof req.params.id === 'string' ? req.params.id.trim() : '';
+    if (!id) {
+      res.status(400).json({ success: false, message: 'Invalid assignment ID' });
+      return;
+    }
+
     const { textContent, fileAttachmentUrl, fileAttachmentName } = req.body;
 
-    let assignment = await prisma.assignment.findUnique({
+    const assignment = await prisma.assignment.findUnique({
       where: { id },
     });
 
-    if (!assignment) {
-      assignment = await prisma.assignment.findFirst({
-        where: {
-          OR: [
-            { id: { contains: id } },
-            { title: { contains: id.replace(/^asg_/, '').replace(/_/g, ' '), mode: 'insensitive' } },
-          ],
-        },
-      });
-    }
-
-    if (!assignment) {
-      let tenantId = user.tenantId;
-      if (!tenantId) {
-        const firstTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
-        tenantId = firstTenant?.id || null;
-      }
-      let teacher = tenantId ? await prisma.teacherProfile.findFirst({ where: { user: { tenantId } } }) : null;
-      if (!teacher) {
-        teacher = await prisma.teacherProfile.findFirst();
-      }
-      if (tenantId && teacher) {
-        assignment = await prisma.assignment.create({
-          data: {
-            tenantId,
-            teacherId: teacher.id,
-            title: id.replace(/^asg_/, '').replace(/_/g, ' ').toUpperCase(),
-            instructions: 'Coursework submission',
-            status: 'PUBLISHED',
-            maxMarks: 100,
-          },
-        });
-      }
-    }
-
-    if (!assignment || (user.tenantId && assignment.tenantId && assignment.tenantId !== user.tenantId)) {
+    if (
+      !assignment ||
+      assignment.topicName === 'ONLINE_QUIZ' ||
+      (user.tenantId && assignment.tenantId !== user.tenantId)
+    ) {
       res.status(404).json({ success: false, message: 'Assignment not found' });
       return;
     }

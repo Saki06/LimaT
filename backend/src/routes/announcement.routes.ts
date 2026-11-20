@@ -7,7 +7,7 @@ import {
   deleteAnnouncement,
   togglePinAnnouncement,
 } from '../controllers/announcement.controller';
-import { authenticateToken, optionalAuthenticateToken } from '../middlewares/auth.middleware';
+import { authenticateToken, optionalAuthenticateToken, requireRoles } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -15,10 +15,10 @@ const router = Router();
 router.get('/', optionalAuthenticateToken, getAnnouncements);
 router.get('/:id', optionalAuthenticateToken, getAnnouncementById);
 
-// Protected routes (Admin / Teacher / Directorate)
-router.post('/', authenticateToken, createAnnouncement);
-router.put('/:id', authenticateToken, updateAnnouncement);
-router.delete('/:id', authenticateToken, deleteAnnouncement);
-router.patch('/:id/pin', authenticateToken, togglePinAnnouncement);
+// Protected routes (Admin / Teacher / Super Admin only — VULN-03 fix)
+router.post('/', authenticateToken, requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'), createAnnouncement);
+router.put('/:id', authenticateToken, requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'), updateAnnouncement);
+router.delete('/:id', authenticateToken, requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'), deleteAnnouncement);
+router.patch('/:id/pin', authenticateToken, requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'), togglePinAnnouncement);
 
 export default router;

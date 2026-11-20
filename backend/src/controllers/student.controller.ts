@@ -37,6 +37,14 @@ const getOrCreateStudentProfile = async (userId: string) => {
   });
 
   if (!profile) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (!user || user.role !== 'STUDENT') {
+      return null;
+    }
+
     const studentIdNo = `STU-${Math.floor(10000 + Math.random() * 90000)}`;
     await prisma.studentProfile.create({
       data: {
@@ -222,134 +230,139 @@ export const getStudentDashboardOverview = async (
       tenantId = activeTenant?.id || undefined;
     }
 
-    // 1. Enrolled Courses
-    const enrollments = await prisma.enrollment.findMany({
-      where: { studentId },
-      include: {
-        course: {
-          include: {
-            teacher: {
-              include: {
-                user: {
-                  select: {
-                    firstName: true,
-                    lastName: true,
-                    avatarUrl: true,
+    // Batch 1: Parallelize Enrollments, Active Package Subscriptions, Existing Submissions, Recent Submissions & Attendance Count
+    const [
+      enrollments,
+      activeSubscriptions,
+      existingSubmissions,
+      recentSubmissions,
+      totalLiveAttendances,
+    ] = await Promise.all([
+      prisma.enrollment.findMany({
+        where: { studentId },
+        include: {
+          course: {
+            include: {
+              teacher: {
+                include: {
+                  user: {
+                    select: {
+                      firstName: true,
+                      lastName: true,
+                      avatarUrl: true,
+                    },
                   },
                 },
               },
             },
           },
         },
-      },
-      orderBy: { enrolledAt: 'desc' },
-    });
+        orderBy: { enrolledAt: 'desc' },
+      }),
+      prisma.packageSubscription.findMany({
+        where: {
+          studentId,
+          status: 'ACTIVE',
+          endDate: { gte: new Date() },
+        },
+        include: {
+          package: {
+            include: {
+              teacher: {
+                include: {
+                  user: {
+                    select: {
+                      firstName: true,
+                      lastName: true,
+                      avatarUrl: true,
+                    },
+                  },
+                },
+              },
+              courses: {
+                include: { course: true },
+              },
+            },
+          },
+        },
+      }),
+      prisma.assignmentSubmission.findMany({
+        where: { studentId },
+        select: { assignmentId: true, marksObtained: true, status: true },
+      }),
+      prisma.assignmentSubmission.findMany({
+        where: { studentId },
+        include: {
+          assignment: {
+            select: {
+              id: true,
+              title: true,
+              maxMarks: true,
+              subjectName: true,
+            },
+          },
+        },
+        orderBy: { submittedAt: 'desc' },
+        take: 5,
+      }),
+      prisma.liveClassAttendance.count({
+        where: { studentId },
+      }),
+    ]);
 
     const enrolledCourseIds = enrollments.map((e) => e.courseId);
+    const subscribedPackageIds = activeSubscriptions.map((s) => s.packageId);
+    const submittedAssignmentIds = existingSubmissions.map((s) => s.assignmentId);
 
-    // 2. Active Package Subscriptions
-    const activeSubscriptions = await prisma.packageSubscription.findMany({
-      where: {
-        studentId,
-        status: 'ACTIVE',
-        endDate: { gte: new Date() },
-      },
-      include: {
-        package: {
-          include: {
-            teacher: {
-              include: {
-                user: {
-                  select: {
-                    firstName: true,
-                    lastName: true,
-                    avatarUrl: true,
-                  },
+    // Batch 2: Parallelize Upcoming Live Classes & Pending Assignments
+    const [upcomingLiveClasses, pendingAssignments] = await Promise.all([
+      prisma.liveClassSession.findMany({
+        where: {
+          OR: [
+            { courseId: { in: enrolledCourseIds } },
+            { packageId: { in: subscribedPackageIds } },
+            ...(tenantId ? [{ tenantId }] : []),
+          ],
+          startTime: { gte: new Date(Date.now() - 3600000) }, // from 1 hour ago into future
+          status: { in: ['SCHEDULED', 'LIVE'] },
+        },
+        include: {
+          teacher: {
+            include: {
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  avatarUrl: true,
                 },
               },
             },
-            courses: {
-              include: { course: true },
-            },
+          },
+          course: {
+            select: { id: true, title: true, code: true },
+          },
+          package: {
+            select: { id: true, title: true },
           },
         },
-      },
-    });
-
-    const subscribedPackageIds = activeSubscriptions.map((s) => s.packageId);
-
-    // 3. Upcoming Live Classes
-    const upcomingLiveClasses = await prisma.liveClassSession.findMany({
-      where: {
-        OR: [
-          { courseId: { in: enrolledCourseIds } },
-          { packageId: { in: subscribedPackageIds } },
-          ...(tenantId ? [{ tenantId }] : []),
-        ],
-        startTime: { gte: new Date(Date.now() - 3600000) }, // from 1 hour ago into future
-        status: { in: ['SCHEDULED', 'LIVE'] },
-      },
-      include: {
-        teacher: {
-          include: {
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
-                avatarUrl: true,
-              },
-            },
+        orderBy: { startTime: 'asc' },
+        take: 6,
+      }),
+      prisma.assignment.findMany({
+        where: {
+          courseId: { in: enrolledCourseIds },
+          status: 'PUBLISHED',
+          id: { notIn: submittedAssignmentIds },
+        },
+        include: {
+          course: {
+            select: { id: true, title: true, code: true },
           },
         },
-        course: {
-          select: { id: true, title: true, code: true },
-        },
-        package: {
-          select: { id: true, title: true },
-        },
-      },
-      orderBy: { startTime: 'asc' },
-      take: 6,
-    });
-
-    // 4. Pending Assignments (Assignments in student courses where student hasn't submitted yet)
-    const existingSubmissions = await prisma.assignmentSubmission.findMany({
-      where: { studentId },
-      select: { assignmentId: true, marksObtained: true, status: true },
-    });
-    const submittedAssignmentIds = existingSubmissions.map((s) => s.assignmentId);
-
-    const pendingAssignments = await prisma.assignment.findMany({
-      where: {
-        courseId: { in: enrolledCourseIds },
-        status: 'PUBLISHED',
-        id: { notIn: submittedAssignmentIds },
-      },
-      include: {
-        course: {
-          select: { id: true, title: true, code: true },
-        },
-      },
-      orderBy: { dueDate: 'asc' },
-      take: 5,
-    });
-
-    // 5. Recent Submissions with marks
-    const recentSubmissions = await prisma.assignmentSubmission.findMany({
-      where: { studentId },
-      include: {
-        assignment: {
-          select: {
-            id: true,
-            title: true,
-            maxMarks: true,
-            subjectName: true,
-          },
-        },
-      },
-      orderBy: { submittedAt: 'desc' },
-      take: 5,
-    });
+        orderBy: { dueDate: 'asc' },
+        take: 5,
+      }),
+    ]);
 
     // 6. Metrics Calculations
     const gradedSubmissions = existingSubmissions.filter(
@@ -362,10 +375,6 @@ export const getStudentDashboardOverview = async (
               gradedSubmissions.length
           )
         : 88; // friendly baseline if fresh student
-
-    const totalLiveAttendances = await prisma.liveClassAttendance.count({
-      where: { studentId },
-    });
 
     const metrics = {
       enrolledCoursesCount: enrollments.length,
@@ -1209,7 +1218,12 @@ export const submitMyAssignment = async (
       return;
     }
 
-    const assignmentId = String(req.params.assignmentId);
+    const assignmentId = typeof req.params.assignmentId === 'string' ? req.params.assignmentId.trim() : '';
+    if (!assignmentId) {
+      res.status(400).json({ success: false, message: 'Invalid assignment ID' });
+      return;
+    }
+
     const { textContent, fileAttachmentUrl, fileAttachmentName } = req.body;
 
     const profile = await getOrCreateStudentProfile(userId);
@@ -1218,46 +1232,15 @@ export const submitMyAssignment = async (
       return;
     }
 
-    let assignment = await prisma.assignment.findUnique({
+    const assignment = await prisma.assignment.findUnique({
       where: { id: assignmentId },
     });
 
-    if (!assignment) {
-      assignment = await prisma.assignment.findFirst({
-        where: {
-          OR: [
-            { id: { contains: assignmentId } },
-            { title: { contains: assignmentId.replace(/^asg_/, '').replace(/_/g, ' '), mode: 'insensitive' } },
-          ],
-        },
-      });
-    }
-
-    if (!assignment) {
-      let tenantId = req.user?.tenantId;
-      if (!tenantId) {
-        const firstTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
-        tenantId = firstTenant?.id || null;
-      }
-      let teacher = tenantId ? await prisma.teacherProfile.findFirst({ where: { user: { tenantId } } }) : null;
-      if (!teacher) {
-        teacher = await prisma.teacherProfile.findFirst();
-      }
-      if (tenantId && teacher) {
-        assignment = await prisma.assignment.create({
-          data: {
-            tenantId,
-            teacherId: teacher.id,
-            title: assignmentId.replace(/^asg_/, '').replace(/_/g, ' ').toUpperCase(),
-            instructions: 'Student Coursework Submission',
-            status: 'PUBLISHED',
-            maxMarks: 100,
-          },
-        });
-      }
-    }
-
-    if (!assignment) {
+    if (
+      !assignment ||
+      assignment.topicName === 'ONLINE_QUIZ' ||
+      (req.user?.tenantId && assignment.tenantId !== req.user.tenantId)
+    ) {
       res.status(404).json({ success: false, message: 'Assignment not found' });
       return;
     }

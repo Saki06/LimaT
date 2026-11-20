@@ -1050,3 +1050,11 @@ model SuperAdminProfile {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model RevokedToken {
+  tokenDigest String   @id
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([expiresAt])
+}

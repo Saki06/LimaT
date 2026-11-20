@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import Image from "next/image";
 import { useApp } from "@/context/AppContext";
-import { useHubSettings } from "@/context/AdminContext";
-import { TeacherSubscriber, TutorPackage, ConnectStudyGroup } from "@/types/lms";
+import { TeacherSubscriber, TutorPackage } from "@/types/lms";
 import { api } from "@/lib/api";
 import {
   Users,
-  Users2,
   CreditCard,
   Receipt,
   CheckCircle2,
@@ -16,27 +15,16 @@ import {
   Video,
   ExternalLink,
   Copy,
-  Send,
   AlertCircle,
   FileCheck,
-  Calendar,
-  Sparkles,
-  ChevronRight,
   Filter,
-  Eye,
   X,
   Building,
-  GraduationCap,
   Package,
   Plus,
   Trash2,
   Edit3,
   Check,
-  Layers,
-  DollarSign,
-  ToggleLeft,
-  ToggleRight,
-  Lock,
   RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -195,29 +183,57 @@ const PREDEFINED_GRADE_GROUPS = [
 
 const ALL_PREDEFINED_GRADES = PREDEFINED_GRADE_GROUPS.flatMap((g) => g.grades);
 
+interface BackendPackageItem {
+  id: string;
+  teacherId?: string;
+  title: string;
+  grade?: string;
+  price?: number | string | null;
+  billingCycle?: string;
+  description?: string | null;
+  features?: string[];
+  liveClassesPerWeek?: number;
+  liveClasses?: unknown[];
+  isPublished?: boolean;
+  _count?: { subscriptions?: number };
+  subscriptions?: unknown[];
+  createdAt?: string;
+  courses?: Array<{ course?: { title?: string; gradeName?: string } | null }>;
+}
+
 export function TeacherConnectView() {
-  const { currentUser, t, fetchCourses, setCurrentView } = useApp();
-  const hubSettings = useHubSettings();
+  const { currentUser, fetchCourses } = useApp();
 
   // Active tab inside Teacher Connect Hub - Default to Packages or restore from URL/localStorage
   const [activeTab, setActiveTab] = useState<TeacherConnectTab>("packages");
+  const hasManualTabChangeRef = useRef(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const urlTab = params.get("tab") as TeacherConnectTab;
-      if (urlTab && ["packages", "subscribers", "slips"].includes(urlTab)) {
-        setActiveTab(urlTab);
-      } else {
-        const savedTab = localStorage.getItem("lms_teacher_connect_tab") as TeacherConnectTab;
-        if (savedTab && ["packages", "subscribers", "slips"].includes(savedTab)) {
-          setActiveTab(savedTab);
+    let cancelled = false;
+
+    Promise.resolve().then(() => {
+      if (cancelled || hasManualTabChangeRef.current) return;
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const urlTab = params.get("tab") as TeacherConnectTab;
+        if (urlTab && ["packages", "subscribers", "slips"].includes(urlTab)) {
+          setActiveTab(urlTab);
+        } else {
+          const savedTab = localStorage.getItem("lms_teacher_connect_tab") as TeacherConnectTab;
+          if (savedTab && ["packages", "subscribers", "slips"].includes(savedTab)) {
+            setActiveTab(savedTab);
+          }
         }
       }
-    }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleTabChange = (tab: TeacherConnectTab) => {
+    hasManualTabChangeRef.current = true;
     setActiveTab(tab);
     if (typeof window !== "undefined") {
       localStorage.setItem("lms_teacher_connect_tab", tab);
@@ -227,7 +243,7 @@ export function TeacherConnectView() {
     }
   };
 
-  const mapBackendPackageToFrontend = (pkg: any): TutorPackage => ({
+  const mapBackendPackageToFrontend = (pkg: BackendPackageItem): TutorPackage => ({
     id: pkg.id,
     teacherId: pkg.teacherId || "",
     title: pkg.title,
@@ -240,7 +256,7 @@ export function TeacherConnectView() {
     liveClassesPerWeek: pkg.liveClassesPerWeek || (pkg.liveClasses?.length || 0),
     status: pkg.isPublished ? "active" : "draft",
     enrolledCount: pkg._count?.subscriptions || pkg.subscriptions?.length || 0,
-    badge: pkg.price > 0 ? "POPULAR" : "FREE",
+    badge: Number(pkg.price) > 0 ? "POPULAR" : "FREE",
     createdAt: pkg.createdAt ? new Date(pkg.createdAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
   });
 
@@ -297,7 +313,7 @@ export function TeacherConnectView() {
   const [subscribers, setSubscribers] = useState<TeacherSubscriber[]>([]);
   const [isSubscribersLoading, setIsSubscribersLoading] = useState(false);
 
-  const loadSubscribers = async () => {
+  const loadSubscribers = useCallback(async () => {
     try {
       setIsSubscribersLoading(true);
       const res = await api.packages.getTeacherSubscribers();
@@ -312,11 +328,19 @@ export function TeacherConnectView() {
     } finally {
       setIsSubscribersLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadSubscribers();
-  }, []);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        void loadSubscribers();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadSubscribers]);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -620,6 +644,8 @@ export function TeacherConnectView() {
             <p className="text-slate-100">{toastMessage}</p>
           </div>
           <button
+            type="button"
+            aria-label="Dismiss notification"
             onClick={() => setToastMessage(null)}
             className="p-1 hover:bg-white/20 rounded-lg text-white/80 cursor-pointer ml-2"
           >
@@ -719,8 +745,8 @@ export function TeacherConnectView() {
         <button
           onClick={() => handleTabChange("packages")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "packages"
-              ? "bg-[#0d5c4d] text-white shadow-xs font-black"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            ? "bg-[#0d5c4d] text-white shadow-xs font-black"
+            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
             }`}
         >
           <Package className="h-4 w-4" />
@@ -734,8 +760,8 @@ export function TeacherConnectView() {
         <button
           onClick={() => handleTabChange("subscribers")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "subscribers"
-              ? "bg-[#0d5c4d] text-white shadow-xs font-black"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            ? "bg-[#0d5c4d] text-white shadow-xs font-black"
+            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
             }`}
         >
           <Users className="h-4 w-4" />
@@ -749,8 +775,8 @@ export function TeacherConnectView() {
         <button
           onClick={() => handleTabChange("slips")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "slips"
-              ? "bg-[#0d5c4d] text-white shadow-xs font-black"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            ? "bg-[#0d5c4d] text-white shadow-xs font-black"
+            : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
             }`}
         >
           <Receipt className="h-4 w-4" />
@@ -810,7 +836,7 @@ export function TeacherConnectView() {
               </span>
               <select
                 value={packageStatusFilter}
-                onChange={(e) => setPackageStatusFilter(e.target.value as any)}
+                onChange={(e) => setPackageStatusFilter(e.target.value as "all" | "active" | "draft")}
                 className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0d5c4d]"
               >
                 <option value="all">All Packages ({packages.length})</option>
@@ -857,8 +883,8 @@ export function TeacherConnectView() {
                         )}
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${pkg.status === "active"
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
                             }`}
                         >
                           {pkg.status}
@@ -961,8 +987,8 @@ export function TeacherConnectView() {
                         variant="outline"
                         onClick={() => handleTogglePackageStatus(pkg.id)}
                         className={`text-xs font-bold cursor-pointer border ${pkg.status === "active"
-                            ? "border-amber-200 text-amber-700 hover:bg-amber-50"
-                            : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                          ? "border-amber-200 text-amber-700 hover:bg-amber-50"
+                          : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                           }`}
                         title={pkg.status === "active" ? "Switch to Draft" : "Publish to Students"}
                       >
@@ -1013,7 +1039,7 @@ export function TeacherConnectView() {
               </span>
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
+                onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "pending_slip" | "expired")}
                 className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0d5c4d]"
               >
                 <option value="all">All Subscribers</option>
@@ -1282,10 +1308,13 @@ export function TeacherConnectView() {
             <div className="p-4 rounded-2xl border-2 border-dashed border-[#c4e9e0] bg-[#ecf8f5]/50 text-center space-y-2">
               {selectedSlipSub.slipUrl ? (
                 <div className="space-y-2">
-                  <img
+                  <Image
                     src={selectedSlipSub.slipUrl}
                     alt="Bank Deposit Slip"
-                    className="max-h-48 mx-auto rounded-xl border border-slate-200 object-contain shadow-2xs bg-white"
+                    width={480}
+                    height={192}
+                    unoptimized
+                    className="max-h-48 w-auto mx-auto rounded-xl border border-slate-200 object-contain shadow-2xs bg-white"
                   />
                   <div className="flex items-center justify-center gap-2">
                     <a
@@ -1485,7 +1514,7 @@ export function TeacherConnectView() {
               <label className="block text-xs font-bold text-slate-700 mb-1">Billing Cycle</label>
               <select
                 value={packageFormData.billingCycle}
-                onChange={(e) => setPackageFormData({ ...packageFormData, billingCycle: e.target.value as any })}
+                onChange={(e) => setPackageFormData({ ...packageFormData, billingCycle: e.target.value as TutorPackage["billingCycle"] })}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
                 <option value="Monthly">Monthly</option>
@@ -1523,7 +1552,7 @@ export function TeacherConnectView() {
               <label className="block text-xs font-bold text-slate-700 mb-1">Initial Status</label>
               <select
                 value={packageFormData.status}
-                onChange={(e) => setPackageFormData({ ...packageFormData, status: e.target.value as any })}
+                onChange={(e) => setPackageFormData({ ...packageFormData, status: e.target.value as "active" | "draft" })}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-bold focus:outline-none focus:border-[#0d5c4d]"
               >
                 <option value="active">Active (Published to Marketplace)</option>
@@ -1760,7 +1789,7 @@ export function TeacherConnectView() {
               <label className="block text-xs font-bold text-slate-700 mb-1">Billing Cycle</label>
               <select
                 value={packageFormData.billingCycle}
-                onChange={(e) => setPackageFormData({ ...packageFormData, billingCycle: e.target.value as any })}
+                onChange={(e) => setPackageFormData({ ...packageFormData, billingCycle: e.target.value as TutorPackage["billingCycle"] })}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
                 <option value="Monthly">Monthly</option>
@@ -1798,7 +1827,7 @@ export function TeacherConnectView() {
               <label className="block text-xs font-bold text-slate-700 mb-1">Status</label>
               <select
                 value={packageFormData.status}
-                onChange={(e) => setPackageFormData({ ...packageFormData, status: e.target.value as any })}
+                onChange={(e) => setPackageFormData({ ...packageFormData, status: e.target.value as "active" | "draft" })}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 font-bold focus:outline-none focus:border-[#0d5c4d]"
               >
                 <option value="active">Active (Published)</option>
@@ -1829,6 +1858,7 @@ export function TeacherConnectView() {
                   </span>
                   <button
                     type="button"
+                    aria-label={`Remove perk ${perk}`}
                     onClick={() => handleRemovePerk(i)}
                     className="text-slate-400 hover:text-rose-600 p-0.5 rounded cursor-pointer"
                   >

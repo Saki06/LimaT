@@ -1,15 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { useApp } from "@/context/AppContext";
 import {
   GraduationCap,
-  School,
   Shield,
   BookOpen,
-  CheckCircle2,
   FileText,
-  TrendingUp,
   ArrowRight,
   Sparkles,
   Zap,
@@ -17,7 +15,6 @@ import {
   Lock,
   Mail,
   User as UserIcon,
-  Building2,
   Eye,
   EyeOff,
   Trophy,
@@ -30,12 +27,7 @@ import {
   Minimize2,
   ArrowLeft,
   Users,
-  Layers,
-  Settings,
-  Award,
   Phone,
-  Heart,
-  ChevronRight,
   ChevronDown,
   MapPin,
   BarChart3,
@@ -49,6 +41,36 @@ import { ForgotPasswordModal } from "./ForgotPasswordModal";
 type SupportedRole = "student" | "parent" | "teacher" | "admin" | "super_admin";
 type AuthDisplayMode = "closed" | "drawer" | "fullpage";
 export type PortalType = "gateway" | "student" | "parent" | "staff";
+
+interface GoogleCredentialResponse {
+  credential?: string;
+}
+
+interface GoogleAccountsId {
+  initialize: (config: {
+    client_id: string;
+    callback: (response: GoogleCredentialResponse) => void | Promise<void>;
+  }) => void;
+  renderButton: (
+    parent: HTMLElement,
+    options: {
+      theme: string;
+      size: string;
+      width: number;
+      text: string;
+      shape: string;
+      logo_alignment: string;
+    }
+  ) => void;
+}
+
+type GoogleWindow = Window & {
+  google?: {
+    accounts?: {
+      id?: GoogleAccountsId;
+    };
+  };
+};
 
 const BANNER_SLIDES = [
   {
@@ -80,12 +102,12 @@ export function LandingView({
   onEnterApp: () => void;
   initialPortal?: PortalType;
 }) {
-  const { setCurrentRole, addToast, schools, t, landingPortal, setLandingPortal, loginUser, loginWithGoogle, registerUser } = useApp();
+  const { setCurrentRole, addToast, landingPortal, setLandingPortal, loginUser, loginWithGoogle, registerUser } = useApp();
 
   const GOOGLE_CLIENT_ID = "786252089709-nac7u469ercpt25hqjg1jkavga6d70hp.apps.googleusercontent.com";
 
   // Auto-rotate the student banner image every 3.5 seconds
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [, setCurrentSlideIndex] = useState(0);
   React.useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlideIndex((prev) => (prev + 1) % BANNER_SLIDES.length);
@@ -106,7 +128,6 @@ export function LandingView({
   const [authMode, setAuthMode] = useState<AuthDisplayMode>("closed");
   const [authTab, setAuthTab] = useState<"login" | "signup">("login");
   const [selectedRole, setSelectedRole] = useState<SupportedRole>("student");
-  const [gatewayTab, setGatewayTab] = useState<"student" | "parent" | "staff">("student");
 
   // Sign In Form State (Empty by default for a clean, generic portal)
   const [loginEmail, setLoginEmail] = useState("");
@@ -123,11 +144,12 @@ export function LandingView({
       const container = document.getElementById("google-signin-btn-login");
       if (!container) return;
 
-      if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
+      const googleWin = typeof window !== "undefined" ? (window as GoogleWindow) : undefined;
+      if (googleWin?.google?.accounts?.id) {
         try {
-          (window as any).google.accounts.id.initialize({
+          googleWin.google.accounts.id.initialize({
             client_id: GOOGLE_CLIENT_ID,
-            callback: async (response: any) => {
+            callback: async (response: GoogleCredentialResponse) => {
               if (response.credential) {
                 const targetRole =
                   selectedRole === "parent"
@@ -157,7 +179,7 @@ export function LandingView({
           const targetWidth = Math.min(380, Math.max(260, Math.round(rect.width || 360)));
 
           container.innerHTML = "";
-          (window as any).google.accounts.id.renderButton(container, {
+          googleWin.google.accounts.id.renderButton(container, {
             theme: "outline",
             size: "large",
             width: targetWidth,
@@ -171,7 +193,8 @@ export function LandingView({
       }
     };
 
-    if (typeof window !== "undefined" && !(window as any).google) {
+    const googleWin = typeof window !== "undefined" ? (window as GoogleWindow) : undefined;
+    if (googleWin && !googleWin.google) {
       const script = document.createElement("script");
       script.src = "https://accounts.google.com/gsi/client";
       script.async = true;
@@ -219,17 +242,14 @@ export function LandingView({
       : "";
 
   // Sri Lankan Parent-Specific Sign In & Registration States
-  const [parentLoginMethod, setParentLoginMethod] = useState<"password" | "otp">("password");
+  const [parentLoginMethod] = useState<"password" | "otp">("password");
   const [parentOtpSent, setParentOtpSent] = useState(false);
-  const [parentOtpCode, setParentOtpCode] = useState("");
+  const [parentOtpCode] = useState("");
 
   const [parentTitle, setParentTitle] = useState("Mrs.");
   const [parentRelation, setParentRelation] = useState("Mother");
   const [parentPhone, setParentPhone] = useState("");
-  const [parentNic, setParentNic] = useState("");
-  const [childName, setChildName] = useState("");
   const [childPhoneOrId, setChildPhoneOrId] = useState("");
-  const [childBatch, setChildBatch] = useState("2026 A/L Theory (English / Tamil)");
   const [parentConsent, setParentConsent] = useState(true);
 
   const parentPhoneError =
@@ -309,40 +329,6 @@ export function LandingView({
     super_admin: "SUPER_ADMIN",
   };
 
-  const handle1ClickDemoLogin = async (role: SupportedRole) => {
-    const creds = rolePresetCredentials[role];
-    if (creds) {
-      try {
-        const res = await loginUser(creds.email, "password123", backendRoleMap[role]);
-        if (res.success) {
-          setAuthMode("closed");
-          onEnterApp();
-          return;
-        }
-      } catch {
-        // Fallback below
-      }
-    }
-    setCurrentRole(role);
-    setAuthMode("closed");
-    addToast({
-      type: "success",
-      title: `Signed in as ${
-        role === "student"
-          ? "Student"
-          : role === "parent"
-          ? "Parent"
-          : role === "teacher"
-          ? "Tutor"
-          : role === "super_admin"
-          ? "Super Admin"
-          : "Admin"
-      }`,
-      message: `Welcome back, ${rolePresetCredentials[role].name}!`
-    });
-    onEnterApp();
-  };
-
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -401,11 +387,11 @@ export function LandingView({
         });
         return;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       addToast({
         type: "error",
         title: "Connection Error",
-        message: err?.message || "Failed to reach authentication server."
+        message: err instanceof Error ? err.message : "Failed to reach authentication server."
       });
       return;
     } finally {
@@ -490,11 +476,11 @@ export function LandingView({
           });
           return;
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         addToast({
           type: "error",
           title: "Registration Error",
-          message: err?.message || "Failed to reach registration server."
+          message: err instanceof Error ? err.message : "Failed to reach registration server."
         });
         return;
       } finally {
@@ -565,11 +551,11 @@ export function LandingView({
           });
           return;
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         addToast({
           type: "error",
           title: "Registration Error",
-          message: err?.message || "Failed to reach registration server."
+          message: err instanceof Error ? err.message : "Failed to reach registration server."
         });
         return;
       } finally {
@@ -703,6 +689,7 @@ export function LandingView({
                   />
                   <button
                     type="button"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                     onClick={() => setShowPassword(!showPassword)}
                     className="p-1 rounded-md text-slate-400 hover:text-slate-600 absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer"
                   >
@@ -1335,9 +1322,12 @@ export function LandingView({
         <header className="h-20 border-b border-[#e6ece8] bg-white px-6 sm:px-12 flex items-center justify-between sticky top-0 z-40">
           <div className="flex items-center gap-3">
             <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-emerald-500/20">
-              <img
+              <Image
                 src="/images/tozy_icon.jpg"
                 alt="Tozy - Newtoz Mascot"
+                width={48}
+                height={48}
+                unoptimized
                 className="w-full h-full object-cover rounded-[14px] bg-white"
               />
               <span className="absolute -top-1 -right-1 text-xs">🪽</span>
@@ -1486,9 +1476,12 @@ export function LandingView({
         <nav className="h-14 sm:h-16 border-b border-emerald-100/60 bg-[#ebf8f4]/85 backdrop-blur-md px-3 sm:px-8 flex items-center justify-between sticky top-0 z-40 shrink-0 transition-colors">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-emerald-500/20">
-              <img
+              <Image
                 src="/images/tozy_icon.jpg"
                 alt="Tozy - Newtoz Mascot"
+                width={44}
+                height={44}
+                unoptimized
                 className="w-full h-full object-cover rounded-[14px] bg-white"
               />
               <span className="absolute -top-1 -right-1 text-xs">🪽</span>
@@ -1515,9 +1508,12 @@ export function LandingView({
             title="Return to All Portals"
           >
             <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-emerald-500/20 group-hover:scale-105 transition-transform">
-              <img
+              <Image
                 src="/images/tozy_icon.jpg"
                 alt="Tozy - Newtoz Mascot"
+                width={44}
+                height={44}
+                unoptimized
                 className="w-full h-full object-cover rounded-[14px] bg-white"
               />
               <span className="absolute -top-1 -right-1 text-xs">🪽</span>
@@ -1557,9 +1553,12 @@ export function LandingView({
             title="Return to All Portals"
           >
             <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-sky-300 to-amber-300 p-0.5 shadow-sm shrink-0 ring-2 ring-sky-500/20 group-hover:scale-105 transition-transform">
-              <img
+              <Image
                 src="/images/tozy_icon.jpg"
                 alt="Tozy - Newtoz Mascot"
+                width={44}
+                height={44}
+                unoptimized
                 className="w-full h-full object-cover rounded-[14px] bg-white"
               />
               <span className="absolute -top-1 -right-1 text-xs">🪽</span>
@@ -1598,9 +1597,12 @@ export function LandingView({
             title="Return to All Portals"
           >
             <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-amber-400 via-emerald-300 to-cyan-300 p-0.5 shadow-sm shrink-0 ring-2 ring-amber-500/20 group-hover:scale-105 transition-transform">
-              <img
+              <Image
                 src="/images/tozy_icon.jpg"
                 alt="Tozy - Newtoz Mascot"
+                width={44}
+                height={44}
+                unoptimized
                 className="w-full h-full object-cover rounded-[14px] bg-white"
               />
               <span className="absolute -top-1 -right-1 text-xs">🪽</span>
@@ -1720,9 +1722,12 @@ export function LandingView({
 
                 {/* Brush-Splash Character Illustration */}
                 <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
-                  <img
+                  <Image
                     src="/images/student_brush_portrait.jpg"
                     alt="Student learning with Newtoz"
+                    width={160}
+                    height={160}
+                    unoptimized
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>
@@ -1754,9 +1759,12 @@ export function LandingView({
 
                 {/* Teacher / Educator Character Illustration */}
                 <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
-                  <img
+                  <Image
                     src="/images/tutor_brush_portrait.jpg"
                     alt="Teacher and Tutor educator with Newtoz"
+                    width={160}
+                    height={160}
+                    unoptimized
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 rounded-2xl"
                   />
                 </div>
@@ -1788,9 +1796,12 @@ export function LandingView({
 
                 {/* Brush-Splash Character Illustration */}
                 <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
-                  <img
+                  <Image
                     src="/images/parent_brush_portrait.jpg"
                     alt="Parent reviewing student progress with Newtoz"
+                    width={160}
+                    height={160}
+                    unoptimized
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>
@@ -1822,9 +1833,12 @@ export function LandingView({
 
                 {/* Administrator Character Illustration */}
                 <div className="relative w-20 h-20 sm:w-36 sm:h-36 lg:w-40 lg:h-40 flex items-center justify-center mt-1 sm:mt-2">
-                  <img
+                  <Image
                     src="/images/admin_brush_portrait.jpg"
                     alt="School Principal and Administrator with Newtoz"
+                    width={160}
+                    height={160}
+                    unoptimized
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 rounded-2xl"
                   />
                 </div>
@@ -1885,9 +1899,12 @@ export function LandingView({
             <section className="relative rounded-3xl sm:rounded-[36px] overflow-hidden border-2 border-emerald-100/80 shadow-lg min-h-[480px] lg:min-h-[540px] flex items-center">
               {/* Full Background Image: Real Sri Lankan Students */}
               <div className="absolute inset-0 z-0">
-                <img
+                <Image
                   src="/images/student_card_hero.jpg"
                   alt="Sri Lankan Students Studying Collaboratively"
+                  width={1200}
+                  height={540}
+                  unoptimized
                   className="w-full h-full object-cover object-right sm:object-center"
                 />
                 {/* Modern Directional Gradient Overlay (ensures 100% text readability on left while showing students on right) */}
@@ -1958,9 +1975,12 @@ export function LandingView({
                   className="group bg-white rounded-3xl p-3 border-2 border-emerald-100/70 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl -translate-y-0 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
                 >
                   <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden mb-3 relative bg-slate-100 shadow-inner">
-                    <img
+                    <Image
                       src="/images/card_archive.jpg"
                       alt="Research Archive"
+                      width={320}
+                      height={240}
+                      unoptimized
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -1984,9 +2004,12 @@ export function LandingView({
                   className="group bg-white rounded-3xl p-3 border-2 border-emerald-100/70 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl -translate-y-0 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
                 >
                   <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden mb-3 relative bg-slate-100 shadow-inner">
-                    <img
+                    <Image
                       src="/images/card_video.jpg"
                       alt="Video Repository"
+                      width={320}
+                      height={240}
+                      unoptimized
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -2010,9 +2033,12 @@ export function LandingView({
                   className="group bg-white rounded-3xl p-3 border-2 border-emerald-100/70 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl -translate-y-0 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
                 >
                   <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden mb-3 relative bg-slate-100 shadow-inner">
-                    <img
+                    <Image
                       src="/images/card_library.jpg"
                       alt="Online Library"
+                      width={320}
+                      height={240}
+                      unoptimized
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -2036,9 +2062,12 @@ export function LandingView({
                   className="group bg-white rounded-3xl p-3 border-2 border-emerald-100/70 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl -translate-y-0 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col items-center text-center"
                 >
                   <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden mb-3 relative bg-slate-100 shadow-inner">
-                    <img
+                    <Image
                       src="/images/card_helpdesk.jpg"
                       alt="Student Help Desk"
+                      width={320}
+                      height={240}
+                      unoptimized
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -2062,9 +2091,12 @@ export function LandingView({
                   className="group bg-white rounded-3xl p-3 border-2 border-emerald-100/70 hover:border-[#0d5c4d] shadow-sm hover:shadow-xl -translate-y-0 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer flex flex-col items-center text-center col-span-2 sm:col-span-1"
                 >
                   <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden mb-3 relative bg-slate-100 shadow-inner">
-                    <img
+                    <Image
                       src="/images/card_service.jpg"
                       alt="Sports Championship"
+                      width={320}
+                      height={240}
+                      unoptimized
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -2263,9 +2295,12 @@ export function LandingView({
 
                   {/* Brush-Splash Character Illustration */}
                   <div className="relative w-40 h-40 sm:w-48 sm:h-48 lg:w-52 lg:h-52 flex items-center justify-center my-2">
-                    <img
+                    <Image
                       src="/images/parent_brush_portrait.jpg"
                       alt="Parent monitoring student progress"
+                      width={208}
+                      height={208}
+                      unoptimized
                       className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                     />
                   </div>
@@ -2465,9 +2500,12 @@ export function LandingView({
 
                   {/* Brush-Splash Character Illustration */}
                   <div className="relative w-40 h-40 sm:w-48 sm:h-48 lg:w-52 lg:h-52 flex items-center justify-center my-2">
-                    <img
+                    <Image
                       src="/images/tutor_brush_portrait.jpg"
                       alt="Tutor educator"
+                      width={208}
+                      height={208}
+                      unoptimized
                       className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                     />
                   </div>
@@ -2626,9 +2664,12 @@ export function LandingView({
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="relative h-9 w-9 rounded-xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-xs shrink-0 ring-1 ring-emerald-500/20">
-                <img
+                <Image
                   src="/images/tozy_icon.jpg"
                   alt="Tozy - Newtoz Mascot"
+                  width={36}
+                  height={36}
+                  unoptimized
                   className="w-full h-full object-cover rounded-[10px] bg-white"
                 />
               </div>
@@ -2712,9 +2753,12 @@ export function LandingView({
             <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-b from-[#f8fbf9] to-white shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-2xs shrink-0 ring-1 ring-emerald-500/20">
-                  <img
+                  <Image
                     src="/images/tozy_icon.jpg"
                     alt="Tozy - Newtoz Mascot"
+                    width={40}
+                    height={40}
+                    unoptimized
                     className="w-full h-full object-cover rounded-[10px] bg-white"
                   />
                   <span className="absolute -top-1 -right-1 text-[10px]">🪽</span>

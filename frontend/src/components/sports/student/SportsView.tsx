@@ -92,10 +92,12 @@ export function SportsView({
   const sportsCoaches = useStaff().filter((member) => member.role === "coach");
 
   const [activeTab, setActiveTab] = useState<SportsTab>(initialTab);
+  const [prevInitialTab, setPrevInitialTab] = useState<SportsTab>(initialTab);
 
-  React.useEffect(() => {
+  if (initialTab !== prevInitialTab) {
+    setPrevInitialTab(initialTab);
     setActiveTab(initialTab);
-  }, [initialTab]);
+  }
 
   const [selectedSport, setSelectedSport] = useState<string>("All");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
@@ -343,21 +345,29 @@ export function SportsView({
   // Populate edit form when a tournament is selected
   React.useEffect(() => {
     if (!editingTournament) return;
+    let cancelled = false;
 
-    setEditTournamentForm({
-      name: editingTournament.name,
-      sportName: editingTournament.sportName,
-      category: editingTournament.category,
-      format: editingTournament.format,
-      status: editingTournament.status,
-      currentRound: editingTournament.currentRound || "",
-      venue: editingTournament.venue,
-      organizer: editingTournament.organizer,
-      trophyTitle: editingTournament.trophyTitle,
-      champion: editingTournament.champion || "",
-      runnerUp: editingTournament.runnerUp || "",
-      description: editingTournament.description || "",
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setEditTournamentForm({
+        name: editingTournament.name,
+        sportName: editingTournament.sportName,
+        category: editingTournament.category,
+        format: editingTournament.format,
+        status: editingTournament.status,
+        currentRound: editingTournament.currentRound || "",
+        venue: editingTournament.venue,
+        organizer: editingTournament.organizer,
+        trophyTitle: editingTournament.trophyTitle,
+        champion: editingTournament.champion || "",
+        runnerUp: editingTournament.runnerUp || "",
+        description: editingTournament.description || "",
+      });
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [editingTournament]);
   // Team states
   const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] =
@@ -413,14 +423,6 @@ export function SportsView({
       tr.trophyTitle.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchSport && matchStatus && matchSearch;
-  });
-
-  // Filter fixtures
-  const filteredFixtures = fixtures.filter((fx) => {
-    return (
-      selectedSport === "All" ||
-      fx.sportName.toLowerCase().includes(selectedSport.toLowerCase())
-    );
   });
 
   // Create tournament
@@ -964,9 +966,9 @@ export function SportsView({
               </div>
 
               <div className="space-y-1 max-w-sm mx-auto">
-                <h3 className="text-base font-black text-[#0d2b26]">
+                <h2 className="text-base font-black text-[#0d2b26]">
                   No Tournaments Found
-                </h3>
+                </h2>
                 <p className="text-xs text-slate-500">
                   {searchQuery || selectedSport !== "All"
                     ? "Try adjusting your filters or search keywords."

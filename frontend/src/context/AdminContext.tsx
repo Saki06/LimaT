@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { api } from '@/lib/api';
 import {
@@ -12,11 +12,38 @@ import {
   HubFlag,
   HubFlagAction,
   HubSettings,
+  SchoolClass,
+  Subject,
   Subscription,
   StaffInput,
   TeacherHub,
   TeacherHubStatus
 } from '@/types/lms';
+
+export interface AdminRecentStudentRecord {
+  id: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  grade?: string;
+  status?: string;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
+export interface AdminRecentStaffRecord {
+  id: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  role?: string;
+  status?: string;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
 export interface AdminOverviewData {
   school: {
     id: string;
@@ -37,8 +64,8 @@ export interface AdminOverviewData {
     activeAttendanceRate: string;
     systemHealth: string;
   };
-  recentStudents: any[];
-  recentStaff: any[];
+  recentStudents: AdminRecentStudentRecord[];
+  recentStaff: AdminRecentStaffRecord[];
 }
 
 export interface SchoolSettingsData {
@@ -54,8 +81,8 @@ export interface SchoolSettingsData {
     principalName?: string;
     logoUrl?: string;
   };
-  classes?: any[];
-  subjects?: any[];
+  classes?: SchoolClass[];
+  subjects?: Subject[];
 }
 
 interface AdminContextValue {
@@ -122,7 +149,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const schoolId = currentUser.schoolId || 'sch_apex_01';
 
   // Fetch live staff, students directory, overview KPIs, and settings from backend
-  const fetchAllAdminData = async () => {
+  const fetchAllAdminData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [staffRes, studentsRes, overviewRes, settingsRes] = await Promise.allSettled([
@@ -149,11 +176,19 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchAllAdminData();
-  }, [schoolId]);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        void fetchAllAdminData();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [schoolId, fetchAllAdminData]);
 
   const value = useMemo<AdminContextValue>(() => ({
     schoolId,
@@ -278,9 +313,9 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
           addToast({ type: 'success', title: 'School settings saved to cloud successfully.' });
           return true;
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error saving school settings:', err);
-        addToast({ type: 'error', title: err.message || 'Failed to save school settings.' });
+        addToast({ type: 'error', title: err instanceof Error ? err.message : 'Failed to save school settings.' });
       }
       return false;
     },
@@ -307,7 +342,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       }
       setAuditLog((entries) => [...entries, { id: `audit_${Date.now()}`, schoolId, adminId: currentUser.id, action: 'settings_change', targetId: schoolId, createdAt: new Date().toISOString() }]);
     }
-  }), [auditLog, currentUser.id, directory, hubFlags, hubSettings, isLoading, overviewData, schoolId, schoolSettings, staff, subscriptions, teacherHubs]);
+  }), [addToast, auditLog, currentUser.id, directory, fetchAllAdminData, hubFlags, hubSettings, isLoading, overviewData, schoolId, schoolSettings, staff, subscriptions, teacherHubs]);
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
 }

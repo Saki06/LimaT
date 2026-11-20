@@ -36,7 +36,7 @@ router.put('/:id', requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'), updateAssign
 router.delete('/:id', requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'), deleteAssignment);
 
 // 6. Student submit assignment
-router.post('/:id/submit', submitAssignment);
+router.post('/:id/submit', requireRoles('STUDENT'), submitAssignment);
 
 // 7. Grade student submission (Teacher / Admin)
 router.patch('/submissions/:submissionId/grade', requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'), gradeSubmission);

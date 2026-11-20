@@ -18,6 +18,7 @@ import {
   Assignment,
   StudentSubmission,
   Quiz,
+  QuizAttemptRecord,
   Sport,
   SportsTeam,
   Fixture,
@@ -39,10 +40,10 @@ import {
   ChampionshipSportItem,
   StoredAthleteRegistration,
 } from '@/components/sports/sportsRegistrationData';
-import { Tenant, TenantFeature, TenantType } from '@/types/tenant';
+import { Tenant } from '@/types/tenant';
 import { TENANT_PRESETS, buildFullFeatures } from '@/data/tenantMockData';
 import { getTranslation } from '@/lib/i18n';
-import { api } from '@/lib/api';
+import { api, AuthResponse, StoredUser } from '@/lib/api';
 import { mapBackendTenant } from '@/lib/tenantMapper';
 
 interface ToastMessage {
@@ -72,9 +73,9 @@ interface AppContextType {
   t: ReturnType<typeof getTranslation>;
 
   // Authentication State & Actions
-  authUser: any | null;
+  authUser: AppAuthUser | null;
   authToken: string | null;
-  updateAuthUser: (updates: Record<string, any>) => void;
+  updateAuthUser: (updates: Partial<AppAuthUser>) => void;
   refreshSuperAdminAvatar: () => void;
   refreshMyTenant: () => void;
   loginUser: (email: string, password: string, expectedRole?: string) => Promise<{ success: boolean; message?: string }>;
@@ -159,7 +160,7 @@ interface AppContextType {
   markLessonComplete: (lessonId: string) => void;
   submitAssignment: (assignmentId: string, text: string, fileName?: string, fileAttachmentUrl?: string) => Promise<void>;
   gradeSubmission: (submissionId: string, marks: number, feedback: string, release: boolean) => void;
-  submitQuizAttempt: (quizId: string, answers: Record<string, any>) => number;
+  submitQuizAttempt: (quizId: string, answers: QuizAttemptRecord['answers']) => Promise<number>;
   createQuiz: (quiz: Partial<Quiz>) => void;
   updateQuiz: (id: string, updates: Partial<Quiz>) => void;
   deleteQuiz: (id: string) => void;
@@ -264,7 +265,7 @@ const mapBackendEventToSchoolEvent = (event: SportsEvent): SchoolEvent => {
     : '09:00 AM - 02:00 PM';
 
   const validAudiences = ['all', 'students', 'teachers', 'grade_11', 'grade_12'] as const;
-  const audience = validAudiences.includes(event.ageCategory as any)
+  const audience = (validAudiences as readonly string[]).includes(event.ageCategory ?? '')
     ? (event.ageCategory as SchoolEvent['audience'])
     : 'all';
 
@@ -325,7 +326,85 @@ function getNextDateForDay(dayName: string, timeStr?: string): Date {
   return targetDate;
 }
 
-const mapLiveClassToTimetableEntry = (session: any): TimetableEntry => {
+interface BackendLiveClassSession {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime?: string | null;
+  durationMinutes?: number | null;
+  courseId?: string | null;
+  packageId?: string | null;
+  teacherId?: string | null;
+  platform?: TimetableEntry['platform'] | string | null;
+  meetingUrl?: string | null;
+  status?: string | null;
+  course?: { title?: string; code?: string } | null;
+  package?: { title?: string } | null;
+  teacher?: { user?: { firstName?: string; lastName?: string | null } | null } | null;
+}
+
+interface BackendAssignmentRecord {
+  id: string;
+  courseId?: string;
+  course?: { id?: string; title?: string } | null;
+  subjectName?: string;
+  title: string;
+  instructions?: string | null;
+  topicName?: string | null;
+  maxMarks?: number | string | null;
+  dueDate?: string | null;
+  status?: string | null;
+  attachmentName?: string | null;
+  submissionsCount?: number | null;
+  _count?: { submissions?: number } | null;
+  pendingReviewCount?: number | null;
+}
+
+interface BackendSubmissionRecord {
+  id: string;
+  assignmentId: string;
+  assignmentTitle?: string | null;
+  studentId: string;
+  studentName?: string | null;
+  studentAvatar?: string | null;
+  submittedAt?: string | null;
+  status: string;
+  textContent?: string | null;
+  fileAttachmentName?: string | null;
+  fileAttachmentUrl?: string | null;
+  marksObtained?: number | string | null;
+  maxMarks?: number | null;
+  teacherFeedback?: string | null;
+  markedAt?: string | null;
+}
+
+interface BackendCourseRecord {
+  id: string;
+  title: string;
+  code: string;
+  description?: string | null;
+  grade?: string | null;
+  medium?: string | null;
+  teacherId?: string | null;
+  teacher?: { userId?: string; user?: { id?: string; firstName?: string; lastName?: string | null } | null } | null;
+  syllabus?: string | { units?: SyllabusUnit[] } | null;
+  lessonsCount?: number | null;
+  completedLessons?: number | null;
+  createdAt?: string | null;
+  isEnrolled?: boolean;
+  progress?: number | null;
+}
+
+type AppAuthUser = StoredUser & {
+  preferredName?: string | null;
+  name?: string;
+  schoolId?: string;
+  schoolName?: string;
+  grade?: string;
+  studentProfile?: (NonNullable<StoredUser['studentProfile']> & { gradeLevel?: string }) | null;
+};
+
+const mapLiveClassToTimetableEntry = (session: BackendLiveClassSession): TimetableEntry => {
   const d = new Date(session.startTime);
   const daysName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
   const day = daysName[d.getDay()] || 'Monday';
@@ -357,7 +436,7 @@ const mapLiveClassToTimetableEntry = (session: any): TimetableEntry => {
     subjectId: session.courseId || session.id,
     subjectName: session.course?.title || session.title,
     subjectCode: session.course?.code || 'LIVE-101',
-    teacherId: session.teacherId,
+    teacherId: session.teacherId || '',
     teacherName,
     startTime,
     endTime,
@@ -380,7 +459,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [landingPortal, setLandingPortal] = useState<'gateway' | 'student' | 'parent' | 'staff'>('gateway');
 
   const [schools, setSchools] = useState<School[]>([]);
-  const [grades, setGrades] = useState<GradeLevel[]>([]);
+  const [grades] = useState<GradeLevel[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -493,15 +572,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [authUser, setAuthUser] = useState<any | null>(null);
+  const [authUser, setAuthUser] = useState<AppAuthUser | null>(null);
 
   const [superAdminAvatarUrl, setSuperAdminAvatarUrl] = useState<string | null>(null);
-const [superAdminAvatarVersion, setSuperAdminAvatarVersion] = useState(0);
+  const [superAdminAvatarVersion, setSuperAdminAvatarVersion] = useState(0);
 
-const refreshSuperAdminAvatar = useCallback(() => {
-  setSuperAdminAvatarUrl(null);
-  setSuperAdminAvatarVersion((previous) => previous + 1);
-}, []);
+  const refreshSuperAdminAvatar = useCallback(() => {
+    setSuperAdminAvatarUrl(null);
+    setSuperAdminAvatarVersion((previous) => previous + 1);
+  }, []);
 
   // Load the tutor's own tenant (plan + enabled features) for Teacher / Admin portals
   const [myTenantVersion, setMyTenantVersion] = useState(0);
@@ -559,9 +638,9 @@ const refreshSuperAdminAvatar = useCallback(() => {
           const realTenants: Tenant[] = result.data.map(mapBackendTenant);
           if (realTenants.length > 0) {
             setTenants(realTenants);
-            if (!realTenants.some((t) => t.id === activeTenantId)) {
-              setActiveTenantId(realTenants[0]?.id ?? '');
-            }
+            setActiveTenantId((prev) =>
+              realTenants.some((t) => t.id === prev) ? prev : realTenants[0]?.id ?? ''
+            );
           }
         }
       } catch (error) {
@@ -577,7 +656,7 @@ const refreshSuperAdminAvatar = useCallback(() => {
     };
   }, [currentRole, authUser?.role, authToken]);
 
-    // Load Super Admin display name after authentication
+  // Load Super Admin display name after authentication
   useEffect(() => {
     if (
       currentRole !== 'super_admin' ||
@@ -600,7 +679,7 @@ const refreshSuperAdminAvatar = useCallback(() => {
 
         if (!preferredName) return;
 
-        setAuthUser((previous: any) => {
+        setAuthUser((previous: AppAuthUser | null) => {
           if (!previous || previous.id !== authUser.id) {
             return previous;
           }
@@ -636,133 +715,145 @@ const refreshSuperAdminAvatar = useCallback(() => {
   }, [currentRole, authUser?.id, authUser?.role, authToken]);
 
   // Load protected Super Admin avatar
-useEffect(() => {
-  if (
-    currentRole !== 'super_admin' ||
-    authUser?.role !== 'SUPER_ADMIN' ||
-    !authToken
-  ) {
-    setSuperAdminAvatarUrl(null);
-    return;
-  }
+  useEffect(() => {
+    let cancelled = false;
 
-  let cancelled = false;
-  let objectUrl: string | null = null;
-
-  const loadSuperAdminAvatar = async () => {
-    try {
-      const response = await api.superAdminProfile.get();
-
-      if (cancelled || !response.success) return;
-
-      const avatarUrl = response.data?.avatarUrl;
-
-      if (!avatarUrl) {
-        setSuperAdminAvatarUrl(null);
-        return;
-      }
-
-      if (!avatarUrl.startsWith('/api/super-admin/avatars/')) {
-        setSuperAdminAvatarUrl(avatarUrl);
-        return;
-      }
-
-      const blob = await api.superAdminProfile.getAvatarBlob(avatarUrl);
-
-      if (cancelled) return;
-
-      objectUrl = URL.createObjectURL(blob);
-      setSuperAdminAvatarUrl(objectUrl);
-    } catch (error) {
-      if (!cancelled) {
-        console.warn('Could not load Super Admin avatar:', error);
-        setSuperAdminAvatarUrl(null);
-      }
+    if (
+      currentRole !== 'super_admin' ||
+      authUser?.role !== 'SUPER_ADMIN' ||
+      !authToken
+    ) {
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setSuperAdminAvatarUrl(null);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
-  };
 
-  void loadSuperAdminAvatar();
+    let objectUrl: string | null = null;
 
-  return () => {
-    cancelled = true;
+    const loadSuperAdminAvatar = async () => {
+      try {
+        const response = await api.superAdminProfile.get();
 
-    if (objectUrl) {
-      URL.revokeObjectURL(objectUrl);
-    }
-  };
-}, [
-  currentRole,
-  authUser?.id,
-  authUser?.role,
-  authToken,
-  superAdminAvatarVersion
-]);
+        if (cancelled || !response.success) return;
+
+        const avatarUrl = response.data?.avatarUrl;
+
+        if (!avatarUrl) {
+          setSuperAdminAvatarUrl(null);
+          return;
+        }
+
+        if (!avatarUrl.startsWith('/api/super-admin/avatars/')) {
+          setSuperAdminAvatarUrl(avatarUrl);
+          return;
+        }
+
+        const blob = await api.superAdminProfile.getAvatarBlob(avatarUrl);
+
+        if (cancelled) return;
+
+        objectUrl = URL.createObjectURL(blob);
+        setSuperAdminAvatarUrl(objectUrl);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Could not load Super Admin avatar:', error);
+          setSuperAdminAvatarUrl(null);
+        }
+      }
+    };
+
+    void loadSuperAdminAvatar();
+
+    return () => {
+      cancelled = true;
+
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [
+    currentRole,
+    authUser?.id,
+    authUser?.role,
+    authToken,
+    superAdminAvatarVersion
+  ]);
 
   // Restore session & navigation state from URL query or localStorage on initial load
   useEffect(() => {
-    let resolvedRole: UserRole | null = null;
-    let resolvedView: string | null = null;
-    let resolvedIsLanding: boolean = true;
+    let cancelled = false;
 
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const urlPortal = params.get('portal');
-      const urlView = params.get('view');
+    Promise.resolve().then(() => {
+      if (cancelled) return;
 
-      const savedIsLanding = localStorage.getItem('lms_is_landing');
-      const savedRole = localStorage.getItem('lms_current_role') as UserRole | null;
-      const savedView = localStorage.getItem('lms_current_view');
+      let resolvedRole: UserRole | null = null;
+      let resolvedView: string | null = null;
+      let resolvedIsLanding: boolean = true;
 
-      const validRoles: UserRole[] = ['student', 'teacher', 'parent', 'admin', 'super_admin'];
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const urlPortal = params.get('portal');
+        const urlView = params.get('view');
 
-      if (urlPortal && validRoles.includes(urlPortal as UserRole)) {
-        resolvedRole = urlPortal as UserRole;
-        resolvedView = urlView || savedView || 'dashboard';
+        const savedIsLanding = localStorage.getItem('lms_is_landing');
+        const savedRole = localStorage.getItem('lms_current_role') as UserRole | null;
+        const savedView = localStorage.getItem('lms_current_view');
+
+        const validRoles: UserRole[] = ['student', 'teacher', 'parent', 'admin', 'super_admin'];
+
+        if (urlPortal && validRoles.includes(urlPortal as UserRole)) {
+          resolvedRole = urlPortal as UserRole;
+          resolvedView = urlView || savedView || 'dashboard';
+          resolvedIsLanding = false;
+        } else if (savedIsLanding === 'false' && savedRole && validRoles.includes(savedRole)) {
+          resolvedRole = savedRole;
+          resolvedView = urlView || savedView || 'dashboard';
+          resolvedIsLanding = false;
+        } else if (urlView || savedView) {
+          resolvedView = urlView || savedView;
+        }
+      }
+
+      const token = api.token.get();
+      const user = api.user.get();
+      if (token && user) {
+        setAuthToken(token);
+        setAuthUser(user);
+        const roleMap: Record<string, UserRole> = {
+          STUDENT: 'student',
+          TEACHER: 'teacher',
+          PARENT: 'parent',
+          ADMIN: 'admin',
+          SUPER_ADMIN: 'super_admin'
+        };
+        if (!resolvedRole && user.role && roleMap[user.role]) {
+          resolvedRole = roleMap[user.role];
+        }
+        if (!resolvedView) {
+          const savedView = typeof window !== 'undefined' ? localStorage.getItem('lms_current_view') : null;
+          resolvedView = savedView || 'dashboard';
+        }
         resolvedIsLanding = false;
-      } else if (savedIsLanding === 'false' && savedRole && validRoles.includes(savedRole)) {
-        resolvedRole = savedRole;
-        resolvedView = urlView || savedView || 'dashboard';
-        resolvedIsLanding = false;
-      } else if (urlView || savedView) {
-        resolvedView = urlView || savedView;
       }
-    }
 
-    const token = api.token.get();
-    const user = api.user.get();
-    if (token && user) {
-      setAuthToken(token);
-      setAuthUser(user);
-      const roleMap: Record<string, UserRole> = {
-        STUDENT: 'student',
-        TEACHER: 'teacher',
-        PARENT: 'parent',
-        ADMIN: 'admin',
-        SUPER_ADMIN: 'super_admin'
-      };
-      if (!resolvedRole && user.role && roleMap[user.role]) {
-        resolvedRole = roleMap[user.role];
+      if (resolvedRole) {
+        setCurrentRole(resolvedRole);
       }
-      if (!resolvedView) {
-        const savedView = typeof window !== 'undefined' ? localStorage.getItem('lms_current_view') : null;
-        resolvedView = savedView || 'dashboard';
+      if (resolvedView) {
+        setCurrentView(resolvedView);
       }
-      resolvedIsLanding = false;
-    }
+      setIsLanding(resolvedIsLanding);
+      setIsSessionLoaded(true);
+    });
 
-    if (resolvedRole) {
-      setCurrentRole(resolvedRole);
-    }
-    if (resolvedView) {
-      setCurrentView(resolvedView);
-    }
-    setIsLanding(resolvedIsLanding);
-    setIsSessionLoaded(true);
-
-    fetchCourses();
-    fetchAnnouncements();
-    fetchAssignments();
-    fetchSubmissions();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Synchronize active portal & view to localStorage and URL search params seamlessly
@@ -795,11 +886,16 @@ useEffect(() => {
     }
   }, [isLanding, currentRole, currentView, isSessionLoaded]);
 
-  const fetchAssignments = async () => {
+  const fetchAssignments = useCallback(async () => {
+    const token = api.token.get();
+    if (!token) {
+      setAssignments([]);
+      return;
+    }
     try {
       const res = await api.assignments.getAll();
       if (res.success && Array.isArray(res.data)) {
-        const loaded: Assignment[] = res.data.map((a: any) => ({
+        const loaded: Assignment[] = res.data.map((a: BackendAssignmentRecord) => ({
           id: a.id,
           courseId: a.courseId || a.course?.id || '',
           subjectName: a.subjectName || a.course?.title || 'Combined Mathematics',
@@ -820,13 +916,26 @@ useEffect(() => {
     } catch (err) {
       console.warn('Backend assignments API not reachable yet:', err);
     }
-  };
+  }, []);
 
-  const fetchSubmissions = async () => {
+  const fetchSubmissions = useCallback(async () => {
+    const token = api.token.get();
+    const user = api.user.get();
+    const userRoleUpper = String(user?.role || '').toUpperCase();
+    const canFetchTeacherSubmissions =
+      Boolean(token) &&
+      (userRoleUpper
+        ? ['TEACHER', 'ADMIN', 'SUPER_ADMIN'].includes(userRoleUpper)
+        : ['teacher', 'admin', 'super_admin'].includes(currentRole));
+
+    if (!canFetchTeacherSubmissions) {
+      setSubmissions([]);
+      return;
+    }
     try {
       const res = await api.assignments.getTeacherSubmissions();
       if (res.success && Array.isArray(res.data)) {
-        const loadedSubs: StudentSubmission[] = res.data.map((s: any) => ({
+        const loadedSubs: StudentSubmission[] = res.data.map((s: BackendSubmissionRecord) => ({
           id: s.id,
           assignmentId: s.assignmentId,
           assignmentTitle: s.assignmentTitle || 'Assignment',
@@ -852,9 +961,9 @@ useEffect(() => {
     } catch (err) {
       console.warn('Backend teacher submissions API not reachable yet:', err);
     }
-  };
+  }, [currentRole]);
 
-  const fetchAnnouncements = async () => {
+  const fetchAnnouncements = useCallback(async () => {
     try {
       const res = await api.announcements.getAll({ role: currentRole.toUpperCase() });
       if (res.success && Array.isArray(res.data)) {
@@ -863,20 +972,22 @@ useEffect(() => {
     } catch (err) {
       console.warn('Could not load announcements from backend:', err);
     }
-  };
+  }, [currentRole]);
 
-  const mapBackendCourseToFrontend = (c: any): Course => {
+  const mapBackendCourseToFrontend = useCallback((c: BackendCourseRecord): Course => {
     const teacherName = c.teacher?.user
       ? `${c.teacher.user.firstName} ${c.teacher.user.lastName || ''}`.trim()
       : 'Assigned Tutor';
 
-    let syllabusObj: any = c.syllabus;
-    if (typeof syllabusObj === 'string') {
+    let syllabusObj: { units?: SyllabusUnit[] } | null = null;
+    if (typeof c.syllabus === 'string') {
       try {
-        syllabusObj = JSON.parse(syllabusObj);
-      } catch (e) {
+        syllabusObj = JSON.parse(c.syllabus) as { units?: SyllabusUnit[] };
+      } catch {
         syllabusObj = null;
       }
+    } else if (c.syllabus && typeof c.syllabus === 'object') {
+      syllabusObj = c.syllabus;
     }
 
     const units: SyllabusUnit[] = Array.isArray(syllabusObj?.units)
@@ -889,7 +1000,7 @@ useEffect(() => {
       u.topics?.forEach((t) => {
         totalLessons += (t.lessons?.length || 0);
         t.lessons?.forEach((l) => {
-          if (currentUser?.id && l.completedByStudentIds?.includes(currentUser.id)) {
+          if (authUser?.id && l.completedByStudentIds?.includes(authUser.id)) {
             completedLessons += 1;
           }
         });
@@ -910,9 +1021,9 @@ useEffect(() => {
       totalLessons,
       completedLessons
     };
-  };
+  }, [authUser]);
 
-  const fetchCourses = async () => {
+  const fetchCourses = useCallback(async () => {
     try {
       const res = await api.courses.getAll();
       if (res.success && Array.isArray(res.data)) {
@@ -922,9 +1033,9 @@ useEffect(() => {
     } catch (err) {
       console.warn('Backend courses API not reachable yet:', err);
     }
-  };
+  }, [mapBackendCourseToFrontend]);
 
-  const fetchLibraryResources = async () => {
+  const fetchLibraryResources = useCallback(async () => {
     try {
       const res = await api.resources.getAll();
       if (res.success && Array.isArray(res.data)) {
@@ -933,9 +1044,9 @@ useEffect(() => {
     } catch (err) {
       console.warn('Backend library resources API not reachable yet:', err);
     }
-  };
+  }, []);
 
-  const fetchQuizzes = async () => {
+  const fetchQuizzes = useCallback(async () => {
     try {
       const res = await api.quizzes.getAll();
       if (res.success && Array.isArray(res.data)) {
@@ -944,9 +1055,9 @@ useEffect(() => {
     } catch (err) {
       console.warn('Backend quizzes API not reachable yet:', err);
     }
-  };
+  }, []);
 
-  const fetchTimetable = async () => {
+  const fetchTimetable = useCallback(async () => {
     try {
       const token = api.token.get();
       if (!token) return;
@@ -972,9 +1083,9 @@ useEffect(() => {
       console.warn('Could not load timetable from backend:', err);
       setTimetable([]);
     }
-  };
+  }, [currentRole]);
 
-  const fetchClasses = async () => {
+  const fetchClasses = useCallback(async () => {
     if (!authToken) {
       setClasses([]);
       return;
@@ -987,9 +1098,9 @@ useEffect(() => {
     } catch (err) {
       console.warn('Could not load classes from backend:', err);
     }
-  };
+  }, [authToken]);
 
-  const fetchSubjects = async () => {
+  const fetchSubjects = useCallback(async () => {
     if (!authToken) {
       setSubjects([]);
       return;
@@ -1002,29 +1113,59 @@ useEffect(() => {
     } catch (err) {
       console.warn('Could not load subjects from backend:', err);
     }
-  };
+  }, [authToken]);
 
   useEffect(() => {
-    fetchAnnouncements();
-    fetchAssignments();
-    fetchSubmissions();
-    fetchCourses();
-    fetchLibraryResources();
-    fetchQuizzes();
-    fetchTimetable();
-  }, [currentRole, activeTenantId, authToken]);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      void fetchAnnouncements();
+      void fetchAssignments();
+      void fetchSubmissions();
+      void fetchCourses();
+      void fetchLibraryResources();
+      void fetchQuizzes();
+      void fetchTimetable();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    currentRole,
+    activeTenantId,
+    authToken,
+    fetchAnnouncements,
+    fetchAssignments,
+    fetchSubmissions,
+    fetchCourses,
+    fetchLibraryResources,
+    fetchQuizzes,
+    fetchTimetable,
+  ]);
 
   useEffect(() => {
+    let cancelled = false;
     if (!authToken) {
-      setClasses([]);
-      setSubjects([]);
-      return;
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setClasses([]);
+          setSubjects([]);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
-    void syncSportsCalendarEvents(setEvents);
-    void fetchTimetable();
-    void fetchClasses();
-    void fetchSubjects();
-  }, [authToken, activeTenantId]);
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      void syncSportsCalendarEvents(setEvents);
+      void fetchClasses();
+      void fetchSubjects();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken, activeTenantId, fetchClasses, fetchSubjects]);
 
   const createCourse = async (data: {
     title: string;
@@ -1052,8 +1193,8 @@ useEffect(() => {
         });
         return { success: false, message: errorMsg };
       }
-    } catch (err: any) {
-      const errorMsg = err.message || 'Network error while creating course';
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Network error while creating course';
       addToast({
         type: 'error',
         title: 'Error Creating Course',
@@ -1095,8 +1236,8 @@ useEffect(() => {
         return { success: true };
       }
       return { success: false, message: res.message || 'Invalid credentials' };
-    } catch (err: any) {
-      return { success: false, message: err.message || 'Failed to connect to backend server' };
+    } catch (err: unknown) {
+      return { success: false, message: err instanceof Error ? err.message : 'Failed to connect to backend server' };
     }
   };
 
@@ -1135,8 +1276,8 @@ useEffect(() => {
         return { success: true };
       }
       return { success: false, message: res.message || 'Google authentication failed' };
-    } catch (err: any) {
-      return { success: false, message: err.message || 'Failed to connect to Google authentication server' };
+    } catch (err: unknown) {
+      return { success: false, message: err instanceof Error ? err.message : 'Failed to connect to Google authentication server' };
     }
   };
 
@@ -1157,7 +1298,7 @@ useEffect(() => {
     childStudentId?: string;
   }): Promise<{ success: boolean; message?: string }> => {
     try {
-      let res: any;
+      let res: AuthResponse | undefined;
       if (input.role === 'student') {
         res = await api.auth.registerStudent({
           firstName: input.firstName,
@@ -1225,16 +1366,25 @@ useEffect(() => {
         return { success: true };
       }
       return { success: false, message: res?.message || 'Registration failed' };
-    } catch (err: any) {
-      return { success: false, message: err.message || 'Registration network error' };
+    } catch (err: unknown) {
+      return { success: false, message: err instanceof Error ? err.message : 'Registration network error' };
     }
   };
 
   const logoutUser = () => {
+    const activeToken = api.token.get();
+    if (activeToken) {
+      void api.auth.logout(activeToken).catch(() => { });
+    }
     api.token.remove();
     api.user.remove();
     setAuthToken(null);
     setAuthUser(null);
+    setAssignments([]);
+    setSubmissions([]);
+    setTimetable([]);
+    setClasses([]);
+    setSubjects([]);
     setEvents((prev) => prev.filter((event) => event.organizer !== sportsEventOrganizer));
     setSports([]);
     setChampionshipSports([]);
@@ -1263,44 +1413,44 @@ useEffect(() => {
     });
   };
 
-  const updateAuthUser = (updates: Record<string, any>) => {
-    setAuthUser((prev: any) => {
+  const updateAuthUser = useCallback((updates: Partial<AppAuthUser>) => {
+    setAuthUser((prev: AppAuthUser | null) => {
       if (!prev) return prev;
       const updated = { ...prev, ...updates };
       api.user.set(updated);
       return updated;
     });
-  };
+  }, [setAuthUser]);
 
   // Teacher Studio Profile & Payout State
   const [teacherProfile, setTeacherProfile] = useState<TeacherProfileData | null>(null);
 
   const t = getTranslation(locale);
   const userAvatar =
-  (currentRole === 'super_admin' && authUser?.role === 'SUPER_ADMIN'
-    ? superAdminAvatarUrl
-    : null) ||
-  (currentRole === 'teacher'
-    ? (teacherProfile?.user?.avatarUrl || teacherProfile?.avatarUrl)
-    : null) ||
-  (currentRole !== 'super_admin' ? authUser?.avatarUrl : null) ||
-  (currentRole !== 'super_admin' && typeof window !== 'undefined'
-    ? (localStorage.getItem(`lms_avatar_${authUser?.id || 'teacher'}`) ||
-       localStorage.getItem('lms_avatar_teacher'))
-    : null) ||
-  undefined;
+    (currentRole === 'super_admin' && authUser?.role === 'SUPER_ADMIN'
+      ? superAdminAvatarUrl
+      : null) ||
+    (currentRole === 'teacher'
+      ? (teacherProfile?.user?.avatarUrl || teacherProfile?.avatarUrl)
+      : null) ||
+    (currentRole !== 'super_admin' ? authUser?.avatarUrl : null) ||
+    (currentRole !== 'super_admin' && typeof window !== 'undefined'
+      ? (localStorage.getItem(`lms_avatar_${authUser?.id || 'teacher'}`) ||
+        localStorage.getItem('lms_avatar_teacher'))
+      : null) ||
+    undefined;
 
   const currentUser: User = authUser
     ? {
       id: authUser.id,
       name:
-  (currentRole === 'super_admin'
-    ? authUser.preferredName?.trim()
-    : '') ||
-  `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() ||
-  authUser.name ||
-  authUser.email ||
-  'User',
+        (currentRole === 'super_admin'
+          ? authUser.preferredName?.trim()
+          : '') ||
+        `${authUser.firstName || ''} ${authUser.lastName || ''}`.trim() ||
+        authUser.name ||
+        authUser.email ||
+        'User',
       email: authUser.email,
       role: currentRole,
       avatar: userAvatar,
@@ -1635,7 +1785,6 @@ useEffect(() => {
       setCurrentView('dashboard');
       prevRoleRef.current = currentRole;
     }
-    fetchAnnouncements();
   }, [currentRole, isSessionLoaded]);
 
   // Mark lesson as complete
@@ -1677,6 +1826,31 @@ useEffect(() => {
     });
   };
 
+  const validateSubmissionTarget = <T extends { id: string }>(
+    rawId: string,
+    items: T[],
+    kind: 'Assignment' | 'Quiz'
+  ): T => {
+    const trimmedId = rawId.trim();
+    if (!currentUser?.id) {
+      const msg = 'You must be signed in to submit.';
+      addToast({ type: 'error', title: 'Authentication Required', message: msg });
+      throw new Error(msg);
+    }
+    if (!trimmedId) {
+      const msg = `${kind} ID is required.`;
+      addToast({ type: 'error', title: `Invalid ${kind}`, message: msg });
+      throw new Error(msg);
+    }
+    const target = items.find((item) => item.id === trimmedId);
+    if (!target) {
+      const msg = `${kind} could not be found.`;
+      addToast({ type: 'error', title: `${kind} Not Found`, message: msg });
+      throw new Error(msg);
+    }
+    return target;
+  };
+
   // Student submits assignment
   const submitAssignment = async (
     assignmentId: string,
@@ -1684,23 +1858,41 @@ useEffect(() => {
     fileName?: string,
     fileAttachmentUrl?: string
   ) => {
-    const asg = assignments.find((a) => a.id === assignmentId);
+    const asg = validateSubmissionTarget(assignmentId, assignments, 'Assignment');
+    const resolvedFileName = fileName || 'Student_Submission.pdf';
+
+    try {
+      await api.assignments.submit(asg.id, {
+        textContent: text,
+        fileAttachmentName: resolvedFileName,
+        fileAttachmentUrl: fileAttachmentUrl || undefined,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unable to submit assignment.';
+      addToast({
+        type: 'error',
+        title: 'Assignment Submission Failed',
+        message,
+      });
+      throw err;
+    }
+
     const existingIndex = submissions.findIndex(
-      (s) => s.assignmentId === assignmentId && s.studentId === currentUser.id
+      (s) => s.assignmentId === asg.id && s.studentId === currentUser.id
     );
 
     const newSub: StudentSubmission = {
       id: existingIndex >= 0 ? submissions[existingIndex].id : `sub_${Date.now()}`,
-      assignmentId,
-      assignmentTitle: asg?.title || 'Assignment',
+      assignmentId: asg.id,
+      assignmentTitle: asg.title,
       studentId: currentUser.id,
       studentName: currentUser.name,
       submittedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
       status: 'submitted',
       textContent: text,
-      fileAttachmentName: fileName || 'Student_Submission.pdf',
+      fileAttachmentName: resolvedFileName,
       fileAttachmentUrl: fileAttachmentUrl || undefined,
-      maxMarks: asg?.maxMarks || 100
+      maxMarks: asg.maxMarks || 100
     };
 
     if (existingIndex >= 0) {
@@ -1714,16 +1906,6 @@ useEffect(() => {
       title: 'Assignment Submitted!',
       message: 'Your work has been submitted to your teacher for marking.'
     });
-
-    try {
-      await api.assignments.submit(assignmentId, {
-        textContent: text,
-        fileAttachmentName: fileName || 'Student_Submission.pdf',
-        fileAttachmentUrl: fileAttachmentUrl || undefined,
-      });
-    } catch (err) {
-      console.warn('Backend submit assignment skipped:', err);
-    }
   };
 
   // Teacher grades submission and releases results
@@ -1768,12 +1950,23 @@ useEffect(() => {
   };
 
   // Student submits quiz attempt
-  const submitQuizAttempt = (
+  const submitQuizAttempt = async (
     quizId: string,
-    answers: Record<string, any>
-  ) => {
-    const quiz = quizzes.find((q) => q.id === quizId);
-    if (!quiz) return 0;
+    answers: QuizAttemptRecord['answers']
+  ): Promise<number> => {
+    const quiz = validateSubmissionTarget(quizId, quizzes, 'Quiz');
+
+    try {
+      await api.quizzes.submitAttempt(quiz.id, { answers, timeSpentSeconds: 420 });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unable to submit quiz attempt.';
+      addToast({
+        type: 'error',
+        title: 'Quiz Submission Failed',
+        message,
+      });
+      throw err;
+    }
 
     let score = 0;
     quiz.questions.forEach((q) => {
@@ -1811,17 +2004,17 @@ useEffect(() => {
       }
     });
 
-    const percent = Math.round((score / quiz.totalMarks) * 100);
+    const percent = quiz.totalMarks > 0 ? Math.round((score / quiz.totalMarks) * 100) : 0;
     const calculatedGrade: 'A' | 'B' | 'C' | 'S' | 'F' =
       percent >= 75 ? 'A' : percent >= 65 ? 'B' : percent >= 55 ? 'C' : percent >= 35 ? 'S' : 'F';
 
-    const newAttemptRecord = {
+    const newAttemptRecord: QuizAttemptRecord = {
       id: `att_${Date.now()}`,
-      quizId,
+      quizId: quiz.id,
       studentId: currentUser.id,
       studentName: currentUser.name,
-      indexNo: (currentUser as any).indexNumber || 'ST-2026-042',
-      classBatch: (currentUser as any).class || '12-Physical Science A',
+      indexNo: currentUser.indexNumber || 'ST-2026-042',
+      classBatch: currentUser.class || '12-Physical Science A',
       score,
       totalMarks: quiz.totalMarks,
       percentage: percent,
@@ -1833,7 +2026,7 @@ useEffect(() => {
 
     setQuizzes((prev) =>
       prev.map((q) => {
-        if (q.id === quizId) {
+        if (q.id === quiz.id) {
           return {
             ...q,
             userAttempt: {
@@ -1853,12 +2046,6 @@ useEffect(() => {
       title: 'Quiz Evaluated Instantly!',
       message: `You scored ${score} / ${quiz.totalMarks} marks.`
     });
-
-    api.quizzes
-      .submitAttempt(quizId, { answers, timeSpentSeconds: 420 })
-      .catch((err) => {
-        console.warn('Backend quiz attempt submission skipped:', err?.message);
-      });
 
     return score;
   };
@@ -2011,12 +2198,12 @@ useEffect(() => {
         }
         await syncSportsCalendarEvents(setEvents);
         return;
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to toggle event registration:', err);
         addToast({
           type: 'error',
           title: 'Action Failed',
-          message: err.message || 'Could not process event registration'
+          message: err instanceof Error ? err.message : 'Could not process event registration'
         });
         return;
       }
@@ -2071,9 +2258,9 @@ useEffect(() => {
 
       setTimetable((previous) => [...previous, { ...entry, id: `tt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` }]);
       addToast({ type: 'success', title: 'Timetable period added', message: 'The scheduled period has been saved.' });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to create timetable entry:', err);
-      addToast({ type: 'error', title: 'Save Failed', message: err.message || 'Unable to save timetable period' });
+      addToast({ type: 'error', title: 'Save Failed', message: err instanceof Error ? err.message : 'Unable to save timetable period' });
     }
   };
 
@@ -2098,9 +2285,9 @@ useEffect(() => {
 
       setTimetable((previous) => previous.map((entry) => entry.id === id ? { ...updates, id } : entry));
       addToast({ type: 'success', title: 'Timetable period updated', message: 'The schedule changes have been saved.' });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update timetable entry:', err);
-      addToast({ type: 'error', title: 'Update Failed', message: err.message || 'Unable to update timetable period' });
+      addToast({ type: 'error', title: 'Update Failed', message: err instanceof Error ? err.message : 'Unable to update timetable period' });
     }
   };
 
@@ -2115,9 +2302,9 @@ useEffect(() => {
 
       setTimetable((previous) => previous.filter((entry) => entry.id !== id));
       addToast({ type: 'success', title: 'Timetable period removed', message: 'The scheduled period has been deleted.' });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to delete timetable entry:', err);
-      addToast({ type: 'error', title: 'Delete Failed', message: err.message || 'Unable to delete timetable period' });
+      addToast({ type: 'error', title: 'Delete Failed', message: err instanceof Error ? err.message : 'Unable to delete timetable period' });
     }
   };
 
@@ -2155,9 +2342,9 @@ useEffect(() => {
         prev.map((event) => event.id === id ? { ...event, ...updates } : event)
       );
       addToast({ type: 'success', title: 'Event Updated', message: 'Event details saved successfully.' });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update event:', err);
-      addToast({ type: 'error', title: 'Update Failed', message: err.message || 'Unable to update event' });
+      addToast({ type: 'error', title: 'Update Failed', message: err instanceof Error ? err.message : 'Unable to update event' });
     }
   };
 
@@ -2172,9 +2359,9 @@ useEffect(() => {
 
       setEvents((prev) => prev.filter((event) => event.id !== id));
       addToast({ type: 'info', title: 'Event Deleted', message: 'Event removed successfully.' });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to delete event:', err);
-      addToast({ type: 'error', title: 'Delete Failed', message: err.message || 'Unable to delete event' });
+      addToast({ type: 'error', title: 'Delete Failed', message: err instanceof Error ? err.message : 'Unable to delete event' });
     }
   };
 
@@ -2305,10 +2492,10 @@ useEffect(() => {
     try {
       const status = updates.status
         ? ({
-            scheduled: 'UPCOMING',
-            in_progress: 'LIVE',
-            completed: 'COMPLETED',
-          } as const)[updates.status]
+          scheduled: 'UPCOMING',
+          in_progress: 'LIVE',
+          completed: 'COMPLETED',
+        } as const)[updates.status]
         : undefined;
       await api.sports.updateFixture(id, {
         ...(updates.tournamentId !== undefined ? { tournamentId: updates.tournamentId } : {}),
@@ -2512,7 +2699,7 @@ useEffect(() => {
         setClasses((prev) => [newCls, ...prev.filter((c) => c.id !== newCls.id)]);
       }
       addToast({ type: 'success', title: 'Class Created Successfully!', message: `"${cls.name || 'New Class'}" saved to cloud database.` });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating class:', error);
       const fallbackCls: SchoolClass = {
         id: `cls_${Date.now()}`,
@@ -2533,7 +2720,7 @@ useEffect(() => {
       const updated = await api.admin.updateClass(id, updates);
       setClasses((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
       addToast({ type: 'success', title: 'Class Updated Successfully!' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating class:', error);
       setClasses((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
       addToast({ type: 'success', title: 'Class Updated (Local)' });
@@ -2545,7 +2732,7 @@ useEffect(() => {
       await api.admin.deleteClass(id);
       setClasses((prev) => prev.filter((c) => c.id !== id));
       addToast({ type: 'info', title: 'Class Removed Successfully' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting class:', error);
       setClasses((prev) => prev.filter((c) => c.id !== id));
       addToast({ type: 'info', title: 'Class Removed (Local)' });
@@ -2559,7 +2746,7 @@ useEffect(() => {
         setSubjects((prev) => [newSub, ...prev.filter((s) => s.id !== newSub.id)]);
       }
       addToast({ type: 'success', title: 'Subject Added to Curriculum!', message: `"${sub.name}" saved to cloud database.` });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating subject:', error);
       const fallbackSub: Subject = {
         id: `sub_${Date.now()}`,
@@ -2581,7 +2768,7 @@ useEffect(() => {
         prev.map((s) => (s.id === id ? { ...s, ...updated } : s))
       );
       addToast({ type: 'success', title: 'Subject Details Updated Successfully!' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating subject:', error);
       setSubjects((prev) =>
         prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
@@ -2595,7 +2782,7 @@ useEffect(() => {
       await api.admin.deleteSubject(id);
       setSubjects((prev) => prev.filter((s) => s.id !== id));
       addToast({ type: 'info', title: 'Subject Removed from Curriculum' });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting subject:', error);
       setSubjects((prev) => prev.filter((s) => s.id !== id));
       addToast({ type: 'info', title: 'Subject Removed (Local)' });
@@ -2648,9 +2835,9 @@ useEffect(() => {
       };
       setEvents((prev) => [newEvt, ...prev]);
       addToast({ type: 'success', title: 'Event Created Successfully!' });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to create event:', err);
-      addToast({ type: 'error', title: 'Create Failed', message: err.message || 'Unable to create event' });
+      addToast({ type: 'error', title: 'Create Failed', message: err instanceof Error ? err.message : 'Unable to create event' });
     }
   };
 
@@ -2851,8 +3038,6 @@ useEffect(() => {
           ...c,
           units: c.units.map((u) => {
             if (u.id !== unitId) return u;
-            const targetTopic = u.topics.find((t) => t.id === topicId);
-            const removedLessons = targetTopic ? targetTopic.lessons.length : 0;
             return {
               ...u,
               topics: u.topics.filter((t) => t.id !== topicId)
@@ -3302,9 +3487,10 @@ useEffect(() => {
       if (res && res.success && res.data) {
         setTeacherProfile(res.data);
         if (res.data.user) {
-          setAuthUser((prev: any) => {
-            const merged = {
-              ...(prev || {}),
+          setAuthUser((prev: AppAuthUser | null) => {
+            if (!prev) return prev;
+            const merged: StoredUser = {
+              ...prev,
               ...res.data.user,
             };
             api.user.set(merged);
@@ -3315,24 +3501,29 @@ useEffect(() => {
     } catch (err) {
       console.warn('Could not fetch teacher profile from API:', err);
     }
-  }, []);
+  }, [setTeacherProfile, setAuthUser]);
 
   const updateTeacherProfile = async (updates: Partial<TeacherProfileData>): Promise<boolean> => {
     try {
       if (updates.avatarUrl) {
-        setAuthUser((prev: any) => ({
-          ...(prev || {}),
-          avatarUrl: updates.avatarUrl,
-        }));
+        setAuthUser((prev: AppAuthUser | null) =>
+          prev
+            ? {
+              ...prev,
+              avatarUrl: updates.avatarUrl,
+            }
+            : prev
+        );
       }
       setTeacherProfile((prev) => (prev ? { ...prev, ...updates } : (updates as TeacherProfileData)));
       const res = await api.teachers.updateMyProfile(updates);
       if (res && res.success && res.data) {
         setTeacherProfile(res.data);
         if (res.data.user) {
-          setAuthUser((prev: any) => {
-            const merged = {
-              ...(prev || {}),
+          setAuthUser((prev: AppAuthUser | null) => {
+            if (!prev) return prev;
+            const merged: StoredUser = {
+              ...prev,
               ...res.data.user,
             };
             api.user.set(merged);
@@ -3353,11 +3544,11 @@ useEffect(() => {
         });
         return false;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       addToast({
         type: 'error',
         title: 'Error',
-        message: err?.message || 'Network error while saving profile.'
+        message: err instanceof Error ? err.message : 'Network error while saving profile.'
       });
       return false;
     }

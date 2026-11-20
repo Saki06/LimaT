@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { prisma } from '../../config/prisma';
-import { config } from '../../config';
 import { isValidEmail } from './auth.utils';
 import { sendPasswordResetEmail } from '../../services/email.service';
 
@@ -56,20 +57,14 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       },
     });
 
-    if (!user) {
-      // Return user-friendly response even if user not found (security practice)
-      res.status(200).json({
-        success: true,
-        message: 'If an account exists with this email, a 6-digit reset code has been generated.',
-      });
-      return;
-    }
+    const genericResponse = {
+      success: true,
+      message: 'If an account exists with this email, a 6-digit reset code has been sent.',
+    };
 
-    if (!user.isActive) {
-      res.status(403).json({
-        success: false,
-        message: 'This account is currently deactivated. Please contact support or your school administrator.',
-      });
+    if (!user || !user.isActive) {
+      // Return identical generic response to prevent account / status enumeration (VULN-07 fix)
+      res.status(200).json(genericResponse);
       return;
     }
 
@@ -77,35 +72,37 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Store in memory with 15-minute expiry
+    const expiresAt = Date.now() + 15 * 60 * 1000;
     resetOtpStore.set(cleanEmail, {
       otp,
-      expiresAt: Date.now() + 15 * 60 * 1000,
+      expiresAt,
       attempts: 0,
     });
 
-    // Create a cryptographic reset token as well
-    const resetToken = jwt.sign(
-      { userId: user.id, email: user.email, type: 'password_reset' },
-      config.jwtSecret,
-      { expiresIn: '15m' }
-    );
-
-    // Dispatch real email (or simulated fallback if SMTP not configured)
+    // Dispatch email (or safe mock when MOCK_EMAIL=true)
     await sendPasswordResetEmail({
       to: cleanEmail,
       name: user.firstName,
       otp,
     });
 
-    console.log(`🔑 [PASSWORD RESET OTP] Target: ${cleanEmail} -> Verification Code: ${otp}`);
+    // Isolated local QA test fixture ONLY when both MOCK_EMAIL=true and NODE_ENV=test
+    // Never exposed in HTTP responses or production logs (VULN-07 fix)
+    if (process.env.MOCK_EMAIL === 'true' && process.env.NODE_ENV === 'test') {
+      try {
+        const fixturePath = path.join(os.tmpdir(), 'newtoz_qa_mock_otp.json');
+        let existing: Record<string, { otp: string; expiresAt: number }> = {};
+        if (fs.existsSync(fixturePath)) {
+          existing = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
+        }
+        existing[cleanEmail] = { otp, expiresAt };
+        fs.writeFileSync(fixturePath, JSON.stringify(existing), { encoding: 'utf-8', mode: 0o600 });
+      } catch {
+        // Non-fatal in test fixture write
+      }
+    }
 
-    res.status(200).json({
-      success: true,
-      message: 'A 6-digit password reset code has been generated.',
-      email: cleanEmail,
-      otp, // Exposed for immediate in-app reset / demo verification
-      resetToken,
-    });
+    res.status(200).json(genericResponse);
   } catch (error: any) {
     console.error('Forgot password error:', error);
     res.status(500).json({ success: false, message: error.message || 'Server error initiating password reset.' });

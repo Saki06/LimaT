@@ -3,7 +3,78 @@ import { prisma } from '../config/prisma';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 /**
- * Helper to ensure a ParentProfile exists for the authenticated user and has linked student(s).
+ * Lightweight helper to fetch or initialize ParentProfile with basic user and child IDs only (BOTTLENECK-04 fix).
+ * Avoids 4-level deep student/course/package/submission eager joins when only parent summary metadata is required.
+ */
+export const getOrCreateParentProfileSummary = async (userId: string): Promise<any> => {
+  const summaryInclude = {
+    user: {
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        role: true,
+        tenantId: true,
+      },
+    },
+    students: {
+      select: {
+        id: true,
+        studentIdNo: true,
+      },
+    },
+  };
+
+  let parent: any = await prisma.parentProfile.findUnique({
+    where: { userId },
+    include: summaryInclude,
+  });
+
+  if (!parent) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.role !== 'PARENT') {
+      return null;
+    }
+    let tenantId = user?.tenantId;
+    if (!tenantId) {
+      const activeTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
+      tenantId = activeTenant?.id || null;
+    }
+
+    const created = await prisma.parentProfile.create({
+      data: {
+        userId,
+        phoneNumber: null,
+      },
+    });
+
+    if (user?.email === 'parent@apex.edu') {
+      const studentsToLink = await prisma.studentProfile.findMany({
+        where: tenantId ? { user: { tenantId } } : {},
+        take: 2,
+      });
+
+      if (studentsToLink.length > 0) {
+        await prisma.studentProfile.updateMany({
+          where: { id: { in: studentsToLink.map((s) => s.id) } },
+          data: { guardianId: created.id },
+        });
+      }
+    }
+
+    parent = await prisma.parentProfile.findUnique({
+      where: { userId },
+      include: summaryInclude,
+    });
+  }
+
+  return parent;
+};
+
+/**
+ * Helper to ensure a ParentProfile exists for the authenticated user and has linked student(s) with full academic records.
  */
 export const getOrCreateParentProfile = async (userId: string): Promise<any> => {
   let parent: any = await prisma.parentProfile.findUnique({
@@ -102,6 +173,9 @@ export const getOrCreateParentProfile = async (userId: string): Promise<any> => 
 
   if (!parent) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.role !== 'PARENT') {
+      return null;
+    }
     let tenantId = user?.tenantId;
     if (!tenantId) {
       const activeTenant = await prisma.tenant.findFirst({ where: { status: 'ACTIVE' } });
@@ -291,9 +365,13 @@ export const getMyChildren = async (
           .join('')
           .toUpperCase() || 'ST';
 
-      // 1. Build Paper Marks from real graded AssignmentSubmissions + QuizAttempts
-      const assignmentMarks = (student.assignmentSubmissions || [])
-        .filter((sub: any) => sub.marksObtained !== null && sub.marksObtained !== undefined)
+      // 1. Build Paper Marks from real graded AssignmentSubmissions (separating regular assignments vs. ONLINE_QUIZ attempts)
+      const gradedSubmissions = (student.assignmentSubmissions || []).filter(
+        (sub: any) => sub.marksObtained !== null && sub.marksObtained !== undefined
+      );
+
+      const assignmentMarks = gradedSubmissions
+        .filter((sub: any) => sub.assignment?.topicName !== 'ONLINE_QUIZ')
         .map((sub: any, idx: number) => {
           const maxScore = Number(sub.assignment?.maxMarks || 100);
           const rawScore = Number(sub.marksObtained || 0);
@@ -321,31 +399,36 @@ export const getMyChildren = async (
           };
         });
 
-      const quizMarks = (student.quizAttempts || []).map((qa: any, idx: number) => {
-        const score = Math.round(Number(qa.score || 0));
-        const maxScore = 100;
-        const grade = score >= 75 ? 'A' : score >= 65 ? 'B' : score >= 55 ? 'C' : score >= 35 ? 'S' : 'F';
-        const tUser = qa.quiz?.course?.teacher?.user;
-        const tutorName = tUser ? `${tUser.firstName} ${tUser.lastName}`.trim() : 'Course Educator';
+      const quizMarks = gradedSubmissions
+        .filter((sub: any) => sub.assignment?.topicName === 'ONLINE_QUIZ')
+        .map((sub: any, idx: number) => {
+          const maxScore = Number(sub.assignment?.maxMarks || 100);
+          const rawScore = Math.round(Number(sub.marksObtained || 0));
+          const pct = maxScore > 0 ? Math.round((rawScore / maxScore) * 100) : 0;
+          const grade = pct >= 75 ? 'A' : pct >= 65 ? 'B' : pct >= 55 ? 'C' : pct >= 35 ? 'S' : 'F';
+          const tUser = sub.assignment?.course?.teacher?.user;
+          const tutorName = tUser ? `${tUser.firstName} ${tUser.lastName}`.trim() : 'Course Educator';
 
-        return {
-          id: qa.id,
-          childId: student.id,
-          paperCode: `QZ-${String(idx + 1).padStart(2, '0')}`,
-          title: qa.quiz?.title || `Quiz Assessment ${idx + 1}`,
-          tutorName,
-          subject: qa.quiz?.course?.title || 'Quiz Assessment',
-          date: qa.completedAt ? qa.completedAt.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          score,
-          maxScore,
-          batchAverage: score,
-          highestScore: 100,
-          rank: 1,
-          batchTotal: Math.max(totalStudentsCount, 1),
-          grade,
-          tutorFeedback: qa.passed ? 'Passed online quiz assessment.' : 'Completed online quiz assessment.',
-        };
-      });
+          return {
+            id: sub.id,
+            childId: student.id,
+            paperCode: `QZ-${String(idx + 1).padStart(2, '0')}`,
+            title: sub.assignment?.title || `Quiz Assessment ${idx + 1}`,
+            tutorName,
+            subject: sub.assignment?.subjectName || sub.assignment?.course?.title || 'Quiz Assessment',
+            date: sub.submittedAt ? sub.submittedAt.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            score: rawScore,
+            maxScore,
+            batchAverage: pct,
+            highestScore: maxScore,
+            rank: 1,
+            batchTotal: Math.max(totalStudentsCount, 1),
+            grade,
+            tutorFeedback:
+              sub.teacherFeedback ||
+              (pct >= 35 ? 'Passed online quiz assessment.' : 'Completed online quiz assessment.'),
+          };
+        });
 
       const paperMarks = [...assignmentMarks, ...quizMarks];
 
@@ -674,7 +757,7 @@ export const getParentDashboardOverview = async (
       return;
     }
 
-    const parent = await getOrCreateParentProfile(userId);
+    const parent = await getOrCreateParentProfileSummary(userId);
     if (!parent) {
       res.status(404).json({ success: false, message: 'Parent profile not found' });
       return;
@@ -687,33 +770,33 @@ export const getParentDashboardOverview = async (
 
     const tenantId = req.user?.tenantId;
 
-    // Upcoming live sessions
-    const upcomingLive = await prisma.liveClassSession.findMany({
-      where: {
-        ...(tenantId ? { tenantId } : {}),
-        status: { in: ['SCHEDULED', 'LIVE'] },
-        startTime: { gte: new Date(Date.now() - 3600000) },
-      },
-      include: {
-        teacher: {
-          include: {
-            user: { select: { firstName: true, lastName: true } },
+    // Parallelize upcoming live sessions and parent announcements (BOTTLENECK-03/04 fix)
+    const [upcomingLive, announcements] = await Promise.all([
+      prisma.liveClassSession.findMany({
+        where: {
+          ...(tenantId ? { tenantId } : {}),
+          status: { in: ['SCHEDULED', 'LIVE'] },
+          startTime: { gte: new Date(Date.now() - 3600000) },
+        },
+        include: {
+          teacher: {
+            include: {
+              user: { select: { firstName: true, lastName: true } },
+            },
           },
         },
-      },
-      orderBy: { startTime: 'asc' },
-      take: 4,
-    });
-
-    // Parent announcements
-    const announcements = await prisma.announcement.findMany({
-      where: {
-        ...(tenantId ? { tenantId } : {}),
-        targetAudience: { in: ['ALL', 'PARENTS', 'STUDENTS', 'Everyone'] },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
+        orderBy: { startTime: 'asc' },
+        take: 4,
+      }),
+      prisma.announcement.findMany({
+        where: {
+          ...(tenantId ? { tenantId } : {}),
+          targetAudience: { in: ['ALL', 'PARENTS', 'STUDENTS', 'Everyone'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+    ]);
 
     res.status(200).json({
       success: true,
@@ -945,7 +1028,7 @@ export const getMyParentProfile = async (
       return;
     }
 
-    const parent = await getOrCreateParentProfile(userId);
+    const parent = await getOrCreateParentProfileSummary(userId);
     res.status(200).json({
       success: true,
       data: {
@@ -1049,9 +1132,18 @@ export const linkChildStudent = async (
       return;
     }
 
-    const parent = await getOrCreateParentProfile(userId);
+    const parent = await getOrCreateParentProfileSummary(userId);
     if (!parent) {
       res.status(404).json({ success: false, message: 'Parent profile not found' });
+      return;
+    }
+
+    const parentTenantId = req.user?.tenantId || parent.user?.tenantId;
+    if (!parentTenantId) {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden: Your account is not assigned to an organization.',
+      });
       return;
     }
 
@@ -1073,6 +1165,7 @@ export const linkChildStudent = async (
             firstName: true,
             lastName: true,
             email: true,
+            tenantId: true,
           },
         },
       },
@@ -1082,6 +1175,14 @@ export const linkChildStudent = async (
       res.status(404).json({
         success: false,
         message: `No student found matching "${rawLookup}". Check the Student ID (STU-XXXX), mobile number, or email.`,
+      });
+      return;
+    }
+
+    if (matchedStudent.user?.tenantId !== parentTenantId) {
+      res.status(403).json({
+        success: false,
+        message: 'Forbidden: You can only link students belonging to your organization.',
       });
       return;
     }

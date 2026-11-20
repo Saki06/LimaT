@@ -21,8 +21,6 @@ import {
   ExternalLink,
   Plus,
   Package,
-  Calendar,
-  Sparkles,
   Users
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +28,42 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { Lesson, Course, SyllabusUnit } from "@/types/lms";
+
+interface BackendStudentCourseItem {
+  id: string;
+  title: string;
+  code: string;
+  description?: string | null;
+  grade?: string | null;
+  medium?: string | null;
+  teacherId?: string | null;
+  teacher?: { userId?: string; user?: { id?: string; firstName?: string; lastName?: string | null } | null } | null;
+  syllabus?: string | { units?: SyllabusUnit[] } | null;
+  lessonsCount?: number | null;
+  completedLessons?: number | null;
+  createdAt?: string | null;
+  isEnrolled?: boolean;
+  progress?: number | null;
+}
+
+interface StudentPackageSubscriptionItem {
+  id: string;
+  status: string;
+  startDate: string;
+  endDate?: string | null;
+  package?: {
+    title?: string | null;
+    description?: string | null;
+    price?: number | null;
+    billingCycle?: string | null;
+    teacher?: {
+      user?: {
+        firstName?: string | null;
+        lastName?: string | null;
+      } | null;
+    } | null;
+  } | null;
+}
 
 export function CourseViews() {
   const {
@@ -39,9 +73,9 @@ export function CourseViews() {
     setSelectedLessonId,
     markLessonComplete,
     currentUser,
+    authUser,
     addToast,
-    setCurrentView,
-    t
+    setCurrentView
   } = useApp();
 
   const [isInsideSyllabus, setIsInsideSyllabus] = useState<boolean>(false);
@@ -50,11 +84,11 @@ export function CourseViews() {
   const [expandedUnitId, setExpandedUnitId] = useState<string>("");
 
   // Live Backend Courses & Package Subscriptions State
-  const [backendCourses, setBackendCourses] = useState<any[]>([]);
-  const [studentPackages, setStudentPackages] = useState<any[]>([]);
+  const [backendCourses, setBackendCourses] = useState<BackendStudentCourseItem[]>([]);
+  const [studentPackages, setStudentPackages] = useState<StudentPackageSubscriptionItem[]>([]);
   const [activeViewTab, setActiveViewTab] = useState<"courses" | "packages">("courses");
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState<boolean>(false);
-  const [allCatalogCourses, setAllCatalogCourses] = useState<any[]>([]);
+  const [allCatalogCourses, setAllCatalogCourses] = useState<BackendStudentCourseItem[]>([]);
   const [isEnrollingId, setIsEnrollingId] = useState<string | null>(null);
 
   // Fetch student courses & subscribed packages from backend
@@ -120,35 +154,41 @@ export function CourseViews() {
           message: res.message || "Failed to enroll in course",
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       addToast({
         type: "error",
         title: "Enrollment Error",
-        message: err.message || "Error enrolling in course",
+        message: err instanceof Error ? err.message : "Error enrolling in course",
       });
     } finally {
       setIsEnrollingId(null);
     }
   };
 
-  const studentGrade = (currentUser as any)?.gradeLevel || currentUser?.grade || "Academic Curriculum";
-  const studentSection = (currentUser as any)?.section || currentUser?.class;
+  const studentProfileMeta = authUser?.studentProfile as
+    | { gradeLevel?: string; section?: string }
+    | null
+    | undefined;
+  const studentGrade = studentProfileMeta?.gradeLevel || currentUser?.grade || "Academic Curriculum";
+  const studentSection = studentProfileMeta?.section || currentUser?.class;
 
   // Convert real enrolled courses from backend to frontend Course format
   const enrolledCourses: Course[] = useMemo(() => {
     if (!Array.isArray(backendCourses)) return [];
-    return backendCourses.map((c: any) => {
+    return backendCourses.map((c) => {
       const teacherName = c.teacher?.user
         ? `${c.teacher.user.firstName} ${c.teacher.user.lastName || ""}`.trim()
         : "Assigned Tutor";
 
-      let syllabusObj: any = c.syllabus;
-      if (typeof syllabusObj === "string") {
+      let syllabusObj: { units?: SyllabusUnit[] } | null = null;
+      if (typeof c.syllabus === "string") {
         try {
-          syllabusObj = JSON.parse(syllabusObj);
+          syllabusObj = JSON.parse(c.syllabus) as { units?: SyllabusUnit[] };
         } catch {
           syllabusObj = null;
         }
+      } else if (c.syllabus && typeof c.syllabus === "object") {
+        syllabusObj = c.syllabus;
       }
 
       const units: SyllabusUnit[] = Array.isArray(syllabusObj?.units)
@@ -183,7 +223,7 @@ export function CourseViews() {
         completedLessons,
       };
     });
-  }, [backendCourses, currentUser?.id, studentGrade]);
+  }, [backendCourses, currentUser, studentGrade]);
 
   const currentCourse = enrolledCourses.find((c) => c.id === selectedCourseId) || enrolledCourses[0] || null;
 
@@ -243,20 +283,29 @@ export function CourseViews() {
     setIsInsideSyllabus(true);
   };
 
+  const [renderNowMs] = useState(() => Date.now());
+
   useEffect(() => {
+    let cancelled = false;
     if (activeLesson) {
-      if (activeLesson.contentType === "pdf") {
-        setActiveTab("pdf");
-      } else if (activeLesson.contentType === "slides") {
-        setActiveTab("slides");
-      } else if (activeLesson.contentType === "video") {
-        setActiveTab("video");
-      } else {
-        setActiveTab("text");
-      }
-      setCurrentSlideIndex(1);
+      Promise.resolve().then(() => {
+        if (cancelled) return;
+        if (activeLesson.contentType === "pdf") {
+          setActiveTab("pdf");
+        } else if (activeLesson.contentType === "slides") {
+          setActiveTab("slides");
+        } else if (activeLesson.contentType === "video") {
+          setActiveTab("video");
+        } else {
+          setActiveTab("text");
+        }
+        setCurrentSlideIndex(1);
+      });
     }
-  }, [activeLesson?.id, activeLesson?.contentType]);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLesson]);
 
   const totalStreamLessons = enrolledCourses.reduce((acc, c) => acc + c.totalLessons, 0);
   const totalStreamCompleted = enrolledCourses.reduce((acc, c) => acc + c.completedLessons, 0);
@@ -450,11 +499,11 @@ export function CourseViews() {
             <div className="space-y-4">
               {studentPackages.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {studentPackages.map((sub: any) => {
+                  {studentPackages.map((sub) => {
                     const pkg = sub.package;
                     const teacher = pkg?.teacher?.user;
                     const teacherName = teacher ? `${teacher.firstName} ${teacher.lastName}` : "Specialist Tutor";
-                    const isExpiringSoon = sub.endDate && new Date(sub.endDate).getTime() - Date.now() < 7 * 86400000;
+                    const isExpiringSoon = sub.endDate && new Date(sub.endDate).getTime() - renderNowMs < 7 * 86400000;
 
                     return (
                       <div
@@ -495,7 +544,7 @@ export function CourseViews() {
                             <div className="flex items-center justify-between text-slate-500">
                               <span>Valid Until:</span>
                               <span className={`font-semibold ${isExpiringSoon ? "text-rose-600 font-bold" : "text-emerald-700"}`}>
-                                {new Date(sub.endDate).toLocaleDateString()}
+                                {sub.endDate ? new Date(sub.endDate).toLocaleDateString() : "Ongoing"}
                               </span>
                             </div>
                           </div>

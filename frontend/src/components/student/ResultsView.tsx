@@ -1,17 +1,31 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useApp } from "@/context/AppContext";
-import { Award, MessageSquare, TrendingUp, Star, CheckCircle, RefreshCw } from "lucide-react";
+import { Award, MessageSquare, TrendingUp, Star, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 
+interface BackendStudentResultItem {
+  id: string;
+  grade: string;
+  designation: string;
+  assignmentTitle: string;
+  subjectName: string;
+  instructor: string;
+  markedAt?: string | null;
+  marksObtained: number;
+  maxMarks: number;
+  percentage: number;
+  teacherFeedback?: string | null;
+}
+
 export function ResultsView() {
   const { submissions, currentUser, t, setCurrentView } = useApp();
 
-  const [backendResults, setBackendResults] = useState<any[] | null>(null);
+  const [backendResults, setBackendResults] = useState<BackendStudentResultItem[] | null>(null);
   const [backendSummary, setBackendSummary] = useState<{
     totalEvaluated: number;
     averageScore: number;
@@ -19,7 +33,7 @@ export function ResultsView() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const fetchResults = async () => {
+  const fetchResults = useCallback(async () => {
     try {
       setIsLoading(true);
       const res = await api.students.getMyResults();
@@ -32,11 +46,19 @@ export function ResultsView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchResults();
-  }, []);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        void fetchResults();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchResults]);
 
   const localSubmissions = submissions.filter(
     (s) => s.studentId === currentUser.id && (s.status === "marked" || s.status === "result_released")
@@ -182,7 +204,7 @@ export function ResultsView() {
                         {t.academic.teacherFeedback}:
                       </p>
                       <p className="text-xs text-slate-800 leading-relaxed italic">
-                        "{resItem.teacherFeedback}"
+                        &ldquo;{resItem.teacherFeedback}&rdquo;
                       </p>
                     </div>
                   )}
@@ -227,7 +249,7 @@ export function ResultsView() {
                         {t.academic.teacherFeedback}:
                       </p>
                       <p className="text-xs text-slate-800 leading-relaxed italic">
-                        "{sub.teacherFeedback}"
+                        &ldquo;{sub.teacherFeedback}&rdquo;
                       </p>
                     </div>
                   )}

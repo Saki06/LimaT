@@ -100,7 +100,15 @@ export function PaymentRequestsView({ onPaymentProcessed }: PaymentRequestsViewP
   }, [addToast]);
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        void load();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
   const handleSaveBankDetails = async (e: React.FormEvent) => {
@@ -377,6 +385,7 @@ export function PaymentRequestsView({ onPaymentProcessed }: PaymentRequestsViewP
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     placeholder="Reason (optional)"
+                    aria-label="Rejection reason"
                     maxLength={300}
                     className="flex-1 min-w-[200px] p-2 rounded-xl border border-slate-300 text-xs"
                   />

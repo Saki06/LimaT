@@ -1,17 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useApp } from "@/context/AppContext";
 import {
   Bell,
   Search,
   Menu,
-  Sparkles,
-  ChevronDown,
   X,
   CheckCheck,
-  CheckCircle2,
-  FileText,
   LogOut
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +16,7 @@ import { Modal } from "@/components/ui/modal";
 import { Announcement } from "@/types/lms";
 
 export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () => void }) {
-  const { currentRole, currentUser, t, announcements, setCurrentView, setIsLanding } = useApp();
+  const { currentUser, t, announcements, setCurrentView, setIsLanding } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const [selectedAnnouncementModal, setSelectedAnnouncementModal] = useState<Announcement | null>(null);
@@ -82,11 +79,10 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
           <button
             type="button"
             onClick={() => setShowNotifications(!showNotifications)}
-            className={`relative p-2.5 rounded-xl border transition-all cursor-pointer ${
-              showNotifications
-                ? "bg-[#ecf8f5] text-[#0d5c4d] border-[#c4e9e0]"
-                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-transparent hover:border-slate-200"
-            }`}
+            className={`relative p-2.5 rounded-xl border transition-all cursor-pointer ${showNotifications
+              ? "bg-[#ecf8f5] text-[#0d5c4d] border-[#c4e9e0]"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-transparent hover:border-slate-200"
+              }`}
             title="Notifications & Announcements"
           >
             <Bell className="h-4 w-4" />
@@ -187,9 +183,12 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
         >
           <div className="h-9 w-9 rounded-xl bg-[#0d5c4d] group-hover:bg-[#0a473b] group-hover:scale-105 flex items-center justify-center font-bold text-xs text-white shadow-sm transition-all ring-2 ring-transparent group-hover:ring-[#0d5c4d]/20 overflow-hidden shrink-0">
             {currentUser.avatar ? (
-              <img
+              <Image
                 src={currentUser.avatar}
                 alt={currentUser.name}
+                width={36}
+                height={36}
+                unoptimized
                 className="h-full w-full object-cover"
               />
             ) : (

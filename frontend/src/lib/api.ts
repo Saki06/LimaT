@@ -1,5 +1,162 @@
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+import type {
+  Course,
+  Quiz,
+  QuizAttemptRecord,
+  SchoolClass,
+  StaffInput,
+  Subject,
+  TeacherProfileData,
+} from '@/types/lms';
+
+/**
+ * Resolves and validates the base API URL for the LMS frontend.
+ * Enforces production safety by requiring an explicit HTTPS NEXT_PUBLIC_API_URL in production,
+ * rejecting localhost and 127.0.0.1 without relying on console warnings, and validating URL structure via new URL().
+ */
+function resolveApiBaseUrl(): string {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const configuredUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  // Local development / non-production fallback and validation
+  if (!isProduction) {
+    if (!configuredUrl) {
+      return 'http://localhost:5000/api';
+    }
+    try {
+      const parsed = new URL(configuredUrl);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error(`Invalid protocol "${parsed.protocol}". Only "http:" and "https:" are allowed.`);
+      }
+      return configuredUrl;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`FATAL CONFIGURATION ERROR: Invalid NEXT_PUBLIC_API_URL ("${configuredUrl}"): ${msg}`);
+    }
+  }
+
+  // Production mode: fail closed
+  if (!configuredUrl) {
+    // Allow local production testing / builds when explicit opt-in flag is provided
+    if (process.env.ALLOW_LOCAL_PROD_BUILD === 'true') {
+      return 'http://localhost:5000/api';
+    }
+
+    throw new Error(
+      'FATAL CONFIGURATION ERROR: NEXT_PUBLIC_API_URL environment variable is required in production. ' +
+      'Silent fallback to http://localhost:5000/api is strictly prohibited in production mode. ' +
+      'Please configure NEXT_PUBLIC_API_URL to your production backend API endpoint.'
+    );
+  }
+
+  // Validate URL format using new URL()
+  let parsed: URL;
+  try {
+    parsed = new URL(configuredUrl);
+  } catch {
+    throw new Error(
+      `FATAL CONFIGURATION ERROR: NEXT_PUBLIC_API_URL is not a valid URL: "${configuredUrl}".`
+    );
+  }
+
+  // Accept only valid URLs with http: or https:
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(
+      `FATAL CONFIGURATION ERROR: NEXT_PUBLIC_API_URL must use http: or https: protocol. Received "${parsed.protocol}".`
+    );
+  }
+
+  // Reject localhost and 127.0.0.1 in production without relying on console warnings
+  const hostname = parsed.hostname.toLowerCase();
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  if (isLocalhost && process.env.ALLOW_LOCAL_PROD_BUILD !== 'true') {
+    throw new Error(
+      `FATAL CONFIGURATION ERROR: NEXT_PUBLIC_API_URL cannot target localhost or 127.0.0.1 in production mode ("${configuredUrl}"). ` +
+      'Production deployments must target a publicly routable HTTPS backend.'
+    );
+  }
+
+  // Require https: protocol in production
+  if (parsed.protocol !== 'https:' && process.env.ALLOW_LOCAL_PROD_BUILD !== 'true') {
+    throw new Error(
+      `FATAL CONFIGURATION ERROR: NEXT_PUBLIC_API_URL must use HTTPS protocol in production mode. Received "${parsed.protocol}".`
+    );
+  }
+
+  return configuredUrl;
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
+
+export interface StudentProfileSummary {
+  id?: string;
+  grade?: string;
+  stream?: string;
+  schoolName?: string;
+  [key: string]: unknown;
+}
+
+export interface ParentProfileSummary {
+  id?: string;
+  phone?: string;
+  occupation?: string;
+  [key: string]: unknown;
+}
+
+export interface PackagePayload {
+  title: string;
+  description?: string;
+  price?: number;
+  billingCycle?: string;
+  durationDays?: number;
+  features?: string[];
+  isPublished?: boolean;
+  courseIds?: string[];
+}
+
+export interface LiveClassPayload {
+  title: string;
+  description?: string;
+  topic?: string;
+  courseId?: string;
+  packageId?: string;
+  startTime: string;
+  durationMinutes?: number;
+  platform?: 'JITSI' | 'GOOGLE_MEET' | 'ZOOM' | 'CUSTOM';
+  meetingUrl?: string;
+  meetingId?: string;
+  passcode?: string;
+  recordingUrl?: string;
+  teacherId?: string;
+}
+
+export interface ResourcePayload {
+  title: string;
+  description?: string;
+  subject?: string;
+  grade?: string;
+  type?: string;
+  category?: string;
+  fileUrl?: string;
+  thumbnailUrl?: string;
+  courseId?: string;
+  isPublished?: boolean;
+  [key: string]: unknown;
+}
+
+export interface AdminSettingsPayload {
+  name?: string;
+  domain?: string;
+  branding?: {
+    motto?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    academicYear?: string;
+    principalName?: string;
+    logoUrl?: string;
+  };
+  [key: string]: unknown;
+}
 
 export interface AuthResponse {
   success: boolean;
@@ -17,11 +174,13 @@ export interface AuthResponse {
       slug: string;
       name: string;
     };
-    studentProfile?: any;
-    teacherProfile?: any;
-    parentProfile?: any;
+    studentProfile?: StudentProfileSummary | null;
+    teacherProfile?: Partial<TeacherProfileData> | null;
+    parentProfile?: ParentProfileSummary | null;
   };
 }
+
+export type StoredUser = NonNullable<AuthResponse['user']> & Record<string, unknown>;
 
 export type SportsEventStatus = 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'CANCELLED';
 export type SportsRegistrationStatus = 'PENDING' | 'CONFIRMED' | 'WAITLISTED' | 'REJECTED';
@@ -543,6 +702,21 @@ export const api = {
       });
       return response.json();
     },
+
+    async logout(existingToken?: string | null): Promise<{ success: boolean; message?: string }> {
+      const token = existingToken ?? api.token.get();
+      if (!token) {
+        return { success: true, message: 'No active token' };
+      }
+      const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return response.json();
+    },
   },
 
   // Courses & Subjects API
@@ -578,7 +752,7 @@ export const api = {
       title: string;
       code: string;
       description?: string;
-      syllabus?: any;
+      syllabus?: Course['units'] | Record<string, unknown>;
     }) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/courses`, {
@@ -596,7 +770,7 @@ export const api = {
       title?: string;
       code?: string;
       description?: string;
-      syllabus?: any;
+      syllabus?: Course['units'] | Record<string, unknown>;
     }) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/courses/${id}`, {
@@ -652,16 +826,7 @@ export const api = {
       return res.json();
     },
 
-    async create(packageData: {
-      title: string;
-      description?: string;
-      price?: number;
-      billingCycle?: string;
-      durationDays?: number;
-      features?: string[];
-      isPublished?: boolean;
-      courseIds?: string[];
-    }) {
+    async create(packageData: PackagePayload) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/packages`, {
         method: 'POST',
@@ -674,7 +839,7 @@ export const api = {
       return res.json();
     },
 
-    async update(id: string, packageData: any) {
+    async update(id: string, packageData: Partial<PackagePayload>) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/packages/${id}`, {
         method: 'PUT',
@@ -780,21 +945,7 @@ export const api = {
       return res.json();
     },
 
-    async create(data: {
-      title: string;
-      description?: string;
-      topic?: string;
-      courseId?: string;
-      packageId?: string;
-      startTime: string;
-      durationMinutes?: number;
-      platform?: 'JITSI' | 'GOOGLE_MEET' | 'ZOOM' | 'CUSTOM';
-      meetingUrl?: string;
-      meetingId?: string;
-      passcode?: string;
-      recordingUrl?: string;
-      teacherId?: string;
-    }) {
+    async create(data: LiveClassPayload) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/live-classes`, {
         method: 'POST',
@@ -807,7 +958,7 @@ export const api = {
       return res.json();
     },
 
-    async update(id: string, data: any) {
+    async update(id: string, data: Partial<LiveClassPayload> & { status?: string }) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/live-classes/${id}`, {
         method: 'PUT',
@@ -959,7 +1110,11 @@ export const api = {
         },
         body: JSON.stringify(data),
       });
-      return res.json();
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || payload?.success === false) {
+        throw new Error(payload?.message || `Assignment submission failed (${res.status})`);
+      }
+      return payload;
     },
 
     async gradeSubmission(
@@ -1043,7 +1198,7 @@ export const api = {
       return res.json();
     },
 
-    async create(data: any) {
+    async create(data: ResourcePayload) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/resources`, {
         method: 'POST',
@@ -1056,7 +1211,7 @@ export const api = {
       return res.json();
     },
 
-    async update(id: string, data: any) {
+    async update(id: string, data: Partial<ResourcePayload>) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/resources/${id}`, {
         method: 'PUT',
@@ -1122,7 +1277,7 @@ export const api = {
       return res.json();
     },
 
-    async create(data: any) {
+    async create(data: Partial<Quiz> & Record<string, unknown>) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/quizzes`, {
         method: 'POST',
@@ -1135,7 +1290,7 @@ export const api = {
       return res.json();
     },
 
-    async update(id: string, data: any) {
+    async update(id: string, data: Partial<Quiz> & Record<string, unknown>) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/quizzes/${id}`, {
         method: 'PUT',
@@ -1160,7 +1315,7 @@ export const api = {
       return res.json();
     },
 
-    async submitAttempt(id: string, data: { answers: Record<string, any>; timeSpentSeconds?: number }) {
+    async submitAttempt(id: string, data: { answers: QuizAttemptRecord['answers']; timeSpentSeconds?: number }) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/quizzes/${id}/attempt`, {
         method: 'POST',
@@ -1170,7 +1325,11 @@ export const api = {
         },
         body: JSON.stringify(data),
       });
-      return res.json();
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || payload?.success === false) {
+        throw new Error(payload?.message || `Quiz attempt submission failed (${res.status})`);
+      }
+      return payload;
     },
   },
 
@@ -1196,7 +1355,7 @@ export const api = {
       return res.json();
     },
 
-    async updateMyProfile(data: any) {
+    async updateMyProfile(data: Partial<TeacherProfileData> & Record<string, unknown>) {
       const token = api.token.get();
       const res = await fetch(`${API_BASE_URL}/teachers/me`, {
         method: 'PUT',
@@ -1626,7 +1785,11 @@ export const api = {
         },
         body: JSON.stringify(data),
       });
-      return res.json();
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || payload?.success === false) {
+        throw new Error(payload?.message || `Assignment submission failed (${res.status})`);
+      }
+      return payload;
     },
 
     async getMyResults() {
@@ -1894,7 +2057,7 @@ export const api = {
     },
   },
 
-    // Super Admin Profile APIs
+  // Super Admin Profile APIs
   superAdminProfile: {
 
     async getTenantStatistics(): Promise<{
@@ -2023,10 +2186,10 @@ export const api = {
       province?: string | null;
       postalCode?: string | null;
       bio?: string | null;
-  dateOfBirth?: string | null;
-  gender?: string | null;
-  languages?: string | null;
-  rootAuthorityId?: string | null;
+      dateOfBirth?: string | null;
+      gender?: string | null;
+      languages?: string | null;
+      rootAuthorityId?: string | null;
     }) {
       const token = api.token.get();
 
@@ -2173,7 +2336,10 @@ export const api = {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch staff');
       return data.data;
     },
-    async createStaff(input: any) {
+    async createStaff(
+      input: Omit<StaffInput, 'gender' | 'dateOfBirth' | 'joiningDate'> &
+        Partial<Pick<StaffInput, 'gender' | 'dateOfBirth' | 'joiningDate'>>
+    ) {
       const token = api.token.get();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2186,7 +2352,7 @@ export const api = {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create staff');
       return data.data;
     },
-    async updateStaff(id: string, input: any) {
+    async updateStaff(id: string, input: Partial<StaffInput>) {
       const token = api.token.get();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2270,7 +2436,7 @@ export const api = {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch settings');
       return data.data;
     },
-    async updateSettings(settingsData: any) {
+    async updateSettings(settingsData: AdminSettingsPayload) {
       const token = api.token.get();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2292,7 +2458,7 @@ export const api = {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch classes');
       return data.data;
     },
-    async createClass(classData: any) {
+    async createClass(classData: Partial<SchoolClass>) {
       const token = api.token.get();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2305,7 +2471,7 @@ export const api = {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create class');
       return data.data;
     },
-    async updateClass(id: string, classData: any) {
+    async updateClass(id: string, classData: Partial<SchoolClass>) {
       const token = api.token.get();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2339,7 +2505,7 @@ export const api = {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch subjects');
       return data.data;
     },
-    async createSubject(subjectData: any) {
+    async createSubject(subjectData: Partial<Subject>) {
       const token = api.token.get();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2352,7 +2518,7 @@ export const api = {
       if (!res.ok || !data.success) throw new Error(data.message || 'Failed to create subject');
       return data.data;
     },
-    async updateSubject(id: string, subjectData: any) {
+    async updateSubject(id: string, subjectData: Partial<Subject>) {
       const token = api.token.get();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2397,12 +2563,12 @@ export const api = {
   },
 
   user: {
-    get(): any | null {
+    get(): StoredUser | null {
       if (typeof window === 'undefined') return null;
       const data = localStorage.getItem('lms_user');
-      return data ? JSON.parse(data) : null;
+      return data ? (JSON.parse(data) as StoredUser) : null;
     },
-    set(user: any): void {
+    set(user: StoredUser): void {
       if (typeof window === 'undefined') return;
       localStorage.setItem('lms_user', JSON.stringify(user));
     },

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Maximize2, X, Shield, Sparkles } from "lucide-react";
+import React, { useState } from "react";
+import { X, Shield } from "lucide-react";
 import { SupportedRole, AuthDisplayMode, AuthTab } from "./types";
 import { LoginForm } from "./LoginForm";
 import { StudentSignupForm } from "./StudentSignupForm";
@@ -24,7 +24,6 @@ export function AuthDrawer({
   authMode: controlledMode,
   initialTab = "login",
   initialRole = "student",
-  portalType = "gateway",
   onClose,
   onEnterApp,
   onModeChange
@@ -32,18 +31,24 @@ export function AuthDrawer({
   const [internalMode, setInternalMode] = useState<AuthDisplayMode>(controlledMode);
   const [authTab, setAuthTab] = useState<AuthTab>(initialTab);
   const [selectedRole, setSelectedRole] = useState<SupportedRole>(initialRole);
+  const [prevControlledMode, setPrevControlledMode] = useState<AuthDisplayMode>(controlledMode);
+  const [prevInitialTab, setPrevInitialTab] = useState<AuthTab>(initialTab);
+  const [prevInitialRole, setPrevInitialRole] = useState<SupportedRole>(initialRole);
 
-  useEffect(() => {
+  if (controlledMode !== prevControlledMode) {
+    setPrevControlledMode(controlledMode);
     setInternalMode(controlledMode);
-  }, [controlledMode]);
+  }
 
-  useEffect(() => {
+  if (initialTab !== prevInitialTab) {
+    setPrevInitialTab(initialTab);
     setAuthTab(initialTab);
-  }, [initialTab]);
+  }
 
-  useEffect(() => {
+  if (initialRole !== prevInitialRole) {
+    setPrevInitialRole(initialRole);
     setSelectedRole(initialRole);
-  }, [initialRole]);
+  }
 
   const handleModeChange = (newMode: AuthDisplayMode) => {
     setInternalMode(newMode);
@@ -84,28 +89,26 @@ export function AuthDrawer({
           <button
             type="button"
             onClick={() => setAuthTab("login")}
-            className={`py-2 rounded-xl transition-all cursor-pointer ${
-              authTab === "login"
+            className={`py-2 rounded-xl transition-all cursor-pointer ${authTab === "login"
                 ? "bg-white text-[#0d2b26] shadow-xs font-black"
                 : "text-slate-500 hover:text-slate-800"
-            }`}
+              }`}
           >
             Sign In (Login)
           </button>
           <button
             type="button"
             onClick={() => setAuthTab("signup")}
-            className={`py-2 rounded-xl transition-all cursor-pointer ${
-              authTab === "signup"
+            className={`py-2 rounded-xl transition-all cursor-pointer ${authTab === "signup"
                 ? "bg-white text-[#0d2b26] shadow-xs font-black"
                 : "text-slate-500 hover:text-slate-800"
-            }`}
+              }`}
           >
             {selectedRole === "parent"
               ? "Register Guardian"
               : selectedRole === "teacher"
-              ? "Register as Tutor"
-              : "Create Account (Sign Up)"}
+                ? "Register as Tutor"
+                : "Create Account (Sign Up)"}
           </button>
         </div>
       ) : (
@@ -140,8 +143,8 @@ export function AuthDrawer({
                 {selectedRole === "parent"
                   ? "Parent & Guardian Desk"
                   : selectedRole === "student"
-                  ? "Student Portal"
-                  : "Teacher Portal"}
+                    ? "Student Portal"
+                    : "Teacher Portal"}
               </p>
             </div>
           </div>

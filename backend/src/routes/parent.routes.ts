@@ -8,12 +8,13 @@ import {
   updateMyParentProfile,
   linkChildStudent,
 } from '../controllers/parent.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import { authenticateToken, requireRoles } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// All parent routes require authentication
+// All parent routes require authentication and PARENT role (BUG-P9-01 fix)
 router.use(authenticateToken);
+router.use(requireRoles('PARENT'));
 
 // 0. Current Parent Profile
 router.get('/me', getMyParentProfile);

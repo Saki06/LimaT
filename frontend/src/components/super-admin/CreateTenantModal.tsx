@@ -44,26 +44,6 @@ setIsSubmitting(true);
     const preset =
       TENANT_PRESETS.find((p) => p.type === newTenantData.type) || TENANT_PRESETS[0];
 
-    const createdTenant: Tenant = {
-      id: `tenant_${Date.now()}`,
-      name: newTenantData.name,
-      code: newTenantData.code.toUpperCase(),
-      type: newTenantData.type,
-      plan: newTenantData.plan,
-      status: "active",
-      contactEmail: newTenantData.contactEmail || "admin@institution.lk",
-      contactPhone: newTenantData.contactPhone || "+94 11 000 0000",
-      adminName: newTenantData.adminName || "Administrator",
-      studentCount: Number(newTenantData.studentCount) || 500,
-      teacherCount: Number(newTenantData.teacherCount) || 20,
-      monthlyFeeLkr: Number(newTenantData.monthlyFeeLkr) || 50000,
-      createdAt: new Date().toISOString().split("T")[0],
-      renewalDate: "2027-12-31",
-      address: newTenantData.address || "Sri Lanka",
-      tagline: newTenantData.tagline || "",
-      enabledFeatures: { ...preset.features }
-    };
-
         try {
      const result = await api.tenants.create({
   name: newTenantData.name.trim(),
@@ -222,12 +202,14 @@ export function EditTenantModal({
   onClose,
   onUpdateTenant,
 }: EditTenantModalProps) {
-  const [draft, setDraft] = React.useState<Tenant | null>(null);
+  const [draft, setDraft] = React.useState<Tenant | null>(() => (tenant ? { ...tenant } : null));
+  const [prevTenant, setPrevTenant] = React.useState<Tenant | null>(tenant);
   const [isSaving, setIsSaving] = React.useState(false);
 
-  React.useEffect(() => {
-  setDraft(tenant ? { ...tenant } : null);
-}, [tenant]);
+  if (tenant !== prevTenant) {
+    setPrevTenant(tenant);
+    setDraft(tenant ? { ...tenant } : null);
+  }
 
   if (!tenant || !draft) return null;
 

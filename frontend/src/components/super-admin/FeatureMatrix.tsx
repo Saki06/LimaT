@@ -2,10 +2,8 @@
 
 import React, { useState } from "react";
 import { Tenant, FeatureCategory } from "@/types/tenant";
-import { HIERARCHICAL_MODULES, TENANT_PRESETS } from "@/data/tenantMockData";
+import { HIERARCHICAL_MODULES } from "@/data/tenantMockData";
 import {
-  Sparkles,
-  ArrowRight,
   Search,
   Layers,
   ChevronDown,
@@ -34,7 +32,6 @@ export function FeatureMatrix({
   matrixTenant,
   selectedTenantForMatrix,
   onSelectTenantForMatrix,
-  onApplyPreset,
   onToggleFeature,
   onBatchToggleCategory,
   onBatchToggleSubOptions
@@ -69,9 +66,9 @@ export function FeatureMatrix({
     if (!matrixTenant) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
-        <h3 className="text-lg font-bold text-slate-800">
+        <h2 className="text-lg font-bold text-slate-800">
           No tenants available
-        </h3>
+        </h2>
         <p className="mt-2 text-sm text-slate-500">
           Create a tenant before configuring feature permissions.
         </p>
@@ -87,10 +84,10 @@ export function FeatureMatrix({
             <span className="text-[10px] uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded bg-[#0d5c4d] text-white">
               Target Customer Tenant
             </span>
-            <h3 className="text-xl font-black text-[#0d2b26] flex items-center gap-2 mt-1">
+            <h2 className="text-xl font-black text-[#0d2b26] flex items-center gap-2 mt-1">
               {matrixTenant?.name ?? 'No tenant selected'}
               <span className="text-xs font-mono text-slate-500 font-normal">[{matrixTenant?.code ?? 'NO-TENANT'}]</span>
-            </h3>
+            </h2>
             <p className="text-xs text-slate-500">
               Toggle individual parent modules and granular sub-features to customize this customer&apos;s exact LMS capabilities.
             </p>
@@ -102,7 +99,7 @@ export function FeatureMatrix({
             <select
               value={selectedTenantForMatrix}
               onChange={(e) => onSelectTenantForMatrix(e.target.value)}
-              className="p-2 rounded-xl border border-slate-300 bg-slate-50 text-xs font-bold text-slate-800 focus:outline-hidden focus:border-[#0d5c4d]"
+              className="min-h-[44px] md:min-h-0 p-2 rounded-xl border border-slate-300 bg-slate-50 text-xs font-bold text-slate-800 focus:outline-hidden focus:border-[#0d5c4d]"
             >
               {tenants.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -119,8 +116,9 @@ export function FeatureMatrix({
         {/* Separate by Portal / User Type */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
           <button
+            type="button"
             onClick={() => setMatrixRoleScope("all")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`min-h-[44px] py-2 md:min-h-0 md:py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               matrixRoleScope === "all"
                 ? "bg-[#0d5c4d] text-white shadow-xs"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -129,8 +127,9 @@ export function FeatureMatrix({
             🌐 All Modules
           </button>
           <button
+            type="button"
             onClick={() => setMatrixRoleScope("student")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`min-h-[44px] py-2 md:min-h-0 md:py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               matrixRoleScope === "student"
                 ? "bg-blue-700 text-white shadow-xs"
                 : "bg-blue-50 text-blue-800 hover:bg-blue-100"
@@ -139,8 +138,9 @@ export function FeatureMatrix({
             👨‍🎓 Student Portal Features
           </button>
           <button
+            type="button"
             onClick={() => setMatrixRoleScope("teacher")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`min-h-[44px] py-2 md:min-h-0 md:py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               matrixRoleScope === "teacher"
                 ? "bg-amber-600 text-white shadow-xs"
                 : "bg-amber-50 text-amber-900 hover:bg-amber-100"
@@ -149,8 +149,9 @@ export function FeatureMatrix({
             👨‍🏫 Teacher Studio Features
           </button>
           <button
+            type="button"
             onClick={() => setMatrixRoleScope("admin")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`min-h-[44px] py-2 md:min-h-0 md:py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               matrixRoleScope === "admin"
                 ? "bg-purple-700 text-white shadow-xs"
                 : "bg-purple-50 text-purple-900 hover:bg-purple-100"
@@ -165,6 +166,7 @@ export function FeatureMatrix({
           <input
             type="text"
             placeholder="Search module or sub-feature name..."
+            aria-label="Search module or sub-feature name"
             value={featureSearchQuery}
             onChange={(e) => setFeatureSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#0d5c4d] focus:bg-white transition-all"
@@ -200,7 +202,7 @@ export function FeatureMatrix({
 
           return (
             <Card key={category} className="border-[#e6ece8] bg-white shadow-2xs overflow-hidden">
-              <CardHeader className="p-4 bg-slate-50/80 border-b border-slate-100 flex flex-row items-center justify-between">
+              <CardHeader className="p-4 bg-slate-50/80 border-b border-slate-100 flex flex-row flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-sm font-extrabold text-[#0d2b26] flex items-center gap-2">
                   <Layers className="h-4 w-4 text-[#0d5c4d]" />
                   <span>{category}</span>
@@ -210,17 +212,19 @@ export function FeatureMatrix({
                 </CardTitle>
 
                 {/* Batch Toggle Buttons for Category */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
+                    type="button"
                     onClick={() => onBatchToggleCategory(category, true)}
-                    className="text-[10px] font-bold text-[#0d5c4d] hover:underline cursor-pointer px-2 py-0.5 rounded hover:bg-emerald-50"
+                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center px-2.5 py-2 md:min-h-0 md:min-w-0 md:px-2 md:py-0.5 text-[10px] font-bold text-[#0d5c4d] hover:underline cursor-pointer rounded hover:bg-emerald-50 whitespace-nowrap"
                   >
                     Enable All
                   </button>
                   <span className="text-slate-300">|</span>
                   <button
+                    type="button"
                     onClick={() => onBatchToggleCategory(category, false)}
-                    className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer px-2 py-0.5 rounded hover:bg-rose-50"
+                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center px-2.5 py-2 md:min-h-0 md:min-w-0 md:px-2 md:py-0.5 text-[10px] font-bold text-rose-600 hover:underline cursor-pointer rounded hover:bg-rose-50 whitespace-nowrap"
                   >
                     Disable All
                   </button>
@@ -243,8 +247,11 @@ export function FeatureMatrix({
                         <div className="space-y-1 max-w-2xl">
                           <div className="flex flex-wrap items-center gap-2">
                             <button
+                              type="button"
+                              aria-expanded={isExpanded}
+                              aria-label={isExpanded ? `Collapse ${mod.label}` : `Expand ${mod.label}`}
                               onClick={() => toggleModuleAccordion(mod.key)}
-                              className="p-1 text-slate-500 hover:text-[#0d5c4d] cursor-pointer"
+                              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg -my-2 -ml-1.5 p-2.5 md:min-h-0 md:min-w-0 md:m-0 md:p-1 text-slate-500 hover:text-[#0d5c4d] cursor-pointer"
                             >
                               {isExpanded ? (
                                 <ChevronDown className="h-4 w-4" />
@@ -252,7 +259,7 @@ export function FeatureMatrix({
                                 <ChevronRight className="h-4 w-4" />
                               )}
                             </button>
-                            <h4 className="text-sm font-black text-slate-900">{mod.label}</h4>
+                            <h3 className="text-sm font-black text-slate-900">{mod.label}</h3>
                             {mod.targetRole === "student" && (
                               <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-100 text-blue-900 border border-blue-200">
                                 👨‍🎓 Student Portal
@@ -287,8 +294,10 @@ export function FeatureMatrix({
                         <div className="flex items-center gap-3 shrink-0 pl-6 sm:pl-0">
                           <span className="text-[11px] font-bold text-slate-500">Master Module:</span>
                           <button
+                            type="button"
+                            aria-pressed={isParentEnabled}
                             onClick={() => onToggleFeature(mod.key, !isParentEnabled)}
-                            className={`px-4 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                            className={`min-h-[44px] min-w-[44px] px-4 py-2 md:min-h-0 md:min-w-0 md:py-1.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs ${
                               isParentEnabled
                                 ? "bg-[#0d5c4d] text-white"
                                 : "bg-slate-200 text-slate-600 hover:bg-slate-300"
@@ -318,17 +327,19 @@ export function FeatureMatrix({
                               <span>Granular Sub-Features ({activeSubCount}/{mod.subOptions.length} Active)</span>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <button
+                                type="button"
                                 onClick={() => onBatchToggleSubOptions(mod.key, true)}
-                                className="text-[10px] font-bold text-[#0d5c4d] hover:underline cursor-pointer"
+                                className="min-h-[44px] inline-flex items-center px-2 py-2 md:min-h-0 md:px-0 md:py-0 text-[10px] font-bold text-[#0d5c4d] hover:underline cursor-pointer"
                               >
                                 Enable All Sub-Options
                               </button>
                               <span className="text-slate-300">|</span>
                               <button
+                                type="button"
                                 onClick={() => onBatchToggleSubOptions(mod.key, false)}
-                                className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
+                                className="min-h-[44px] inline-flex items-center px-2 py-2 md:min-h-0 md:px-0 md:py-0 text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
                               >
                                 Disable All Sub-Options
                               </button>
@@ -358,8 +369,10 @@ export function FeatureMatrix({
                                   </div>
 
                                   <button
+                                    type="button"
+                                    aria-pressed={isSubEnabled}
                                     onClick={() => onToggleFeature(sub.key, !isSubEnabled)}
-                                    className={`px-3 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                                    className={`min-h-[44px] min-w-[44px] justify-center px-4 py-2 md:min-h-0 md:min-w-0 md:justify-start md:px-3 md:py-1 rounded-lg font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
                                       isSubEnabled
                                         ? "bg-[#0d5c4d] text-white shadow-2xs"
                                         : "bg-slate-200 text-slate-600 hover:bg-slate-300"

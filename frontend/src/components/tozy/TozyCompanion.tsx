@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { useApp } from "@/context/AppContext";
 import {
   Sparkles,
@@ -11,15 +12,8 @@ import {
   BookOpen,
   Calendar,
   Layers,
-  Heart,
   ChevronRight,
-  HelpCircle,
-  Lightbulb,
-  Zap,
-  Volume2,
-  VolumeX,
-  ExternalLink,
-  Smile
+  Lightbulb
 } from "lucide-react";
 import { TozyAnimatedMascot } from "./TozyAnimatedMascot";
 
@@ -47,7 +41,7 @@ const STUDY_TIPS = [
 ];
 
 export function TozyCompanion() {
-  const { currentRole, currentView, setCurrentView, setIsLanding, setLandingPortal } = useApp();
+  const { setCurrentView, setIsLanding, setLandingPortal } = useApp();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"tips" | "timer" | "shortcuts">("tips");
   const [quoteIndex, setQuoteIndex] = useState(0);
@@ -57,6 +51,7 @@ export function TozyCompanion() {
   // Focus Timer State (Pomodoro: 25 mins)
   const [timerSeconds, setTimerSeconds] = useState(25 * 60);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const timerCompletedRef = useRef(false);
 
   // Auto-cycle speech bubble every 12 seconds
   useEffect(() => {
@@ -68,24 +63,50 @@ export function TozyCompanion() {
 
   // Update speech bubble based on current quote
   useEffect(() => {
-    if (!isOpen) {
-      setBubbleMessage(MOTIVATIONAL_QUOTES[quoteIndex]);
+    let cancelled = false;
+    if (!isOpen && !timerCompletedRef.current) {
+      Promise.resolve().then(() => {
+        if (!cancelled && !timerCompletedRef.current) {
+          setBubbleMessage(MOTIVATIONAL_QUOTES[quoteIndex]);
+        }
+      });
     }
+    return () => {
+      cancelled = true;
+    };
   }, [quoteIndex, isOpen]);
 
   // Pomodoro countdown timer
   useEffect(() => {
-    let interval: any = null;
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (isTimerRunning && timerSeconds > 0) {
+      timerCompletedRef.current = false;
       interval = setInterval(() => {
-        setTimerSeconds((prev) => prev - 1);
+        setTimerSeconds((prev) => {
+          if (prev <= 1) {
+            timerCompletedRef.current = true;
+            setIsTimerRunning(false);
+            setBubbleMessage("🎉 Focus session completed! Take a 5-minute breather, superstar!");
+            setShowSpeechBubble(true);
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
     } else if (timerSeconds === 0 && isTimerRunning) {
-      setIsTimerRunning(false);
-      setBubbleMessage("🎉 Focus session completed! Take a 5-minute breather, superstar!");
-      setShowSpeechBubble(true);
+      Promise.resolve().then(() => {
+        if (cancelled) return;
+        timerCompletedRef.current = true;
+        setIsTimerRunning(false);
+        setBubbleMessage("🎉 Focus session completed! Take a 5-minute breather, superstar!");
+        setShowSpeechBubble(true);
+      });
     }
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      if (interval !== undefined) clearInterval(interval);
+    };
   }, [isTimerRunning, timerSeconds]);
 
   const formatTimer = (totalSecs: number) => {
@@ -123,9 +144,12 @@ export function TozyCompanion() {
           <div className="bg-gradient-to-r from-[#0d5c4d] via-[#10705e] to-[#083e34] p-4 text-white relative flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <img
+                <Image
                   src="/images/tozy_icon.jpg"
                   alt="Tozy Avatar"
+                  width={48}
+                  height={48}
+                  unoptimized
                   className="w-12 h-12 rounded-full ring-2 ring-amber-300 shadow-md object-cover bg-white"
                 />
                 <span className="absolute -bottom-0.5 -right-0.5 bg-amber-400 text-slate-950 text-[9px] font-black px-1 rounded-full">

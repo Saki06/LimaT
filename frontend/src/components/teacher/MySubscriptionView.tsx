@@ -74,8 +74,13 @@ const TONE_BORDER: Record<PlanCard["tone"], string> = {
   purple: "border-purple-400 bg-purple-50/40",
 };
 
+interface TenantSubscriptionSettings extends Record<string, unknown> {
+  renewalDate?: string;
+  monthlyFeeLkr?: number | string;
+}
+
 interface SubscriptionData {
-  tenant: { plan: string; settings?: Record<string, any> | null };
+  tenant: { plan: string; settings?: TenantSubscriptionSettings | null };
   enrolledStudents: number;
   bankDetails: { bankName: string; accountName: string; accountNumber: string; branch: string };
   pendingRequest: {
@@ -170,7 +175,15 @@ export function MySubscriptionView() {
   }, []);
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        void load();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
   const resetForm = () => {

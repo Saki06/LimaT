@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import * as crypto from 'crypto';
 import { prisma } from '../../config/prisma';
 import { config } from '../../config';
 import { Role } from '@prisma/client';
@@ -10,7 +11,77 @@ export const isValidEmail = (email: string): boolean => {
 };
 
 /**
- * Signs a JWT token with standard LMS user payload
+ * Two-tier revoked token registry (VULN-10 remediation):
+ *   1. Authoritative persistent PostgreSQL `RevokedToken` table (SHA-256 digests only).
+ *   2. Process-local `Map` used strictly as a fast-reject cache for already-known
+ *      revoked tokens — never used to assume a token is valid.
+ */
+const revokedTokenDigests = new Map<string, number>();
+
+export const hashToken = (rawToken: string): string =>
+  crypto.createHash('sha256').update(rawToken).digest('hex');
+
+export const revokeToken = async (rawToken: string): Promise<void> => {
+  if (!rawToken) return;
+  const decoded = jwt.decode(rawToken) as { exp?: number } | null;
+  const expiresAtMs =
+    decoded?.exp && Number.isFinite(decoded.exp)
+      ? decoded.exp * 1000
+      : Date.now() + 7 * 24 * 60 * 60 * 1000;
+  const digest = hashToken(rawToken);
+  const expiresAt = new Date(expiresAtMs);
+
+  // Persist to PostgreSQL before reporting success (throws on DB failure)
+  await prisma.revokedToken.upsert({
+    where: { tokenDigest: digest },
+    create: { tokenDigest: digest, expiresAt },
+    update: { expiresAt },
+  });
+
+  revokedTokenDigests.set(digest, expiresAtMs);
+
+  // Opportunistic non-blocking cleanup of already-expired revocation rows
+  prisma.revokedToken
+    .deleteMany({
+      where: { expiresAt: { lt: new Date() } },
+    })
+    .catch(() => {
+      // Non-critical background cleanup; never fails logout
+    });
+};
+
+export const isTokenRevoked = async (rawToken: string): Promise<boolean> => {
+  if (!rawToken) return false;
+  const digest = hashToken(rawToken);
+
+  // Fast-reject only if this process already observed the revocation
+  const cachedExpMs = revokedTokenDigests.get(digest);
+  if (cachedExpMs !== undefined) {
+    if (Date.now() <= cachedExpMs) {
+      return true;
+    }
+    revokedTokenDigests.delete(digest);
+  }
+
+  // Always verify against persistent PostgreSQL store; DB errors propagate to fail closed
+  const record = await prisma.revokedToken.findUnique({
+    where: { tokenDigest: digest },
+    select: { expiresAt: true },
+  });
+
+  if (!record) return false;
+
+  const expMs = record.expiresAt.getTime();
+  if (Date.now() > expMs) {
+    return false;
+  }
+
+  revokedTokenDigests.set(digest, expMs);
+  return true;
+};
+
+/**
+ * Signs a JWT token with standard LMS user payload and unique jti
  */
 export const signUserToken = (payload: {
   userId: string;
@@ -20,7 +91,11 @@ export const signUserToken = (payload: {
   firstName?: string;
   lastName?: string;
 }): string => {
-  return jwt.sign(payload, config.jwtSecret, { expiresIn: '7d' });
+  return jwt.sign(
+    { ...payload, jti: crypto.randomUUID() },
+    config.jwtSecret,
+    { expiresIn: '7d' }
+  );
 };
 
 /**

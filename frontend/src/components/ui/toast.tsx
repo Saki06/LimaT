@@ -40,8 +40,10 @@ export function ToastContainer() {
               )}
             </div>
             <button
+              type="button"
+              aria-label={`Dismiss notification: ${toast.title}`}
               onClick={() => removeToast(toast.id)}
-              className="rounded p-1 text-slate-400 hover:text-white"
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center -mr-2 p-2.5 md:min-h-0 md:min-w-0 md:mr-0 md:p-1 rounded text-slate-400 hover:text-white shrink-0"
             >
               <X className="h-4 w-4" />
             </button>

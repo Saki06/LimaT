@@ -1,26 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useApp } from "@/context/AppContext";
 import {
   Bell,
   Search,
   Menu,
-  Sparkles,
-  ChevronDown,
   X,
   CheckCheck,
-  CheckCircle2,
-  FileText,
-  LogOut,
-  BookOpen,
-  GraduationCap,
-  Library,
-  Video,
-  Trophy,
-  User,
-  Home,
-  ArrowRight
+  LogOut
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
@@ -50,25 +39,30 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  const { activeTenant } = useApp();
-
   const readStorageKey = `lms_read_announcements_${currentUser?.id || currentRole || "guest"}`;
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const saved = localStorage.getItem(readStorageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setReadAnnouncementIds(parsed);
-          return;
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      try {
+        const saved = localStorage.getItem(readStorageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            setReadAnnouncementIds(parsed);
+            return;
+          }
         }
+      } catch {
+        // ignore storage parse error
       }
-    } catch {
-      // ignore storage parse error
-    }
-    setReadAnnouncementIds([]);
+      setReadAnnouncementIds([]);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [readStorageKey]);
 
   const markAnnouncementsRead = (idsToMark: string[]) => {
@@ -263,8 +257,10 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
       <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
         {/* Mobile menu trigger */}
         <button
+          type="button"
+          aria-label="Open navigation menu"
           onClick={onToggleMobileSidebar}
-          className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+          className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 focus:outline-hidden focus:ring-2 focus:ring-[#0d5c4d] transition-colors shrink-0"
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -280,9 +276,12 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
         >
           {/* Tozy Winged Mascot Logo */}
           <div className="relative h-9 w-9 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-tr from-cyan-400 via-emerald-300 to-amber-300 p-0.5 shadow-sm group-hover:scale-105 transition-all shrink-0 ring-2 ring-emerald-500/20">
-            <img
+            <Image
               src="/images/tozy_icon.jpg"
               alt="Tozy - Newtoz Mascot"
+              width={44}
+              height={44}
+              unoptimized
               className="w-full h-full object-cover rounded-[14px] bg-white"
             />
             <span className="absolute -top-1 -right-1 text-xs animate-bounce pointer-events-none">✨</span>
@@ -306,6 +305,7 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
           <input
             type="text"
             value={searchQuery}
+            aria-label={t.common.search || "Search"}
             onFocus={() => setIsSearchOpen(true)}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -385,13 +385,13 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
       )}
 
       {/* Right controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         {/* Notifications */}
         <div className="relative">
           <button
             type="button"
             onClick={() => setShowNotifications(!showNotifications)}
-            className={`relative p-2.5 rounded-xl border transition-all cursor-pointer ${
+            className={`relative min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${
               showNotifications
                 ? "bg-[#ecf8f5] text-[#0d5c4d] border-[#c4e9e0]"
                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-transparent hover:border-slate-200"
@@ -438,6 +438,7 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
                     )}
                     <button
                       type="button"
+                      aria-label="Close notifications"
                       onClick={() => setShowNotifications(false)}
                       className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
@@ -516,14 +517,17 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
         <button
           type="button"
           onClick={() => setCurrentView("profile")}
-          className="flex items-center gap-2.5 pl-3 border-l border-slate-200 group cursor-pointer text-left focus:outline-none"
+          className="min-h-[44px] md:min-h-0 flex items-center gap-2.5 pl-2 sm:pl-3 border-l border-slate-200 group cursor-pointer text-left focus:outline-none"
           title="View & Edit Profile"
         >
           <div className="h-9 w-9 rounded-xl bg-[#0d5c4d] group-hover:bg-[#0a473b] group-hover:scale-105 flex items-center justify-center font-bold text-xs text-white shadow-sm transition-all ring-2 ring-transparent group-hover:ring-[#0d5c4d]/20 overflow-hidden shrink-0">
             {currentUser.avatar ? (
-              <img
+              <Image
                 src={currentUser.avatar}
                 alt={currentUser.name}
+                width={36}
+                height={36}
+                unoptimized
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -544,7 +548,7 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
         <button
           type="button"
           onClick={() => logoutUser()}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 text-xs font-bold transition-all cursor-pointer shadow-2xs ml-1"
+          className="min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 text-xs font-bold transition-all cursor-pointer shadow-2xs ml-1"
           title="Sign out & return to LimaT Smart Book startup page"
         >
           <LogOut className="h-3.5 w-3.5" />

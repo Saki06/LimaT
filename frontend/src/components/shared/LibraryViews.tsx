@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import Image from "next/image";
 import { useApp } from "@/context/AppContext";
 import { LibraryResource, LibraryResourceType } from "@/types/lms";
 import { api } from "@/lib/api";
@@ -9,9 +10,7 @@ import {
   BookOpen,
   FileText,
   Search,
-  Filter,
   Bookmark,
-  BookmarkCheck,
   Download,
   Eye,
   Plus,
@@ -21,36 +20,83 @@ import {
   CheckCircle2,
   AlertCircle,
   FileCheck,
-  Share2,
   Trash2,
   Edit3,
   Globe,
   Lock,
-  Users,
   Grid,
   List,
   ChevronRight,
   ChevronLeft,
   X,
-  Maximize2,
-  Minimize2,
   ZoomIn,
   ZoomOut,
-  Type,
   Sun,
   Moon,
   Coffee,
   Check,
   UploadCloud,
   Layers,
-  ArrowUpRight,
   GraduationCap,
   Award,
-  Trophy,
   Play,
   Pause,
   RotateCcw
 } from "lucide-react";
+
+interface StudentPackageSub {
+  status?: string;
+  packageId?: string;
+  package?: {
+    id?: string;
+    teacherId?: string;
+  };
+}
+
+interface BackendLibraryItem {
+  id: string;
+  title: string;
+  description?: string;
+  resourceType?: string;
+  subject: string;
+  author?: string;
+  teacherId?: string;
+  isOwner?: boolean;
+  topic?: string;
+  category?: string;
+  coverImage?: string;
+  fileUrl?: string;
+  fileType?: string;
+  fileSize?: string;
+  pageCount?: number;
+  createdAt?: string;
+  status?: LibraryResource["status"];
+  visibility?: LibraryResource["visibility"];
+  packageId?: string;
+  packageName?: string;
+  isLocked?: boolean;
+  year?: number;
+  medium?: LibraryResource["medium"];
+  examType?: LibraryResource["examType"];
+  paperPart?: LibraryResource["paperPart"];
+  hasMarkingScheme?: boolean;
+  markingSchemeUrl?: string;
+  markingSchemeNotes?: string;
+  timeAllowedMinutes?: number;
+  allowDownload?: boolean;
+  downloadsCount?: number;
+  viewsCount?: number;
+  rating?: number;
+  featured?: boolean;
+}
+
+interface TutorPackageOption {
+  id: string;
+  title: string;
+  price?: number;
+  monthlyFeeLkr?: number;
+  subject?: string;
+}
 
 interface LibraryViewsProps {
   initialTab?: "all" | "past_papers" | "tutes" | "books" | "saved" | "manage";
@@ -75,9 +121,17 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
   const [activeTab, setActiveTab] = useState<"all" | "past_papers" | "tutes" | "books" | "saved" | "manage">(initialTab);
 
   useEffect(() => {
+    let cancelled = false;
     if (initialTab) {
-      setActiveTab(initialTab);
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setActiveTab(initialTab);
+        }
+      });
     }
+    return () => {
+      cancelled = true;
+    };
   }, [initialTab]);
 
   // Search & Filters
@@ -113,7 +167,7 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
         .then((res) => {
           if (res?.success && Array.isArray(res.data)) {
             const activeIds: string[] = [];
-            res.data.forEach((sub: any) => {
+            (res.data as StudentPackageSub[]).forEach((sub) => {
               if (sub.status === "ACTIVE") {
                 if (sub.packageId) activeIds.push(sub.packageId);
                 if (sub.package?.id) activeIds.push(sub.package.id);
@@ -141,10 +195,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
   const [readerTheme, setReaderTheme] = useState<"light" | "sepia" | "dark">("light");
   const [readerFontSize, setReaderFontSize] = useState<"small" | "medium" | "large">("medium");
   const [readerCurrentChapterIndex, setReaderCurrentChapterIndex] = useState(0);
-  const [readerIsSidebarOpen, setReaderIsSidebarOpen] = useState(true);
+  const [readerIsSidebarOpen] = useState(true);
 
   // Viewer Settings State
-  const [viewerCurrentPage, setViewerCurrentPage] = useState(1);
+  const [, setViewerCurrentPage] = useState(1);
   const [viewerZoom, setViewerZoom] = useState(100);
 
   // Live Backend Resources Fetching
@@ -153,7 +207,7 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
   useEffect(() => {
     async function loadBackendResources() {
       try {
-        let res: any = null;
+        let res: { success?: boolean; data?: BackendLibraryItem[] } | null = null;
         if (currentRole === "student" && api.students?.getMyLibraryResources) {
           res = await api.students.getMyLibraryResources({
             resourceType: initialTab === "past_papers" ? "PAST_PAPER" : undefined,
@@ -166,15 +220,15 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
         }
 
         if (res?.success && Array.isArray(res.data)) {
-          const mapped: LibraryResource[] = res.data.map((item: any) => ({
+          const mapped: LibraryResource[] = res.data.map((item: BackendLibraryItem) => ({
             id: item.id,
             title: item.title,
             description: item.description || "",
             resourceType: (item.resourceType?.toLowerCase() === "past_paper"
               ? "past_paper"
               : item.resourceType?.toLowerCase() === "book"
-              ? "book"
-              : "tute") as LibraryResourceType,
+                ? "book"
+                : "tute") as LibraryResourceType,
             subject: item.subject,
             author: item.author || "Certified Tutor",
             teacherId: item.teacherId,
@@ -200,8 +254,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             isLocked: item.isLocked || false,
             year: item.year,
             medium: item.medium || "Tamil",
-            examType: item.examType || "G.C.E. A/L",
-            paperPart: item.paperPart || "Part I & II (Combined)",
+            examType: item.examType || "G.C.E. Advanced Level",
+            paperPart: item.paperPart || "Complete Set (Paper I + II)",
             hasMarkingScheme: Boolean(item.hasMarkingScheme),
             markingSchemeUrl: item.markingSchemeUrl,
             markingSchemeNotes: item.markingSchemeNotes,
@@ -303,8 +357,9 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
       return new Date(b.uploadedDate).getTime() - new Date(a.uploadedDate).getTime();
     });
   }, [
-    libraryResources,
+    combinedResources,
     currentRole,
+    initialTab,
     activeTab,
     selectedType,
     selectedYear,
@@ -399,15 +454,29 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
 
   // Practice Countdown Timer Effect
   React.useEffect(() => {
-    let interval: any = null;
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (isTimerRunning && practiceTimeRemaining > 0) {
       interval = setInterval(() => {
-        setPracticeTimeRemaining((prev) => (prev > 0 ? prev - 1 : 0));
+        setPracticeTimeRemaining((prev) => {
+          if (prev <= 1) {
+            setIsTimerRunning(false);
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
     } else if (practiceTimeRemaining === 0 && isTimerRunning) {
-      setIsTimerRunning(false);
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setIsTimerRunning(false);
+        }
+      });
     }
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      if (interval !== undefined) clearInterval(interval);
+    };
   }, [isTimerRunning, practiceTimeRemaining]);
 
   const formatTimer = (totalSeconds: number) => {
@@ -484,10 +553,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
               {activeTab === "past_papers"
                 ? "My Learning → Past Papers & Schemes"
                 : currentRole === "teacher"
-                ? "Teacher Workspace → Library"
-                : currentRole === "admin"
-                ? "Admin Control → Library Repository"
-                : "Student Workspace → Library"}
+                  ? "Teacher Workspace → Library"
+                  : currentRole === "admin"
+                    ? "Admin Control → Library Repository"
+                    : "Student Workspace → Library"}
             </h1>
             <p className="text-sm text-emerald-100/80 leading-relaxed">
               {activeTab === "past_papers"
@@ -574,43 +643,39 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
               <>
                 <button
                   onClick={() => setActiveTab("all")}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    activeTab === "all"
-                      ? "bg-white text-[#0d5c4d] shadow-xs"
-                      : "text-emerald-100 hover:text-white hover:bg-white/10"
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "all"
+                    ? "bg-white text-[#0d5c4d] shadow-xs"
+                    : "text-emerald-100 hover:text-white hover:bg-white/10"
+                    }`}
                 >
                   All Resources ({libraryResources.filter((r) => r.resourceType !== "past_paper" && r.status === "published").length})
                 </button>
                 <button
                   onClick={() => setActiveTab("tutes")}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    activeTab === "tutes"
-                      ? "bg-white text-[#0d5c4d] shadow-xs"
-                      : "text-emerald-100 hover:text-white hover:bg-white/10"
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === "tutes"
+                    ? "bg-white text-[#0d5c4d] shadow-xs"
+                    : "text-emerald-100 hover:text-white hover:bg-white/10"
+                    }`}
                 >
                   <FileText className="h-3.5 w-3.5" />
                   <span>Tutes / Study Packs</span>
                 </button>
                 <button
                   onClick={() => setActiveTab("books")}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    activeTab === "books"
-                      ? "bg-white text-[#0d5c4d] shadow-xs"
-                      : "text-emerald-100 hover:text-white hover:bg-white/10"
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === "books"
+                    ? "bg-white text-[#0d5c4d] shadow-xs"
+                    : "text-emerald-100 hover:text-white hover:bg-white/10"
+                    }`}
                 >
                   <BookOpen className="h-3.5 w-3.5" />
                   <span>Books</span>
                 </button>
                 <button
                   onClick={() => setActiveTab("saved")}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    activeTab === "saved"
-                      ? "bg-white text-[#0d5c4d] shadow-xs"
-                      : "text-emerald-100 hover:text-white hover:bg-white/10"
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === "saved"
+                    ? "bg-white text-[#0d5c4d] shadow-xs"
+                    : "text-emerald-100 hover:text-white hover:bg-white/10"
+                    }`}
                 >
                   <Bookmark className="h-3.5 w-3.5" />
                   <span>My Saved ({savedResourceIds.length})</span>
@@ -620,11 +685,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 {(currentRole === "teacher" || currentRole === "admin") && (
                   <button
                     onClick={() => setActiveTab("manage")}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                      activeTab === "manage"
-                        ? "bg-[#f3b738] text-[#0d2b26] shadow-xs"
-                        : "text-[#f3b738] hover:bg-[#f3b738]/20"
-                    }`}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === "manage"
+                      ? "bg-[#f3b738] text-[#0d2b26] shadow-xs"
+                      : "text-[#f3b738] hover:bg-[#f3b738]/20"
+                      }`}
                   >
                     <Layers className="h-3.5 w-3.5" />
                     <span>Teacher Management</span>
@@ -637,18 +701,16 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-lg transition-colors ${
-                viewMode === "grid" ? "bg-white/20 text-white" : "text-white/60 hover:text-white"
-              }`}
+              className={`p-1.5 rounded-lg transition-colors ${viewMode === "grid" ? "bg-white/20 text-white" : "text-white/60 hover:text-white"
+                }`}
               title="Grid View"
             >
               <Grid className="h-4 w-4" />
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-lg transition-colors ${
-                viewMode === "list" ? "bg-white/20 text-white" : "text-white/60 hover:text-white"
-              }`}
+              className={`p-1.5 rounded-lg transition-colors ${viewMode === "list" ? "bg-white/20 text-white" : "text-white/60 hover:text-white"
+                }`}
               title="List View"
             >
               <List className="h-4 w-4" />
@@ -738,43 +800,39 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setManagementFilter("all")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  managementFilter === "all"
-                    ? "bg-[#0d5c4d] text-white shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent"
-                }`}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${managementFilter === "all"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent"
+                  }`}
               >
                 All Uploads ({myTeacherResources.length})
               </button>
               <button
                 onClick={() => setManagementFilter("public")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  managementFilter === "public"
-                    ? "bg-emerald-600 text-white shadow-xs"
-                    : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
-                }`}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${managementFilter === "public"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
+                  }`}
               >
                 <Globe className="h-3 w-3" />
                 <span>🌐 Public ({myTeacherResources.filter((r) => r.visibility === "public" || !r.visibility).length})</span>
               </button>
               <button
                 onClick={() => setManagementFilter("subscribers_only")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  managementFilter === "subscribers_only"
-                    ? "bg-amber-600 text-white shadow-xs"
-                    : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
-                }`}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${managementFilter === "subscribers_only"
+                  ? "bg-amber-600 text-white shadow-xs"
+                  : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
+                  }`}
               >
                 <Lock className="h-3 w-3" />
                 <span>🔒 Subscribers Only ({myTeacherResources.filter((r) => r.visibility === "subscribers_only" || r.visibility === "private").length})</span>
               </button>
               <button
                 onClick={() => setManagementFilter("draft")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  managementFilter === "draft"
-                    ? "bg-slate-700 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent"
-                }`}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${managementFilter === "draft"
+                  ? "bg-slate-700 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-transparent"
+                  }`}
               >
                 Draft ({myTeacherResources.filter((r) => r.status === "draft").length})
               </button>
@@ -831,9 +889,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-8 rounded overflow-hidden bg-slate-100 shrink-0 shadow-xs border border-slate-200">
-                                <img
+                                <Image
                                   src={res.coverImage}
                                   alt={res.title}
+                                  width={32}
+                                  height={40}
+                                  unoptimized
                                   className="h-full w-full object-cover"
                                 />
                               </div>
@@ -847,13 +908,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                           </td>
                           <td className="py-3 px-4">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                isPastPaper
-                                  ? "bg-amber-50 text-amber-800 border border-amber-200"
-                                  : isBook
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isPastPaper
+                                ? "bg-amber-50 text-amber-800 border border-amber-200"
+                                : isBook
                                   ? "bg-purple-50 text-purple-700 border border-purple-200"
                                   : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              }`}
+                                }`}
                             >
                               {isPastPaper ? "Past Paper" : isBook ? "Book" : "Tute"}
                             </span>
@@ -886,13 +946,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                           </td>
                           <td className="py-3 px-4">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
-                                res.status === "published"
-                                  ? "bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0]"
-                                  : res.status === "draft"
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${res.status === "published"
+                                ? "bg-[#ecf8f5] text-[#0d5c4d] border border-[#c4e9e0]"
+                                : res.status === "draft"
                                   ? "bg-amber-50 text-amber-700 border border-amber-200"
                                   : "bg-slate-100 text-slate-600 border border-slate-200"
-                              }`}
+                                }`}
                             >
                               {res.status}
                             </span>
@@ -922,11 +981,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                                         : `"${res.title}" is now restricted to your tuition subscribers.`
                                   });
                                 }}
-                                className={`p-1.5 rounded-lg transition-colors ${
-                                  isSubOnly
-                                    ? "text-amber-600 hover:bg-amber-50"
-                                    : "text-emerald-600 hover:bg-emerald-50"
-                                }`}
+                                className={`p-1.5 rounded-lg transition-colors ${isSubOnly
+                                  ? "text-amber-600 hover:bg-amber-50"
+                                  : "text-emerald-600 hover:bg-emerald-50"
+                                  }`}
                                 title={
                                   isSubOnly
                                     ? "Click to switch to Public Access (Free for all)"
@@ -943,11 +1001,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                                     res.status === "published" ? "unpublished" : "published";
                                   updateLibraryResource(res.id, { status: newStatus });
                                 }}
-                                className={`p-1.5 rounded-lg transition-colors ${
-                                  res.status === "published"
-                                    ? "text-emerald-600 hover:bg-emerald-50"
-                                    : "text-slate-400 hover:bg-slate-100"
-                                }`}
+                                className={`p-1.5 rounded-lg transition-colors ${res.status === "published"
+                                  ? "text-emerald-600 hover:bg-emerald-50"
+                                  : "text-slate-400 hover:bg-slate-100"
+                                  }`}
                                 title={res.status === "published" ? "Unpublish" : "Publish"}
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5" />
@@ -1002,6 +1059,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 />
                 {searchQuery && (
                   <button
+                    type="button"
+                    aria-label="Clear library search"
                     onClick={() => setSearchQuery("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                   >
@@ -1041,7 +1100,7 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
               {/* Sort By */}
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as "recent" | "popular" | "rating" | "title")}
                 className="py-2.5 px-3 rounded-xl border border-[#d6dfd9] text-xs bg-white text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-[#0d5c4d]/20"
               >
                 <option value="recent">Recently Added</option>
@@ -1058,32 +1117,29 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                   <span className="text-slate-400 font-medium mr-1">Resource Type:</span>
                   <button
                     onClick={() => setSelectedType("all")}
-                    className={`px-3 py-1 rounded-lg font-bold transition-all ${
-                      selectedType === "all"
-                        ? "bg-[#0d5c4d] text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all ${selectedType === "all"
+                      ? "bg-[#0d5c4d] text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
                   >
                     All
                   </button>
                   <button
                     onClick={() => setSelectedType("book")}
-                    className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
-                      selectedType === "book"
-                        ? "bg-[#0d5c4d] text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${selectedType === "book"
+                      ? "bg-[#0d5c4d] text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
                   >
                     <BookOpen className="h-3 w-3" />
                     <span>Books</span>
                   </button>
                   <button
                     onClick={() => setSelectedType("tute")}
-                    className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${
-                      selectedType === "tute"
-                        ? "bg-[#0d5c4d] text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 ${selectedType === "tute"
+                      ? "bg-[#0d5c4d] text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
                   >
                     <FileText className="h-3 w-3" />
                     <span>Tutes / Study Materials</span>
@@ -1095,18 +1151,18 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                   selectedSubject !== "all" ||
                   selectedCategory !== "all" ||
                   selectedType !== "all") && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery("");
-                      setSelectedSubject("all");
-                      setSelectedCategory("all");
-                      setSelectedType("all");
-                    }}
-                    className="text-xs text-rose-600 font-bold hover:underline"
-                  >
-                    Clear all filters
-                  </button>
-                )}
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSelectedSubject("all");
+                        setSelectedCategory("all");
+                        setSelectedType("all");
+                      }}
+                      className="text-xs text-rose-600 font-bold hover:underline"
+                    >
+                      Clear all filters
+                    </button>
+                  )}
               </div>
             )}
 
@@ -1200,9 +1256,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                     className="group bg-white rounded-2xl p-4 border border-[#e6ece8] shadow-xs hover:shadow-md hover:border-[#c4e9e0] transition-all cursor-pointer flex gap-4 items-center"
                   >
                     <div className="relative w-16 h-22 shrink-0 rounded-lg overflow-hidden bg-slate-100 shadow-sm border border-slate-200">
-                      <img
+                      <Image
                         src={res.coverImage}
                         alt={res.title}
+                        width={64}
+                        height={88}
+                        unoptimized
                         className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                       <span className="absolute bottom-1 right-1 px-1 py-0.2 rounded text-[8px] font-bold bg-black/60 text-white uppercase">
@@ -1283,9 +1342,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                     >
                       {/* Card Cover & Badges */}
                       <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
-                        <img
+                        <Image
                           src={res.coverImage}
                           alt={res.title}
+                          width={400}
+                          height={250}
+                          unoptimized
                           className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
@@ -1304,13 +1366,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                         <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span
-                              className={`px-2.5 py-0.8 rounded-full text-[10px] font-extrabold uppercase tracking-wider backdrop-blur-md shadow-xs ${
-                                isPastPaper
-                                  ? "bg-amber-500/95 text-white"
-                                  : isBook
+                              className={`px-2.5 py-0.8 rounded-full text-[10px] font-extrabold uppercase tracking-wider backdrop-blur-md shadow-xs ${isPastPaper
+                                ? "bg-amber-500/95 text-white"
+                                : isBook
                                   ? "bg-purple-600/90 text-white"
                                   : "bg-[#0d5c4d]/90 text-white"
-                              }`}
+                                }`}
                             >
                               {isPastPaper ? "Past Paper & Scheme" : isBook ? "Book" : "Tute"}
                             </span>
@@ -1329,11 +1390,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                               e.stopPropagation();
                               toggleSaveResource(res.id);
                             }}
-                            className={`p-1.5 rounded-full backdrop-blur-md transition-all ${
-                              isSaved
-                                ? "bg-[#f3b738] text-[#0d2b26] shadow-sm"
-                                : "bg-black/30 hover:bg-black/50 text-white"
-                            }`}
+                            className={`p-1.5 rounded-full backdrop-blur-md transition-all ${isSaved
+                              ? "bg-[#f3b738] text-[#0d2b26] shadow-sm"
+                              : "bg-black/30 hover:bg-black/50 text-white"
+                              }`}
                             title={isSaved ? "Remove Bookmark" : "Save Resource"}
                           >
                             <Bookmark className={`h-3.5 w-3.5 ${isSaved ? "fill-current" : ""}`} />
@@ -1408,11 +1468,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                             <>
                               <button
                                 onClick={() => handleOpenResource(res)}
-                                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl font-bold text-xs transition-colors ${
-                                  isPastPaper
-                                    ? "bg-[#fef7e6] hover:bg-[#fde4af] text-[#b47a16]"
-                                    : "bg-[#ecf8f5] hover:bg-[#c4e9e0] text-[#0d5c4d]"
-                                }`}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl font-bold text-xs transition-colors ${isPastPaper
+                                  ? "bg-[#fef7e6] hover:bg-[#fde4af] text-[#b47a16]"
+                                  : "bg-[#ecf8f5] hover:bg-[#c4e9e0] text-[#0d5c4d]"
+                                  }`}
                               >
                                 {isPastPaper ? (
                                   <>
@@ -1475,9 +1534,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                           onClick={() => handleOpenResource(res)}
                           className="relative w-16 h-20 shrink-0 rounded-lg overflow-hidden bg-slate-100 shadow-xs border border-slate-200 cursor-pointer"
                         >
-                          <img
+                          <Image
                             src={res.coverImage}
                             alt={res.title}
+                            width={64}
+                            height={80}
+                            unoptimized
                             className="h-full w-full object-cover"
                           />
                           {!unlocked && (
@@ -1490,11 +1552,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                isBook
-                                  ? "bg-purple-100 text-purple-700"
-                                  : "bg-[#ecf8f5] text-[#0d5c4d]"
-                              }`}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${isBook
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-[#ecf8f5] text-[#0d5c4d]"
+                                }`}
                             >
                               {isBook ? "Book" : "Tute"}
                             </span>
@@ -1534,11 +1595,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
 
                         <button
                           onClick={() => toggleSaveResource(res.id)}
-                          className={`p-2 rounded-xl border transition-colors ${
-                            isSaved
-                              ? "bg-[#fef7e6] text-[#b47a16] border-[#fde4af]"
-                              : "border-[#d6dfd9] text-slate-500 hover:bg-slate-100"
-                          }`}
+                          className={`p-2 rounded-xl border transition-colors ${isSaved
+                            ? "bg-[#fef7e6] text-[#b47a16] border-[#fde4af]"
+                            : "border-[#d6dfd9] text-slate-500 hover:bg-slate-100"
+                            }`}
                           title={isSaved ? "Saved" : "Save"}
                         >
                           <Bookmark className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`} />
@@ -1568,8 +1628,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                               {res.resourceType === "past_paper"
                                 ? "Solve & Scheme"
                                 : isBook
-                                ? "Read Book"
-                                : "View Tute"}
+                                  ? "Read Book"
+                                  : "View Tute"}
                             </span>
                           </button>
                         )}
@@ -1608,6 +1668,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 <span className="text-xs font-semibold text-slate-500">{selectedBook.subject}</span>
               </div>
               <button
+                type="button"
+                aria-label="Close book details"
                 onClick={() => setSelectedBook(null)}
                 className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
               >
@@ -1620,9 +1682,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
               <div className="flex flex-col sm:flex-row gap-6">
                 {/* 3D Book Cover Presentation */}
                 <div className="w-36 h-48 sm:w-44 sm:h-60 rounded-xl overflow-hidden bg-slate-100 shadow-md border border-slate-200 shrink-0 mx-auto sm:mx-0">
-                  <img
+                  <Image
                     src={selectedBook.coverImage}
                     alt={selectedBook.title}
+                    width={176}
+                    height={240}
+                    unoptimized
                     className="h-full w-full object-cover"
                   />
                 </div>
@@ -1694,11 +1759,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             <div className="p-6 border-t border-[#e6ece8] bg-[#fbfcfb] flex flex-wrap items-center justify-between gap-3">
               <button
                 onClick={() => toggleSaveResource(selectedBook.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${
-                  savedResourceIds.includes(selectedBook.id)
-                    ? "bg-[#fef7e6] text-[#b47a16] border-[#fde4af]"
-                    : "border-slate-300 text-slate-600 hover:bg-slate-100"
-                }`}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${savedResourceIds.includes(selectedBook.id)
+                  ? "bg-[#fef7e6] text-[#b47a16] border-[#fde4af]"
+                  : "border-slate-300 text-slate-600 hover:bg-slate-100"
+                  }`}
               >
                 <Bookmark className="h-4 w-4" />
                 <span>{savedResourceIds.includes(selectedBook.id) ? "Saved" : "Save Book"}</span>
@@ -1743,6 +1807,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 <span className="text-xs font-semibold text-slate-500">{selectedTute.subject}</span>
               </div>
               <button
+                type="button"
+                aria-label="Close study material details"
                 onClick={() => setSelectedTute(null)}
                 className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
               >
@@ -1754,9 +1820,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             <div className="p-6 space-y-6">
               <div className="flex flex-col sm:flex-row gap-5">
                 <div className="w-32 h-44 rounded-xl overflow-hidden bg-slate-100 shadow-sm border border-slate-200 shrink-0 mx-auto sm:mx-0">
-                  <img
+                  <Image
                     src={selectedTute.coverImage}
                     alt={selectedTute.title}
+                    width={128}
+                    height={176}
+                    unoptimized
                     className="h-full w-full object-cover"
                   />
                 </div>
@@ -1820,11 +1889,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             <div className="p-6 border-t border-[#e6ece8] bg-[#fbfcfb] flex flex-wrap items-center justify-between gap-3">
               <button
                 onClick={() => toggleSaveResource(selectedTute.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${
-                  savedResourceIds.includes(selectedTute.id)
-                    ? "bg-[#fef7e6] text-[#b47a16] border-[#fde4af]"
-                    : "border-slate-300 text-slate-600 hover:bg-slate-100"
-                }`}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${savedResourceIds.includes(selectedTute.id)
+                  ? "bg-[#fef7e6] text-[#b47a16] border-[#fde4af]"
+                  : "border-slate-300 text-slate-600 hover:bg-slate-100"
+                  }`}
               >
                 <Bookmark className="h-4 w-4" />
                 <span>{savedResourceIds.includes(selectedTute.id) ? "Saved" : "Save Tute"}</span>
@@ -1877,6 +1945,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 )}
               </div>
               <button
+                type="button"
+                aria-label="Close past paper modal"
                 onClick={() => {
                   setSelectedPastPaper(null);
                   setIsTimerRunning(false);
@@ -1909,33 +1979,30 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             <div className="px-6 pt-3 border-b border-[#eef4f1] flex items-center gap-2 overflow-x-auto">
               <button
                 onClick={() => setPastPaperTab("question_paper")}
-                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-                  pastPaperTab === "question_paper"
-                    ? "border-[#0d5c4d] text-[#0d5c4d]"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
-                }`}
+                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${pastPaperTab === "question_paper"
+                  ? "border-[#0d5c4d] text-[#0d5c4d]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
               >
                 <FileText className="w-3.5 h-3.5" />
                 <span>Question Paper</span>
               </button>
               <button
                 onClick={() => setPastPaperTab("marking_scheme")}
-                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-                  pastPaperTab === "marking_scheme"
-                    ? "border-[#0d5c4d] text-[#0d5c4d]"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
-                }`}
+                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${pastPaperTab === "marking_scheme"
+                  ? "border-[#0d5c4d] text-[#0d5c4d]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
               >
                 <Award className="w-3.5 h-3.5 text-amber-500" />
                 <span>Official Marking Scheme &amp; Rubric</span>
               </button>
               <button
                 onClick={() => setPastPaperTab("timed_practice")}
-                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-                  pastPaperTab === "timed_practice"
-                    ? "border-[#0d5c4d] text-[#0d5c4d]"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
-                }`}
+                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${pastPaperTab === "timed_practice"
+                  ? "border-[#0d5c4d] text-[#0d5c4d]"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
               >
                 <Clock className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Timed Practice Simulator (3h)</span>
@@ -2051,11 +2118,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setIsTimerRunning(!isTimerRunning)}
-                        className={`px-4 py-2.5 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-sm transition-all ${
-                          isTimerRunning
-                            ? "bg-rose-600 hover:bg-rose-700 text-white"
-                            : "bg-[#f3b738] hover:bg-[#e0a424] text-[#0d2b26]"
-                        }`}
+                        className={`px-4 py-2.5 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-sm transition-all ${isTimerRunning
+                          ? "bg-rose-600 hover:bg-rose-700 text-white"
+                          : "bg-[#f3b738] hover:bg-[#e0a424] text-[#0d2b26]"
+                          }`}
                       >
                         {isTimerRunning ? (
                           <>
@@ -2102,11 +2168,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             <div className="p-6 border-t border-[#e6ece8] bg-[#fbfcfb] flex flex-wrap items-center justify-between gap-3">
               <button
                 onClick={() => toggleSaveResource(selectedPastPaper.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${
-                  savedResourceIds.includes(selectedPastPaper.id)
-                    ? "bg-[#fef7e6] text-[#b47a16] border-[#fde4af]"
-                    : "border-slate-300 text-slate-600 hover:bg-slate-100"
-                }`}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${savedResourceIds.includes(selectedPastPaper.id)
+                  ? "bg-[#fef7e6] text-[#b47a16] border-[#fde4af]"
+                  : "border-slate-300 text-slate-600 hover:bg-slate-100"
+                  }`}
               >
                 <Bookmark className="h-4 w-4" />
                 <span>{savedResourceIds.includes(selectedPastPaper.id) ? "Saved" : "Save Paper"}</span>
@@ -2143,13 +2208,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col">
           {/* Reader Top Bar */}
           <div
-            className={`px-4 sm:px-6 py-3 border-b flex items-center justify-between transition-colors ${
-              readerTheme === "dark"
-                ? "bg-slate-900 border-slate-800 text-white"
-                : readerTheme === "sepia"
+            className={`px-4 sm:px-6 py-3 border-b flex items-center justify-between transition-colors ${readerTheme === "dark"
+              ? "bg-slate-900 border-slate-800 text-white"
+              : readerTheme === "sepia"
                 ? "bg-[#fbf0d9] border-[#e8d8b8] text-[#5f4b32]"
                 : "bg-white border-slate-200 text-[#0d2b26]"
-            }`}
+              }`}
           >
             <div className="flex items-center gap-3">
               <button
@@ -2173,27 +2237,24 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
               <div className="flex items-center gap-1 bg-black/5 p-1 rounded-lg">
                 <button
                   onClick={() => setReaderFontSize("small")}
-                  className={`px-2 py-0.5 text-xs rounded font-bold ${
-                    readerFontSize === "small" ? "bg-white shadow-xs" : "opacity-60"
-                  }`}
+                  className={`px-2 py-0.5 text-xs rounded font-bold ${readerFontSize === "small" ? "bg-white shadow-xs" : "opacity-60"
+                    }`}
                   title="Small Text"
                 >
                   A-
                 </button>
                 <button
                   onClick={() => setReaderFontSize("medium")}
-                  className={`px-2 py-0.5 text-xs rounded font-bold ${
-                    readerFontSize === "medium" ? "bg-white shadow-xs" : "opacity-60"
-                  }`}
+                  className={`px-2 py-0.5 text-xs rounded font-bold ${readerFontSize === "medium" ? "bg-white shadow-xs" : "opacity-60"
+                    }`}
                   title="Medium Text"
                 >
                   A
                 </button>
                 <button
                   onClick={() => setReaderFontSize("large")}
-                  className={`px-2 py-0.5 text-xs rounded font-bold ${
-                    readerFontSize === "large" ? "bg-white shadow-xs" : "opacity-60"
-                  }`}
+                  className={`px-2 py-0.5 text-xs rounded font-bold ${readerFontSize === "large" ? "bg-white shadow-xs" : "opacity-60"
+                    }`}
                   title="Large Text"
                 >
                   A+
@@ -2227,6 +2288,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
 
               {/* Close Button */}
               <button
+                type="button"
+                aria-label="Close book reader"
                 onClick={() => setActiveReaderResource(null)}
                 className="p-1.5 rounded-lg hover:bg-black/10 transition-colors"
               >
@@ -2240,13 +2303,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             {/* Table of Contents Drawer */}
             {readerIsSidebarOpen && activeReaderResource.sampleContent && (
               <div
-                className={`w-64 border-r overflow-y-auto hidden md:block p-4 space-y-2 shrink-0 ${
-                  readerTheme === "dark"
-                    ? "bg-slate-900 border-slate-800 text-slate-300"
-                    : readerTheme === "sepia"
+                className={`w-64 border-r overflow-y-auto hidden md:block p-4 space-y-2 shrink-0 ${readerTheme === "dark"
+                  ? "bg-slate-900 border-slate-800 text-slate-300"
+                  : readerTheme === "sepia"
                     ? "bg-[#f5e7c8] border-[#e8d8b8] text-[#5f4b32]"
                     : "bg-slate-50 border-slate-200 text-slate-700"
-                }`}
+                  }`}
               >
                 <h4 className="text-[11px] font-bold uppercase tracking-wider opacity-60">
                   Contents & Chapters
@@ -2256,11 +2318,10 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                     <button
                       key={idx}
                       onClick={() => setReaderCurrentChapterIndex(idx)}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                        readerCurrentChapterIndex === idx
-                          ? "bg-[#0d5c4d] text-white shadow-xs"
-                          : "hover:bg-black/5"
-                      }`}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-all ${readerCurrentChapterIndex === idx
+                        ? "bg-[#0d5c4d] text-white shadow-xs"
+                        : "hover:bg-black/5"
+                        }`}
                     >
                       <p className="line-clamp-1">{chapter.chapterTitle}</p>
                       <p className="text-[10px] opacity-75 font-mono">Page {chapter.pageNumber}</p>
@@ -2275,17 +2336,16 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
 
             {/* Reader Content Page View */}
             <div
-              className={`flex-1 overflow-y-auto p-6 sm:p-12 flex justify-center ${
-                readerTheme === "dark"
-                  ? "bg-slate-950 text-slate-200"
-                  : readerTheme === "sepia"
+              className={`flex-1 overflow-y-auto p-6 sm:p-12 flex justify-center ${readerTheme === "dark"
+                ? "bg-slate-950 text-slate-200"
+                : readerTheme === "sepia"
                   ? "bg-[#fbf0d9] text-[#4a3928]"
                   : "bg-[#f8faf8] text-[#1c2e29]"
-              }`}
+                }`}
             >
               <div className="max-w-2xl w-full space-y-6">
                 {activeReaderResource.sampleContent &&
-                activeReaderResource.sampleContent[readerCurrentChapterIndex] ? (
+                  activeReaderResource.sampleContent[readerCurrentChapterIndex] ? (
                   <>
                     <div className="border-b pb-4 border-current/10">
                       <span className="text-[11px] font-mono opacity-60">
@@ -2300,13 +2360,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                     </div>
 
                     <div
-                      className={`leading-relaxed tracking-normal font-serif ${
-                        readerFontSize === "small"
-                          ? "text-sm leading-6"
-                          : readerFontSize === "large"
+                      className={`leading-relaxed tracking-normal font-serif ${readerFontSize === "small"
+                        ? "text-sm leading-6"
+                        : readerFontSize === "large"
                           ? "text-lg leading-8"
                           : "text-base leading-7"
-                      }`}
+                        }`}
                     >
                       <p className="text-justify indent-6">
                         {activeReaderResource.sampleContent[readerCurrentChapterIndex].text}
@@ -2331,13 +2390,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
 
           {/* Reader Bottom Navigation Bar */}
           <div
-            className={`px-6 py-3 border-t flex items-center justify-between text-xs font-semibold ${
-              readerTheme === "dark"
-                ? "bg-slate-900 border-slate-800 text-slate-400"
-                : readerTheme === "sepia"
+            className={`px-6 py-3 border-t flex items-center justify-between text-xs font-semibold ${readerTheme === "dark"
+              ? "bg-slate-900 border-slate-800 text-slate-400"
+              : readerTheme === "sepia"
                 ? "bg-[#fbf0d9] border-[#e8d8b8] text-[#5f4b32]"
                 : "bg-white border-slate-200 text-slate-600"
-            }`}
+              }`}
           >
             <button
               disabled={readerCurrentChapterIndex === 0}
@@ -2384,6 +2442,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
           <div className="bg-slate-900 text-white px-6 py-3 flex items-center justify-between border-b border-slate-800">
             <div className="flex items-center gap-3">
               <button
+                type="button"
+                aria-label="Back from viewer"
                 onClick={() => setActiveViewerResource(null)}
                 className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
               >
@@ -2401,6 +2461,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-lg text-xs">
                 <button
+                  type="button"
+                  aria-label="Zoom out"
                   onClick={() => setViewerZoom((z) => Math.max(75, z - 25))}
                   className="p-1 hover:text-emerald-400"
                 >
@@ -2408,6 +2470,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 </button>
                 <span className="px-1 text-[11px] font-mono">{viewerZoom}%</span>
                 <button
+                  type="button"
+                  aria-label="Zoom in"
                   onClick={() => setViewerZoom((z) => Math.min(175, z + 25))}
                   className="p-1 hover:text-emerald-400"
                 >
@@ -2426,6 +2490,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
               )}
 
               <button
+                type="button"
+                aria-label="Close material viewer"
                 onClick={() => setActiveViewerResource(null)}
                 className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
               >
@@ -2544,7 +2610,7 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
               <h3 className="text-base font-bold text-[#0d2b26]">Delete Library Resource?</h3>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                 Are you sure you want to permanently delete{" "}
-                <span className="font-bold text-slate-700">"{resourceToDelete.title}"</span>? This
+                <span className="font-bold text-slate-700">&quot;{resourceToDelete.title}&quot;</span>? This
                 will remove student access and saved bookmarks.
               </p>
             </div>
@@ -2586,6 +2652,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                 </div>
               </div>
               <button
+                type="button"
+                aria-label="Close subscriber access dialog"
                 onClick={() => setLockedResourceModal(null)}
                 className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
               >
@@ -2596,9 +2664,12 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
             {/* Resource Preview Card */}
             <div className="p-3.5 rounded-2xl bg-[#f8faf9] border border-[#e6ece8] flex items-start gap-3">
               <div className="h-14 w-11 rounded-lg overflow-hidden bg-slate-200 shrink-0 border border-slate-300 shadow-xs">
-                <img
+                <Image
                   src={lockedResourceModal.coverImage}
                   alt={lockedResourceModal.title}
+                  width={44}
+                  height={56}
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               </div>
@@ -2608,8 +2679,8 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                     {lockedResourceModal.resourceType === "past_paper"
                       ? "Past Paper & Scheme"
                       : lockedResourceModal.resourceType === "book"
-                      ? "Textbook"
-                      : "Revision Tute"}
+                        ? "Textbook"
+                        : "Revision Tute"}
                   </span>
                   <span className="text-[10px] font-bold text-slate-500">{lockedResourceModal.subject}</span>
                 </div>
@@ -2679,7 +2750,7 @@ export function LibraryViews({ initialTab = "all" }: LibraryViewsProps) {
                         setLockedResourceModal(null);
                         return;
                       }
-                    } catch (e: any) {
+                    } catch (e: unknown) {
                       console.warn("Direct subscribe error:", e);
                     }
                   }
@@ -2737,13 +2808,13 @@ function TeacherUploadModal({
   const [topic, setTopic] = useState(resource?.topic || "");
   const [category, setCategory] = useState(resource?.category || "Advanced Level");
   const [fileType, setFileType] = useState(resource?.fileType || "PDF");
-  const [fileSize, setFileSize] = useState(resource?.fileSize || "4.5 MB");
+  const [fileSize] = useState(resource?.fileSize || "4.5 MB");
   const [visibility, setVisibility] = useState<"public" | "subscribers_only" | "class_only" | "private">(
     resource?.visibility || "subscribers_only"
   );
 
   // Available packages for this tutor
-  const [tutorPackages, setTutorPackages] = useState<any[]>([]);
+  const [tutorPackages, setTutorPackages] = useState<TutorPackageOption[]>([]);
 
   const [selectedPackageId, setSelectedPackageId] = useState<string>(
     resource?.packageId || ""
@@ -2897,6 +2968,8 @@ function TeacherUploadModal({
             </p>
           </div>
           <button
+            type="button"
+            aria-label="Close upload resource modal"
             onClick={onClose}
             className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
           >
@@ -2920,11 +2993,10 @@ function TeacherUploadModal({
               <button
                 type="button"
                 onClick={() => setResourceType("book")}
-                className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left ${
-                  resourceType === "book"
-                    ? "bg-purple-50/70 border-purple-300 text-purple-900 shadow-xs ring-1 ring-purple-400/30"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left ${resourceType === "book"
+                  ? "bg-purple-50/70 border-purple-300 text-purple-900 shadow-xs ring-1 ring-purple-400/30"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
               >
                 <BookOpen className="h-4 w-4 text-purple-600 shrink-0" />
                 <div>
@@ -2936,11 +3008,10 @@ function TeacherUploadModal({
               <button
                 type="button"
                 onClick={() => setResourceType("tute")}
-                className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left ${
-                  resourceType === "tute"
-                    ? "bg-[#ecf8f5] border-[#a5f3df] text-[#0d5c4d] shadow-xs ring-1 ring-[#0d5c4d]/30"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left ${resourceType === "tute"
+                  ? "bg-[#ecf8f5] border-[#a5f3df] text-[#0d5c4d] shadow-xs ring-1 ring-[#0d5c4d]/30"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
               >
                 <FileText className="h-4 w-4 text-[#0d5c4d] shrink-0" />
                 <div>
@@ -2952,11 +3023,10 @@ function TeacherUploadModal({
               <button
                 type="button"
                 onClick={() => setResourceType("past_paper")}
-                className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left ${
-                  resourceType === "past_paper"
-                    ? "bg-amber-50/80 border-amber-300 text-amber-950 shadow-xs ring-1 ring-amber-400/40"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                className={`p-3 rounded-xl border flex items-center gap-2.5 transition-all text-left ${resourceType === "past_paper"
+                  ? "bg-amber-50/80 border-amber-300 text-amber-950 shadow-xs ring-1 ring-amber-400/40"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
               >
                 <GraduationCap className="h-4 w-4 text-amber-600 shrink-0" />
                 <div>
@@ -2995,7 +3065,7 @@ function TeacherUploadModal({
                   <label className="font-bold text-slate-700 text-[11px]">Medium *</label>
                   <select
                     value={medium}
-                    onChange={(e) => setMedium(e.target.value as any)}
+                    onChange={(e) => setMedium(e.target.value as "Tamil" | "English" | "Sinhala" | "Trilingual" | "All")}
                     className="w-full px-2.5 py-1.5 rounded-lg border border-amber-200 bg-white text-xs font-semibold"
                   >
                     <option value="Tamil">Tamil (தமிழ்)</option>
@@ -3009,7 +3079,7 @@ function TeacherUploadModal({
                   <label className="font-bold text-slate-700 text-[11px]">Exam Level *</label>
                   <select
                     value={examType}
-                    onChange={(e) => setExamType(e.target.value as any)}
+                    onChange={(e) => setExamType(e.target.value as "G.C.E. Advanced Level" | "G.C.E. Ordinary Level" | "Provincial Term Test" | "School Model Paper")}
                     className="w-full px-2.5 py-1.5 rounded-lg border border-amber-200 bg-white text-xs font-semibold"
                   >
                     <option value="G.C.E. Advanced Level">G.C.E. A/L</option>
@@ -3023,7 +3093,7 @@ function TeacherUploadModal({
                   <label className="font-bold text-slate-700 text-[11px]">Component</label>
                   <select
                     value={paperPart}
-                    onChange={(e) => setPaperPart(e.target.value as any)}
+                    onChange={(e) => setPaperPart(e.target.value as "Paper I (MCQ)" | "Paper II (Structured & Essay)" | "Complete Set (Paper I + II)" | "Marking Scheme")}
                     className="w-full px-2.5 py-1.5 rounded-lg border border-amber-200 bg-white text-xs font-semibold"
                   >
                     <option value="Complete Set (Paper I + II)">Both (Paper I + II)</option>
@@ -3178,16 +3248,19 @@ function TeacherUploadModal({
                 <button
                   key={idx}
                   type="button"
+                  aria-label={`Select cover ${preset.label}`}
                   onClick={() => setCoverImage(preset.url)}
-                  className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${
-                    coverImage === preset.url
-                      ? "border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/30"
-                      : "border-transparent opacity-60 hover:opacity-100"
-                  }`}
+                  className={`relative aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all ${coverImage === preset.url
+                    ? "border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/30"
+                    : "border-transparent opacity-60 hover:opacity-100"
+                    }`}
                 >
-                  <img
+                  <Image
                     src={preset.url}
                     alt={preset.label}
+                    width={120}
+                    height={160}
+                    unoptimized
                     className="h-full w-full object-cover"
                   />
                   {coverImage === preset.url && (
@@ -3217,11 +3290,10 @@ function TeacherUploadModal({
                   key={fmt}
                   type="button"
                   onClick={() => setFileType(fmt)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    fileType === fmt
-                      ? "bg-[#0d5c4d] text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${fileType === fmt
+                    ? "bg-[#0d5c4d] text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
                 >
                   {fmt}
                 </button>
@@ -3243,11 +3315,10 @@ function TeacherUploadModal({
               <button
                 type="button"
                 onClick={() => setVisibility("public")}
-                className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all ${
-                  visibility === "public"
-                    ? "bg-emerald-50/80 border-emerald-300 text-emerald-950 shadow-xs ring-2 ring-emerald-500/20"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all ${visibility === "public"
+                  ? "bg-emerald-50/80 border-emerald-300 text-emerald-950 shadow-xs ring-2 ring-emerald-500/20"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
               >
                 <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${visibility === "public" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
                   <Globe className="h-4 w-4" />
@@ -3264,11 +3335,10 @@ function TeacherUploadModal({
               <button
                 type="button"
                 onClick={() => setVisibility("subscribers_only")}
-                className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all ${
-                  visibility === "subscribers_only" || visibility === "private"
-                    ? "bg-amber-50/80 border-amber-300 text-amber-950 shadow-xs ring-2 ring-amber-500/20"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all ${visibility === "subscribers_only" || visibility === "private"
+                  ? "bg-amber-50/80 border-amber-300 text-amber-950 shadow-xs ring-2 ring-amber-500/20"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
               >
                 <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${visibility === "subscribers_only" || visibility === "private" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
                   <Lock className="h-4 w-4" />
@@ -3318,7 +3388,7 @@ function TeacherUploadModal({
                   )}
                 </select>
                 <p className="text-[10px] text-amber-800/80 leading-relaxed">
-                  Students without an active monthly subscription to this package will see a "Subscribe to Unlock (LKR {selectedPackagePrice.toLocaleString()})" prompt.
+                  Students without an active monthly subscription to this package will see a &quot;Subscribe to Unlock (LKR {selectedPackagePrice.toLocaleString()})&quot; prompt.
                 </p>
               </div>
             )}

@@ -3,7 +3,6 @@ import { Response } from 'express';
 import { prisma } from '../config/prisma';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { avatarDirectory } from '../middlewares/avatarUpload.middleware';
-import { fromFile } from 'file-type';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
@@ -12,6 +11,53 @@ const allowedFormats: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
+};
+
+/**
+ * Dependency-free magic-byte validator for JPEG, PNG, and WebP images.
+ * Reads only the first 12 bytes to eliminate external parser attack surface (VULN-11).
+ */
+const detectImageSignature = async (
+  filePath: string
+): Promise<{ mime: 'image/jpeg' | 'image/png' | 'image/webp' } | null> => {
+  const handle = await fs.open(filePath, 'r');
+  try {
+    const buf = Buffer.alloc(12);
+    const { bytesRead } = await handle.read(buf, 0, 12, 0);
+
+    // JPEG: FF D8 FF
+    if (bytesRead >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+      return { mime: 'image/jpeg' };
+    }
+
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if (
+      bytesRead >= 8 &&
+      buf[0] === 0x89 &&
+      buf[1] === 0x50 &&
+      buf[2] === 0x4e &&
+      buf[3] === 0x47 &&
+      buf[4] === 0x0d &&
+      buf[5] === 0x0a &&
+      buf[6] === 0x1a &&
+      buf[7] === 0x0a
+    ) {
+      return { mime: 'image/png' };
+    }
+
+    // WebP: "RIFF" + 4-byte size + "WEBP"
+    if (
+      bytesRead >= 12 &&
+      buf.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buf.subarray(8, 12).toString('ascii') === 'WEBP'
+    ) {
+      return { mime: 'image/webp' };
+    }
+
+    return null;
+  } finally {
+    await handle.close();
+  }
 };
 
 const deleteFile = async (filePath: string): Promise<void> => {
@@ -41,7 +87,7 @@ export const uploadSuperAdminAvatarController = async (
   let finalPath: string | null = null;
 
   try {
-    const detectedType = await fromFile(uploadedFile.path);
+    const detectedType = await detectImageSignature(uploadedFile.path);
 
     if (
       !detectedType ||

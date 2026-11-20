@@ -80,11 +80,11 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
           message: res.message || "Invalid email or password. Please verify your credentials."
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       addToast({
         type: "error",
         title: "Connection Error",
-        message: err.message || "Could not reach the authentication server."
+        message: err instanceof Error ? err.message : "Could not reach the authentication server."
       });
     } finally {
       setIsLoading(false);
@@ -252,6 +252,7 @@ export function LoginForm({ selectedRole, onSuccess }: LoginFormProps) {
                 />
                 <button
                   type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   onClick={() => setShowPassword(!showPassword)}
                   className="p-1 rounded-md text-slate-400 hover:text-slate-600 absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer"
                 >

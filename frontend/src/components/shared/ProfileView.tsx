@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import NextImage from "next/image";
 import { useApp } from "@/context/AppContext";
 import {
   User,
@@ -22,19 +23,14 @@ import {
   Calendar,
   Clock,
   Download,
-  UserCheck,
   ShieldCheck,
   Trophy,
   Award,
   Activity,
-  Medal,
-  Zap,
-  Briefcase,
   Video,
   ExternalLink,
   DollarSign,
   Building2,
-  Sliders,
   CreditCard,
   TrendingUp,
   BarChart3,
@@ -43,28 +39,82 @@ import {
   Globe,
   Share2,
   Sparkles,
-  Send,
   Eye,
   X,
   Lock,
   Plus,
   Trash2,
-  HelpCircle,
   Phone,
-  MessageSquare,
-  AlertCircle,
-  AlertTriangle,
   Mail,
   FileText,
   Loader2
 } from "lucide-react";
 import {
+  Assignment,
   TeacherQualification,
   TeacherAccreditation,
   TeacherBankAccount,
   TeacherSocialChannel
 } from "@/types/lms";
 import { api } from "@/lib/api";
+
+interface EnrolledCourseRecord {
+  id?: string;
+  title: string;
+  code?: string;
+  gradeLevel?: string;
+  gradeName?: string;
+  subject?: string;
+  totalLessons?: number;
+  completedLessons?: number;
+  teacherName?: string;
+  teacher?: {
+    user?: {
+      firstName?: string;
+      lastName?: string;
+    };
+  };
+  liveClasses?: { title?: string }[];
+  assignments?: unknown[];
+  enrollmentType?: string;
+  packageName?: string;
+}
+
+interface SportsRegistrationRecord {
+  id?: string;
+  roleInTeam?: string;
+  jerseyNumber?: string | number;
+  status?: string;
+  notes?: string;
+  event?: {
+    sportType?: string;
+    title?: string;
+    venue?: string;
+    eventDate?: string;
+    startDate?: string;
+    status?: string;
+  };
+}
+
+interface TeacherProfilePackageItem {
+  id: string;
+  title: string;
+  slug?: string;
+  billingCycle?: string;
+  price?: number | string;
+  subscriptions?: unknown[];
+}
+
+type ExtendedAuthUser = NonNullable<ReturnType<typeof useApp>["currentUser"]> & {
+  phoneNumber?: string;
+  phone?: string;
+  studentIdNo?: string;
+  studentProfile?: {
+    gradeLevel?: string;
+    section?: string;
+    studentIdNo?: string;
+  } | null;
+};
 
 type ProfileTab =
   | "personal"
@@ -170,27 +220,27 @@ export function ProfileView() {
   const [studentStatisticsError, setStudentStatisticsError] =
     useState<string | null>(null);
 
-  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourseRecord[]>([]);
   const [isLoadingEnrolledCourses, setIsLoadingEnrolledCourses] = useState(false);
-  const [sportsRegistrations, setSportsRegistrations] = useState<any[]>([]);
+  const [sportsRegistrations, setSportsRegistrations] = useState<SportsRegistrationRecord[]>([]);
   const [isLoadingSports, setIsLoadingSports] = useState(false);
 
   // Real student learning progress computed from enrollments & submissions
   const studentSubmissions = useMemo(() => {
     return (submissions || []).filter(
-      (s: any) => s.studentId === currentUser?.id || s.studentName === currentUser?.name
+      (s) => s.studentId === currentUser?.id || s.studentName === currentUser?.name
     );
   }, [submissions, currentUser]);
 
   const gradedSubmissions = useMemo(() => {
     return studentSubmissions.filter(
-      (s: any) => typeof s.marksObtained === "number" && s.marksObtained > 0
+      (s) => typeof s.marksObtained === "number" && s.marksObtained > 0
     );
   }, [studentSubmissions]);
 
   const averageQuizScore = useMemo(() => {
     if (gradedSubmissions.length === 0) return 0;
-    const sum = gradedSubmissions.reduce((acc: number, s: any) => {
+    const sum = gradedSubmissions.reduce((acc: number, s) => {
       const max = s.maxMarks || 100;
       return acc + ((s.marksObtained || 0) / max) * 100;
     }, 0);
@@ -201,7 +251,7 @@ export function ProfileView() {
     if (enrolledCourses.length === 0) return 0;
     let total = 0;
     let completed = 0;
-    enrolledCourses.forEach((c: any) => {
+    enrolledCourses.forEach((c) => {
       if (c.totalLessons) total += c.totalLessons;
       if (c.completedLessons) completed += c.completedLessons;
     });
@@ -210,7 +260,7 @@ export function ProfileView() {
 
   const estimatedStudyHours = useMemo(() => {
     let hours = 0;
-    enrolledCourses.forEach((c: any) => {
+    enrolledCourses.forEach((c) => {
       hours += (c.completedLessons || 0) * 1.5;
     });
     hours += studentSubmissions.length * 1.0;
@@ -218,12 +268,18 @@ export function ProfileView() {
   }, [enrolledCourses, studentSubmissions]);
 
   useEffect(() => {
-    if (currentRole !== "super_admin") {
-      setTenantStatistics(null);
-      return;
-    }
-
     let cancelled = false;
+
+    if (currentRole !== "super_admin") {
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setTenantStatistics(null);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const fetchTenantStatistics = async () => {
       setTenantStatisticsLoading(true);
@@ -260,14 +316,20 @@ export function ProfileView() {
   }, [currentRole]);
 
   useEffect(() => {
-    if (currentRole !== "super_admin") {
-      setMonthlyMrr(null);
-      setMonthlyMrrError(null);
-      setMonthlyMrrLoading(false);
-      return;
-    }
-
     let cancelled = false;
+
+    if (currentRole !== "super_admin") {
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setMonthlyMrr(null);
+          setMonthlyMrrError(null);
+          setMonthlyMrrLoading(false);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const fetchMonthlyMrr = async () => {
       setMonthlyMrrLoading(true);
@@ -305,14 +367,20 @@ export function ProfileView() {
 
 
   useEffect(() => {
-    if (currentRole !== "super_admin") {
-      setStudentStatistics(null);
-      setStudentStatisticsError(null);
-      setStudentStatisticsLoading(false);
-      return;
-    }
-
     let cancelled = false;
+
+    if (currentRole !== "super_admin") {
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setStudentStatistics(null);
+          setStudentStatisticsError(null);
+          setStudentStatisticsLoading(false);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const fetchStudentStatistics = async () => {
       setStudentStatisticsLoading(true);
@@ -348,19 +416,6 @@ export function ProfileView() {
       cancelled = true;
     };
   }, [currentRole]);
-
-  const handleContinueCourse = (courseId: string) => {
-    setSelectedCourseId(courseId);
-    setCurrentView("courses");
-  };
-
-  const handleDownloadHallTicket = () => {
-    addToast({
-      type: "success",
-      title: "Hall Ticket Downloaded",
-      message: "Official Examination Admission Card & Timetable (PDF) has been saved."
-    });
-  };
 
   const handleDownloadSportsCertificate = () => {
     if (typeof window !== "undefined") {
@@ -423,6 +478,7 @@ export function ProfileView() {
     }
 
     if (currentRole === "parent") {
+      const extUser = currentUser as ExtendedAuthUser | null;
       return {
         name: currentUser.name || "Parent / Guardian",
         fullName: currentUser.name || "Parent / Guardian",
@@ -430,7 +486,7 @@ export function ProfileView() {
         studentId: currentUser.id ? `PAR-${currentUser.id.slice(0, 6).toUpperCase()}` : "PAR-PORTAL",
         indexNumber: "",
         email: currentUser.email || "",
-        phone: (currentUser as any).phoneNumber || "",
+        phone: extUser?.phoneNumber || "",
         altPhone: "",
         dob: "",
         gender: "",
@@ -457,7 +513,7 @@ export function ProfileView() {
         gpa: "Verified Guardian",
         guardianName: currentUser.name || "",
         guardianRelationship: "Parent / Guardian",
-        guardianPhone: (currentUser as any).phoneNumber || "",
+        guardianPhone: extUser?.phoneNumber || "",
         guardianEmail: currentUser.email || "",
         guardianOccupation: "",
         motherName: "",
@@ -516,21 +572,22 @@ export function ProfileView() {
       };
     }
 
+    const extUser = currentUser as ExtendedAuthUser | null;
     const userFullName = currentUser.name || "Student";
     const userFirstName = userFullName.split(" ")[0] || "Student";
-    const studentUserGrade = (currentUser as any)?.grade || (currentUser as any)?.studentProfile?.gradeLevel || "Grade 12";
+    const studentUserGrade = extUser?.grade || extUser?.studentProfile?.gradeLevel || "Grade 12";
     const studentGradeNum = studentUserGrade.replace(/\D/g, "") || "12";
-    const studentUserSection = (currentUser as any)?.class || (currentUser as any)?.studentProfile?.section || "Physical Sciences & Technology";
+    const studentUserSection = extUser?.class || extUser?.studentProfile?.section || "Physical Sciences & Technology";
 
     return {
       name: userFullName,
       fullName: userFullName,
       preferredName: userFirstName,
       avatarUrl: currentUser.avatar || (typeof window !== "undefined" ? localStorage.getItem(`lms_avatar_${currentUser.id || 'student'}`) || "" : ""),
-      studentId: (currentUser as any)?.studentIdNo || (currentUser as any)?.studentProfile?.studentIdNo || (currentUser?.id ? `STU-${currentUser.id.slice(0, 4).toUpperCase()}` : "STU-0001"),
-      indexNumber: (typeof window !== "undefined" ? localStorage.getItem(`lms_index_${currentUser.id || 'student'}`) || "" : "") || (currentUser as any)?.studentIdNo || (currentUser as any)?.studentProfile?.studentIdNo || "",
+      studentId: extUser?.studentIdNo || extUser?.studentProfile?.studentIdNo || (currentUser?.id ? `STU-${currentUser.id.slice(0, 4).toUpperCase()}` : "STU-0001"),
+      indexNumber: (typeof window !== "undefined" ? localStorage.getItem(`lms_index_${currentUser.id || 'student'}`) || "" : "") || extUser?.studentIdNo || extUser?.studentProfile?.studentIdNo || "",
       email: currentUser.email || "",
-      phone: (currentUser as any)?.phone || (typeof window !== "undefined" ? localStorage.getItem(`lms_phone_${currentUser.id || 'student'}`) || "" : ""),
+      phone: extUser?.phone || (typeof window !== "undefined" ? localStorage.getItem(`lms_phone_${currentUser.id || 'student'}`) || "" : ""),
       altPhone: "",
       dob: (typeof window !== "undefined" ? localStorage.getItem(`lms_dob_${currentUser.id || 'student'}`) || "" : ""),
       gender: (typeof window !== "undefined" ? localStorage.getItem(`lms_gender_${currentUser.id || 'student'}`) || "Male" : "Male"),
@@ -642,7 +699,7 @@ export function ProfileView() {
             }
             updateAuthUser({ avatarUrl: compressedDataUrl });
             if (currentRole === "student") {
-              api.students.updateMyProfile({ avatarUrl: compressedDataUrl }).catch(() => {});
+              api.students.updateMyProfile({ avatarUrl: compressedDataUrl }).catch(() => { });
             }
             addToast({
               type: "success",
@@ -661,7 +718,7 @@ export function ProfileView() {
           }
           updateAuthUser({ avatarUrl: rawUrl });
           if (currentRole === "student") {
-            api.students.updateMyProfile({ avatarUrl: rawUrl }).catch(() => {});
+            api.students.updateMyProfile({ avatarUrl: rawUrl }).catch(() => { });
           }
         }
       };
@@ -671,26 +728,6 @@ export function ProfileView() {
     event.target.value = "";
   };
 
-  const tutorProfileCompletion = useMemo(() => {
-    if (currentRole !== "teacher") return 100;
-    const checks = [
-      Boolean(profileData.avatarUrl),
-      Boolean(profileData.fullName?.trim()),
-      Boolean(profileData.name?.trim()),
-      Boolean(profileData.email?.trim()),
-      Boolean(profileData.phone?.trim()),
-      Boolean(profileData.dob?.trim()),
-      Boolean(profileData.gender?.trim()),
-      Boolean(profileData.address?.trim()),
-      Boolean(profileData.bio?.trim()),
-      subjectsList.length > 0,
-      selectedMediums.length > 0,
-    ];
-    const completedCount = checks.filter(Boolean).length;
-    return Math.round((completedCount / checks.length) * 100);
-  }, [currentRole, profileData, subjectsList, selectedMediums]);
-
-  // Modal states for full CRUD workflows
   const [degreeModalState, setDegreeModalState] = useState<{
     isOpen: boolean;
     mode: "add" | "edit";
@@ -747,64 +784,85 @@ export function ProfileView() {
 
   // Sync with backend teacher profile when loaded
   useEffect(() => {
+    let cancelled = false;
+
     if (teacherProfile && currentRole === "teacher") {
-      setBankName(teacherProfile.bankName || "");
-      setBankAccountName(teacherProfile.bankAccountName || profileData.fullName || "");
-      setBankAccountNumber(teacherProfile.bankAccountNumber || "");
-      setBankBranch(teacherProfile.bankBranch || "");
-      setBankBranchCode(teacherProfile.bankBranchCode || "");
-      setPublicSlug(teacherProfile.publicSlug || "");
-      setYoutubeUrl(teacherProfile.youtubeUrl || "");
-      setTelegramUrl(teacherProfile.telegramUrl || "");
-      setWhatsappNumber(teacherProfile.whatsappNumber || "");
-      setWebsiteUrl(teacherProfile.websiteUrl || "");
-      setCoverImageUrl(teacherProfile.coverImageUrl || "");
-      setExperienceYears(teacherProfile.experienceYears || 0);
-      if (Array.isArray(teacherProfile.mediums) && teacherProfile.mediums.length > 0) {
-        setSelectedMediums(teacherProfile.mediums);
-      }
-      setQualificationsList(Array.isArray(teacherProfile.qualifications) ? teacherProfile.qualifications : []);
-      setAccreditationsList(Array.isArray(teacherProfile.accreditations) ? teacherProfile.accreditations : []);
-      setBankAccountsList(Array.isArray(teacherProfile.bankAccounts) ? teacherProfile.bankAccounts : []);
-      setSocialChannelsList(Array.isArray(teacherProfile.socialChannels) ? teacherProfile.socialChannels : []);
-      if (teacherProfile.specialization) {
-        const parsedSubjects = teacherProfile.specialization.split(",").map((s) => s.trim()).filter(Boolean);
-        setSubjectsList(parsedSubjects);
-      } else {
-        setSubjectsList([]);
-      }
-      if (teacherProfile.dob || teacherProfile.gender) {
-        setProfileData((prev) => ({
-          ...prev,
-          dob: teacherProfile.dob || prev.dob,
-          gender: teacherProfile.gender || prev.gender,
-        }));
-      }
-      if (teacherProfile.user?.avatarUrl || teacherProfile.avatarUrl) {
-        setProfileData((prev) => ({
-          ...prev,
-          avatarUrl: teacherProfile.user?.avatarUrl || teacherProfile.avatarUrl || prev.avatarUrl,
-        }));
-      }
+      Promise.resolve().then(() => {
+        if (cancelled) return;
+        setBankName(teacherProfile.bankName || "");
+        setBankAccountName(teacherProfile.bankAccountName || profileData.fullName || "");
+        setBankAccountNumber(teacherProfile.bankAccountNumber || "");
+        setBankBranch(teacherProfile.bankBranch || "");
+        setBankBranchCode(teacherProfile.bankBranchCode || "");
+        setPublicSlug(teacherProfile.publicSlug || "");
+        setYoutubeUrl(teacherProfile.youtubeUrl || "");
+        setTelegramUrl(teacherProfile.telegramUrl || "");
+        setWhatsappNumber(teacherProfile.whatsappNumber || "");
+        setWebsiteUrl(teacherProfile.websiteUrl || "");
+        setCoverImageUrl(teacherProfile.coverImageUrl || "");
+        setExperienceYears(teacherProfile.experienceYears || 0);
+        if (Array.isArray(teacherProfile.mediums) && teacherProfile.mediums.length > 0) {
+          setSelectedMediums(teacherProfile.mediums);
+        }
+        setQualificationsList(Array.isArray(teacherProfile.qualifications) ? teacherProfile.qualifications : []);
+        setAccreditationsList(Array.isArray(teacherProfile.accreditations) ? teacherProfile.accreditations : []);
+        setBankAccountsList(Array.isArray(teacherProfile.bankAccounts) ? teacherProfile.bankAccounts : []);
+        setSocialChannelsList(Array.isArray(teacherProfile.socialChannels) ? teacherProfile.socialChannels : []);
+        if (teacherProfile.specialization) {
+          const parsedSubjects = teacherProfile.specialization.split(",").map((s) => s.trim()).filter(Boolean);
+          setSubjectsList(parsedSubjects);
+        } else {
+          setSubjectsList([]);
+        }
+        if (teacherProfile.dob || teacherProfile.gender) {
+          setProfileData((prev) => ({
+            ...prev,
+            dob: teacherProfile.dob || prev.dob,
+            gender: teacherProfile.gender || prev.gender,
+          }));
+        }
+        if (teacherProfile.user?.avatarUrl || teacherProfile.avatarUrl) {
+          setProfileData((prev) => ({
+            ...prev,
+            avatarUrl: teacherProfile.user?.avatarUrl || teacherProfile.avatarUrl || prev.avatarUrl,
+          }));
+        }
+      });
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [teacherProfile, currentRole, profileData.fullName]);
 
   useEffect(() => {
-    setProfileData(defaultProfile);
-    if (currentRole === "teacher") {
-      if (!["personal", "payout", "social", "teaching", "schedule"].includes(activeTab)) {
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setProfileData(defaultProfile);
+      if (currentRole === "teacher") {
+        if (!["personal", "payout", "social", "teaching", "schedule"].includes(activeTab)) {
+          setActiveTab("personal");
+        }
+      } else if (currentRole === "super_admin") {
         setActiveTab("personal");
+      } else {
+        if (!["personal", "academic", "progress", "timetable", "sports"].includes(activeTab)) {
+          setActiveTab("personal");
+        }
       }
-    } else if (currentRole === "super_admin") {
-      setActiveTab("personal");
-    } else {
-      if (!["personal", "academic", "progress", "timetable", "sports"].includes(activeTab)) {
-        setActiveTab("personal");
-      }
-    }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [defaultProfile, currentRole, activeTab]);
 
-    // Load Super Admin profile from PostgreSQL
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [savedAvatarUrl, setSavedAvatarUrl] = useState<string | null>(null);
+  const [savedAvatarImageUrl, setSavedAvatarImageUrl] = useState<string | null>(null);
+
+  // Load Super Admin profile from PostgreSQL
   useEffect(() => {
     if (currentRole !== "super_admin") return;
 
@@ -819,23 +877,23 @@ export function ProfileView() {
         setSavedAvatarUrl(response.data?.avatarUrl ?? null);
         const savedProfile = response.data?.superAdminProfile;
 
-if (!response.data) return;
+        if (!response.data) return;
 
-if (!savedProfile) {
-  setProfileData((previous) => ({
-    ...previous,
-    email: response.data.email ?? previous.email,
-    studentId: response.data.id ?? previous.studentId,
-  }));
-  return;
-}
+        if (!savedProfile) {
+          setProfileData((previous) => ({
+            ...previous,
+            email: response.data.email ?? previous.email,
+            studentId: response.data.id ?? previous.studentId,
+          }));
+          return;
+        }
 
-// Restore saved Super Admin display name after page refresh
-if (savedProfile.preferredName) {
-  updateAuthUser({
-    preferredName: savedProfile.preferredName,
-  });
-}
+        // Restore saved Super Admin display name after page refresh
+        if (savedProfile.preferredName) {
+          updateAuthUser({
+            preferredName: savedProfile.preferredName,
+          });
+        }
 
         setProfileData((previous) => ({
           ...previous,
@@ -876,7 +934,7 @@ if (savedProfile.preferredName) {
     return () => {
       cancelled = true;
     };
-  }, [currentRole, currentUser.id, addToast]);
+  }, [currentRole, currentUser.id, addToast, updateAuthUser]);
 
   // Load Student Profile from database if student
   useEffect(() => {
@@ -961,7 +1019,7 @@ if (savedProfile.preferredName) {
     const fetchSports = async () => {
       setIsLoadingSports(true);
       try {
-        const response: any = await api.sports.getMyRegistrations();
+        const response = await api.sports.getMyRegistrations() as SportsRegistrationRecord[] | { data?: SportsRegistrationRecord[] };
         const list = Array.isArray(response) ? response : (response?.data && Array.isArray(response.data) ? response.data : []);
         if (!cancelled) {
           setSportsRegistrations(list);
@@ -1016,24 +1074,28 @@ if (savedProfile.preferredName) {
     };
   }, [currentRole, currentUser.id]);
 
-  const [avatarPreset, setAvatarPreset] = useState<string>("default");
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [savedAvatarUrl, setSavedAvatarUrl] = useState<string | null>(null);
-  const [savedAvatarImageUrl, setSavedAvatarImageUrl] = useState<string | null>(null);
-
-
   useEffect(() => {
+    let cancelled = false;
+
     if (currentRole !== "super_admin" || !savedAvatarUrl) {
-      setSavedAvatarImageUrl(null);
-      return;
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setSavedAvatarImageUrl(null);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
 
-    let cancelled = false;
     let objectUrl: string | null = null;
 
     const loadSavedAvatar = async () => {
       try {
+        await Promise.resolve();
+        if (cancelled) return;
+        setSavedAvatarImageUrl(null);
+
         if (!savedAvatarUrl.startsWith("/api/super-admin/avatars/")) {
           if (!cancelled) {
             setSavedAvatarImageUrl(savedAvatarUrl);
@@ -1055,7 +1117,6 @@ if (savedProfile.preferredName) {
       }
     };
 
-    setSavedAvatarImageUrl(null);
     void loadSavedAvatar();
 
     return () => {
@@ -1153,7 +1214,7 @@ if (savedProfile.preferredName) {
 
   const tutorPackagesList = useMemo(() => {
     if (teacherProfile?.packages && teacherProfile.packages.length > 0) {
-      return teacherProfile.packages.map((pkg: any) => ({
+      return (teacherProfile.packages as TeacherProfilePackageItem[]).map((pkg) => ({
         id: pkg.id,
         title: pkg.title,
         code: pkg.slug || `PKG-${pkg.id?.slice(0, 6)?.toUpperCase() || "BATCH"}`,
@@ -1197,7 +1258,7 @@ if (savedProfile.preferredName) {
       });
     }
     return [];
-  }, [teacherProfile?.packages, courses, currentUser]);
+  }, [teacherProfile, courses, currentUser]);
 
   const handleCopyId = () => {
     navigator.clipboard?.writeText(profileData.studentId);
@@ -1208,14 +1269,6 @@ if (savedProfile.preferredName) {
       message: `${currentRole === "teacher" ? "Tutor ID " : ""}${profileData.studentId} copied to clipboard.`
     });
     setTimeout(() => setCopiedId(false), 2000);
-  };
-
-  const handleDownloadTeacherDossier = () => {
-    addToast({
-      type: "success",
-      title: "Tutor Profile & Portfolio Downloaded",
-      message: "Verified Tutor Profile, Credentials & Course Catalog (PDF) has been saved."
-    });
   };
 
   const handleDownloadTeacherTimetable = () => {
@@ -1247,16 +1300,6 @@ if (savedProfile.preferredName) {
     }
   };
 
-  const deleteDegree = (index: number) => {
-    const item = qualificationsList[index];
-    const updated = qualificationsList.filter((_, i) => i !== index);
-    setQualificationsList(updated);
-    addToast({ type: "info", title: "Degree Removed", message: `"${item.degree}" was removed from your profile.` });
-    if (currentRole === "teacher") {
-      updateTeacherProfile({ qualifications: updated, accreditations: accreditationsList, bankAccounts: bankAccountsList, socialChannels: socialChannelsList });
-    }
-  };
-
   // 2. Accreditation CRUD
   const saveAccreditation = (item: TeacherAccreditation) => {
     let updated: TeacherAccreditation[];
@@ -1269,16 +1312,6 @@ if (savedProfile.preferredName) {
     }
     setAccreditationsList(updated);
     setAccreditationModalState({ ...accreditationModalState, isOpen: false });
-    if (currentRole === "teacher") {
-      updateTeacherProfile({ qualifications: qualificationsList, accreditations: updated, bankAccounts: bankAccountsList, socialChannels: socialChannelsList });
-    }
-  };
-
-  const deleteAccreditation = (index: number) => {
-    const item = accreditationsList[index];
-    const updated = accreditationsList.filter((_, i) => i !== index);
-    setAccreditationsList(updated);
-    addToast({ type: "info", title: "Accreditation Removed", message: `"${item.title}" was removed.` });
     if (currentRole === "teacher") {
       updateTeacherProfile({ qualifications: qualificationsList, accreditations: updated, bankAccounts: bankAccountsList, socialChannels: socialChannelsList });
     }
@@ -1492,7 +1525,7 @@ if (savedProfile.preferredName) {
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-        if (currentRole === "super_admin") {
+    if (currentRole === "super_admin") {
       setIsSavingProfile(true);
 
       try {
@@ -1505,7 +1538,7 @@ if (savedProfile.preferredName) {
           city: profileData.city,
           district: profileData.district,
           province: profileData.province,
-                    postalCode: profileData.postalCode,
+          postalCode: profileData.postalCode,
           bio: profileData.bio,
           dateOfBirth: profileData.dob || null,
           gender: profileData.gender || null,
@@ -1518,8 +1551,8 @@ if (savedProfile.preferredName) {
           throw new Error(response.message || "Profile update failed");
         }
         updateAuthUser({
-  preferredName: profileData.name.trim(),
-});
+          preferredName: profileData.name.trim(),
+        });
 
         if (avatarFile) {
           const avatarResponse = await api.superAdminProfile.uploadAvatar(
@@ -1660,11 +1693,11 @@ if (savedProfile.preferredName) {
           title: "Profile Saved",
           message: "Student academic profile and identity updated successfully.",
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         addToast({
           type: "error",
           title: "Save Failed",
-          message: error?.message || "Unable to update Student profile.",
+          message: error instanceof Error ? error.message : "Unable to update Student profile.",
         });
       } finally {
         setIsSavingProfile(false);
@@ -1705,11 +1738,11 @@ if (savedProfile.preferredName) {
           title: "Profile Saved",
           message: "Parent contact profile and identity updated successfully.",
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         addToast({
           type: "error",
           title: "Save Failed",
-          message: error?.message || "Unable to update Parent profile.",
+          message: error instanceof Error ? error.message : "Unable to update Parent profile.",
         });
       } finally {
         setIsSavingProfile(false);
@@ -1802,16 +1835,22 @@ if (savedProfile.preferredName) {
           <div className="relative group shrink-0">
             <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-3xl bg-gradient-to-br from-[#0d5c4d] to-[#16423b] flex items-center justify-center overflow-hidden text-white text-3xl sm:text-4xl font-black shadow-lg shadow-[#0d5c4d]/25 border-4 border-white ring-2 ring-[#0d5c4d]/10">
               {currentRole === "super_admin" &&
-              (avatarPreviewUrl || savedAvatarImageUrl) ? (
-                <img
+                (avatarPreviewUrl || savedAvatarImageUrl) ? (
+                <NextImage
                   src={avatarPreviewUrl || savedAvatarImageUrl || ""}
                   alt="Super Admin profile picture"
+                  width={112}
+                  height={112}
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               ) : profileData.avatarUrl ? (
-                <img
+                <NextImage
                   src={profileData.avatarUrl}
                   alt={profileData.name}
+                  width={112}
+                  height={112}
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -1873,7 +1912,7 @@ if (savedProfile.preferredName) {
                   }
                   updateAuthUser({ avatarUrl: "" });
                   if (currentRole === "student") {
-                    api.students.updateMyProfile({ avatarUrl: "" }).catch(() => {});
+                    api.students.updateMyProfile({ avatarUrl: "" }).catch(() => { });
                   }
                   addToast({ type: "info", title: "Photo Removed", message: currentRole === "student" ? "Profile photo removed." : "Click 'Save Details' to persist this change." });
                 }}
@@ -1927,8 +1966,8 @@ if (savedProfile.preferredName) {
                 {currentRole === "teacher"
                   ? "Verified Tutor & Creator"
                   : currentRole === "super_admin"
-                  ? "Master Super Admin • Platform Owner"
-                  : currentRole}
+                    ? "Master Super Admin • Platform Owner"
+                    : currentRole}
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold">
                 {currentRole === "student"
@@ -1948,8 +1987,8 @@ if (savedProfile.preferredName) {
                   {currentRole === "teacher"
                     ? "Online Tutor Studio & LMS"
                     : currentRole === "super_admin"
-                    ? "Global Multi-Tenant SaaS Platform"
-                    : profileData.schoolName}
+                      ? "Global Multi-Tenant SaaS Platform"
+                      : profileData.schoolName}
                 </span>
               </div>
               {currentRole !== "student" && profileData.classRoom && (
@@ -1969,16 +2008,16 @@ if (savedProfile.preferredName) {
                   currentRole === "teacher"
                     ? "Click to copy Tutor ID"
                     : currentRole === "super_admin"
-                    ? "Click to copy Master Root ID"
-                    : "Click to copy Student ID"
+                      ? "Click to copy Master Root ID"
+                      : "Click to copy Student ID"
                 }
               >
                 <span>
                   {currentRole === "teacher"
                     ? `Tutor ID: ${profileData.studentId}`
                     : currentRole === "super_admin"
-                    ? `Root ID: ${profileData.studentId}`
-                    : `ID: ${profileData.studentId}`}
+                      ? `Root ID: ${profileData.studentId}`
+                      : `ID: ${profileData.studentId}`}
                 </span>
                 {copiedId ? (
                   <Check className="h-3 w-3 text-emerald-600" />
@@ -2032,20 +2071,20 @@ if (savedProfile.preferredName) {
               <div className="flex items-baseline gap-1.5 mt-0.5">
 
 
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg font-black text-[#0d5c4d]">
-                  {tenantStatisticsLoading
-                    ? "Loading..."
-                    : tenantStatisticsError
-                      ? "Unavailable"
-                      : tenantStatistics
-                        ? `${tenantStatistics.activeTenants.toLocaleString()} Active Clients`
-                        : "Unavailable"}
-                </span>
-                <span className="text-[10px] text-emerald-600 font-bold">
-                  Schools, Tutors &amp; Academies
-                </span>
-              </div>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-lg font-black text-[#0d5c4d]">
+                    {tenantStatisticsLoading
+                      ? "Loading..."
+                      : tenantStatisticsError
+                        ? "Unavailable"
+                        : tenantStatistics
+                          ? `${tenantStatistics.activeTenants.toLocaleString()} Active Clients`
+                          : "Unavailable"}
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-bold">
+                    Schools, Tutors &amp; Academies
+                  </span>
+                </div>
 
 
                 <span className="text-[10px] text-emerald-600 font-bold">Schools, Tutors &amp; Academies</span>
@@ -2063,9 +2102,9 @@ if (savedProfile.preferredName) {
                       ? "Unavailable"
                       : monthlyMrr
                         ? `${monthlyMrr.currency} ${monthlyMrr.monthlyMrr.toLocaleString("en-LK", {
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 2,
-                          })}`
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 2,
+                        })}`
                         : "Unavailable"}
                 </span>
                 <span className="text-[10px] text-slate-500 font-semibold">Recurring Platform Revenue</span>
@@ -2076,18 +2115,18 @@ if (savedProfile.preferredName) {
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Platform Students</p>
               <div className="flex items-baseline gap-1.5 mt-0.5">
 
-<span className="text-lg font-black text-[#0d2b26]">
-  {studentStatisticsLoading
-    ? "Loading..."
-    : studentStatisticsError
-      ? "Unavailable"
-      : studentStatistics
-        ? `${studentStatistics.totalStudents.toLocaleString()} Students`
-        : "Unavailable"}
-</span>
+                <span className="text-lg font-black text-[#0d2b26]">
+                  {studentStatisticsLoading
+                    ? "Loading..."
+                    : studentStatisticsError
+                      ? "Unavailable"
+                      : studentStatistics
+                        ? `${studentStatistics.totalStudents.toLocaleString()} Students`
+                        : "Unavailable"}
+                </span>
                 <span className="text-[10px] text-emerald-600 font-bold">
-  Registered Students Across Non-Archived Tenants
-</span>
+                  Registered Students Across Non-Archived Tenants
+                </span>
               </div>
             </div>
           </div>
@@ -2099,17 +2138,17 @@ if (savedProfile.preferredName) {
       <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200">
         {(currentRole === "teacher"
           ? [
-              { id: "personal", label: "Tutor Studio Profile", icon: User },
-              { id: "payout", label: "Bank & Payout Details", icon: CreditCard },
-              { id: "social", label: "Public Studio & Social", icon: Globe },
-              { id: "teaching", label: "Active Batches & Study Packages", icon: BookOpen },
-              { id: "schedule", label: "Live Class Schedule & Meet", icon: Calendar }
-            ]
+            { id: "personal", label: "Tutor Studio Profile", icon: User },
+            { id: "payout", label: "Bank & Payout Details", icon: CreditCard },
+            { id: "social", label: "Public Studio & Social", icon: Globe },
+            { id: "teaching", label: "Active Batches & Study Packages", icon: BookOpen },
+            { id: "schedule", label: "Live Class Schedule & Meet", icon: Calendar }
+          ]
           : currentRole === "super_admin"
-          ? [
+            ? [
               { id: "personal", label: "Platform Director Credentials", icon: User }
             ]
-          : [
+            : [
               { id: "personal", label: "Personal Details", icon: User },
               { id: "academic", label: "Enrolled Tutors & Subjects", icon: GraduationCap },
               { id: "progress", label: "Learning Progress", icon: TrendingUp },
@@ -2123,11 +2162,10 @@ if (savedProfile.preferredName) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as ProfileTab)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                isActive
-                  ? "bg-[#0d5c4d] text-white shadow-sm"
-                  : "bg-white text-slate-600 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] border border-slate-200"
-              }`}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${isActive
+                ? "bg-[#0d5c4d] text-white shadow-sm"
+                : "bg-white text-slate-600 hover:text-[#0d5c4d] hover:bg-[#ecf8f5] border border-slate-200"
+                }`}
             >
               <Icon className="h-3.5 w-3.5" />
               <span>{tab.label}</span>
@@ -2429,7 +2467,7 @@ if (savedProfile.preferredName) {
                         <div className="relative group shrink-0">
                           <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-[#0d5c4d] text-white flex items-center justify-center font-black text-2xl overflow-hidden border-2 border-white shadow-md">
                             {profileData.avatarUrl ? (
-                              <img src={profileData.avatarUrl} alt={profileData.name} className="h-full w-full object-cover" />
+                              <NextImage src={profileData.avatarUrl} alt={profileData.name} width={80} height={80} unoptimized className="h-full w-full object-cover" />
                             ) : (
                               profileData.name ? profileData.name.charAt(0).toUpperCase() : "T"
                             )}
@@ -2721,11 +2759,10 @@ if (savedProfile.preferredName) {
                                     prev.includes(med) ? prev.filter((m) => m !== med) : [...prev, med]
                                   );
                                 }}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                                  isSel
-                                    ? "bg-[#0d5c4d] text-white border-[#0d5c4d]"
-                                    : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
-                                }`}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${isSel
+                                  ? "bg-[#0d5c4d] text-white border-[#0d5c4d]"
+                                  : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                                  }`}
                               >
                                 {isSel ? `✓ ${med}` : `+ ${med}`}
                               </button>
@@ -2972,9 +3009,8 @@ if (savedProfile.preferredName) {
                             });
                           }
                         }}
-                        className={`w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 ${
-                          currentRole === "super_admin" ? "bg-slate-100 cursor-not-allowed" : ""
-                        }`}
+                        className={`w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d] focus:ring-2 focus:ring-[#0d5c4d]/10 ${currentRole === "super_admin" ? "bg-slate-100 cursor-not-allowed" : ""
+                          }`}
                       />
                     ) : (
                       <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
@@ -3132,121 +3168,121 @@ if (savedProfile.preferredName) {
                 )}
               </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Primary Contact Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Primary Guardian Name</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.guardianName}
-                    onChange={(e) => setProfileData({ ...profileData, guardianName: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianName || "Not registered"}
-                  </p>
-                )}
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Primary Contact Name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Primary Guardian Name</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={profileData.guardianName}
+                      onChange={(e) => setProfileData({ ...profileData, guardianName: e.target.value })}
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                    />
+                  ) : (
+                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                      {profileData.guardianName || "Not registered"}
+                    </p>
+                  )}
+                </div>
 
-              {/* Relationship */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Relationship to Student</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.guardianRelationship}
-                    onChange={(e) => setProfileData({ ...profileData, guardianRelationship: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianRelationship || "Not specified"}
-                  </p>
-                )}
-              </div>
+                {/* Relationship */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Relationship to Student</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={profileData.guardianRelationship}
+                      onChange={(e) => setProfileData({ ...profileData, guardianRelationship: e.target.value })}
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                    />
+                  ) : (
+                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                      {profileData.guardianRelationship || "Not specified"}
+                    </p>
+                  )}
+                </div>
 
-              {/* Contact Phone */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Primary Contact Phone</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.guardianPhone}
-                    onChange={(e) => setProfileData({ ...profileData, guardianPhone: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    <span>{profileData.guardianPhone || "Not specified"}</span>
-                    {profileData.guardianPhone && (
-                      <a
-                        href={`tel:${profileData.guardianPhone}`}
-                        className="text-[10px] text-[#0d5c4d] font-bold hover:underline"
-                      >
-                        Call Guardian
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
+                {/* Contact Phone */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Primary Contact Phone</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={profileData.guardianPhone}
+                      onChange={(e) => setProfileData({ ...profileData, guardianPhone: e.target.value })}
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                      <span>{profileData.guardianPhone || "Not specified"}</span>
+                      {profileData.guardianPhone && (
+                        <a
+                          href={`tel:${profileData.guardianPhone}`}
+                          className="text-[10px] text-[#0d5c4d] font-bold hover:underline"
+                        >
+                          Call Guardian
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-              {/* Contact Email */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Guardian Email</label>
-                {isEditing ? (
-                  <input
-                    type="email"
-                    value={profileData.guardianEmail}
-                    onChange={(e) => setProfileData({ ...profileData, guardianEmail: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianEmail || "Not specified"}
-                  </p>
-                )}
-              </div>
+                {/* Contact Email */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Guardian Email</label>
+                  {isEditing ? (
+                    <input
+                      type="email"
+                      value={profileData.guardianEmail}
+                      onChange={(e) => setProfileData({ ...profileData, guardianEmail: e.target.value })}
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                    />
+                  ) : (
+                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                      {profileData.guardianEmail || "Not specified"}
+                    </p>
+                  )}
+                </div>
 
-              {/* Occupation */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Guardian Occupation / Workplace</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.guardianOccupation}
-                    onChange={(e) => setProfileData({ ...profileData, guardianOccupation: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
-                    {profileData.guardianOccupation || "Not specified"}
-                  </p>
-                )}
-              </div>
+                {/* Occupation */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Guardian Occupation / Workplace</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={profileData.guardianOccupation}
+                      onChange={(e) => setProfileData({ ...profileData, guardianOccupation: e.target.value })}
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                    />
+                  ) : (
+                    <p className="p-2.5 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-semibold text-slate-900">
+                      {profileData.guardianOccupation || "Not specified"}
+                    </p>
+                  )}
+                </div>
 
-              {/* Emergency Contact */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Emergency Contact (24/7)</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={profileData.emergencyContact}
-                    onChange={(e) => setProfileData({ ...profileData, emergencyContact: e.target.value })}
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
-                  />
-                ) : (
-                  <p className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800">
-                    {profileData.emergencyContact || "Not specified"}
-                  </p>
-                )}
+                {/* Emergency Contact */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Emergency Contact (24/7)</label>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={profileData.emergencyContact}
+                      onChange={(e) => setProfileData({ ...profileData, emergencyContact: e.target.value })}
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-[#0d5c4d]"
+                    />
+                  ) : (
+                    <p className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800">
+                      {profileData.emergencyContact || "Not specified"}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
-    )}
+          )}
+        </div>
+      )}
 
       {/* =================================================================== */}
       {/* TEACHER TAB 2: ACTIVE BATCHES & STUDY PACKAGES                      */}
@@ -3480,11 +3516,10 @@ if (savedProfile.preferredName) {
                   key={day}
                   type="button"
                   onClick={() => setSelectedScheduleDay(day)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                    selectedScheduleDay === day
-                      ? "bg-[#0d5c4d] text-white shadow-xs"
-                      : "bg-[#f8faf9] text-slate-600 hover:bg-[#ecf8f5] border border-slate-200"
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${selectedScheduleDay === day
+                    ? "bg-[#0d5c4d] text-white shadow-xs"
+                    : "bg-[#f8faf9] text-slate-600 hover:bg-[#ecf8f5] border border-slate-200"
+                    }`}
                 >
                   {day}
                 </button>
@@ -3663,11 +3698,10 @@ if (savedProfile.preferredName) {
                 {bankAccountsList.map((account, idx) => (
                   <div
                     key={account.id || idx}
-                    className={`p-5 rounded-2xl border transition-all space-y-3 shadow-2xs group ${
-                      account.isPrimary
-                        ? "bg-gradient-to-br from-white to-[#f7fcf9] border-[#0d5c4d] ring-1 ring-[#0d5c4d]/20"
-                        : "bg-white border-[#e2eae5] hover:border-slate-400"
-                    }`}
+                    className={`p-5 rounded-2xl border transition-all space-y-3 shadow-2xs group ${account.isPrimary
+                      ? "bg-gradient-to-br from-white to-[#f7fcf9] border-[#0d5c4d] ring-1 ring-[#0d5c4d]/20"
+                      : "bg-white border-[#e2eae5] hover:border-slate-400"
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="space-y-1">
@@ -3916,9 +3950,12 @@ if (savedProfile.preferredName) {
               </div>
 
               <div className="relative h-32 rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 shadow-inner">
-                <img
+                <NextImage
                   src={coverImageUrl}
                   alt="Studio Cover"
+                  width={600}
+                  height={128}
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex items-end justify-between p-4 text-white">
@@ -4074,651 +4111,651 @@ if (savedProfile.preferredName) {
         <>
           {/* TAB 2: ENROLLED TUTORS & ACTIVE SUBJECTS                         */}
           {activeTab === "academic" && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-            <div>
-              <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
-                <span>Enrolled Tutors &amp; Active Subject Batches</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Active tuition subscriptions under independent educators, weekly live lecture schedules, and monthly access passes.
-              </p>
-            </div>
-
-            {/* Tuition Hub & Subscription Details Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Enrolled Courses</span>
-                <p className="font-black text-sm text-[#0d2b26]">
-                  {enrolledCourses.length > 0 ? `${enrolledCourses.length} Enrolled ${enrolledCourses.length === 1 ? "Course" : "Courses"}` : "0 Enrolled"}
-                </p>
-                <p className="text-[11px] text-slate-500 truncate">
-                  {enrolledCourses.length > 0 ? enrolledCourses.map((c: any) => c.title).slice(0, 2).join(", ") : "No courses enrolled"}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Target Academic Stage
-                </span>
-                <p className="font-black text-sm text-[#0d2b26]">
-                  {profileData.grade || "Grade 12"}
-                </p>
-                <p className="text-[11px] text-slate-500">
-                  {profileData.stream || profileData.classRoom || "Tuition Cohort"}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tuition Subscriptions</span>
-                <p className="font-black text-sm text-[#0d5c4d]">
-                  {enrolledCourses.length > 0 ? `${enrolledCourses.length} Active ${enrolledCourses.length === 1 ? "Pass" : "Passes"}` : "0 Active Passes"}
-                </p>
-                <p className="text-[11px] text-emerald-600 font-semibold">
-                  {enrolledCourses.length > 0 ? "Bank Slips Verified • Paid" : "Enroll to activate passes"}
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Weekly Live Classes</span>
-                <p className="font-black text-sm text-[#0d2b26]">
-                  {enrolledCourses.reduce((acc: number, c: any) => acc + (Array.isArray(c.liveClasses) ? c.liveClasses.length : 0), 0)} Scheduled
-                </p>
-                <p className="text-[11px] text-slate-500">Google Meet &amp; Video Vault</p>
-              </div>
-            </div>
-
-            {/* Enrolled Subjects & Tutors List */}
-            <div className="space-y-3 pt-4 border-t border-slate-100">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-sm text-[#0d2b26]">Active Tuition Classes &amp; Tutors</h4>
-                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  {enrolledCourses.length} Active {enrolledCourses.length === 1 ? "Batch" : "Batches"}
-                </span>
-              </div>
-
-              {isLoadingEnrolledCourses ? (
-                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
-                  <Loader2 className="h-6 w-6 animate-spin text-[#0d5c4d] mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-slate-600">Loading enrolled courses &amp; tutors...</p>
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+                <div>
+                  <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-[#0d5c4d]" />
+                    <span>Enrolled Tutors &amp; Active Subject Batches</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Active tuition subscriptions under independent educators, weekly live lecture schedules, and monthly access passes.
+                  </p>
                 </div>
-              ) : enrolledCourses.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {enrolledCourses.map((course: any, idx: number) => {
-                    const teacherName = course.teacher?.user
-                      ? `${course.teacher.user.firstName || ''} ${course.teacher.user.lastName || ''}`.trim()
-                      : course.teacherName || "Assigned Educator";
-                    const nextLive = Array.isArray(course.liveClasses) && course.liveClasses.length > 0 ? course.liveClasses[0] : null;
 
-                    return (
-                      <div
-                        key={course.id || idx}
-                        className="p-5 rounded-2xl border border-emerald-200 bg-white flex flex-col justify-between gap-4 transition-all hover:shadow-md"
+                {/* Tuition Hub & Subscription Details Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Enrolled Courses</span>
+                    <p className="font-black text-sm text-[#0d2b26]">
+                      {enrolledCourses.length > 0 ? `${enrolledCourses.length} Enrolled ${enrolledCourses.length === 1 ? "Course" : "Courses"}` : "0 Enrolled"}
+                    </p>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {enrolledCourses.length > 0 ? enrolledCourses.map((c) => c.title).slice(0, 2).join(", ") : "No courses enrolled"}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Target Academic Stage
+                    </span>
+                    <p className="font-black text-sm text-[#0d2b26]">
+                      {profileData.grade || "Grade 12"}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {profileData.stream || profileData.classRoom || "Tuition Cohort"}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tuition Subscriptions</span>
+                    <p className="font-black text-sm text-[#0d5c4d]">
+                      {enrolledCourses.length > 0 ? `${enrolledCourses.length} Active ${enrolledCourses.length === 1 ? "Pass" : "Passes"}` : "0 Active Passes"}
+                    </p>
+                    <p className="text-[11px] text-emerald-600 font-semibold">
+                      {enrolledCourses.length > 0 ? "Bank Slips Verified • Paid" : "Enroll to activate passes"}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Weekly Live Classes</span>
+                    <p className="font-black text-sm text-[#0d2b26]">
+                      {enrolledCourses.reduce((acc: number, c) => acc + (Array.isArray(c.liveClasses) ? c.liveClasses.length : 0), 0)} Scheduled
+                    </p>
+                    <p className="text-[11px] text-slate-500">Google Meet &amp; Video Vault</p>
+                  </div>
+                </div>
+
+                {/* Enrolled Subjects & Tutors List */}
+                <div className="space-y-3 pt-4 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-sm text-[#0d2b26]">Active Tuition Classes &amp; Tutors</h4>
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      {enrolledCourses.length} Active {enrolledCourses.length === 1 ? "Batch" : "Batches"}
+                    </span>
+                  </div>
+
+                  {isLoadingEnrolledCourses ? (
+                    <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
+                      <Loader2 className="h-6 w-6 animate-spin text-[#0d5c4d] mx-auto mb-2" />
+                      <p className="text-xs font-semibold text-slate-600">Loading enrolled courses &amp; tutors...</p>
+                    </div>
+                  ) : enrolledCourses.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {enrolledCourses.map((course, idx: number) => {
+                        const teacherName = course.teacher?.user
+                          ? `${course.teacher.user.firstName || ''} ${course.teacher.user.lastName || ''}`.trim()
+                          : course.teacherName || "Assigned Educator";
+                        const nextLive = Array.isArray(course.liveClasses) && course.liveClasses.length > 0 ? course.liveClasses[0] : null;
+
+                        return (
+                          <div
+                            key={course.id || idx}
+                            className="p-5 rounded-2xl border border-emerald-200 bg-white flex flex-col justify-between gap-4 transition-all hover:shadow-md"
+                          >
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-extrabold text-sm text-slate-900">{course.title}</span>
+                                <span className="text-[10px] font-mono font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-[#c4e9e0]">
+                                  {course.code || "BATCH"}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-slate-800">{teacherName}</p>
+                                <p className="text-[11px] text-slate-500">
+                                  {course.gradeLevel || course.gradeName || profileData.grade} &bull; {course.subject || profileData.stream || "Tuition Batch"}
+                                </p>
+                              </div>
+
+                              {nextLive ? (
+                                <div className="p-2.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] flex items-center gap-2 text-xs">
+                                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                  <span className="font-extrabold text-[#0d5c4d]">Next Live:</span>
+                                  <span className="font-bold text-slate-800 truncate">{nextLive.title || "Scheduled Class"}</span>
+                                </div>
+                              ) : (
+                                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2 text-xs text-slate-600">
+                                  <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                  <span className="font-semibold text-slate-700">Tuition Status:</span>
+                                  <span className="font-medium text-slate-500">Live Access Active</span>
+                                </div>
+                              )}
+
+                              {Array.isArray(course.assignments) && course.assignments.length > 0 && (
+                                <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-medium">
+                                  <FileText className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                                  <span>{course.assignments.length} Coursework / Assessments</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                <span>{course.enrollmentType === 'PACKAGE' ? `Package: ${course.packageName || 'Active'}` : 'Enrolled'}</span>
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCourseId(course.id || "");
+                                  setCurrentView("courses");
+                                }}
+                                className="text-xs font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>Open Course</span>
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                      <GraduationCap className="h-10 w-10 text-slate-400 mx-auto" />
+                      <p className="text-sm font-bold text-slate-700">No Enrolled Subject Batches Found</p>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        You are not currently enrolled in any course batches. Explore tuition packages and live masterclasses to get started.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentView("courses")}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
                       >
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-extrabold text-sm text-slate-900">{course.title}</span>
-                            <span className="text-[10px] font-mono font-bold text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md border border-[#c4e9e0]">
-                              {course.code || "BATCH"}
-                            </span>
-                          </div>
+                        <BookOpen className="h-3.5 w-3.5" />
+                        <span>Browse Available Courses</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* =================================================================== */}
+          {/* TAB: ONLINE ASSESSMENT SCHEDULE & MODEL PAPERS                     */}
+          {/* =================================================================== */}
+          {activeTab === "timetable" && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>Online Masterclass Assessments &amp; Model Paper Schedule</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Scheduled online model paper dates, timed portal submission windows, proctoring details, and live mentor discussion slots.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] font-bold text-xs border border-[#b2e5d9] self-start sm:self-auto">
+                    <Video className="h-3.5 w-3.5" />
+                    <span>Live Online Proctored</span>
+                  </div>
+                </div>
+
+                {/* Exams Grid */}
+                {assignments && assignments.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {assignments.slice(0, 4).map((asg: Assignment & { teacherName?: string }) => (
+                      <div
+                        key={asg.id}
+                        className="bg-[#fcfdfc] rounded-2xl border border-[#e6ece8] p-5 shadow-2xs hover:shadow-md hover:border-[#b2e5d9] transition-all space-y-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-xs font-bold text-slate-800">{teacherName}</p>
-                            <p className="text-[11px] text-slate-500">
-                              {course.gradeLevel || course.gradeName || profileData.grade} &bull; {course.subject || profileData.stream || "Tuition Batch"}
-                            </p>
+                            <span className="px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-bold uppercase tracking-wider">
+                              {asg.subjectName || "Coursework"}
+                            </span>
+                            <h4 className="font-extrabold text-sm text-[#0d2b26] mt-1.5 leading-snug">
+                              {asg.title}
+                            </h4>
                           </div>
 
-                          {nextLive ? (
-                            <div className="p-2.5 rounded-xl bg-[#ecf8f5] border border-[#c4e9e0] flex items-center gap-2 text-xs">
-                              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                              <span className="font-extrabold text-[#0d5c4d]">Next Live:</span>
-                              <span className="font-bold text-slate-800 truncate">{nextLive.title || "Scheduled Class"}</span>
-                            </div>
-                          ) : (
-                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2 text-xs text-slate-600">
-                              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                              <span className="font-semibold text-slate-700">Tuition Status:</span>
-                              <span className="font-medium text-slate-500">Live Access Active</span>
-                            </div>
-                          )}
-
-                          {Array.isArray(course.assignments) && course.assignments.length > 0 && (
-                            <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-medium">
-                              <FileText className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                              <span>{course.assignments.length} Coursework / Assessments</span>
-                            </div>
-                          )}
+                          <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-extrabold text-[11px] border border-amber-200 shrink-0">
+                            {asg.maxMarks} Marks
+                          </span>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            <span>{course.enrollmentType === 'PACKAGE' ? `Package: ${course.packageName || 'Active'}` : 'Enrolled'}</span>
-                          </span>
+                        <div className="grid grid-cols-2 gap-3 text-xs bg-white p-3 rounded-xl border border-[#eef3f0]">
+                          <div className="flex items-center gap-2 text-slate-700">
+                            <Calendar className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-medium">Due Date</p>
+                              <p className="font-bold">{asg.dueDate ? new Date(asg.dueDate).toLocaleDateString() : "Open Submission"}</p>
+                            </div>
+                          </div>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedCourseId(course.id);
-                              setCurrentView("courses");
-                            }}
-                            className="text-xs font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
-                          >
-                            <span>Open Course</span>
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </button>
+                          <div className="flex items-center gap-2 text-slate-700">
+                            <Clock className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-medium">Session Window</p>
+                              <p className="font-bold">Active Window</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-slate-700">
+                            <Video className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-medium">Exam Platform</p>
+                              <p className="font-bold line-clamp-1">Apex Portal</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-slate-700">
+                            <ShieldCheck className="h-4 w-4 text-[#0d5c4d] shrink-0" />
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-medium">Mode</p>
+                              <p className="font-bold text-[#0d5c4d]">Web Proctored</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-[#f0f4f1] text-xs">
+                          <span className="text-slate-500 text-[11px]">
+                            Mentor: <span className="text-slate-800 font-bold">{asg.teacherName || "Assigned Faculty"}</span>
+                          </span>
+                          <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                            Active Assessment ✓
+                          </span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
-                  <GraduationCap className="h-10 w-10 text-slate-400 mx-auto" />
-                  <p className="text-sm font-bold text-slate-700">No Enrolled Subject Batches Found</p>
-                  <p className="text-xs text-slate-500 max-w-md mx-auto">
-                    You are not currently enrolled in any course batches. Explore tuition packages and live masterclasses to get started.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentView("courses")}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                  >
-                    <BookOpen className="h-3.5 w-3.5" />
-                    <span>Browse Available Courses</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =================================================================== */}
-      {/* TAB: ONLINE ASSESSMENT SCHEDULE & MODEL PAPERS                     */}
-      {/* =================================================================== */}
-      {activeTab === "timetable" && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Online Masterclass Assessments &amp; Model Paper Schedule</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Scheduled online model paper dates, timed portal submission windows, proctoring details, and live mentor discussion slots.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] font-bold text-xs border border-[#b2e5d9] self-start sm:self-auto">
-                <Video className="h-3.5 w-3.5" />
-                <span>Live Online Proctored</span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center rounded-2xl border border-dashed border-[#e6ece8] bg-white text-xs text-slate-500">
+                    No formal examinations or assessments scheduled for your profile currently.
+                  </div>
+                )}
               </div>
             </div>
+          )}
 
-            {/* Exams Grid */}
-            {assignments && assignments.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {assignments.slice(0, 4).map((asg: any) => (
-                  <div
-                    key={asg.id}
-                    className="bg-[#fcfdfc] rounded-2xl border border-[#e6ece8] p-5 shadow-2xs hover:shadow-md hover:border-[#b2e5d9] transition-all space-y-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <span className="px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-bold uppercase tracking-wider">
-                          {asg.subjectName || "Coursework"}
+          {/* =================================================================== */}
+          {/* TAB: LEARNING PROGRESS & SYLLABUS MASTERY                           */}
+          {/* =================================================================== */}
+          {activeTab === "progress" && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>Learning Progress &amp; Syllabus Mastery</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Real-time tracking of syllabus completion across enrolled tutor masterclasses, weekly study hours, quiz mastery, and unit milestones.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] text-xs font-bold border border-[#b2e5d9] flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${enrolledCourses.length > 0 ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
+                      <span>
+                        {enrolledCourses.length > 0
+                          ? `${overallSyllabusProgress}% Covered across ${enrolledCourses.length} ${enrolledCourses.length === 1 ? 'batch' : 'batches'}`
+                          : "No Active Batches"}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Top Key Metrics */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                  <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Overall Syllabus</span>
+                      <TrendingUp className="h-4 w-4 text-[#0d5c4d]" />
+                    </div>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="text-2xl font-black text-[#0d5c4d]">{overallSyllabusProgress}%</p>
+                      {enrolledCourses.length > 0 && (
+                        <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
+                          Active
                         </span>
-                        <h4 className="font-extrabold text-sm text-[#0d2b26] mt-1.5 leading-snug">
-                          {asg.title}
+                      )}
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
+                      <div className="bg-[#0d5c4d] h-full rounded-full transition-all duration-500" style={{ width: `${overallSyllabusProgress}%` }} />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1.5">
+                      {enrolledCourses.length > 0 ? `Average across ${enrolledCourses.length} enrolled ${enrolledCourses.length === 1 ? 'course' : 'courses'}` : "No courses enrolled"}
+                    </p>
+                  </div>
+
+                  <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Study Hours</span>
+                      <Clock className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="text-2xl font-black text-slate-800">{estimatedStudyHours}</p>
+                      <span className="text-xs font-bold text-slate-400">hours</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-500">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span>
+                        {enrolledCourses.reduce((acc: number, c) => acc + (c.completedLessons || 0), 0)} Completed Lessons
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      {studentSubmissions.length > 0 ? `${studentSubmissions.length} coursework tasks completed` : "Active coursework logging"}
+                    </p>
+                  </div>
+
+                  <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daily Streak</span>
+                      <Flame className="h-4 w-4 text-amber-500" />
+                    </div>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="text-2xl font-black text-amber-600">
+                        {enrolledCourses.length > 0 ? (studentSubmissions.length > 0 ? `${Math.min(30, studentSubmissions.length * 3 + 2)} Days` : "Active") : "0 Days"}
+                      </p>
+                      <span className="text-base">🔥</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-extrabold border border-amber-200">
+                        {enrolledCourses.length > 0 ? "Consistency Tracked" : "Not Started"}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      {enrolledCourses.length > 0 ? "Regular live class & assignment activity" : "Enroll to begin learning streak"}
+                    </p>
+                  </div>
+
+                  <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quiz Mastery</span>
+                      <Target className="h-4 w-4 text-teal-600" />
+                    </div>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="text-2xl font-black text-[#0d5c4d]">
+                        {gradedSubmissions.length > 0 ? `${averageQuizScore}%` : (studentSubmissions.length > 0 ? "Pending" : "0%")}
+                      </p>
+                      <span className="text-[10px] font-bold text-slate-500">Avg Score</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-600 font-semibold">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>
+                        {gradedSubmissions.length > 0
+                          ? `${gradedSubmissions.length} of ${studentSubmissions.length} Graded`
+                          : (studentSubmissions.length > 0 ? `${studentSubmissions.length} Awaiting Review` : "No submissions yet")}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      {studentSubmissions.length > 0 ? `${studentSubmissions.length} total assignment submissions` : "Take quizzes to record score"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Enrolled Courses Syllabus Breakdown */}
+                {enrolledCourses && enrolledCourses.length > 0 ? (
+                  <div className="bg-[#fcfdfc] rounded-2xl border border-[#e2eae5] p-5 shadow-2xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-[#0d5c4d]" />
+                        <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26]">
+                          Enrolled Subject Mastery &amp; Unit Breakdown
                         </h4>
                       </div>
-
-                      <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-extrabold text-[11px] border border-amber-200 shrink-0">
-                        {asg.maxMarks} Marks
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentView("progress")}
+                        className="text-xs font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Open Comprehensive Learning Analytics</span>
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 text-xs bg-white p-3 rounded-xl border border-[#eef3f0]">
-                      <div className="flex items-center gap-2 text-slate-700">
-                        <Calendar className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                        <div>
-                          <p className="text-[10px] text-slate-400 font-medium">Due Date</p>
-                          <p className="font-bold">{asg.dueDate ? new Date(asg.dueDate).toLocaleDateString() : "Open Submission"}</p>
-                        </div>
-                      </div>
+                    <div className="space-y-3 pt-1">
+                      {enrolledCourses.map((c, idx: number) => {
+                        const courseProgress = (c.totalLessons || 0) > 0 ? Math.min(100, Math.round(((c.completedLessons || 0) / (c.totalLessons || 1)) * 100)) : 0;
+                        const teacherName = c.teacher?.user
+                          ? `${c.teacher.user.firstName || ''} ${c.teacher.user.lastName || ''}`.trim()
+                          : c.teacherName || "Assigned Educator";
 
-                      <div className="flex items-center gap-2 text-slate-700">
-                        <Clock className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                        <div>
-                          <p className="text-[10px] text-slate-400 font-medium">Session Window</p>
-                          <p className="font-bold">Active Window</p>
-                        </div>
-                      </div>
+                        return (
+                          <div
+                            key={c.id || idx}
+                            className="p-4 rounded-xl bg-white border border-slate-200/80 hover:border-emerald-300 transition-all space-y-2"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                              <div>
+                                <span className="font-bold text-xs text-slate-900">{c.title}</span>
+                                <span className="text-[10px] text-slate-500 ml-2">by {teacherName}</span>
+                              </div>
+                              <span className="font-mono text-xs font-bold text-[#0d5c4d]">
+                                {c.completedLessons || 0} / {c.totalLessons || 0} Lessons ({courseProgress}%)
+                              </span>
+                            </div>
 
-                      <div className="flex items-center gap-2 text-slate-700">
-                        <Video className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                        <div>
-                          <p className="text-[10px] text-slate-400 font-medium">Exam Platform</p>
-                          <p className="font-bold line-clamp-1">Apex Portal</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-slate-700">
-                        <ShieldCheck className="h-4 w-4 text-[#0d5c4d] shrink-0" />
-                        <div>
-                          <p className="text-[10px] text-slate-400 font-medium">Mode</p>
-                          <p className="font-bold text-[#0d5c4d]">Web Proctored</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-[#f0f4f1] text-xs">
-                      <span className="text-slate-500 text-[11px]">
-                        Mentor: <span className="text-slate-800 font-bold">{asg.teacherName || "Assigned Faculty"}</span>
-                      </span>
-                      <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                        Active Assessment ✓
-                      </span>
+                            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                              <div
+                                className="bg-[#0d5c4d] h-full rounded-full transition-all duration-500"
+                                style={{ width: `${courseProgress}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-8 text-center rounded-2xl border border-dashed border-[#e6ece8] bg-white text-xs text-slate-500">
-                No formal examinations or assessments scheduled for your profile currently.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* =================================================================== */}
-      {/* TAB: LEARNING PROGRESS & SYLLABUS MASTERY                           */}
-      {/* =================================================================== */}
-      {activeTab === "progress" && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Learning Progress &amp; Syllabus Mastery</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Real-time tracking of syllabus completion across enrolled tutor masterclasses, weekly study hours, quiz mastery, and unit milestones.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1.5 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] text-xs font-bold border border-[#b2e5d9] flex items-center gap-1.5">
-                  <span className={`w-2 h-2 rounded-full ${enrolledCourses.length > 0 ? "bg-emerald-500 animate-pulse" : "bg-amber-400"}`} />
-                  <span>
-                    {enrolledCourses.length > 0
-                      ? `${overallSyllabusProgress}% Covered across ${enrolledCourses.length} ${enrolledCourses.length === 1 ? 'batch' : 'batches'}`
-                      : "No Active Batches"}
-                  </span>
-                </span>
+                ) : (
+                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                    <TrendingUp className="h-10 w-10 text-slate-400 mx-auto" />
+                    <p className="text-sm font-bold text-slate-700">No Learning Progress Recorded</p>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                      You are not currently enrolled in any course batches. Once enrolled, lesson completions, quiz mastery, and syllabus coverage will be automatically tracked here.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView("courses")}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      <BookOpen className="h-3.5 w-3.5" />
+                      <span>Browse Available Courses</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
+          )}
 
-            {/* Top Key Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Overall Syllabus</span>
-                  <TrendingUp className="h-4 w-4 text-[#0d5c4d]" />
-                </div>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-[#0d5c4d]">{overallSyllabusProgress}%</p>
-                  {enrolledCourses.length > 0 && (
-                    <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                      Active
-                    </span>
-                  )}
-                </div>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden mt-2">
-                  <div className="bg-[#0d5c4d] h-full rounded-full transition-all duration-500" style={{ width: `${overallSyllabusProgress}%` }} />
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1.5">
-                  {enrolledCourses.length > 0 ? `Average across ${enrolledCourses.length} enrolled ${enrolledCourses.length === 1 ? 'course' : 'courses'}` : "No courses enrolled"}
-                </p>
-              </div>
-
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Study Hours</span>
-                  <Clock className="h-4 w-4 text-emerald-600" />
-                </div>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-slate-800">{estimatedStudyHours}</p>
-                  <span className="text-xs font-bold text-slate-400">hours</span>
-                </div>
-                <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-500">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span>
-                    {enrolledCourses.reduce((acc: number, c: any) => acc + (c.completedLessons || 0), 0)} Completed Lessons
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  {studentSubmissions.length > 0 ? `${studentSubmissions.length} coursework tasks completed` : "Active coursework logging"}
-                </p>
-              </div>
-
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daily Streak</span>
-                  <Flame className="h-4 w-4 text-amber-500" />
-                </div>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-amber-600">
-                    {enrolledCourses.length > 0 ? (studentSubmissions.length > 0 ? `${Math.min(30, studentSubmissions.length * 3 + 2)} Days` : "Active") : "0 Days"}
-                  </p>
-                  <span className="text-base">🔥</span>
-                </div>
-                <div className="flex items-center gap-1.5 mt-2">
-                  <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-extrabold border border-amber-200">
-                    {enrolledCourses.length > 0 ? "Consistency Tracked" : "Not Started"}
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  {enrolledCourses.length > 0 ? "Regular live class & assignment activity" : "Enroll to begin learning streak"}
-                </p>
-              </div>
-
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quiz Mastery</span>
-                  <Target className="h-4 w-4 text-teal-600" />
-                </div>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-2xl font-black text-[#0d5c4d]">
-                    {gradedSubmissions.length > 0 ? `${averageQuizScore}%` : (studentSubmissions.length > 0 ? "Pending" : "0%")}
-                  </p>
-                  <span className="text-[10px] font-bold text-slate-500">Avg Score</span>
-                </div>
-                <div className="flex items-center gap-1.5 mt-2 text-[10px] text-slate-600 font-semibold">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>
-                    {gradedSubmissions.length > 0
-                      ? `${gradedSubmissions.length} of ${studentSubmissions.length} Graded`
-                      : (studentSubmissions.length > 0 ? `${studentSubmissions.length} Awaiting Review` : "No submissions yet")}
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  {studentSubmissions.length > 0 ? `${studentSubmissions.length} total assignment submissions` : "Take quizzes to record score"}
-                </p>
-              </div>
-            </div>
-
-            {/* Enrolled Courses Syllabus Breakdown */}
-            {enrolledCourses && enrolledCourses.length > 0 ? (
-              <div className="bg-[#fcfdfc] rounded-2xl border border-[#e2eae5] p-5 shadow-2xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-[#0d5c4d]" />
-                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26]">
-                      Enrolled Subject Mastery &amp; Unit Breakdown
-                    </h4>
+          {/* =================================================================== */}
+          {/* TAB: SPORTS & ATHLETIC ACHIEVEMENTS RECORD                         */}
+          {/* =================================================================== */}
+          {activeTab === "sports" && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
+                      <Trophy className="h-4 w-4 text-[#0d5c4d]" />
+                      <span>Student Athletic Portfolio &amp; Sports Records</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Verified sports registrations, tournament records, squad rosters, and athletic fitness certifications.
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setCurrentView("progress")}
-                    className="text-xs font-bold text-[#0d5c4d] hover:underline flex items-center gap-1 cursor-pointer"
+                    onClick={handleDownloadSportsCertificate}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-md transition-colors self-start sm:self-auto cursor-pointer"
                   >
-                    <span>Open Comprehensive Learning Analytics</span>
-                    <ExternalLink className="h-3.5 w-3.5" />
+                    <Download className="h-4 w-4" />
+                    <span>Print / Save Record (PDF)</span>
                   </button>
                 </div>
 
-                <div className="space-y-3 pt-1">
-                  {enrolledCourses.map((c: any, idx: number) => {
-                    const courseProgress = c.totalLessons > 0 ? Math.min(100, Math.round(((c.completedLessons || 0) / c.totalLessons) * 100)) : 0;
-                    const teacherName = c.teacher?.user
-                      ? `${c.teacher.user.firstName || ''} ${c.teacher.user.lastName || ''}`.trim()
-                      : c.teacherName || "Assigned Educator";
-
-                    return (
-                      <div
-                        key={c.id || idx}
-                        className="p-4 rounded-xl bg-white border border-slate-200/80 hover:border-emerald-300 transition-all space-y-2"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                          <div>
-                            <span className="font-bold text-xs text-slate-900">{c.title}</span>
-                            <span className="text-[10px] text-slate-500 ml-2">by {teacherName}</span>
-                          </div>
-                          <span className="font-mono text-xs font-bold text-[#0d5c4d]">
-                            {c.completedLessons || 0} / {c.totalLessons || 0} Lessons ({courseProgress}%)
-                          </span>
-                        </div>
-
-                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                          <div
-                            className="bg-[#0d5c4d] h-full rounded-full transition-all duration-500"
-                            style={{ width: `${courseProgress}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
-                <TrendingUp className="h-10 w-10 text-slate-400 mx-auto" />
-                <p className="text-sm font-bold text-slate-700">No Learning Progress Recorded</p>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  You are not currently enrolled in any course batches. Once enrolled, lesson completions, quiz mastery, and syllabus coverage will be automatically tracked here.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setCurrentView("courses")}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                >
-                  <BookOpen className="h-3.5 w-3.5" />
-                  <span>Browse Available Courses</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* =================================================================== */}
-      {/* TAB: SPORTS & ATHLETIC ACHIEVEMENTS RECORD                         */}
-      {/* =================================================================== */}
-      {activeTab === "sports" && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl border border-[#e2eae5] p-5 sm:p-7 shadow-xs space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="font-extrabold text-base text-[#0d2b26] flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-[#0d5c4d]" />
-                  <span>Student Athletic Portfolio &amp; Sports Records</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Verified sports registrations, tournament records, squad rosters, and athletic fitness certifications.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleDownloadSportsCertificate}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-md transition-colors self-start sm:self-auto cursor-pointer"
-              >
-                <Download className="h-4 w-4" />
-                <span>Print / Save Record (PDF)</span>
-              </button>
-            </div>
-
-            {/* Top Athletic Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Primary Sport</span>
-                <p className="text-lg font-black text-[#0d5c4d] mt-1">
-                  {sportsRegistrations.length > 0 ? (sportsRegistrations[0].event?.sportType || "Athletics") : "Not Enrolled"}
-                </p>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
-                    {sportsRegistrations.length > 0 ? (sportsRegistrations[0].roleInTeam || "Participant") : "No Active Sports"}
-                  </span>
-                  {sportsRegistrations.length > 0 && sportsRegistrations[0].jerseyNumber && (
-                    <span className="text-[10px] text-slate-500 font-semibold">Jersey #{sportsRegistrations[0].jerseyNumber}</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registered Events</span>
-                <p className="text-lg font-black text-[#0d2b26] mt-1">
-                  {sportsRegistrations.length > 0 ? `${sportsRegistrations.length} Active ${sportsRegistrations.length === 1 ? 'Event' : 'Events'}` : "0 Events"}
-                </p>
-                <p className="text-[10px] text-emerald-600 font-bold mt-1">
-                  {sportsRegistrations.length > 0 ? "Confirmed Participation" : "Standard Student Status"}
-                </p>
-              </div>
-
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Event Standing</span>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <p className="text-xl font-black text-amber-600 font-mono">
-                    {sportsRegistrations.length > 0 ? (sportsRegistrations[0].status || "Active") : "None"}
-                  </p>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-                  {sportsRegistrations.length > 0 ? (sportsRegistrations[0].event?.title || "Inter-House Sports") : "No active tournaments"}
-                </p>
-              </div>
-
-              <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fitness Level</span>
-                <p className="text-lg font-black text-[#0d5c4d] mt-1 font-mono">Cleared &amp; Fit</p>
-                <p className="text-[10px] text-emerald-700 font-bold mt-1">Standard Athletic Health Clearance</p>
-              </div>
-            </div>
-
-            {/* Active Teams & Event Registrations */}
-            {isLoadingSports ? (
-              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
-                <Loader2 className="h-6 w-6 animate-spin text-[#0d5c4d] mx-auto mb-2" />
-                <p className="text-xs font-semibold text-slate-600">Loading sports registrations...</p>
-              </div>
-            ) : sportsRegistrations && sportsRegistrations.length > 0 ? (
-              <div className="space-y-4">
-                <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                  <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                  <span>Enrolled Sports Teams &amp; Event Rosters</span>
-                </h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {sportsRegistrations.map((reg: any, idx: number) => (
-                    <div
-                      key={reg.id || idx}
-                      className="p-5 rounded-2xl bg-[#fcfdfc] border border-[#e2eae5] hover:border-[#b2e5d9] transition-all space-y-3 shadow-2xs"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-extrabold">
-                            {reg.event?.sportType || "Sports Event"}
-                          </span>
-                          <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">
-                            {reg.event?.title || "Championship Event"}
-                          </h5>
-                        </div>
-                        <span className="text-xl">🏆</span>
-                      </div>
-
-                      <div className="text-xs space-y-1 text-slate-600">
-                        <p>
-                          <span className="font-bold text-slate-800">Role:</span> {reg.roleInTeam || "Participant"}
-                          {reg.jerseyNumber ? ` (Jersey #${reg.jerseyNumber})` : ""}
-                        </p>
-                        <p>
-                          <span className="font-bold text-slate-800">Venue:</span> {reg.event?.venue || "Main Sports Oval"}
-                        </p>
-                        <p>
-                          <span className="font-bold text-slate-800">Event Date:</span> {reg.event?.startDate ? new Date(reg.event.startDate).toLocaleDateString() : "Scheduled"}
-                        </p>
-                        {reg.notes && (
-                          <p>
-                            <span className="font-bold text-slate-800">Notes:</span> {reg.notes}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                        <span className="text-emerald-700 font-bold">{reg.status || "CONFIRMED"}</span>
-                        <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">Roster Verified ✓</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Physical Biometrics & Health Clearance Card */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                  <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                        <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                        <span>Physical Biometrics &amp; Conditioning</span>
-                      </h5>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-extrabold border border-emerald-200">
-                        Medical Fit ✓
+                {/* Top Athletic Metrics */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                  <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Primary Sport</span>
+                    <p className="text-lg font-black text-[#0d5c4d] mt-1">
+                      {sportsRegistrations.length > 0 ? (sportsRegistrations[0].event?.sportType || "Athletics") : "Not Enrolled"}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
+                        {sportsRegistrations.length > 0 ? (sportsRegistrations[0].roleInTeam || "Participant") : "No Active Sports"}
                       </span>
-                    </div>
-
-                    <div className="text-xs text-slate-600 space-y-1">
-                      <p>• General Fitness: <span className="font-bold text-slate-800">Cleared for Competitive Sports</span></p>
-                      <p>• Emergency Response: <span className="font-bold text-slate-800">On-field First Aid Registered</span></p>
-                      <p>• Clearance Validity: <span className="font-bold text-slate-800">Academic Year {new Date().getFullYear()}</span></p>
+                      {sportsRegistrations.length > 0 && sportsRegistrations[0].jerseyNumber && (
+                        <span className="text-[10px] text-slate-500 font-semibold">Jersey #{sportsRegistrations[0].jerseyNumber}</span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3 flex flex-col justify-between">
-                    <div>
-                      <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
-                        <ShieldCheck className="h-3.5 w-3.5 text-[#0d5c4d]" />
-                        <span>Sports Department Endorsement</span>
-                      </h5>
-                      <p className="text-xs text-slate-600 italic mt-2 leading-relaxed bg-white p-3 rounded-xl border border-slate-200">
-                        &ldquo;{currentUser.name || 'This student'} is officially enrolled on our athletic squad rosters, demonstrating teamwork, physical discipline, and sportsmanship.&rdquo;
+                  <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registered Events</span>
+                    <p className="text-lg font-black text-[#0d2b26] mt-1">
+                      {sportsRegistrations.length > 0 ? `${sportsRegistrations.length} Active ${sportsRegistrations.length === 1 ? 'Event' : 'Events'}` : "0 Events"}
+                    </p>
+                    <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                      {sportsRegistrations.length > 0 ? "Confirmed Participation" : "Standard Student Status"}
+                    </p>
+                  </div>
+
+                  <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Event Standing</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="text-xl font-black text-amber-600 font-mono">
+                        {sportsRegistrations.length > 0 ? (sportsRegistrations[0].status || "Active") : "None"}
                       </p>
                     </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                      {sportsRegistrations.length > 0 ? (sportsRegistrations[0].event?.title || "Inter-House Sports") : "No active tournaments"}
+                    </p>
+                  </div>
 
-                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60">
-                      <span className="font-bold text-slate-700">Sports &amp; Athletics Directorate</span>
-                      <span className="px-2 py-0.5 rounded-full bg-white border border-[#c4e9e0] text-[#0d5c4d] font-bold">
-                        Official Record Verified ✓
-                      </span>
-                    </div>
+                  <div className="bg-[#f8faf9] rounded-2xl p-4 border border-[#e2eae5] shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fitness Level</span>
+                    <p className="text-lg font-black text-[#0d5c4d] mt-1 font-mono">Cleared &amp; Fit</p>
+                    <p className="text-[10px] text-emerald-700 font-bold mt-1">Standard Athletic Health Clearance</p>
                   </div>
                 </div>
+
+                {/* Active Teams & Event Registrations */}
+                {isLoadingSports ? (
+                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
+                    <Loader2 className="h-6 w-6 animate-spin text-[#0d5c4d] mx-auto mb-2" />
+                    <p className="text-xs font-semibold text-slate-600">Loading sports registrations...</p>
+                  </div>
+                ) : sportsRegistrations && sportsRegistrations.length > 0 ? (
+                  <div className="space-y-4">
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
+                      <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                      <span>Enrolled Sports Teams &amp; Event Rosters</span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {sportsRegistrations.map((reg, idx: number) => (
+                        <div
+                          key={reg.id || idx}
+                          className="p-5 rounded-2xl bg-[#fcfdfc] border border-[#e2eae5] hover:border-[#b2e5d9] transition-all space-y-3 shadow-2xs"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-extrabold">
+                                {reg.event?.sportType || "Sports Event"}
+                              </span>
+                              <h5 className="font-extrabold text-sm text-[#0d2b26] mt-1">
+                                {reg.event?.title || "Championship Event"}
+                              </h5>
+                            </div>
+                            <span className="text-xl">🏆</span>
+                          </div>
+
+                          <div className="text-xs space-y-1 text-slate-600">
+                            <p>
+                              <span className="font-bold text-slate-800">Role:</span> {reg.roleInTeam || "Participant"}
+                              {reg.jerseyNumber ? ` (Jersey #${reg.jerseyNumber})` : ""}
+                            </p>
+                            <p>
+                              <span className="font-bold text-slate-800">Venue:</span> {reg.event?.venue || "Main Sports Oval"}
+                            </p>
+                            <p>
+                              <span className="font-bold text-slate-800">Event Date:</span> {reg.event?.startDate ? new Date(reg.event.startDate).toLocaleDateString() : "Scheduled"}
+                            </p>
+                            {reg.notes && (
+                              <p>
+                                <span className="font-bold text-slate-800">Notes:</span> {reg.notes}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                            <span className="text-emerald-700 font-bold">{reg.status || "CONFIRMED"}</span>
+                            <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">Roster Verified ✓</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Physical Biometrics & Health Clearance Card */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                      <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
+                            <Activity className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                            <span>Physical Biometrics &amp; Conditioning</span>
+                          </h5>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-extrabold border border-emerald-200">
+                            Medical Fit ✓
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-slate-600 space-y-1">
+                          <p>• General Fitness: <span className="font-bold text-slate-800">Cleared for Competitive Sports</span></p>
+                          <p>• Emergency Response: <span className="font-bold text-slate-800">On-field First Aid Registered</span></p>
+                          <p>• Clearance Validity: <span className="font-bold text-slate-800">Academic Year {new Date().getFullYear()}</span></p>
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-[#f8faf9] border border-[#e2eae5] space-y-3 flex flex-col justify-between">
+                        <div>
+                          <h5 className="font-extrabold text-xs uppercase tracking-wider text-[#0d2b26] flex items-center gap-1.5">
+                            <ShieldCheck className="h-3.5 w-3.5 text-[#0d5c4d]" />
+                            <span>Sports Department Endorsement</span>
+                          </h5>
+                          <p className="text-xs text-slate-600 italic mt-2 leading-relaxed bg-white p-3 rounded-xl border border-slate-200">
+                            &ldquo;{currentUser.name || 'This student'} is officially enrolled on our athletic squad rosters, demonstrating teamwork, physical discipline, and sportsmanship.&rdquo;
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60">
+                          <span className="font-bold text-slate-700">Sports &amp; Athletics Directorate</span>
+                          <span className="px-2 py-0.5 rounded-full bg-white border border-[#c4e9e0] text-[#0d5c4d] font-bold">
+                            Official Record Verified ✓
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
+                    <Trophy className="h-10 w-10 text-slate-400 mx-auto" />
+                    <p className="text-sm font-bold text-slate-700">No Sports Registrations Found</p>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto">
+                      This student is not currently registered for any athletic tournaments, sports teams, or inter-house competitions.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentView("sports")}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Trophy className="h-3.5 w-3.5" />
+                      <span>Explore Sports &amp; Tournaments</span>
+                    </button>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-3">
-                <Trophy className="h-10 w-10 text-slate-400 mx-auto" />
-                <p className="text-sm font-bold text-slate-700">No Sports Registrations Found</p>
-                <p className="text-xs text-slate-500 max-w-md mx-auto">
-                  This student is not currently registered for any athletic tournaments, sports teams, or inter-house competitions.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setCurrentView("sports")}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                >
-                  <Trophy className="h-3.5 w-3.5" />
-                  <span>Explore Sports &amp; Tournaments</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+            </div>
+          )}
         </>
       )}
 
@@ -4747,6 +4784,7 @@ if (savedProfile.preferredName) {
               </div>
               <button
                 type="button"
+                aria-label="Close public studio preview"
                 onClick={() => setShowPublicPreview(false)}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
@@ -4758,9 +4796,12 @@ if (savedProfile.preferredName) {
             <div className="max-h-[80vh] overflow-y-auto">
               {/* Studio Cover Banner */}
               <div className="relative h-44 sm:h-52 w-full bg-slate-900">
-                <img
+                <NextImage
                   src={coverImageUrl}
                   alt="Studio Cover"
+                  width={800}
+                  height={208}
+                  unoptimized
                   className="h-full w-full object-cover opacity-85"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -4768,7 +4809,7 @@ if (savedProfile.preferredName) {
                   <div className="flex items-end gap-4">
                     <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-gradient-to-br from-[#0d5c4d] to-[#147a66] border-4 border-white text-white flex items-center justify-center text-3xl font-black shadow-xl overflow-hidden">
                       {profileData.avatarUrl ? (
-                        <img src={profileData.avatarUrl} alt={profileData.name} className="h-full w-full object-cover" />
+                        <NextImage src={profileData.avatarUrl} alt={profileData.name} width={96} height={96} unoptimized className="h-full w-full object-cover" />
                       ) : (
                         profileData.name.charAt(0)
                       )}
@@ -4958,6 +4999,7 @@ if (savedProfile.preferredName) {
               </div>
               <button
                 type="button"
+                aria-label="Close degree dialog"
                 onClick={() => setDegreeModalState({ ...degreeModalState, isOpen: false })}
                 className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
               >
@@ -5087,6 +5129,7 @@ if (savedProfile.preferredName) {
               </div>
               <button
                 type="button"
+                aria-label="Close accreditation dialog"
                 onClick={() => setAccreditationModalState({ ...accreditationModalState, isOpen: false })}
                 className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
               >
@@ -5227,6 +5270,7 @@ if (savedProfile.preferredName) {
               </div>
               <button
                 type="button"
+                aria-label="Close bank account dialog"
                 onClick={() => setBankModalState({ ...bankModalState, isOpen: false })}
                 className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
               >
@@ -5382,6 +5426,7 @@ if (savedProfile.preferredName) {
               </div>
               <button
                 type="button"
+                aria-label="Close social channel dialog"
                 onClick={() => setSocialModalState({ ...socialModalState, isOpen: false })}
                 className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
               >
@@ -5504,6 +5549,7 @@ if (savedProfile.preferredName) {
               </div>
               <button
                 type="button"
+                aria-label="Close cover banner dialog"
                 onClick={() => setCoverModalState({ ...coverModalState, isOpen: false })}
                 className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
               >
@@ -5537,11 +5583,10 @@ if (savedProfile.preferredName) {
                       key={idx}
                       type="button"
                       onClick={() => setCoverModalState({ ...coverModalState, url: preset.url })}
-                      className={`relative h-20 rounded-xl overflow-hidden border-2 text-left transition-all cursor-pointer group ${
-                        coverModalState.url === preset.url ? "border-[#0d5c4d] ring-2 ring-[#0d5c4d]/20" : "border-slate-200 hover:border-slate-400"
-                      }`}
+                      className={`relative h-20 rounded-xl overflow-hidden border-2 text-left transition-all cursor-pointer group ${coverModalState.url === preset.url ? "border-[#0d5c4d] ring-2 ring-[#0d5c4d]/20" : "border-slate-200 hover:border-slate-400"
+                        }`}
                     >
-                      <img src={preset.url} alt={preset.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                      <NextImage src={preset.url} alt={preset.title} width={160} height={80} unoptimized className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
                       <div className="absolute inset-0 bg-black/40 flex items-end p-2 text-white text-[11px] font-bold">
                         <span>{preset.title}</span>
                       </div>
@@ -5599,6 +5644,7 @@ if (savedProfile.preferredName) {
               </div>
               <button
                 type="button"
+                aria-label="Close avatar selector"
                 onClick={() => setAvatarModalOpen(false)}
                 className="h-8 w-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
               >
@@ -5629,11 +5675,10 @@ if (savedProfile.preferredName) {
                             message: "Profile photo updated. Click 'Save Details' to persist."
                           });
                         }}
-                        className={`group relative rounded-2xl overflow-hidden border-2 aspect-square transition-all cursor-pointer ${
-                          isSelected ? "border-[#0d5c4d] ring-2 ring-[#0d5c4d]/30" : "border-slate-200 hover:border-[#0d5c4d]"
-                        }`}
+                        className={`group relative rounded-2xl overflow-hidden border-2 aspect-square transition-all cursor-pointer ${isSelected ? "border-[#0d5c4d] ring-2 ring-[#0d5c4d]/30" : "border-slate-200 hover:border-[#0d5c4d]"
+                          }`}
                       >
-                        <img src={preset.url} alt={preset.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                        <NextImage src={preset.url} alt={preset.title} width={160} height={80} unoptimized className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-1.5 text-white text-[10px] font-bold">
                           <span className="truncate">{preset.title}</span>
                         </div>

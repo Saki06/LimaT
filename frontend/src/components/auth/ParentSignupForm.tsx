@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { Users, User as UserIcon, Phone, GraduationCap, Lock, UserPlus, Loader2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
-import { api } from "@/lib/api";
 
 interface ParentSignupFormProps {
   onSuccess: () => void;
@@ -74,11 +73,11 @@ export function ParentSignupForm({ onSuccess }: ParentSignupFormProps) {
           message: res.message || "Could not complete guardian registration."
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       addToast({
         type: "error",
         title: "Connection Error",
-        message: err.message || "Could not reach registration server."
+        message: err instanceof Error ? err.message : "Could not reach registration server."
       });
     } finally {
       setIsLoading(false);

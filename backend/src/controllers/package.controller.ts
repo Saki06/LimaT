@@ -55,6 +55,18 @@ export const createPackage = async (req: AuthenticatedRequest, res: Response): P
       return;
     }
 
+    const numericPrice = Number(price);
+    if (!Number.isFinite(numericPrice) || numericPrice < 0 || numericPrice > 10_000_000) {
+      res.status(400).json({ success: false, message: 'Package price must be a non-negative number up to 10,000,000.' });
+      return;
+    }
+
+    const numericDuration = Number(durationDays);
+    if (!Number.isFinite(numericDuration) || numericDuration <= 0 || numericDuration > 3650) {
+      res.status(400).json({ success: false, message: 'Package durationDays must be a positive number (1-3650 days).' });
+      return;
+    }
+
     const tenantId = user.tenantId;
 
 if (!tenantId) {

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/lib/api";
 import {
@@ -12,20 +13,14 @@ import {
   FileText,
   Plus,
   Send,
-  MessageSquare,
-  Award,
   ClipboardCheck,
   Eye,
   Bell,
-  Sparkles,
-  Filter,
   Check,
   BarChart3,
   Calendar,
   AlertCircle,
-  ExternalLink,
   Search,
-  TrendingUp,
   UploadCloud,
   Video,
   Presentation,
@@ -46,8 +41,6 @@ import {
   CheckCheck,
   HelpCircle,
   RotateCcw,
-  Lock,
-  Globe,
   RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,9 +56,46 @@ import {
   Tooltip,
   CartesianGrid
 } from "recharts";
-import { Assignment, Course, Announcement, Quiz, QuizQuestion, LibraryResource } from "@/types/lms";
+import { Assignment, Course, Announcement, Quiz, QuizAttemptRecord, LibraryResource } from "@/types/lms";
 import { QuizBuilderModal } from "./QuizBuilderModal";
 import { ResourceUploadModal } from "./ResourceUploadModal";
+
+interface TeacherPackageItem {
+  id?: string;
+  title?: string;
+  name?: string;
+  grade?: string;
+}
+
+type PackagesApiResponse =
+  | TeacherPackageItem[]
+  | { packages?: TeacherPackageItem[]; data?: TeacherPackageItem[] };
+
+interface ScheduleItem {
+  period: string;
+  time: string;
+  course: string;
+  courseId: string;
+  topic: string;
+  classRoom: string;
+  deliveryMode: "physical" | "live_online";
+  type: string;
+  status: "completed" | "in_progress" | "upcoming";
+  studentsCount: number;
+  meetingUrl?: string;
+  meetingId?: string;
+  passcode?: string;
+}
+
+interface TeacherDashboardData {
+  kpis?: {
+    totalEnrolledStudents?: number;
+    activeBatchesCount?: number;
+    pendingReviewsCount?: number;
+    liveSessionsTodayCount?: number;
+  };
+  todaySchedule?: ScheduleItem[];
+}
 
 interface TeacherViewsProps {
   initialTab?: "home" | "grading" | "assignments" | "analytics";
@@ -89,7 +119,6 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
     updateQuiz,
     deleteQuiz,
     fetchQuizzes,
-    setSelectedQuizId,
     announcements,
     createAnnouncement,
     updateAnnouncement,
@@ -141,19 +170,19 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   }, [courses, currentUser]);
 
   // Tutor's study packages
-  const [tutorPackages, setTutorPackages] = useState<any[]>([]);
+  const [tutorPackages, setTutorPackages] = useState<TeacherPackageItem[]>([]);
 
   useEffect(() => {
     let isMounted = true;
     api.packages
       .getMyPackages()
-      .then((res: any) => {
+      .then((res: PackagesApiResponse) => {
         if (!isMounted) return;
         const list = Array.isArray(res) ? res : res?.packages || res?.data || [];
         if (Array.isArray(list) && list.length > 0) {
           setTutorPackages(list);
         } else {
-          api.packages.getAll().then((allRes: any) => {
+          api.packages.getAll().then((allRes: PackagesApiResponse) => {
             if (!isMounted) return;
             const allList = Array.isArray(allRes) ? allRes : allRes?.packages || allRes?.data || [];
             setTutorPackages(Array.isArray(allList) ? allList : []);
@@ -161,7 +190,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
         }
       })
       .catch(() => {
-        api.packages.getAll().then((allRes: any) => {
+        api.packages.getAll().then((allRes: PackagesApiResponse) => {
           if (!isMounted) return;
           const allList = Array.isArray(allRes) ? allRes : allRes?.packages || allRes?.data || [];
           setTutorPackages(Array.isArray(allList) ? allList : []);
@@ -186,7 +215,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
       }
     });
 
-    tutorPackages.forEach((pkg: any) => {
+    tutorPackages.forEach((pkg) => {
       const title = pkg.title || pkg.name;
       if (title && !list.some((item) => item.value === title)) {
         list.push({
@@ -215,7 +244,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [quizToEdit, setQuizToEdit] = useState<Quiz | null>(null);
   const [previewQuiz, setPreviewQuiz] = useState<Quiz | null>(null);
-  const [previewAnswers, setPreviewAnswers] = useState<Record<string, any>>({});
+  const [previewAnswers, setPreviewAnswers] = useState<QuizAttemptRecord["answers"]>({});
   const [previewResult, setPreviewResult] = useState<{ score: number; totalMarks: number } | null>(null);
   const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
 
@@ -234,22 +263,29 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
 
   // Sync tab if currentView changes externally from sidebar
   useEffect(() => {
-    if (currentView === "assignments") {
-      setActiveTab("assignments");
-      setCourseworkSubTab("assignments");
-    } else if (currentView === "quizzes") {
-      setActiveTab("assignments");
-      setCourseworkSubTab("quizzes");
-    } else if (currentView === "resources" || currentView === "materials" || currentView === "library" || currentView === "tutes") {
-      setActiveTab("assignments");
-      setCourseworkSubTab("resources");
-    } else if (currentView === "submissions") {
-      setActiveTab("grading");
-    } else if (currentView === "analytics") {
-      setActiveTab("analytics");
-    } else if (currentView === "dashboard") {
-      setActiveTab("home");
-    }
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      if (currentView === "assignments") {
+        setActiveTab("assignments");
+        setCourseworkSubTab("assignments");
+      } else if (currentView === "quizzes") {
+        setActiveTab("assignments");
+        setCourseworkSubTab("quizzes");
+      } else if (currentView === "resources" || currentView === "materials" || currentView === "library" || currentView === "tutes") {
+        setActiveTab("assignments");
+        setCourseworkSubTab("resources");
+      } else if (currentView === "submissions") {
+        setActiveTab("grading");
+      } else if (currentView === "analytics") {
+        setActiveTab("analytics");
+      } else if (currentView === "dashboard") {
+        setActiveTab("home");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [currentView]);
 
 
@@ -268,7 +304,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const [isCreateAnnouncementModalOpen, setIsCreateAnnouncementModalOpen] = useState(false);
 
   // Live Teacher Dashboard State
-  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [dashboardData, setDashboardData] = useState<TeacherDashboardData | null>(null);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
 
   const loadTeacherDashboard = async () => {
@@ -286,9 +322,17 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   };
 
   useEffect(() => {
+    let cancelled = false;
     if (activeTab === "home") {
-      loadTeacherDashboard();
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          void loadTeacherDashboard();
+        }
+      });
     }
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab]);
 
   // Live Class Stream Modal State
@@ -522,11 +566,18 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
 
   // Update inputs when active submission changes
   useEffect(() => {
+    let cancelled = false;
     if (activeSubmission) {
-      setMarksInput(activeSubmission.marksObtained ?? Math.round(activeSubmission.maxMarks * 0.85));
-      setFeedbackInput(activeSubmission.teacherFeedback || "");
+      Promise.resolve().then(() => {
+        if (cancelled) return;
+        setMarksInput(activeSubmission.marksObtained ?? Math.round(activeSubmission.maxMarks * 0.85));
+        setFeedbackInput(activeSubmission.teacherFeedback || "");
+      });
     }
-  }, [activeSubmission?.id]);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSubmission]);
 
   const handleSaveGrade = (release: boolean) => {
     if (!activeSubmission) return;
@@ -708,7 +759,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
       setEditAnnAudience("__custom__");
       setEditCustomAudience(notice.targetAudience);
     }
-    setEditAnnPriority(notice.priority === "urgent" ? "high" : (notice.priority as any) || "normal");
+    setEditAnnPriority(notice.priority === "urgent" || notice.priority === "high" ? "high" : "normal");
     setIsEditAnnouncementModalOpen(true);
   };
 
@@ -734,36 +785,6 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
   const handleDeleteNotice = (id: string) => {
     deleteAnnouncement(id);
   };
-
-  // Performance analytics calculation
-  const gradedSubmissions = submissions.filter((s) => s.marksObtained !== undefined);
-  const avgScore = gradedSubmissions.length > 0
-    ? (
-        gradedSubmissions.reduce(
-          (sum, s) => sum + ((s.marksObtained || 0) / s.maxMarks) * 100,
-          0
-        ) / gradedSubmissions.length
-      ).toFixed(1)
-    : "0.0";
-
-  // Today's Teaching Schedule (Timeline)
-  interface ScheduleItem {
-    period: string;
-    time: string;
-    course: string;
-    courseId: string;
-    topic: string;
-    classRoom: string;
-    deliveryMode: "physical" | "live_online";
-    type: string;
-    status: "completed" | "in_progress" | "upcoming";
-    studentsCount: number;
-    meetingUrl?: string;
-    meetingId?: string;
-    passcode?: string;
-  }
-
-  const todaySchedule: ScheduleItem[] = [];
 
   // Sri Lanka G.C.E A/L Grade Distribution (Calculated from real submissions)
   const gradeDistribution = useMemo(() => {
@@ -1870,6 +1891,8 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 />
                 {searchStudent && (
                   <button
+                    type="button"
+                    aria-label="Clear student search"
                     onClick={() => setSearchStudent("")}
                     className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
@@ -2025,7 +2048,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                           <FileText className="h-4 w-4 text-[#0d5c4d]" />
-                          Student's Submitted Work &amp; Solution:
+                          Student&apos;s Submitted Work &amp; Solution:
                         </p>
                         {activeSubmission.textContent && (
                           <button
@@ -2762,6 +2785,8 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                     />
                     {resourceSearch && (
                       <button
+                        type="button"
+                        aria-label="Clear resource search"
                         onClick={() => setResourceSearch("")}
                         className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                       >
@@ -2775,7 +2800,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                     <span className="text-xs font-bold text-slate-500">Access:</span>
                     <select
                       value={resourceVisibilityFilter}
-                      onChange={(e) => setResourceVisibilityFilter(e.target.value as any)}
+                      onChange={(e) => setResourceVisibilityFilter(e.target.value as "all" | "public" | "subscribers_only")}
                       className="h-9 px-3 rounded-xl bg-[#f8faf9] border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
                     >
                       <option value="all">All Access Levels</option>
@@ -2789,19 +2814,19 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-100">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">Type:</span>
                   {[
-                    { id: "all", label: "All Items", count: myTeacherResources.length },
+                    { id: "all" as const, label: "All Items", count: myTeacherResources.length },
                     {
-                      id: "tute",
+                      id: "tute" as const,
                       label: "📝 Class Tutes",
                       count: myTeacherResources.filter((r) => r.resourceType === "tute").length
                     },
                     {
-                      id: "past_paper",
+                      id: "past_paper" as const,
                       label: "📑 Past Papers & Model Exams",
                       count: myTeacherResources.filter((r) => r.resourceType === "past_paper").length
                     },
                     {
-                      id: "book",
+                      id: "book" as const,
                       label: "📖 Books & Guides",
                       count: myTeacherResources.filter((r) => r.resourceType === "book").length
                     }
@@ -2809,7 +2834,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setResourceTypeFilter(tab.id as any)}
+                      onClick={() => setResourceTypeFilter(tab.id)}
                       className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                         resourceTypeFilter === tab.id
                           ? "bg-[#0d5c4d] text-white shadow-xs"
@@ -2875,10 +2900,13 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                       >
                         {/* Cover Image Banner */}
                         <div className="relative h-32 w-full bg-slate-900 overflow-hidden">
-                          <img
+                          <Image
                             src={res.coverImage || "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=600&auto=format&fit=crop&q=80"}
                             alt={res.title}
-                            className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-500"
+                            fill
+                            unoptimized
+                            sizes="(max-width: 768px) 100vw, 33vw"
+                            className="object-cover opacity-75 group-hover:scale-105 transition-transform duration-500"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
 
@@ -3820,6 +3848,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                   </div>
                   <button
                     type="button"
+                    aria-label="Remove uploaded file"
                     onClick={() => setUploadedMainFile(null)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                   >
@@ -3893,6 +3922,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                   </div>
                   <button
                     type="button"
+                    aria-label="Remove uploaded file"
                     onClick={() => setUploadedMainFile(null)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                   >
@@ -3984,6 +4014,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                   </div>
                   <button
                     type="button"
+                    aria-label="Remove uploaded file"
                     onClick={() => setUploadedMainFile(null)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                   >
@@ -4065,6 +4096,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                     <span className="text-[10px] text-slate-400">({file.size})</span>
                     <button
                       type="button"
+                      aria-label={`Remove ${file.name}`}
                       onClick={() => removeSupplementaryFile(idx)}
                       className="text-slate-400 hover:text-rose-600"
                     >
@@ -4143,7 +4175,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
               </label>
               <select
                 value={annPriority}
-                onChange={(e) => setAnnPriority(e.target.value as any)}
+                onChange={(e) => setAnnPriority(e.target.value as "normal" | "high")}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
                 <option value="normal">Standard Notice</option>
@@ -4245,7 +4277,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
               </label>
               <select
                 value={editAnnPriority}
-                onChange={(e) => setEditAnnPriority(e.target.value as any)}
+                onChange={(e) => setEditAnnPriority(e.target.value as "normal" | "high")}
                 className="w-full h-10 px-3 rounded-xl bg-[#f8faf9] border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0d5c4d]"
               >
                 <option value="normal">Standard Notice</option>
@@ -4551,7 +4583,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                 <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg">
                   <p className="font-bold text-slate-900 mb-1 font-sans">Part B — Question 02 [Definite Integral Solution]:</p>
                   <p>&int;₀^(&pi;/2) x &bull; cos(x) dx</p>
-                  <p>Using Integration by Parts: &int; u v' dx = u v - &int; u' v dx</p>
+                  <p>Using Integration by Parts: &int; u v&apos; dx = u v - &int; u&apos; v dx</p>
                   <p>Let u = x &rArr; du = dx ; dv = cos(x) dx &rArr; v = sin(x)</p>
                   <p className="pl-4">&rArr; [x &bull; sin(x)]₀^(&pi;/2) - &int;₀^(&pi;/2) sin(x) dx</p>
                   <p className="pl-4 text-emerald-800 font-bold">&rArr; (&pi;/2 &bull; 1 - 0) - [ -cos(x) ]₀^(&pi;/2) = &pi;/2 - 1 &check; (Full Marks)</p>
@@ -4614,7 +4646,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                   Candidate Exam Simulation & Diagnostic Preview
                 </h3>
                 <p className="text-xs text-slate-500 font-normal">
-                  Testing "{previewQuiz.title}" as an enrolled student.
+                  Testing &ldquo;{previewQuiz.title}&rdquo; as an enrolled student.
                 </p>
               </div>
             </div>
@@ -4802,7 +4834,7 @@ export function TeacherViews({ initialTab = "home", initialSubTab = "assignments
                             ? q.correctAnswer.map(String).sort()
                             : [String(q.correctAnswer)];
                           const studentArr = Array.isArray(studentAns)
-                            ? (studentAns as any[]).map(String).sort()
+                            ? studentAns.map(String).sort()
                             : [String(studentAns)];
                           if (
                             studentArr.length === correctArr.length &&

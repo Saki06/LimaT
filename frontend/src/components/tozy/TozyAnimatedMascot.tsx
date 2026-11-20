@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { Sparkles, Heart } from "lucide-react";
 
 export interface TozyMascotProps {
@@ -16,7 +17,6 @@ export interface TozyMascotProps {
 
 export function TozyAnimatedMascot({
   size = "md",
-  mood = "welcoming",
   interactive = true,
   showWings = true,
   showSpeech = false,
@@ -149,9 +149,12 @@ export function TozyAnimatedMascot({
 
         {/* Mascot Center Image */}
         <div className="relative z-10 w-full h-full flex items-center justify-center drop-shadow-[0_8px_16px_rgba(13,92,77,0.18)]">
-          <img
+          <Image
             src="/images/tozy_icon.jpg"
             alt="Tozy the winged baby elephant - Newtoz mascot"
+            width={288}
+            height={288}
+            unoptimized
             className="w-full h-full object-contain rounded-full ring-2 ring-emerald-300/40 p-0.5 bg-white/80"
           />
         </div>

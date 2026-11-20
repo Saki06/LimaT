@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { prisma } from '../config/prisma';
 
 export const listTenants = async (req: Request, res: Response): Promise<void> => {
@@ -237,6 +238,35 @@ if (
 },
       },
     });
+
+    // If an administrator email is provided, ensure a School Administrator User record is associated
+    if (adminEmail && typeof adminEmail === 'string' && adminEmail.trim()) {
+      const normalizedEmail = adminEmail.trim().toLowerCase();
+      const existingUser = await prisma.user.findFirst({
+        where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+      });
+      if (!existingUser) {
+        const defaultPasswordHash = await bcrypt.hash('Test1234!', 10);
+        const nameParts = (adminName || 'School Administrator').trim().split(' ');
+        const firstName = nameParts[0] || 'School';
+        const lastName = nameParts.slice(1).join(' ') || 'Admin';
+        await prisma.user.create({
+          data: {
+            email: normalizedEmail,
+            passwordHash: defaultPasswordHash,
+            role: 'ADMIN',
+            firstName,
+            lastName,
+            tenantId: newTenant.id,
+          },
+        });
+      } else if (!existingUser.tenantId) {
+        await prisma.user.update({
+          where: { id: existingUser.id },
+          data: { tenantId: newTenant.id, role: 'ADMIN' },
+        });
+      }
+    }
 
     res.status(201).json({ success: true, message: 'Tenant created successfully', data: newTenant });
   } catch (error: any) {

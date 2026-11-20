@@ -1,4 +1,4 @@
-import { Router, Response, NextFunction } from 'express';
+import { Router } from 'express';
 import {
   listTenants,
   listArchivedTenants,
@@ -10,30 +10,15 @@ import {
 } from '../controllers/tenant.controller';
 
 import {
-  optionalAuthenticateToken,
+  authenticateToken,
   requireRoles,
-  AuthenticatedRequest,
 } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-// Middleware: Allow Super Admin, or allow preview in non-production
-const requireSuperAdminOrDev = (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): void => {
-  if (req.user?.role === 'SUPER_ADMIN') {
-    return next();
-  }
-  if (process.env.NODE_ENV !== 'production') {
-    return next();
-  }
-  return requireRoles('SUPER_ADMIN')(req, res, next);
-};
-
-router.use(optionalAuthenticateToken);
-router.use(requireSuperAdminOrDev);
+// Strict Super Admin authentication & role enforcement in all environments (VULN-04 fix)
+router.use(authenticateToken);
+router.use(requireRoles('SUPER_ADMIN'));
 
 // 1. Get all active tenants
 router.get('/', listTenants);

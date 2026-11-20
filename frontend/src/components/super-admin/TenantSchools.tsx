@@ -61,6 +61,7 @@ export function TenantSchools({
           <input
             type="text"
             placeholder="Search institution, code, admin, subject..."
+            aria-label="Search institution, code, admin, subject"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#0d5c4d] focus:bg-white transition-all"
@@ -74,9 +75,9 @@ export function TenantSchools({
           <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-2xl">
             🔍
           </div>
-          <h4 className="text-base font-black text-slate-800">
+          <h2 className="text-base font-black text-slate-800">
             No Tutors Found
-          </h4>
+          </h2>
           <p className="text-xs text-slate-500 max-w-md mx-auto">
             {searchQuery
               ? `No educational studios or tutors matched "${searchQuery}". Try another name, code, or subject.`
@@ -139,7 +140,7 @@ export function TenantSchools({
                         )}
                       </div>
 
-                      <h3 className="text-base font-black text-[#0d2b26] mt-1">{tenant.name}</h3>
+                      <h2 className="text-base font-black text-[#0d2b26] mt-1">{tenant.name}</h2>
                       {tenant.tagline && <p className="text-xs text-slate-500 italic">&ldquo;{tenant.tagline}&rdquo;</p>}
 
                       {tenant.subjects && tenant.subjects.length > 0 && (

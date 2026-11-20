@@ -1,9 +1,102 @@
 import { PrismaClient, Role, TenantStatus, EventStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
+/**
+ * Validates a database connection URL string against strict safety requirements.
+ * Ensures the target matches ONLY the isolated local QA database (127.0.0.1:5434/newtoz_test).
+ * Never prints database credentials or connection strings in logs.
+ */
+function validateDbUrl(rawUrl: string | undefined, varName: string): void {
+  if (!rawUrl || !rawUrl.trim()) {
+    if (varName === 'DATABASE_URL') {
+      console.error(`\n🛑 CRITICAL DATABASE SAFETY ABORT: ${varName} environment variable is required.\n`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  const trimmed = rawUrl.trim();
+
+  // Reject cloud Supabase or external managed pools
+  const isCloudKeyword =
+    trimmed.includes('supabase.co') ||
+    trimmed.includes('supabase.com') ||
+    trimmed.includes('pooler.supabase') ||
+    trimmed.includes('rds.amazonaws.com') ||
+    trimmed.includes('neon.tech') ||
+    trimmed.includes('render.com');
+
+  if (isCloudKeyword) {
+    console.error(`\n🛑 CRITICAL DATABASE SAFETY ABORT: ${varName} references an external/cloud provider.`);
+    console.error('Destructive test seeding is strictly restricted to local QA target: 127.0.0.1:5434/newtoz_test.\n');
+    process.exit(1);
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    console.error(`\n🛑 CRITICAL DATABASE SAFETY ABORT: ${varName} is a malformed URL.\n`);
+    process.exit(1);
+  }
+
+  const protocol = parsed.protocol.toLowerCase();
+  const hostname = parsed.hostname.toLowerCase();
+  const port = parsed.port;
+  // Database name from pathname (e.g. "/newtoz_test" -> "newtoz_test")
+  const dbName = parsed.pathname.replace(/^\//, '');
+
+  const isPostgresProto = protocol === 'postgresql:' || protocol === 'postgres:';
+  const isLocalHost = hostname === '127.0.0.1' || hostname === 'localhost';
+  const isPort5434 = port === '5434';
+  const isTestDb = dbName === 'newtoz_test';
+
+  if (!isPostgresProto || !isLocalHost || !isPort5434 || !isTestDb) {
+    console.error('\n🛑 CRITICAL DATABASE SAFETY ABORT:');
+    console.error(`Database seed target in ${varName} is NOT the verified local QA database!`);
+    console.error('Destructive operations (deleteMany) are strictly limited to local QA target: 127.0.0.1:5434/newtoz_test.');
+    console.error(`  Parsed protocol: "${protocol}" (allowed: postgresql:, postgres:)`);
+    console.error(`  Parsed host: "${hostname}" (allowed: 127.0.0.1, localhost)`);
+    console.error(`  Parsed port: "${port}" (allowed: 5434)`);
+    console.error(`  Parsed database: "${dbName}" (allowed: newtoz_test)`);
+    console.error('Execution terminated to protect production, staging, and enterprise databases.\n');
+    process.exit(1);
+  }
+}
+
+/**
+ * Fail-closed safety assertion for development database seeding.
+ * Strictly prevents destructive deleteMany() operations against production, staging,
+ * or cloud-hosted databases. Validates both DATABASE_URL and DIRECT_URL.
+ */
+function assertSafeSeedTarget(): void {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  if (nodeEnv === 'production') {
+    console.error('\n🛑 CRITICAL DATABASE SAFETY ABORT:');
+    console.error('Destructive database seeding (seed.ts) is strictly prohibited in production mode (NODE_ENV=production).');
+    console.error('All deleteMany() and synthetic account creations have been blocked to protect production data.\n');
+    process.exit(1);
+  }
+
+  // Validate DATABASE_URL (mandatory)
+  validateDbUrl(process.env.DATABASE_URL, 'DATABASE_URL');
+
+  // Validate DIRECT_URL if configured
+  if (process.env.DIRECT_URL) {
+    validateDbUrl(process.env.DIRECT_URL, 'DIRECT_URL');
+  }
+
+  console.log('🛡️  Seed target verified safe: Local QA database (127.0.0.1:5434/newtoz_test).');
+}
+
+// CRITICAL SAFETY GUARD: Must execute before PrismaClient is instantiated
+assertSafeSeedTarget();
+
 const prisma = new PrismaClient();
 
 async function main() {
+  assertSafeSeedTarget();
+
   console.log('🌱 Starting database seeding...');
 
   // Clean existing records (optional, in order of dependencies)
@@ -55,6 +148,13 @@ async function main() {
       firstName: 'Chief',
       lastName: 'Administrator',
       avatarUrl: '/images/tutor_brush_portrait.jpg',
+      superAdminProfile: {
+        create: {
+          fullName: 'Chief Administrator',
+          preferredName: 'Chief Admin',
+          phone: '+94 77 000 1122',
+        },
+      },
     },
   });
 
@@ -202,11 +302,15 @@ async function main() {
   console.log('🎉 Database seeding completed successfully!');
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Error during database seeding:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+export { assertSafeSeedTarget, validateDbUrl };
+
+if (require.main === module) {
+  main()
+    .catch((e) => {
+      console.error('❌ Error during database seeding:', e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

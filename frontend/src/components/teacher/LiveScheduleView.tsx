@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/lib/api";
+import type { Course } from "@/types/lms";
 import {
   Video,
   Calendar,
@@ -14,39 +15,22 @@ import {
   Copy,
   ExternalLink,
   Send,
-  CheckCircle2,
-  AlertCircle,
   Search,
-  Filter,
-  Sparkles,
   Link as LinkIcon,
-  BookOpen,
-  GraduationCap,
-  Layers,
   Radio,
   Share2,
   X,
-  Laptop,
   Play,
   Maximize2,
   Minimize2,
-  ShieldCheck,
-  Check,
-  Mic,
-  MicOff,
-  VideoOff,
   PhoneOff,
-  MessageSquare,
   FileText,
   Download,
   Eye,
   Paperclip,
-  ChevronRight,
-  ThumbsUp,
-  MessageCircle,
   RefreshCw
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
@@ -114,7 +98,36 @@ function parseDurationMinutes(durStr?: string): number {
   return total > 0 ? total : 90;
 }
 
-function extractGradeFromCourse(course?: any, fallbackText?: string): string {
+interface BackendLivePackageItem {
+  id: string;
+  title: string;
+  price?: number | null;
+  teacherId?: string | null;
+  teacher?: { userId?: string | null } | null;
+  teacherName?: string | null;
+}
+
+interface BackendLiveClassItem {
+  id: string;
+  title: string;
+  startTime: string;
+  platform?: string | null;
+  status?: string | null;
+  meetingUrl?: string | null;
+  meetingId?: string;
+  passcode?: string;
+  topic?: string | null;
+  enrolledCount?: number | null;
+  _count?: { attendances?: number | null } | null;
+  recordingUrl?: string;
+  courseId?: string;
+  packageId?: string;
+  subject?: string | null;
+  course?: { title?: string | null; grade?: string | null } | null;
+  package?: { title?: string | null } | null;
+}
+
+function extractGradeFromCourse(course?: Pick<Course, "title" | "gradeName"> | null, fallbackText?: string): string {
   const text = course?.title || fallbackText || "";
   const match = text.match(/Grade\s*\d+(\s*(&|and|-)\s*\d+)?/i);
   if (match) return match[0];
@@ -177,7 +190,7 @@ export function LiveScheduleView() {
   const [selectedDay, setSelectedDay] = useState<string>("All Days");
   const [selectedTab, setSelectedTab] = useState<"all" | "live" | "upcoming" | "recordings">("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [availablePackages, setAvailablePackages] = useState<any[]>([]);
+  const [availablePackages, setAvailablePackages] = useState<BackendLivePackageItem[]>([]);
 
   // In-App Video Studio Modal
   const [activeStudioSession, setActiveStudioSession] = useState<LiveSlot | null>(null);
@@ -188,7 +201,7 @@ export function LiveScheduleView() {
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
 
   // Form State
-  const [formData, setFormData] = useState<Omit<LiveSlot, "id">>({
+  const [formData, setFormData] = useState<Omit<LiveSlot, "id">>(() => ({
     title: "",
     subject: teacherCourses[0]?.title || "",
     grade: extractGradeFromCourse(teacherCourses[0]),
@@ -209,7 +222,7 @@ export function LiveScheduleView() {
     handoutName: "",
     duration: "2h 00m",
     viewsCount: 0
-  });
+  }));
 
   // Delete & Broadcast Modals
   const [deletingSlot, setDeletingSlot] = useState<LiveSlot | null>(null);
@@ -278,9 +291,9 @@ export function LiveScheduleView() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const fetchLiveClasses = async () => {
+  const fetchLiveClasses = React.useCallback(async () => {
     try {
-      let res: any = null;
+      let res: { success?: boolean; data?: BackendLiveClassItem[] } | null = null;
       if (!isTeacher && api.students?.getMyLiveClasses) {
         res = await api.students.getMyLiveClasses();
       } else {
@@ -288,7 +301,7 @@ export function LiveScheduleView() {
       }
 
       if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
-        const mapped: LiveSlot[] = res.data.map((item: any) => {
+        const mapped: LiveSlot[] = res.data.map((item) => {
           const startD = new Date(item.startTime);
           const daysOfWeek: LiveSlot["day"][] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
           const dayName = daysOfWeek[startD.getDay()] || "Tuesday";
@@ -331,35 +344,44 @@ export function LiveScheduleView() {
       console.warn("Could not fetch live classes:", err);
       setSlots([]);
     }
-  };
+  }, [isTeacher]);
 
   // 1. Fetch live classes from backend on mount
   useEffect(() => {
-    fetchLiveClasses();
+    let cancelled = false;
 
     const fetchPackages = async () => {
       try {
         const res = await api.packages.getAll();
+        if (cancelled) return;
         if (res.success && Array.isArray(res.data)) {
+          const packageList = res.data as BackendLivePackageItem[];
           const isGlobalAdmin = currentUser?.role === "admin" || currentUser?.role === "super_admin";
           const pkgs = isGlobalAdmin
-            ? res.data
-            : res.data.filter(
-                (p: any) =>
+            ? packageList
+            : packageList.filter(
+                (p) =>
                   (p.teacherId && currentUser?.id && p.teacherId === currentUser.id) ||
                   (p.teacher?.userId && currentUser?.id && p.teacher.userId === currentUser.id) ||
                   (p.teacherName && currentUser?.name && p.teacherName.toLowerCase() === currentUser.name.toLowerCase())
               );
-          setAvailablePackages(pkgs.length > 0 ? pkgs : res.data);
+          setAvailablePackages(pkgs.length > 0 ? pkgs : packageList);
         }
       } catch (e) {
         console.warn("Could not fetch packages:", e);
       }
     };
 
-    fetchLiveClasses();
-    fetchPackages();
-  }, []);
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      void fetchLiveClasses();
+      void fetchPackages();
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchLiveClasses, currentUser?.id, currentUser?.name, currentUser?.role]);
 
   // Open Add Modal
   const handleOpenAdd = () => {
@@ -499,7 +521,7 @@ export function LiveScheduleView() {
           message: `Scheduled new live lecture: "${formData.title}"`
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.warn("Failed to persist live class:", err);
     }
 
@@ -1862,7 +1884,9 @@ export function LiveScheduleView() {
                   <ExternalLink className="h-3.5 w-3.5 mr-1" /> External Tab
                 </Button>
                 <Button
+                  type="button"
                   size="sm"
+                  aria-label="Close replay viewer"
                   onClick={() => setViewingReplaySlot(null)}
                   className="bg-white/15 hover:bg-white/25 text-white text-xs font-bold rounded-xl h-8 px-3 cursor-pointer"
                 >

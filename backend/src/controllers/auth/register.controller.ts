@@ -14,7 +14,7 @@ export const registerStudent = async (req: Request, res: Response): Promise<void
   try {
     const { firstName, lastName, email, password, phoneNumber, gradeLevel, section, studentIdNo, tenantId } = req.body;
 
-    if (!email || !password || !firstName) {
+    if (!email || !password || !firstName || typeof firstName !== 'string' || !firstName.trim()) {
       res.status(400).json({ success: false, message: 'Missing required student registration fields' });
       return;
     }

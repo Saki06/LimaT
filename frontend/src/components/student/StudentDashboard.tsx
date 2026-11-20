@@ -1,46 +1,86 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useApp } from "@/context/AppContext";
 import { api } from "@/lib/api";
 import {
   BookOpen,
   CheckCircle2,
-  Clock,
-  Award,
-  ArrowRight,
-  Trophy,
   Calendar,
   Sparkles,
-  TrendingUp,
   FileText,
   Video,
   ExternalLink,
   X,
   Filter,
   ChevronRight,
-  GraduationCap,
-  PlayCircle,
-  Users,
   RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import type { Assignment } from "@/types/lms";
+
+interface DashboardTeacherUser {
+  firstName?: string | null;
+  lastName?: string | null;
+}
+
+interface DashboardLiveClassItem {
+  status?: string;
+  title?: string;
+  startTime?: string | null;
+  meetingUrl?: string | null;
+  course?: { title?: string } | null;
+  package?: { title?: string } | null;
+  teacher?: { user?: DashboardTeacherUser | null } | null;
+}
+
+interface DashboardEnrollmentItem {
+  course?: {
+    title?: string;
+    teacher?: { user?: DashboardTeacherUser | null } | null;
+  } | null;
+}
+
+interface DashboardSubscriptionItem {
+  package?: {
+    title?: string;
+    teacher?: { user?: DashboardTeacherUser | null } | null;
+  } | null;
+}
+
+interface DashboardPendingAssignmentItem {
+  id: string;
+  title?: string;
+  subjectName?: string;
+  dueDate?: string | null;
+  course?: { title?: string } | null;
+}
+
+interface StudentDashboardOverview {
+  metrics?: {
+    enrolledCoursesCount?: number;
+    upcomingLiveClassesCount?: number;
+    pendingAssignmentsCount?: number;
+    attendanceRate?: number;
+    averageScore?: number;
+  };
+  upcomingLiveClasses?: DashboardLiveClassItem[];
+  pendingAssignments?: DashboardPendingAssignmentItem[];
+  enrollments?: DashboardEnrollmentItem[];
+  activeSubscriptions?: DashboardSubscriptionItem[];
+}
 
 export function StudentDashboard() {
   const {
     currentUser,
+    authUser,
     courses,
     assignments,
     quizzes,
-    fixtures,
-    events,
     announcements,
-    t,
     setCurrentView,
-    setSelectedCourseId,
-    setSelectedLessonId,
     setSelectedAssignmentId,
     addToast,
     activeTenant
@@ -58,11 +98,11 @@ export function StudentDashboard() {
       .toUpperCase() || "SP";
 
   const [isLiveClassModalOpen, setIsLiveClassModalOpen] = useState(false);
-  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [dashboardData, setDashboardData] = useState<StudentDashboardOverview | null>(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState<boolean>(false);
 
   // Fetch real-time student dashboard metrics from backend
-  const fetchDashboard = async (showToast = false) => {
+  const fetchDashboard = useCallback(async (showToast = false) => {
     try {
       setIsLoadingDashboard(true);
       const res = await api.students.getDashboardOverview();
@@ -81,23 +121,29 @@ export function StudentDashboard() {
     } finally {
       setIsLoadingDashboard(false);
     }
-  };
+  }, [addToast]);
 
   useEffect(() => {
-    fetchDashboard(false);
-  }, []);
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        void fetchDashboard(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchDashboard]);
 
   // Compute live or fallback metrics
   const enrolledCoursesCount = dashboardData?.metrics?.enrolledCoursesCount ?? courses.length;
   const upcomingLiveCount = dashboardData?.metrics?.upcomingLiveClassesCount ?? (dashboardData?.upcomingLiveClasses?.length ?? 0);
   const pendingAssignmentsCount = dashboardData?.metrics?.pendingAssignmentsCount ?? (dashboardData?.pendingAssignments?.length ?? assignments.length);
-  const attendanceRate = dashboardData?.metrics?.attendanceRate ?? 100;
-  const averageScore = dashboardData?.metrics?.averageScore ?? 0;
 
   // Active live class / Next upcoming class
-  const activeLiveNow = dashboardData?.upcomingLiveClasses?.find((c: any) => c.status === "LIVE");
+  const activeLiveNow = dashboardData?.upcomingLiveClasses?.find((c) => c.status === "LIVE");
   const nextUpcomingLive =
-    dashboardData?.upcomingLiveClasses?.find((c: any) => c.status === "SCHEDULED") ||
+    dashboardData?.upcomingLiveClasses?.find((c) => c.status === "SCHEDULED") ||
     dashboardData?.upcomingLiveClasses?.[0];
 
   // Learning Feed State
@@ -105,13 +151,14 @@ export function StudentDashboard() {
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState<boolean>(false);
 
   const feedPosts = useMemo(() => {
-    const studentGradeStr = String((currentUser as any)?.studentProfile?.gradeLevel || (currentUser as any)?.grade || "");
+    const studentProfileMeta = authUser?.studentProfile as { gradeLevel?: string } | null | undefined;
+    const studentGradeStr = String(studentProfileMeta?.gradeLevel || currentUser?.grade || "");
     const studentGradeNum = studentGradeStr.match(/\d+/)?.[0];
 
     const enrolledTeacherNames: string[] = [];
     const enrolledBatchTitles: string[] = [];
 
-    dashboardData?.enrollments?.forEach((e: any) => {
+    dashboardData?.enrollments?.forEach((e) => {
       if (e.course?.teacher?.user) {
         const u = e.course.teacher.user;
         if (u.firstName) enrolledTeacherNames.push(u.firstName.toLowerCase());
@@ -121,7 +168,7 @@ export function StudentDashboard() {
       if (e.course?.title) enrolledBatchTitles.push(e.course.title.toLowerCase());
     });
 
-    dashboardData?.activeSubscriptions?.forEach((sub: any) => {
+    dashboardData?.activeSubscriptions?.forEach((sub) => {
       if (sub.package?.teacher?.user) {
         const u = sub.package.teacher.user;
         if (u.firstName) enrolledTeacherNames.push(u.firstName.toLowerCase());
@@ -171,16 +218,7 @@ export function StudentDashboard() {
 
       return true;
     });
-  }, [announcements, currentUser, dashboardData, activeFeedFilter]);
-
-  const totalLessons = courses.reduce((acc, c) => acc + c.totalLessons, 0);
-  const completedLessons = courses.reduce((acc, c) => acc + c.completedLessons, 0);
-  const completionPercentage = Math.round((completedLessons / totalLessons) * 100) || 0;
-
-  const handleContinueCourse = (courseId: string) => {
-    setSelectedCourseId(courseId);
-    setCurrentView("courses");
-  };
+  }, [announcements, authUser, currentUser, dashboardData, activeFeedFilter]);
 
   // Dynamic Time-of-day Greeting
   const currentHour = new Date().getHours();
@@ -350,9 +388,9 @@ export function StudentDashboard() {
                   </div>
 
                   <div>
-                    <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                    <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
                       {activeLiveNow.title || activeLiveNow.course?.title || "Live Lecture Masterclass"}
-                    </h3>
+                    </h2>
                     <p className="text-xs text-slate-600 font-medium">
                       <span className="font-bold text-slate-900">
                         {activeLiveNow.teacher?.user ? `${activeLiveNow.teacher.user.firstName} ${activeLiveNow.teacher.user.lastName}` : tutorName}
@@ -386,9 +424,9 @@ export function StudentDashboard() {
                   </div>
 
                   <div>
-                    <h3 className="text-base sm:text-lg font-black text-indigo-950 tracking-tight">
+                    <h2 className="text-base sm:text-lg font-black text-indigo-950 tracking-tight">
                       {nextUpcomingLive.title || nextUpcomingLive.course?.title || "Curriculum Masterclass"}
-                    </h3>
+                    </h2>
                     <p className="text-xs text-slate-600 font-medium">
                       <span className="font-bold text-indigo-900">
                         {nextUpcomingLive.teacher?.user ? `${nextUpcomingLive.teacher.user.firstName} ${nextUpcomingLive.teacher.user.lastName}` : tutorName}
@@ -415,9 +453,9 @@ export function StudentDashboard() {
                     </span>
                     <span className="text-xs text-slate-500 font-medium">No live lectures currently in progress</span>
                   </div>
-                  <h3 className="text-sm sm:text-base font-extrabold text-[#0d2b26]">
+                  <h2 className="text-sm sm:text-base font-extrabold text-[#0d2b26]">
                     Interactive Live Lectures &amp; Masterclasses
-                  </h3>
+                  </h2>
                   <p className="text-xs text-slate-500">
                     Check your timetable for upcoming video sessions and revision batches.
                   </p>
@@ -506,7 +544,7 @@ export function StudentDashboard() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className="font-extrabold text-sm text-[#0d2b26]">{postAuthor}</h4>
+                            <h3 className="font-extrabold text-sm text-[#0d2b26]">{postAuthor}</h3>
                             {post.priority === "high" || post.priority === "urgent" ? (
                               <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black uppercase tracking-wider">
                                 Important
@@ -521,7 +559,7 @@ export function StudentDashboard() {
 
                       {/* Body Content */}
                       <div className="space-y-1">
-                        <h5 className="font-extrabold text-xs sm:text-sm text-[#0d2b26]">{post.title}</h5>
+                        <h4 className="font-extrabold text-xs sm:text-sm text-[#0d2b26]">{post.title}</h4>
                         <p className="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line">
                           {post.message}
                         </p>
@@ -570,7 +608,7 @@ export function StudentDashboard() {
                 (dashboardData?.pendingAssignments && dashboardData.pendingAssignments.length > 0
                   ? dashboardData.pendingAssignments
                   : assignments
-                ).slice(0, 5).map((asg: any) => (
+                ).slice(0, 5).map((asg: DashboardPendingAssignmentItem | Assignment) => (
                   <div
                     key={asg.id}
                     onClick={() => {
@@ -581,7 +619,7 @@ export function StudentDashboard() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-[#0d5c4d] group-hover:underline">
-                        {asg.course?.title || asg.subjectName || "Assignment"}
+                        {("course" in asg ? asg.course?.title : undefined) || asg.subjectName || "Assignment"}
                       </span>
                       <span className="text-[10px] text-[#b47a16] font-mono font-bold">
                         Due: {asg.dueDate ? String(asg.dueDate).split("T")[0].split(" ")[0] : "Soon"}
@@ -725,6 +763,8 @@ export function StudentDashboard() {
                 </span>
               </div>
               <button
+                type="button"
+                aria-label="Close live broadcast modal"
                 onClick={() => setIsLiveClassModalOpen(false)}
                 className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
               >

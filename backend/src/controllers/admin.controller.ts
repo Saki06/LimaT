@@ -732,12 +732,16 @@ export const createStudent = async (
     const tenantId = await resolveTenantId(req);
     const { name, email, grade, section, studentIdNo } = req.body;
 
-    if (!name || !email) {
+    if (!name || !email || !String(name).trim() || !String(email).trim()) {
       res.status(400).json({ success: false, message: 'Name and email are required.' });
       return;
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+      return;
+    }
     const existingUser = await prisma.user.findUnique({
       where: { email: cleanEmail },
     });

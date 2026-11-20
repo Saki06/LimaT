@@ -19,16 +19,11 @@ import {
   Search,
   CheckCircle2,
   Lock,
-  Unlock,
   Star,
   Video,
-  BookOpen,
-  Calendar,
   CreditCard,
   Building,
-  UploadCloud,
   FileCheck,
-  ChevronRight,
   ExternalLink,
   X,
   Sparkles,
@@ -37,23 +32,95 @@ import {
   Clock,
   Download,
   Printer,
-  FileText,
   AlertCircle,
   Package,
-  Sliders,
-  Power,
-  ToggleLeft,
-  ToggleRight,
-  Eye,
-  EyeOff
+  Power
 } from "lucide-react";
 import { TeacherConnectView } from "@/components/teacher/TeacherConnectView";
 
 type ConnectTab = "teachers" | "purchases" | "groups" | "students";
 
+interface TeacherBankMeta {
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
+  bankBranch?: string;
+  specialization?: string;
+}
+
+interface MarketplaceTeacher extends Omit<ConnectTeacher, "rating"> {
+  rating?: number;
+  userId?: string;
+  packageId?: string;
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
+  bankBranch?: string;
+}
+
+interface MarketplacePackage extends TutorPackage {
+  monthlyFee?: number;
+  currency?: string;
+  teacher?: TeacherBankMeta;
+}
+
+interface ParentChildItem {
+  id: string;
+  name: string;
+  admissionNo?: string;
+  grade?: string;
+}
+
+interface BackendQualificationItem {
+  degree?: string;
+  title?: string;
+  institution?: string;
+}
+
+interface BackendMarketplaceTeacher {
+  id: string;
+  name?: string;
+  isVerified?: boolean;
+  title?: string;
+  specialization?: string;
+  studentsCount?: number;
+  coursesCount?: number;
+  courses?: unknown[];
+  liveClassesCount?: number;
+  packages?: { price?: number }[];
+  monthlyFeeLkr?: number;
+  rating?: number;
+  mediums?: string[];
+  websiteUrl?: string;
+  bio?: string;
+  qualifications?: BackendQualificationItem[] | string;
+  youtubeUrl?: string;
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
+  bankBranch?: string;
+}
+
+interface BackendPackageCourseItem {
+  course?: { title?: string };
+}
+
+interface BackendMarketplacePackage {
+  id: string;
+  teacherId?: string;
+  title: string;
+  price?: number | string;
+  description?: string;
+  features?: string[] | string;
+  billingCycle?: string;
+  createdAt?: string;
+  courses?: BackendPackageCourseItem[];
+  _count?: { subscriptions?: number };
+  teacher?: TeacherBankMeta;
+}
+
 export function ConnectView() {
   const {
-    currentUser,
     currentRole,
     setCurrentView,
     isFeatureEnabled,
@@ -75,34 +142,43 @@ export function ConnectView() {
 
   // Keep activeTab in sync with enabled options
   React.useEffect(() => {
-    if (activeTab === "teachers" && !isFindTeachersTabEnabled) {
-      if (isSubscriptionsTabEnabled) setActiveTab("purchases");
-      else if (isStudyGroupsTabEnabled) setActiveTab("groups");
-    } else if (activeTab === "purchases" && !isSubscriptionsTabEnabled) {
-      if (isFindTeachersTabEnabled) setActiveTab("teachers");
-      else if (isStudyGroupsTabEnabled) setActiveTab("groups");
-    } else if (activeTab === "groups" && !isStudyGroupsTabEnabled) {
-      if (isFindTeachersTabEnabled) setActiveTab("teachers");
-      else if (isSubscriptionsTabEnabled) setActiveTab("purchases");
-    }
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      if (activeTab === "teachers" && !isFindTeachersTabEnabled) {
+        if (isSubscriptionsTabEnabled) setActiveTab("purchases");
+        else if (isStudyGroupsTabEnabled) setActiveTab("groups");
+      } else if (activeTab === "purchases" && !isSubscriptionsTabEnabled) {
+        if (isFindTeachersTabEnabled) setActiveTab("teachers");
+        else if (isStudyGroupsTabEnabled) setActiveTab("groups");
+      } else if (activeTab === "groups" && !isStudyGroupsTabEnabled) {
+        if (isFindTeachersTabEnabled) setActiveTab("teachers");
+        else if (isSubscriptionsTabEnabled) setActiveTab("purchases");
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab, isFindTeachersTabEnabled, isSubscriptionsTabEnabled, isStudyGroupsTabEnabled]);
 
   // State management (strictly live data from DB - no mock)
-  const [teachers, setTeachers] = useState<ConnectTeacher[]>([]);
-  const [packages, setPackages] = useState<TutorPackage[]>([]);
+  const [teachers, setTeachers] = useState<MarketplaceTeacher[]>([]);
+  const [packages, setPackages] = useState<MarketplacePackage[]>([]);
   const [students, setStudents] = useState<ConnectStudent[]>([]);
   const [studyGroups, setStudyGroups] = useState<ConnectStudyGroup[]>([]);
   const [purchases, setPurchases] = useState<ConnectPurchase[]>([]);
-  const [parentChildren, setParentChildren] = useState<any[]>([]);
+  const [parentChildren, setParentChildren] = useState<ParentChildItem[]>([]);
   const [selectedParentChildId, setSelectedParentChildId] = useState<string>("");
   const [isLoadingMarketplace, setIsLoadingMarketplace] = useState<boolean>(true);
 
   // Load live tutors and packages from backend Marketplace API
   useEffect(() => {
     let isMounted = true;
-    setIsLoadingMarketplace(true);
 
     async function loadData() {
+      await Promise.resolve();
+      if (!isMounted) return;
+      setIsLoadingMarketplace(true);
       try {
         const [teachersRes, packagesRes] = await Promise.all([
           api.teachers.getMarketplace(),
@@ -112,7 +188,7 @@ export function ConnectView() {
         if (!isMounted) return;
 
         if (teachersRes?.success && Array.isArray(teachersRes.data)) {
-          const mappedTutors: ConnectTeacher[] = teachersRes.data.map((t: any) => {
+          const mappedTutors: MarketplaceTeacher[] = (teachersRes.data as BackendMarketplaceTeacher[]).map((t) => {
             const nameParts = (t.name || "Tutor").trim().split(" ");
             const initials = nameParts.length > 1
               ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
@@ -144,15 +220,15 @@ export function ConnectView() {
               bio: t.bio || "Registered specialist educator on Newtoz.",
               qualifications: Array.isArray(t.qualifications) && t.qualifications.length > 0
                 ? t.qualifications
-                    .map((q: any) => `${q.degree || q.title || 'Degree'} (${q.institution || 'University'})`)
-                    .join(", ")
+                  .map((q) => `${q.degree || q.title || "Degree"} (${q.institution || "University"})`)
+                  .join(", ")
                 : (typeof t.qualifications === "string" ? t.qualifications : ""),
               sampleVideoTitle: t.youtubeUrl ? "Sample Lesson / Masterclass" : "",
               bankName: t.bankName || "",
               bankAccountName: t.bankAccountName || "",
               bankAccountNumber: t.bankAccountNumber || "",
               bankBranch: t.bankBranch || ""
-            } as any;
+            };
           });
 
           setTeachers(mappedTutors);
@@ -161,8 +237,12 @@ export function ConnectView() {
         }
 
         if (packagesRes?.success && Array.isArray(packagesRes.data)) {
-          const mappedPackages: TutorPackage[] = packagesRes.data.map((pkg: any) => {
+          const mappedPackages: MarketplacePackage[] = (packagesRes.data as BackendMarketplacePackage[]).map((pkg) => {
             const fee = Number(pkg.price) || 0;
+            const normalizedBillingCycle: TutorPackage["billingCycle"] =
+              pkg.billingCycle === "Term (3 Months)" || pkg.billingCycle === "Full Syllabus Pass"
+                ? pkg.billingCycle
+                : "Monthly";
             return {
               id: pkg.id,
               teacherId: pkg.teacherId,
@@ -176,16 +256,16 @@ export function ConnectView() {
               features: Array.isArray(pkg.features)
                 ? pkg.features
                 : typeof pkg.features === "string"
-                ? pkg.features.split("\n").filter(Boolean)
-                : [],
-              billingCycle: pkg.billingCycle === "MONTHLY" ? "Monthly" : (pkg.billingCycle || "Monthly"),
+                  ? pkg.features.split("\n").filter(Boolean)
+                  : [],
+              billingCycle: normalizedBillingCycle,
               liveClassesPerWeek: 2,
               status: "active",
               enrolledCount: pkg._count?.subscriptions || 0,
               badge: "Popular",
               createdAt: pkg.createdAt || new Date().toISOString(),
               teacher: pkg.teacher
-            } as any;
+            };
           });
           setPackages(mappedPackages);
         } else {
@@ -256,8 +336,8 @@ export function ConnectView() {
   const [groupFilter, setGroupFilter] = useState<"all" | "enrolled">("all");
 
   // Modals
-  const [selectedTeacherForSubscribe, setSelectedTeacherForSubscribe] = useState<ConnectTeacher | null>(null);
-  const [selectedPackageForSubscribe, setSelectedPackageForSubscribe] = useState<TutorPackage | null>(null);
+  const [selectedTeacherForSubscribe, setSelectedTeacherForSubscribe] = useState<MarketplaceTeacher | null>(null);
+  const [selectedPackageForSubscribe, setSelectedPackageForSubscribe] = useState<MarketplacePackage | null>(null);
   const [selectedPurchaseForReceipt, setSelectedPurchaseForReceipt] = useState<ConnectPurchase | null>(null);
   const [paymentSuccessToast, setPaymentSuccessToast] = useState<string | null>(null);
 
@@ -325,20 +405,20 @@ export function ConnectView() {
   const activeBankDetails = useMemo(() => {
     if (selectedTeacherForSubscribe) {
       return {
-        bankName: (selectedTeacherForSubscribe as any).bankName,
-        accountName: (selectedTeacherForSubscribe as any).bankAccountName,
-        accountNumber: (selectedTeacherForSubscribe as any).bankAccountNumber,
-        branch: (selectedTeacherForSubscribe as any).bankBranch,
+        bankName: selectedTeacherForSubscribe.bankName,
+        accountName: selectedTeacherForSubscribe.bankAccountName,
+        accountNumber: selectedTeacherForSubscribe.bankAccountNumber,
+        branch: selectedTeacherForSubscribe.bankBranch,
       };
     }
     if (selectedPackageForSubscribe) {
-      const pkgTeacher = (selectedPackageForSubscribe as any).teacher;
+      const pkgTeacher = selectedPackageForSubscribe.teacher;
       const matchedTeacher = teachers.find((t) => t.id === selectedPackageForSubscribe.teacherId);
       return {
-        bankName: pkgTeacher?.bankName || (matchedTeacher as any)?.bankName,
-        accountName: pkgTeacher?.bankAccountName || (matchedTeacher as any)?.bankAccountName,
-        accountNumber: pkgTeacher?.bankAccountNumber || (matchedTeacher as any)?.bankAccountNumber,
-        branch: pkgTeacher?.bankBranch || (matchedTeacher as any)?.bankBranch,
+        bankName: pkgTeacher?.bankName || matchedTeacher?.bankName,
+        accountName: pkgTeacher?.bankAccountName || matchedTeacher?.bankAccountName,
+        accountNumber: pkgTeacher?.bankAccountNumber || matchedTeacher?.bankAccountNumber,
+        branch: pkgTeacher?.bankBranch || matchedTeacher?.bankBranch,
       };
     }
     return null;
@@ -348,19 +428,19 @@ export function ConnectView() {
   const [enrollmentStatusFilter, setEnrollmentStatusFilter] = useState<"all" | "enrolled" | "unenrolled">("all");
 
   // Helper to reliably check if a teacher is enrolled/subscribed
-  const isTeacherSubscribed = (t: ConnectTeacher) => {
+  const isTeacherSubscribed = React.useCallback((t: MarketplaceTeacher) => {
     if (t.isSubscribed) return true;
     return purchases.some((p) => {
       if (p.status !== "active") return false;
-      if (p.teacherId && (p.teacherId === t.id || p.teacherId === (t as any).userId)) return true;
+      if (p.teacherId && (p.teacherId === t.id || p.teacherId === t.userId)) return true;
       const tPlans = packages.filter((pkg) => pkg.teacherId === t.id);
       return tPlans.some((pkg) => pkg.id === p.packageId);
     });
-  };
+  }, [purchases, packages]);
 
   const enrolledTeachersCount = useMemo(() => {
     return teachers.filter((t) => isTeacherSubscribed(t)).length;
-  }, [teachers, purchases, packages]);
+  }, [teachers, isTeacherSubscribed]);
 
   // Dynamic subjects list from active teachers
   const availableSubjects = useMemo(() => {
@@ -391,7 +471,7 @@ export function ConnectView() {
         t.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchSubject && matchQuery;
     });
-  }, [teachers, purchases, packages, selectedSubject, searchQuery, enrollmentStatusFilter]);
+  }, [teachers, isTeacherSubscribed, selectedSubject, searchQuery, enrollmentStatusFilter]);
 
   // Handle Subscribe Completion via Live Supabase API
   const handleConfirmSubscribe = async () => {
@@ -423,21 +503,20 @@ export function ConnectView() {
       }
     }
 
-    const isTeacher = !!selectedTeacherForSubscribe;
     const item = selectedTeacherForSubscribe
       ? {
-          id: selectedTeacherForSubscribe.id,
-          packageId: (selectedTeacherForSubscribe as any).packageId || selectedTeacherForSubscribe.id,
-          name: selectedTeacherForSubscribe.name,
-          initials: selectedTeacherForSubscribe.initials,
-          avatarColor: selectedTeacherForSubscribe.avatarColor,
-          subject: selectedTeacherForSubscribe.subject,
-          amount: selectedTeacherForSubscribe.monthlyFee,
-          currency: selectedTeacherForSubscribe.currency,
-          meetUrl: selectedTeacherForSubscribe.meetUrl
-        }
+        id: selectedTeacherForSubscribe.id,
+        packageId: selectedTeacherForSubscribe.packageId || selectedTeacherForSubscribe.id,
+        name: selectedTeacherForSubscribe.name,
+        initials: selectedTeacherForSubscribe.initials,
+        avatarColor: selectedTeacherForSubscribe.avatarColor,
+        subject: selectedTeacherForSubscribe.subject,
+        amount: selectedTeacherForSubscribe.monthlyFee,
+        currency: selectedTeacherForSubscribe.currency,
+        meetUrl: selectedTeacherForSubscribe.meetUrl
+      }
       : selectedPackageForSubscribe
-      ? {
+        ? {
           id: selectedPackageForSubscribe.id,
           packageId: selectedPackageForSubscribe.id,
           name: selectedPackageForSubscribe.title,
@@ -448,7 +527,7 @@ export function ConnectView() {
           currency: "LKR",
           meetUrl: "https://meet.google.com/limat-math-master"
         }
-      : null;
+        : null;
 
     if (!item) return;
     setIsProcessing(true);
@@ -491,10 +570,10 @@ export function ConnectView() {
             prev.map((t) =>
               t.id === item.id
                 ? {
-                    ...t,
-                    isSubscribed: true,
-                    subscribedDate: d.date || new Date().toISOString().split('T')[0]
-                  }
+                  ...t,
+                  isSubscribed: true,
+                  subscribedDate: d.date || new Date().toISOString().split('T')[0]
+                }
                 : t
             )
           );
@@ -506,9 +585,13 @@ export function ConnectView() {
       } else {
         setCheckoutError(res?.message || "Failed to process enrollment. Please check your payment details.");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Checkout error:", err);
-      const errMsg = err?.response?.data?.message || err?.message || "Payment verification failed. Please check payment details and try again.";
+      const errObj = err as { response?: { data?: { message?: string } }; message?: string } | null;
+      const errMsg =
+        errObj?.response?.data?.message ||
+        (err instanceof Error ? err.message : errObj?.message) ||
+        "Payment verification failed. Please check payment details and try again.";
       setCheckoutError(errMsg);
     } finally {
       setIsProcessing(false);
@@ -528,10 +611,10 @@ export function ConnectView() {
       prev.map((g) =>
         g.id === groupId
           ? {
-              ...g,
-              isJoined: !g.isJoined,
-              membersCount: g.isJoined ? g.membersCount - 1 : g.membersCount + 1
-            }
+            ...g,
+            isJoined: !g.isJoined,
+            membersCount: g.isJoined ? g.membersCount - 1 : g.membersCount + 1
+          }
           : g
       )
     );
@@ -613,6 +696,8 @@ export function ConnectView() {
             <p className="text-slate-200">{paymentSuccessToast}</p>
           </div>
           <button
+            type="button"
+            aria-label="Dismiss payment confirmation"
             onClick={() => setPaymentSuccessToast(null)}
             className="p-1 hover:bg-white/20 rounded-lg text-white/80"
           >
@@ -676,17 +761,15 @@ export function ConnectView() {
             {isFindTeachersTabEnabled && (
               <button
                 onClick={() => setActiveTab("teachers")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === "teachers"
-                    ? "bg-[#0d5c4d] text-white shadow-sm ring-1 ring-[#0d5c4d]/20"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "teachers"
+                  ? "bg-[#0d5c4d] text-white shadow-sm ring-1 ring-[#0d5c4d]/20"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
               >
                 <GraduationCap className="h-4 w-4" />
                 <span>Find Teachers</span>
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                  activeTab === "teachers" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                }`}>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${activeTab === "teachers" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                  }`}>
                   {teachers.length}
                 </span>
               </button>
@@ -695,17 +778,15 @@ export function ConnectView() {
             {isSubscriptionsTabEnabled && (
               <button
                 onClick={() => setActiveTab("purchases")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === "purchases"
-                    ? "bg-[#0d5c4d] text-white shadow-sm ring-1 ring-[#0d5c4d]/20"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "purchases"
+                  ? "bg-[#0d5c4d] text-white shadow-sm ring-1 ring-[#0d5c4d]/20"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
               >
                 <Receipt className="h-4 w-4" />
                 <span>Subscriptions &amp; Invoices</span>
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                  activeTab === "purchases" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                }`}>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${activeTab === "purchases" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                  }`}>
                   {purchases.length}
                 </span>
               </button>
@@ -714,17 +795,15 @@ export function ConnectView() {
             {isStudyGroupsTabEnabled && (
               <button
                 onClick={() => setActiveTab("groups")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === "groups"
-                    ? "bg-[#0d5c4d] text-white shadow-sm ring-1 ring-[#0d5c4d]/20"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "groups"
+                  ? "bg-[#0d5c4d] text-white shadow-sm ring-1 ring-[#0d5c4d]/20"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
               >
                 <Users2 className="h-4 w-4" />
                 <span>Study Groups</span>
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-                  activeTab === "groups" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                }`}>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${activeTab === "groups" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                  }`}>
                   {studyGroups.length}
                 </span>
               </button>
@@ -799,22 +878,20 @@ export function ConnectView() {
                 <button
                   type="button"
                   onClick={() => setEnrollmentStatusFilter("all")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    enrollmentStatusFilter === "all"
-                      ? "bg-white text-[#0d2b26] shadow-xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${enrollmentStatusFilter === "all"
+                    ? "bg-white text-[#0d2b26] shadow-xs"
+                    : "text-slate-500 hover:text-slate-800"
+                    }`}
                 >
                   All ({teachers.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setEnrollmentStatusFilter("enrolled")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    enrollmentStatusFilter === "enrolled"
-                      ? "bg-emerald-600 text-white shadow-xs"
-                      : "text-emerald-800 hover:bg-emerald-50"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${enrollmentStatusFilter === "enrolled"
+                    ? "bg-emerald-600 text-white shadow-xs"
+                    : "text-emerald-800 hover:bg-emerald-50"
+                    }`}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   <span>Enrolled ({enrolledTeachersCount})</span>
@@ -822,11 +899,10 @@ export function ConnectView() {
                 <button
                   type="button"
                   onClick={() => setEnrollmentStatusFilter("unenrolled")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    enrollmentStatusFilter === "unenrolled"
-                      ? "bg-white text-[#0d2b26] shadow-xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${enrollmentStatusFilter === "unenrolled"
+                    ? "bg-white text-[#0d2b26] shadow-xs"
+                    : "text-slate-500 hover:text-slate-800"
+                    }`}
                 >
                   Available ({Math.max(0, teachers.length - enrolledTeachersCount)})
                 </button>
@@ -879,235 +955,233 @@ export function ConnectView() {
                   p.subject.toLowerCase().includes(teacher.subject.toLowerCase())
               );
 
-            return (
-              <div
-                key={teacher.id}
-                className={`bg-white rounded-3xl transition-all overflow-hidden border border-slate-200 shadow-xs hover:shadow-sm ${
-                  isSubscribed ? "border-l-4 border-l-[#0d5c4d]" : ""
-                }`}
-              >
-                {/* Teacher Profile Card Header */}
-                <div className="p-6 pb-4">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                    {/* Left: Avatar + Details */}
-                    <div className="flex items-start gap-4">
-                      {/* Initials Avatar */}
-                      <div
-                        className={`h-14 w-14 rounded-2xl ${teacher.avatarColor} text-white font-black text-xl flex items-center justify-center shrink-0 shadow-sm`}
-                      >
-                        {teacher.initials}
-                      </div>
-
-                      {/* Name & Title */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-lg font-black text-[#0d2b26] tracking-tight">
-                            {teacher.name}
-                          </h3>
-                          {teacher.verified && (
-                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold tracking-wider uppercase flex items-center gap-1">
-                              <CheckCircle2 className="h-3 w-3 text-[#0d5c4d]" />
-                              VERIFIED
-                            </span>
-                          )}
-                          {isSubscribed && (
-                            <span className="px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#a5f3df] text-[10px] font-bold tracking-wider uppercase flex items-center gap-1">
-                              <CheckCircle2 className="h-3 w-3 text-[#0d5c4d]" />
-                              ENROLLED
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="text-xs font-semibold text-slate-500">
-                          {teacher.title}
-                        </p>
-
-                        {/* Metrics Row */}
-                        <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap pt-1">
-                          <span className="font-bold text-slate-800">
-                            {teacher.studentsCount} <span className="font-normal text-slate-500">students</span>
-                          </span>
-                          <span className="text-slate-300">•</span>
-                          <span className="font-bold text-slate-800">
-                            {teacher.lessonsCount} <span className="font-normal text-slate-500">lessons</span>
-                          </span>
-                          <span className="text-slate-300">•</span>
-                          <span className="font-bold text-slate-800">
-                            {teacher.liveClassesCount} <span className="font-normal text-slate-500">live classes</span>
-                          </span>
-                          <span className="text-slate-300">•</span>
-                          <span className="font-black text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md">
-                            From LKR {(teacher.monthlyFee ?? 0).toLocaleString()}/month
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Rating Pill (Only displayed if genuine student ratings exist) */}
-                    {typeof teacher.rating === "number" && teacher.rating > 0 ? (
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black shrink-0 self-start">
-                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                        <span>{teacher.rating.toFixed(1)}</span>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {/* Bio & Tags */}
-                  <div className="mt-3.5 space-y-2">
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      {teacher.bio}
-                    </p>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {teacher.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold"
+              return (
+                <div
+                  key={teacher.id}
+                  className={`bg-white rounded-3xl transition-all overflow-hidden border border-slate-200 shadow-xs hover:shadow-sm ${isSubscribed ? "border-l-4 border-l-[#0d5c4d]" : ""
+                    }`}
+                >
+                  {/* Teacher Profile Card Header */}
+                  <div className="p-6 pb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      {/* Left: Avatar + Details */}
+                      <div className="flex items-start gap-4">
+                        {/* Initials Avatar */}
+                        <div
+                          className={`h-14 w-14 rounded-2xl ${teacher.avatarColor} text-white font-black text-xl flex items-center justify-center shrink-0 shadow-sm`}
                         >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Teacher's Available Subscription Plans / Packages */}
-                  {teacherPlans.length > 0 && (
-                    <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2">
-                          <Package className="h-4 w-4 text-[#0d5c4d]" />
-                          <h4 className="font-extrabold text-xs text-[#0d2b26] uppercase tracking-wider">
-                            Teacher's Subscription Packages &amp; Plans ({teacherPlans.length})
-                          </h4>
+                          {teacher.initials}
                         </div>
-                        <span className="text-[11px] font-semibold text-slate-500">
-                          {currentRole === "parent" ? "Choose a plan to enroll your child" : "Select a plan to subscribe"}
-                        </span>
-                      </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                        {teacherPlans.map((plan) => {
-                          const isPlanEnrolled = purchases.some(
-                            (p) => p.packageId === plan.id && p.status === "active"
-                          );
-                          return (
-                          <div
-                            key={plan.id}
-                            className={`rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-all ${
-                              isPlanEnrolled
-                                ? "border border-slate-300 bg-white shadow-xs"
-                                : "border border-slate-200 bg-[#f8faf9] hover:border-slate-300 hover:bg-white hover:shadow-xs"
-                            }`}
-                          >
-                            <div className="space-y-2">
-                              <div className="flex items-start justify-between gap-2">
-                                <h5 className="font-black text-xs text-[#0d2b26] leading-snug">
-                                  {plan.title}
-                                </h5>
-                                {isPlanEnrolled ? (
-                                  <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-300 text-[9px] font-bold uppercase shrink-0">
-                                    Enrolled ✓
-                                  </span>
-                                ) : plan.badge ? (
-                                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-extrabold uppercase shrink-0">
-                                    {plan.badge}
-                                  </span>
-                                ) : null}
-                              </div>
-
-                              <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
-                                {plan.description}
-                              </p>
-
-                              <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-baseline justify-between">
-                                <div>
-                                  <span className="text-base font-black text-[#0d5c4d]">
-                                    LKR {(plan.monthlyFeeLkr ?? (plan as any).monthlyFee ?? 0).toLocaleString()}
-                                  </span>
-                                  <span className="text-[10px] text-slate-500 font-semibold"> / {(plan.billingCycle || "Monthly").toLowerCase()}</span>
-                                </div>
-                                <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
-                                  {(plan.liveClassesPerWeek ?? 2)} Meets / wk
-                                </span>
-                              </div>
-
-                              {/* Features Checklist */}
-                              <div className="space-y-1 pt-1">
-                                {plan.features.slice(0, 3).map((feat, idx) => (
-                                  <div key={idx} className="flex items-center gap-1.5 text-[10px] text-slate-600">
-                                    <CheckCircle2 className="h-3 w-3 text-[#0d5c4d] shrink-0" />
-                                    <span className="truncate">{feat}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-
-                            {isPlanEnrolled ? (
-                              <div className="w-full py-2.5 px-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5">
-                                <CheckCircle2 className="h-4 w-4 text-[#0d5c4d]" />
-                                <span>Active Plan Enrollment</span>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedPackageForSubscribe(plan)}
-                                className="w-full py-2.5 px-3 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-extrabold text-xs shadow-2xs transition-all hover:scale-[1.01] flex items-center justify-center gap-1.5 cursor-pointer"
-                              >
-                                <CreditCard className="h-3.5 w-3.5 text-[#f3b738]" />
-                                <span>{currentRole === "parent" ? "Enroll Child in Plan" : "Enroll in Plan"}</span>
-                              </button>
+                        {/* Name & Title */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-lg font-black text-[#0d2b26] tracking-tight">
+                              {teacher.name}
+                            </h3>
+                            {teacher.verified && (
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold tracking-wider uppercase flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3 text-[#0d5c4d]" />
+                                VERIFIED
+                              </span>
+                            )}
+                            {isSubscribed && (
+                              <span className="px-2.5 py-0.5 rounded-full bg-[#ecf8f5] text-[#0d5c4d] border border-[#a5f3df] text-[10px] font-bold tracking-wider uppercase flex items-center gap-1">
+                                <CheckCircle2 className="h-3 w-3 text-[#0d5c4d]" />
+                                ENROLLED
+                              </span>
                             )}
                           </div>
-                        );
-                        })}
+
+                          <p className="text-xs font-semibold text-slate-500">
+                            {teacher.title}
+                          </p>
+
+                          {/* Metrics Row */}
+                          <div className="flex items-center gap-3 text-xs text-slate-600 flex-wrap pt-1">
+                            <span className="font-bold text-slate-800">
+                              {teacher.studentsCount} <span className="font-normal text-slate-500">students</span>
+                            </span>
+                            <span className="text-slate-300">•</span>
+                            <span className="font-bold text-slate-800">
+                              {teacher.lessonsCount} <span className="font-normal text-slate-500">lessons</span>
+                            </span>
+                            <span className="text-slate-300">•</span>
+                            <span className="font-bold text-slate-800">
+                              {teacher.liveClassesCount} <span className="font-normal text-slate-500">live classes</span>
+                            </span>
+                            <span className="text-slate-300">•</span>
+                            <span className="font-black text-[#0d5c4d] bg-[#ecf8f5] px-2 py-0.5 rounded-md">
+                              From LKR {(teacher.monthlyFee ?? 0).toLocaleString()}/month
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Rating Pill (Only displayed if genuine student ratings exist) */}
+                      {typeof teacher.rating === "number" && teacher.rating > 0 ? (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black shrink-0 self-start">
+                          <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                          <span>{teacher.rating.toFixed(1)}</span>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* Bio & Tags */}
+                    <div className="mt-3.5 space-y-2">
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        {teacher.bio}
+                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {teacher.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold"
+                          >
+                            {tag}
+                          </span>
+                        ))}
                       </div>
                     </div>
-                  )}
 
-                  {/* Actions Row */}
-                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
-                    {isSubscribed ? (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs flex items-center gap-1.5 border border-slate-200">
-                          <CheckCircle2 className="h-4 w-4 text-[#0d5c4d]" />
-                          Subscribed ✓
-                        </span>
-                        {teacher.meetUrl ? (
-                          <a
-                            href={teacher.meetUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:scale-[1.02]"
-                          >
-                            <Video className="h-4 w-4" />
-                            Join Live Class
-                          </a>
-                        ) : null}
+                    {/* Teacher's Available Subscription Plans / Packages */}
+                    {teacherPlans.length > 0 && (
+                      <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <Package className="h-4 w-4 text-[#0d5c4d]" />
+                            <h4 className="font-extrabold text-xs text-[#0d2b26] uppercase tracking-wider">
+                              Teacher&apos;s Subscription Packages &amp; Plans ({teacherPlans.length})
+                            </h4>
+                          </div>
+                          <span className="text-[11px] font-semibold text-slate-500">
+                            {currentRole === "parent" ? "Choose a plan to enroll your child" : "Select a plan to subscribe"}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                          {teacherPlans.map((plan) => {
+                            const isPlanEnrolled = purchases.some(
+                              (p) => p.packageId === plan.id && p.status === "active"
+                            );
+                            return (
+                              <div
+                                key={plan.id}
+                                className={`rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-all ${isPlanEnrolled
+                                  ? "border border-slate-300 bg-white shadow-xs"
+                                  : "border border-slate-200 bg-[#f8faf9] hover:border-slate-300 hover:bg-white hover:shadow-xs"
+                                  }`}
+                              >
+                                <div className="space-y-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <h5 className="font-black text-xs text-[#0d2b26] leading-snug">
+                                      {plan.title}
+                                    </h5>
+                                    {isPlanEnrolled ? (
+                                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 border border-slate-300 text-[9px] font-bold uppercase shrink-0">
+                                        Enrolled ✓
+                                      </span>
+                                    ) : plan.badge ? (
+                                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-extrabold uppercase shrink-0">
+                                        {plan.badge}
+                                      </span>
+                                    ) : null}
+                                  </div>
+
+                                  <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
+                                    {plan.description}
+                                  </p>
+
+                                  <div className="p-2.5 rounded-xl bg-white border border-slate-200 flex items-baseline justify-between">
+                                    <div>
+                                      <span className="text-base font-black text-[#0d5c4d]">
+                                        LKR {(plan.monthlyFeeLkr ?? plan.monthlyFee ?? 0).toLocaleString()}
+                                      </span>
+                                      <span className="text-[10px] text-slate-500 font-semibold"> / {(plan.billingCycle || "Monthly").toLowerCase()}</span>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                                      {(plan.liveClassesPerWeek ?? 2)} Meets / wk
+                                    </span>
+                                  </div>
+
+                                  {/* Features Checklist */}
+                                  <div className="space-y-1 pt-1">
+                                    {plan.features.slice(0, 3).map((feat, idx) => (
+                                      <div key={idx} className="flex items-center gap-1.5 text-[10px] text-slate-600">
+                                        <CheckCircle2 className="h-3 w-3 text-[#0d5c4d] shrink-0" />
+                                        <span className="truncate">{feat}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {isPlanEnrolled ? (
+                                  <div className="w-full py-2.5 px-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5">
+                                    <CheckCircle2 className="h-4 w-4 text-[#0d5c4d]" />
+                                    <span>Active Plan Enrollment</span>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedPackageForSubscribe(plan)}
+                                    className="w-full py-2.5 px-3 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-extrabold text-xs shadow-2xs transition-all hover:scale-[1.01] flex items-center justify-center gap-1.5 cursor-pointer"
+                                  >
+                                    <CreditCard className="h-3.5 w-3.5 text-[#f3b738]" />
+                                    <span>{currentRole === "parent" ? "Enroll Child in Plan" : "Enroll in Plan"}</span>
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => setSelectedTeacherForSubscribe(teacher)}
-                        className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black flex items-center gap-2 shadow-sm transition-all hover:scale-[1.02] cursor-pointer"
-                      >
-                        <CreditCard className="h-3.5 w-3.5 text-amber-300" />
-                        <span>Quick Monthly Pass — LKR {(teacher.monthlyFee ?? 0).toLocaleString()}/mo</span>
-                      </button>
                     )}
+
+                    {/* Actions Row */}
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
+                      {isSubscribed ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-3.5 py-2 rounded-xl bg-slate-100 text-slate-800 font-bold text-xs flex items-center gap-1.5 border border-slate-200">
+                            <CheckCircle2 className="h-4 w-4 text-[#0d5c4d]" />
+                            Subscribed ✓
+                          </span>
+                          {teacher.meetUrl ? (
+                            <a
+                              href={teacher.meetUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-4 py-2 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:scale-[1.02]"
+                            >
+                              <Video className="h-4 w-4" />
+                              Join Live Class
+                            </a>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setSelectedTeacherForSubscribe(teacher)}
+                          className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black flex items-center gap-2 shadow-sm transition-all hover:scale-[1.02] cursor-pointer"
+                        >
+                          <CreditCard className="h-3.5 w-3.5 text-amber-300" />
+                          <span>Quick Monthly Pass — LKR {(teacher.monthlyFee ?? 0).toLocaleString()}/mo</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 shadow-xs space-y-3">
-            <Users className="h-10 w-10 text-slate-300 mx-auto" />
-            <h4 className="text-sm font-black text-[#0d2b26]">No teachers found</h4>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              {searchQuery || selectedSubject !== "all"
-                ? "Try adjusting your search query or subject filter to find available educators."
-                : "No registered teachers are currently available in the marketplace."}
-            </p>
-          </div>
-        )}
+              );
+            })
+          ) : (
+            <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 shadow-xs space-y-3">
+              <Users className="h-10 w-10 text-slate-300 mx-auto" />
+              <h4 className="text-sm font-black text-[#0d2b26]">No teachers found</h4>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                {searchQuery || selectedSubject !== "all"
+                  ? "Try adjusting your search query or subject filter to find available educators."
+                  : "No registered teachers are currently available in the marketplace."}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -1139,13 +1213,12 @@ export function ConnectView() {
                     >
                       {student.initials}
                       <span
-                        className={`absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-white ${
-                          student.status === "online"
-                            ? "bg-emerald-500"
-                            : student.status === "in_study"
+                        className={`absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-2 border-white ${student.status === "online"
+                          ? "bg-emerald-500"
+                          : student.status === "in_study"
                             ? "bg-amber-500"
                             : "bg-slate-300"
-                        }`}
+                          }`}
                       />
                     </div>
 
@@ -1177,11 +1250,10 @@ export function ConnectView() {
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => handleToggleBuddy(student.id)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
-                        student.isBuddy
-                          ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          : "bg-[#0d5c4d] text-white hover:bg-[#0a473b]"
-                      }`}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${student.isBuddy
+                        ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        : "bg-[#0d5c4d] text-white hover:bg-[#0a473b]"
+                        }`}
                     >
                       {student.isBuddy ? "Connected" : "+ Connect"}
                     </button>
@@ -1223,22 +1295,20 @@ export function ConnectView() {
               <button
                 type="button"
                 onClick={() => setGroupFilter("all")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  groupFilter === "all"
-                    ? "bg-[#0d5c4d] text-white shadow-xs"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${groupFilter === "all"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  }`}
               >
                 All Circles ({studyGroups.length})
               </button>
               <button
                 type="button"
                 onClick={() => setGroupFilter("enrolled")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  groupFilter === "enrolled"
-                    ? "bg-[#0d5c4d] text-white shadow-xs"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${groupFilter === "enrolled"
+                  ? "bg-[#0d5c4d] text-white shadow-xs"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  }`}
               >
                 My Subscribed Teachers Only
               </button>
@@ -1256,136 +1326,133 @@ export function ConnectView() {
                   return isSubscribedToTeacher;
                 })
                 .map((group) => {
-                const targetTeacher = teachers.find((t) => t.id === group.teacherId);
-                const isSubscribedToTeacher =
-                  teachers.some((t) => t.id === group.teacherId && t.isSubscribed) ||
-                  purchases.some((p) => p.teacherId === group.teacherId && p.status === "active");
+                  const targetTeacher = teachers.find((t) => t.id === group.teacherId);
+                  const isSubscribedToTeacher =
+                    teachers.some((t) => t.id === group.teacherId && t.isSubscribed) ||
+                    purchases.some((p) => p.teacherId === group.teacherId && p.status === "active");
 
-                return (
-                  <div
-                    key={group.id}
-                    className={`bg-white rounded-3xl border transition-all p-6 shadow-xs flex flex-col justify-between space-y-4 relative overflow-hidden ${
-                      isSubscribedToTeacher
+                  return (
+                    <div
+                      key={group.id}
+                      className={`bg-white rounded-3xl border transition-all p-6 shadow-xs flex flex-col justify-between space-y-4 relative overflow-hidden ${isSubscribedToTeacher
                         ? "border-[#c4e9e0] hover:border-[#0d5c4d]/50 hover:shadow-md"
                         : "border-slate-200/90 bg-slate-50/40"
-                    }`}
-                  >
-                    <div className="space-y-3">
-                      {/* Teacher Creator Header */}
-                      <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className={`h-7 w-7 rounded-lg ${
-                              targetTeacher?.avatarColor || "bg-[#0d5c4d]"
-                            } text-white font-extrabold text-[11px] flex items-center justify-center shrink-0`}
-                          >
-                            {targetTeacher?.initials || group.teacherName.substring(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                              Created By Teacher
-                            </p>
-                            <p className="font-extrabold text-xs text-[#0d2b26]">
-                              {group.teacherName}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Subscription Access Badge */}
-                        {isSubscribedToTeacher ? (
-                          <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-black flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                            Subscribed Access ✓
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-black flex items-center gap-1">
-                            <Lock className="h-3 w-3 text-amber-700" />
-                            Requires Subscription
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Group Title & Details */}
-                      <div>
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className="px-2.5 py-0.5 rounded-md bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-bold">
-                            {group.subject}
-                          </span>
-                          <span className="text-xs font-bold text-slate-500">
-                            {group.membersCount} / {group.maxMembers} Students
-                          </span>
-                        </div>
-                        <h3 className="font-black text-base text-[#0d2b26]">{group.name}</h3>
-                        <p className="text-xs text-slate-600 leading-relaxed mt-1">{group.description}</p>
-                      </div>
-                    </div>
-
-                    {/* Schedule & Topic Card */}
-                    <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 space-y-1.5 text-xs shadow-2xs">
-                      <p className="font-bold text-slate-700 flex items-center gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                        <span>Current Topic:</span> <span className="font-semibold text-slate-800">{group.activeTopic}</span>
-                      </p>
-                      <p className="text-slate-500 flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                        <span>Schedule:</span> <span className="font-medium text-slate-700">{group.schedule}</span>
-                      </p>
-                    </div>
-
-                    {/* Bottom Action Area */}
-                    <div className="pt-2">
-                      {isSubscribedToTeacher ? (
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleJoinGroup(group.id)}
-                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                              group.isJoined
-                                ? "bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-transparent"
-                                : "bg-[#0d5c4d] hover:bg-[#0a473b] text-white shadow-xs"
-                            }`}
-                          >
-                            {group.isJoined ? "Joined Circle ✓ (Leave)" : "Join Study Circle"}
-                          </button>
-
-                          {group.isJoined && group.meetUrl && (
-                            <a
-                              href={group.meetUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                        }`}
+                    >
+                      <div className="space-y-3">
+                        {/* Teacher Creator Header */}
+                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className={`h-7 w-7 rounded-lg ${targetTeacher?.avatarColor || "bg-[#0d5c4d]"
+                                } text-white font-extrabold text-[11px] flex items-center justify-center shrink-0`}
                             >
-                              <Video className="h-3.5 w-3.5" />
-                              <span>Open Discussion Room</span>
-                              <ExternalLink className="h-3 w-3 opacity-80" />
-                            </a>
+                              {targetTeacher?.initials || group.teacherName.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                Created By Teacher
+                              </p>
+                              <p className="font-extrabold text-xs text-[#0d2b26]">
+                                {group.teacherName}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Subscription Access Badge */}
+                          {isSubscribedToTeacher ? (
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-black flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                              Subscribed Access ✓
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-black flex items-center gap-1">
+                              <Lock className="h-3 w-3 text-amber-700" />
+                              Requires Subscription
+                            </span>
                           )}
                         </div>
-                      ) : (
-                        <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-2">
-                          <p className="text-[11px] text-amber-900 leading-snug">
-                            🔒 <strong>Subscribers Only:</strong> This study circle is exclusively for students enrolled in <strong>{group.teacherName}</strong>'s subscription package.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (targetTeacher) {
-                                setSelectedTeacherForSubscribe(targetTeacher);
-                              } else {
-                                setActiveTab("teachers");
-                              }
-                            }}
-                            className="w-full py-2 px-3 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-extrabold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <CreditCard className="h-3.5 w-3.5 text-[#f3b738]" />
-                            <span>Subscribe to {group.teacherName} to Unlock</span>
-                          </button>
+
+                        {/* Group Title & Details */}
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="px-2.5 py-0.5 rounded-md bg-[#ecf8f5] text-[#0d5c4d] text-[10px] font-bold">
+                              {group.subject}
+                            </span>
+                            <span className="text-xs font-bold text-slate-500">
+                              {group.membersCount} / {group.maxMembers} Students
+                            </span>
+                          </div>
+                          <h3 className="font-black text-base text-[#0d2b26]">{group.name}</h3>
+                          <p className="text-xs text-slate-600 leading-relaxed mt-1">{group.description}</p>
                         </div>
-                      )}
+                      </div>
+
+                      {/* Schedule & Topic Card */}
+                      <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 space-y-1.5 text-xs shadow-2xs">
+                        <p className="font-bold text-slate-700 flex items-center gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                          <span>Current Topic:</span> <span className="font-semibold text-slate-800">{group.activeTopic}</span>
+                        </p>
+                        <p className="text-slate-500 flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span>Schedule:</span> <span className="font-medium text-slate-700">{group.schedule}</span>
+                        </p>
+                      </div>
+
+                      {/* Bottom Action Area */}
+                      <div className="pt-2">
+                        {isSubscribedToTeacher ? (
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleJoinGroup(group.id)}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${group.isJoined
+                                ? "bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 border border-transparent"
+                                : "bg-[#0d5c4d] hover:bg-[#0a473b] text-white shadow-xs"
+                                }`}
+                            >
+                              {group.isJoined ? "Joined Circle ✓ (Leave)" : "Join Study Circle"}
+                            </button>
+
+                            {group.isJoined && group.meetUrl && (
+                              <a
+                                href={group.meetUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                              >
+                                <Video className="h-3.5 w-3.5" />
+                                <span>Open Discussion Room</span>
+                                <ExternalLink className="h-3 w-3 opacity-80" />
+                              </a>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-2">
+                            <p className="text-[11px] text-amber-900 leading-snug">
+                              🔒 <strong>Subscribers Only:</strong> This study circle is exclusively for students enrolled in <strong>{group.teacherName}</strong>&apos;s subscription package.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (targetTeacher) {
+                                  setSelectedTeacherForSubscribe(targetTeacher);
+                                } else {
+                                  setActiveTab("teachers");
+                                }
+                              }}
+                              className="w-full py-2 px-3 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-extrabold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <CreditCard className="h-3.5 w-3.5 text-[#f3b738]" />
+                              <span>Subscribe to {group.teacherName} to Unlock</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })
             ) : (
               <div className="col-span-full p-12 text-center bg-white rounded-3xl border border-dashed border-[#c4e9e0] shadow-xs space-y-3">
                 <Users2 className="h-10 w-10 text-slate-300 mx-auto" />
@@ -1488,19 +1555,19 @@ export function ConnectView() {
       {(selectedTeacherForSubscribe || selectedPackageForSubscribe) && (() => {
         const activeSubTarget = selectedTeacherForSubscribe
           ? {
-              name: selectedTeacherForSubscribe.name,
-              subject: selectedTeacherForSubscribe.subject,
-              fee: selectedTeacherForSubscribe.monthlyFee,
-              badge: "Solo Teacher Pass"
-            }
+            name: selectedTeacherForSubscribe.name,
+            subject: selectedTeacherForSubscribe.subject,
+            fee: selectedTeacherForSubscribe.monthlyFee,
+            badge: "Solo Teacher Pass"
+          }
           : selectedPackageForSubscribe
-          ? {
+            ? {
               name: selectedPackageForSubscribe.title,
               subject: selectedPackageForSubscribe.subject,
               fee: selectedPackageForSubscribe.monthlyFeeLkr,
               badge: selectedPackageForSubscribe.grade
             }
-          : null;
+            : null;
 
         if (!activeSubTarget) return null;
 
@@ -1521,6 +1588,8 @@ export function ConnectView() {
                   </p>
                 </div>
                 <button
+                  type="button"
+                  aria-label="Close enrollment checkout modal"
                   onClick={resetCheckoutModal}
                   className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
@@ -1577,11 +1646,10 @@ export function ConnectView() {
                         setPaymentMethod("card");
                         setCheckoutError(null);
                       }}
-                      className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${
-                        paymentMethod === "card"
-                          ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
-                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}
+                      className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${paymentMethod === "card"
+                        ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
                     >
                       <div className="flex items-center gap-1.5 font-bold text-xs">
                         <CreditCard className="h-4 w-4 text-[#0d5c4d]" />
@@ -1596,11 +1664,10 @@ export function ConnectView() {
                         setPaymentMethod("bank_slip");
                         setCheckoutError(null);
                       }}
-                      className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${
-                        paymentMethod === "bank_slip"
-                          ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
-                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}
+                      className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${paymentMethod === "bank_slip"
+                        ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
                     >
                       <div className="flex items-center gap-1.5 font-bold text-xs">
                         <Building className="h-4 w-4 text-emerald-700" />
@@ -1736,11 +1803,10 @@ export function ConnectView() {
                       />
                       <div
                         onClick={() => fileInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-xl p-3.5 text-center flex items-center justify-center gap-2.5 font-bold cursor-pointer transition-all shadow-2xs ${
-                          uploadedSlipName
-                            ? "border-emerald-500 bg-emerald-50/70 text-emerald-900"
-                            : "border-slate-300 hover:border-emerald-600 bg-white hover:bg-emerald-50/40 text-slate-700"
-                        }`}
+                        className={`border-2 border-dashed rounded-xl p-3.5 text-center flex items-center justify-center gap-2.5 font-bold cursor-pointer transition-all shadow-2xs ${uploadedSlipName
+                          ? "border-emerald-500 bg-emerald-50/70 text-emerald-900"
+                          : "border-slate-300 hover:border-emerald-600 bg-white hover:bg-emerald-50/40 text-slate-700"
+                          }`}
                       >
                         <FileCheck className={`h-5 w-5 shrink-0 ${uploadedSlipName ? "text-emerald-600" : "text-slate-400"}`} />
                         <div className="text-left flex-1 min-w-0">
@@ -1781,11 +1847,10 @@ export function ConnectView() {
                   type="button"
                   disabled={!isFormValid || isProcessing}
                   onClick={handleConfirmSubscribe}
-                  className={`px-5 py-2.5 rounded-xl font-black text-xs shadow-md transition-all flex items-center gap-2 ${
-                    !isFormValid || isProcessing
-                      ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
-                      : "bg-[#0d5c4d] hover:bg-[#0a473b] text-white hover:scale-[1.02]"
-                  }`}
+                  className={`px-5 py-2.5 rounded-xl font-black text-xs shadow-md transition-all flex items-center gap-2 ${!isFormValid || isProcessing
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                    : "bg-[#0d5c4d] hover:bg-[#0a473b] text-white hover:scale-[1.02]"
+                    }`}
                 >
                   {isProcessing ? (
                     <span>Activating Subscription...</span>
@@ -1815,6 +1880,8 @@ export function ConnectView() {
                 <h3 className="font-black text-sm text-[#0d2b26] tracking-tight">Official Tuition Payment Receipt</h3>
               </div>
               <button
+                type="button"
+                aria-label="Close tuition payment receipt"
                 onClick={() => setSelectedPurchaseForReceipt(null)}
                 className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 cursor-pointer"
               >

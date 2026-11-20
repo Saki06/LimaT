@@ -25,7 +25,7 @@ import {
 } from "@/components/teacher";
 import { ParentDashboardView } from "@/components/parent";
 import { AdminViews } from "@/components/admin";
-import { SuperAdminPortalView, PaymentRequestsView } from "@/components/super-admin";
+import { SuperAdminPortalView } from "@/components/super-admin";
 import { SportsView } from "@/components/sports";
 import {
   AnnouncementsView,

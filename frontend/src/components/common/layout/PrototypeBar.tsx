@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useApp } from "@/context/AppContext";
+import type { UserRole } from "@/types/lms";
 import { Sun, Moon, Globe, Shield, GraduationCap, School, Users, Sparkles } from "lucide-react";
 
 export function PrototypeBar() {
@@ -21,7 +22,7 @@ export function PrototypeBar() {
     setLandingPortal
   } = useApp();
 
-  const handleRoleChange = (role: any) => {
+  const handleRoleChange = (role: UserRole) => {
     setCurrentRole(role);
     if (isLanding) {
       if (role === "student") {

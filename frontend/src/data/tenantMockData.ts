@@ -1,4 +1,4 @@
-import { Tenant, TenantModuleConfig, TenantPreset } from '@/types/tenant';
+import { TenantModuleConfig, TenantPreset } from '@/types/tenant';
 
 export const HIERARCHICAL_MODULES: TenantModuleConfig[] = [
   // =========================================================================

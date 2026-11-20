@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import {
   Layers,
   BookOpen,
   Plus,
   FolderPlus,
-  FilePlus,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -15,10 +14,6 @@ import {
   Presentation,
   Video,
   Trash2,
-  CheckCircle2,
-  Calendar,
-  Sparkles,
-  Search,
   ExternalLink,
   UploadCloud,
   X,
@@ -30,15 +25,13 @@ import {
   Copy,
   Download,
   ChevronLeft,
-  PlayCircle,
-  Printer,
-  Maximize2
+  PlayCircle
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
-import { Course, SyllabusUnit, Topic, Lesson } from "@/types/lms";
+import { Lesson } from "@/types/lms";
 
 export function SyllabusBuilderView() {
   const {
@@ -75,17 +68,16 @@ export function SyllabusBuilderView() {
     return courses;
   }, [courses, currentRole, currentUser]);
 
-  const [activeCourseId, setActiveCourseId] = useState<string>(
+  const [courseIdState, setActiveCourseId] = useState<string>(
     selectedCourseId || visibleCourses[0]?.id || ""
   );
 
-  useEffect(() => {
-    if (selectedCourseId && visibleCourses.some((c) => c.id === selectedCourseId)) {
-      setActiveCourseId(selectedCourseId);
-    } else if (!visibleCourses.some((c) => c.id === activeCourseId) && visibleCourses.length > 0) {
-      setActiveCourseId(visibleCourses[0].id);
-    }
-  }, [selectedCourseId, visibleCourses, activeCourseId]);
+  const activeCourseId =
+    (selectedCourseId && visibleCourses.some((c) => c.id === selectedCourseId)
+      ? selectedCourseId
+      : visibleCourses.some((c) => c.id === courseIdState)
+        ? courseIdState
+        : visibleCourses[0]?.id) || "";
 
   const activeCourse = visibleCourses.find((c) => c.id === activeCourseId) || visibleCourses[0];
 
@@ -152,7 +144,7 @@ export function SyllabusBuilderView() {
         title: "Syllabus Saved to Cloud",
         message: `${activeCourse.title} units & lessons are synchronized with server database.`
       });
-    } catch (e) {
+    } catch {
       addToast({
         type: "error",
         title: "Cloud Sync Failed",
@@ -374,94 +366,6 @@ export function SyllabusBuilderView() {
         message: `${file.name} is now open in your native PDF viewer.`
       });
     }
-  };
-
-  const handlePrintDocument = (
-    title: string,
-    body: string,
-    unitTitle: string,
-    topicTitle: string,
-    courseTitle?: string
-  ) => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="en">
-        <head>
-          <meta charset="utf-8" />
-          <title>${title} - Handout Document</title>
-          <style>
-            @page { size: A4; margin: 20mm; }
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-              padding: 40px;
-              max-width: 800px;
-              margin: 0 auto;
-              color: #0f172a;
-              line-height: 1.8;
-              background: #ffffff;
-            }
-            .header {
-              border-bottom: 2px solid #0d5c4d;
-              padding-bottom: 16px;
-              margin-bottom: 24px;
-            }
-            .course {
-              font-size: 11px;
-              font-weight: 800;
-              color: #0d5c4d;
-              text-transform: uppercase;
-              letter-spacing: 1px;
-            }
-            .meta {
-              font-size: 13px;
-              color: #64748b;
-              margin-top: 4px;
-            }
-            h1 {
-              font-size: 26px;
-              color: #0d2b26;
-              margin: 10px 0 0 0;
-            }
-            .content {
-              white-space: pre-wrap;
-              font-size: 14.5px;
-              color: #334155;
-              margin-top: 24px;
-            }
-            .footer {
-              margin-top: 48px;
-              padding-top: 16px;
-              border-top: 1px dashed #cbd5e1;
-              font-size: 11px;
-              color: #94a3b8;
-              display: flex;
-              justify-content: space-between;
-            }
-            @media print {
-              body { padding: 0; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="course">${courseTitle || "LMS Curriculum"} &bull; Official Handout</div>
-            <h1>${title}</h1>
-            <div class="meta">${unitTitle} &bull; ${topicTitle}</div>
-          </div>
-          <div class="content">${body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
-          <div class="footer">
-            <span>Verified LMS Curriculum Material</span>
-            <span>Printed on ${new Date().toLocaleDateString()}</span>
-          </div>
-          <script>
-            window.onload = function() { window.print(); }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
   };
 
   const handleCopyText = (text: string) => {
@@ -921,12 +825,12 @@ export function SyllabusBuilderView() {
     const activePdfUrl = mainPdf?.url || (
       lesson.contentType === "pdf"
         ? generateRealPdfBlob(
-            lesson.title,
-            activeCourse?.title || "",
-            unitTitle,
-            topicTitle,
-            lesson.contentBody
-          )
+          lesson.title,
+          activeCourse?.title || "",
+          unitTitle,
+          topicTitle,
+          lesson.contentBody
+        )
         : ""
     );
 
@@ -1219,11 +1123,10 @@ export function SyllabusBuilderView() {
                     key={i}
                     type="button"
                     onClick={() => setActiveSlideIndex(i + 1)}
-                    className={`h-7 min-w-7 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      activeSlideIndex === i + 1
-                        ? "bg-[#0d5c4d] text-white shadow-2xs scale-105"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
+                    className={`h-7 min-w-7 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeSlideIndex === i + 1
+                      ? "bg-[#0d5c4d] text-white shadow-2xs scale-105"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
                   >
                     {i + 1}
                   </button>
@@ -1625,7 +1528,12 @@ export function SyllabusBuilderView() {
                     onClick={() => toggleUnit(unit.id)}
                     className="flex items-center gap-3.5 flex-1 cursor-pointer select-none"
                   >
-                    <button className="h-7 w-7 rounded-lg bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0">
+                    <button
+                      type="button"
+                      aria-expanded={isExpanded}
+                      aria-label={isExpanded ? `Collapse Unit ${unitIdx + 1}` : `Expand Unit ${unitIdx + 1}`}
+                      className="h-7 w-7 rounded-lg bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center shrink-0"
+                    >
                       {isExpanded ? (
                         <ChevronDown className="h-4 w-4" />
                       ) : (
@@ -2038,11 +1946,10 @@ export function SyllabusBuilderView() {
               <button
                 type="button"
                 onClick={() => setLessonContentType("pdf")}
-                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                  lessonContentType === "pdf"
-                    ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
-                    : "bg-white border-slate-200 hover:border-slate-300"
-                }`}
+                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${lessonContentType === "pdf"
+                  ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
+                  : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="h-8 w-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
@@ -2061,11 +1968,10 @@ export function SyllabusBuilderView() {
               <button
                 type="button"
                 onClick={() => setLessonContentType("slides")}
-                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                  lessonContentType === "slides"
-                    ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
-                    : "bg-white border-slate-200 hover:border-slate-300"
-                }`}
+                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${lessonContentType === "slides"
+                  ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
+                  : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="h-8 w-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
@@ -2084,11 +1990,10 @@ export function SyllabusBuilderView() {
               <button
                 type="button"
                 onClick={() => setLessonContentType("video")}
-                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                  lessonContentType === "video"
-                    ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
-                    : "bg-white border-slate-200 hover:border-slate-300"
-                }`}
+                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${lessonContentType === "video"
+                  ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
+                  : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -2107,11 +2012,10 @@ export function SyllabusBuilderView() {
               <button
                 type="button"
                 onClick={() => setLessonContentType("rich_text")}
-                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                  lessonContentType === "rich_text"
-                    ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
-                    : "bg-white border-slate-200 hover:border-slate-300"
-                }`}
+                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${lessonContentType === "rich_text"
+                  ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
+                  : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
@@ -2149,6 +2053,7 @@ export function SyllabusBuilderView() {
                   </div>
                   <button
                     type="button"
+                    aria-label="Remove uploaded file"
                     onClick={() => setUploadedMainFile(null)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                   >
@@ -2220,6 +2125,7 @@ export function SyllabusBuilderView() {
                   </div>
                   <button
                     type="button"
+                    aria-label="Remove uploaded file"
                     onClick={() => setUploadedMainFile(null)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                   >
@@ -2305,6 +2211,7 @@ export function SyllabusBuilderView() {
                   </div>
                   <button
                     type="button"
+                    aria-label="Remove uploaded file"
                     onClick={() => setUploadedMainFile(null)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                   >
@@ -2373,6 +2280,7 @@ export function SyllabusBuilderView() {
                     <span>{file.name}</span>
                     <button
                       type="button"
+                      aria-label={`Remove ${file.name}`}
                       onClick={() =>
                         setSupplementaryFiles((prev) => prev.filter((_, i) => i !== idx))
                       }
@@ -2604,11 +2512,10 @@ export function SyllabusBuilderView() {
               <button
                 type="button"
                 onClick={() => setEditLessonContentType("pdf")}
-                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                  editLessonContentType === "pdf"
-                    ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
-                    : "bg-white border-slate-200 hover:border-slate-300"
-                }`}
+                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${editLessonContentType === "pdf"
+                  ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
+                  : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="h-8 w-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
@@ -2627,11 +2534,10 @@ export function SyllabusBuilderView() {
               <button
                 type="button"
                 onClick={() => setEditLessonContentType("slides")}
-                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                  editLessonContentType === "slides"
-                    ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
-                    : "bg-white border-slate-200 hover:border-slate-300"
-                }`}
+                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${editLessonContentType === "slides"
+                  ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
+                  : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="h-8 w-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
@@ -2650,11 +2556,10 @@ export function SyllabusBuilderView() {
               <button
                 type="button"
                 onClick={() => setEditLessonContentType("video")}
-                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                  editLessonContentType === "video"
-                    ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
-                    : "bg-white border-slate-200 hover:border-slate-300"
-                }`}
+                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${editLessonContentType === "video"
+                  ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
+                  : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
@@ -2673,11 +2578,10 @@ export function SyllabusBuilderView() {
               <button
                 type="button"
                 onClick={() => setEditLessonContentType("rich_text")}
-                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                  editLessonContentType === "rich_text"
-                    ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
-                    : "bg-white border-slate-200 hover:border-slate-300"
-                }`}
+                className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${editLessonContentType === "rich_text"
+                  ? "bg-[#ecf8f5] border-[#0d5c4d] shadow-2xs ring-1 ring-[#0d5c4d]"
+                  : "bg-white border-slate-200 hover:border-slate-300"
+                  }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
@@ -2715,6 +2619,7 @@ export function SyllabusBuilderView() {
                   </div>
                   <button
                     type="button"
+                    aria-label="Remove uploaded file"
                     onClick={() => setEditUploadedMainFile(null)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                   >
@@ -2784,6 +2689,7 @@ export function SyllabusBuilderView() {
                   </div>
                   <button
                     type="button"
+                    aria-label="Remove uploaded file"
                     onClick={() => setEditUploadedMainFile(null)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                   >
@@ -2911,6 +2817,7 @@ export function SyllabusBuilderView() {
                     <span>{file.name}</span>
                     <button
                       type="button"
+                      aria-label={`Remove ${file.name}`}
                       onClick={() =>
                         setEditSupplementaryFiles((prev) => prev.filter((_, i) => i !== idx))
                       }
