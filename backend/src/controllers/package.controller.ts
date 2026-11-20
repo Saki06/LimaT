@@ -2,6 +2,25 @@ import { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
+const PUBLIC_TEACHER_FIELDS = [
+  'id', 'userId', 'title', 'specialization', 'bio', 'rating', 'isVerified', 'mediums',
+  'experienceYears', 'city', 'district', 'coverImageUrl', 'publicSlug', 'youtubeUrl',
+  'whatsappNumber', 'qualifications',
+] as const;
+
+const toPublicPackage = <T extends Record<string, any>>(pkg: T): T => {
+  if (!pkg.teacher) return pkg;
+  const teacher: Record<string, unknown> = {};
+  for (const field of PUBLIC_TEACHER_FIELDS) {
+    if (field in pkg.teacher) teacher[field] = pkg.teacher[field];
+  }
+  if (pkg.teacher.user) {
+    const { id, firstName, lastName, avatarUrl } = pkg.teacher.user;
+    teacher.user = { id, firstName, lastName, avatarUrl };
+  }
+  return { ...pkg, teacher };
+};
+
 /**
  * Helper to ensure a TeacherProfile exists for a user
  */
@@ -198,15 +217,12 @@ export const listPackages = async (req: Request, res: Response): Promise<void> =
         orderBy: { createdAt: 'desc' },
         include: {
           teacher: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  avatarUrl: true,
-                },
-              },
+            select: {
+              id: true, userId: true, title: true, specialization: true, bio: true, rating: true,
+              isVerified: true, mediums: true, experienceYears: true, city: true, district: true,
+              coverImageUrl: true, publicSlug: true, youtubeUrl: true, whatsappNumber: true,
+              qualifications: true,
+              user: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
             },
           },
           courses: {
@@ -229,7 +245,7 @@ export const listPackages = async (req: Request, res: Response): Promise<void> =
 
     res.status(200).json({
       success: true,
-      data: packages,
+      data: packages.map((pkg) => toPublicPackage(pkg as Record<string, any>)),
       pagination: {
         total,
         page: pageNumber,
@@ -310,8 +326,8 @@ export const getPackageById = async (req: Request, res: Response): Promise<void>
   try {
     const id = req.params.id as string;
 
-    const pkg = await prisma.package.findUnique({
-      where: { id },
+    const pkg = await prisma.package.findFirst({
+      where: { id, isPublished: true },
       include: {
         tenant: {
           select: {
@@ -321,15 +337,12 @@ export const getPackageById = async (req: Request, res: Response): Promise<void>
           },
         },
         teacher: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                avatarUrl: true,
-              },
-            },
+          select: {
+            id: true, userId: true, title: true, specialization: true, bio: true, rating: true,
+            isVerified: true, mediums: true, experienceYears: true, city: true, district: true,
+            coverImageUrl: true, publicSlug: true, youtubeUrl: true, whatsappNumber: true,
+            qualifications: true,
+            user: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
           },
         },
         courses: {
@@ -350,7 +363,7 @@ export const getPackageById = async (req: Request, res: Response): Promise<void>
 
     res.status(200).json({
       success: true,
-      data: pkg,
+      data: toPublicPackage(pkg as Record<string, any>),
     });
   } catch (error: any) {
     console.error('Error fetching package:', error);
@@ -358,6 +371,54 @@ export const getPackageById = async (req: Request, res: Response): Promise<void>
       success: false,
       message: error.message || 'Internal server error while fetching package',
     });
+  }
+};
+
+/**
+ * GET /api/packages/:id/payment-details
+ * Bank details are only returned to an authenticated student in the package tenant.
+ */
+export const getPackagePaymentDetails = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user || user.role !== 'STUDENT') {
+      res.status(403).json({ success: false, message: 'Student authorization is required.' });
+      return;
+    }
+    if (!user.tenantId) {
+      res.status(403).json({ success: false, message: 'Student account is not assigned to an organization.' });
+      return;
+    }
+    const pkg = await prisma.package.findFirst({
+      where: { id: String(req.params.id), tenantId: user.tenantId, isPublished: true },
+      select: {
+        id: true,
+        teacher: {
+          select: {
+            bankName: true,
+            bankAccountName: true,
+            bankAccountNumber: true,
+            bankBranch: true,
+          },
+        },
+      },
+    });
+    if (!pkg) {
+      res.status(404).json({ success: false, message: 'Published package not found in your organization.' });
+      return;
+    }
+    res.status(200).json({
+      success: true,
+      data: {
+        bankName: pkg.teacher?.bankName ?? null,
+        accountName: pkg.teacher?.bankAccountName ?? null,
+        accountNumber: pkg.teacher?.bankAccountNumber ?? null,
+        branch: pkg.teacher?.bankBranch ?? null,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching package payment details:', error);
+    res.status(500).json({ success: false, message: 'Could not load payment details.' });
   }
 };
 
@@ -507,7 +568,6 @@ export const deletePackage = async (req: AuthenticatedRequest, res: Response): P
  */
 export const subscribeToPackage = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const id = req.params.id as string;
     const user = req.user;
 
     if (!user) {
@@ -515,69 +575,10 @@ export const subscribeToPackage = async (req: AuthenticatedRequest, res: Respons
       return;
     }
 
-    let studentProfile = await prisma.studentProfile.findUnique({
-      where: { userId: user.userId },
-    });
-
-    if (!studentProfile) {
-      const studentIdNo = `STU-${user.userId.substring(0, 8).toUpperCase()}`;
-      studentProfile = await prisma.studentProfile.create({
-        data: {
-          userId: user.userId,
-          studentIdNo,
-          gradeLevel: 'General Batch',
-        },
-      });
-    }
-
-    const pkg = await prisma.package.findUnique({
-      where: { id },
-      include: {
-        courses: true,
-      },
-    });
-
-    if (!pkg) {
-      res.status(404).json({ success: false, message: 'Package not found' });
-      return;
-    }
-
-    const startDate = new Date();
-    const endDate = new Date(startDate.getTime() + (pkg.durationDays || 30) * 24 * 60 * 60 * 1000);
-
-    // Create Package Subscription
-    const subscription = await prisma.packageSubscription.create({
-      data: {
-        packageId: id,
-        studentId: studentProfile.id,
-        status: 'ACTIVE',
-        startDate,
-        endDate,
-        paidAmount: pkg.price,
-      },
-    });
-
-    // Auto-enroll student into all courses bundled in this package!
-    for (const item of pkg.courses) {
-      await prisma.enrollment.upsert({
-        where: {
-          courseId_studentId: {
-            courseId: item.courseId,
-            studentId: studentProfile.id,
-          },
-        },
-        create: {
-          courseId: item.courseId,
-          studentId: studentProfile.id,
-        },
-        update: {},
-      });
-    }
-
-    res.status(201).json({
-      success: true,
-      message: `Successfully subscribed to "${pkg.title}"! Course access granted.`,
-      data: subscription,
+    res.status(503).json({
+      success: false,
+      code: 'PAYMENT_EVIDENCE_REQUIRED',
+      message: 'Direct subscription is disabled. Submit a bank slip for review; subscription activation requires verified approval.',
     });
   } catch (error: any) {
     console.error('Error subscribing to package:', error);
@@ -796,11 +797,12 @@ export const verifyBankSlip = async (req: AuthenticatedRequest, res: Response): 
         package: {
           include: {
             courses: true,
+            teacher: { select: { userId: true } },
           },
         },
         student: {
           include: {
-            user: true,
+            user: { select: { id: true, tenantId: true, firstName: true, lastName: true } },
           },
         },
       },
@@ -811,39 +813,59 @@ export const verifyBankSlip = async (req: AuthenticatedRequest, res: Response): 
       return;
     }
 
-    const isApprove = action.toUpperCase() === 'APPROVE';
+    const packageTenantId = subscription.package.tenantId;
+    if (
+      (user.role === 'TEACHER' && subscription.package.teacher.userId !== user.userId) ||
+      (user.role === 'ADMIN' && subscription.student.user.tenantId !== user.tenantId) ||
+      (user.role !== 'TEACHER' && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')
+    ) {
+      res.status(403).json({ success: false, message: 'You are not authorized to review this bank slip.' });
+      return;
+    }
+    if (user.role === 'ADMIN' && packageTenantId !== user.tenantId) {
+      res.status(403).json({ success: false, message: 'Cross-tenant payment review is not allowed.' });
+      return;
+    }
+
+    if (!['APPROVE', 'REJECT'].includes(String(action).toUpperCase())) {
+      res.status(400).json({ success: false, message: 'Action must be APPROVE or REJECT.' });
+      return;
+    }
+    if (subscription.status !== 'PENDING') {
+      res.status(409).json({ success: false, message: 'Only pending bank slips can be reviewed.' });
+      return;
+    }
+    const isApprove = String(action).toUpperCase() === 'APPROVE';
     const newStatus = isApprove ? 'ACTIVE' : 'CANCELLED';
 
     const now = new Date();
     const durationDays = subscription.package?.durationDays || 30;
     const newEndDate = isApprove ? new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000) : subscription.endDate;
 
-    const updated = await prisma.packageSubscription.update({
-      where: { id: subscriptionId },
-      data: {
-        status: newStatus,
-        endDate: newEndDate,
-        paymentNotes: notes || (isApprove ? 'Bank deposit slip approved by tutor' : 'Bank deposit slip rejected'),
-      },
-    });
-
-    // If approved, ensure student is enrolled in all bundled courses in the package!
-    if (isApprove && subscription.package?.courses) {
-      for (const item of subscription.package.courses) {
-        await prisma.enrollment.upsert({
-          where: {
-            courseId_studentId: {
-              courseId: item.courseId,
-              studentId: subscription.studentId,
-            },
-          },
-          create: {
-            courseId: item.courseId,
-            studentId: subscription.studentId,
-          },
-          update: {},
-        });
+    const updated = await prisma.$transaction(async (tx) => {
+      const changed = await tx.packageSubscription.updateMany({
+        where: { id: subscriptionId, status: 'PENDING' },
+        data: {
+          status: newStatus,
+          endDate: newEndDate,
+          paymentNotes: notes || (isApprove ? 'Bank deposit slip approved by tutor' : 'Bank deposit slip rejected'),
+        },
+      });
+      if (changed.count !== 1) return null;
+      if (isApprove) {
+        for (const item of subscription.package.courses) {
+          await tx.enrollment.upsert({
+            where: { courseId_studentId: { courseId: item.courseId, studentId: subscription.studentId } },
+            create: { courseId: item.courseId, studentId: subscription.studentId },
+            update: {},
+          });
+        }
       }
+      return tx.packageSubscription.findUnique({ where: { id: subscriptionId } });
+    });
+    if (!updated) {
+      res.status(409).json({ success: false, message: 'The bank slip has already been reviewed.' });
+      return;
     }
 
     const studentName = subscription.student?.user

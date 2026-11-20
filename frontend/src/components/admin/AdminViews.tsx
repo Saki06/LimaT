@@ -682,19 +682,28 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       joiningDate: member.joiningDate || "", status: member.status, qualification: member.qualification || "",
       subjects: member.subjects?.join(", ") || "", classes: member.classes?.join(", ") || "",
       classTeacherOf: member.classTeacherOf || "", medium: member.medium || "english",
-      sports: member.sport || "", teams: member.teams?.join(", ") || "",
+      sports: member.sports?.join(", ") || member.sport || "", teams: member.teams?.join(", ") || "",
       certification: member.certification || "", availability: member.availability || ""
     } : { role: staffRoleFilter, name: "", photo: "", staffId: "", email: "", phone: "", gender: "other", dateOfBirth: "", joiningDate: "", status: "active", qualification: "", subjects: "", classes: "", classTeacherOf: "", medium: "english", sports: "", teams: "", certification: "", availability: "" });
     setIsStaffModalOpen(true);
   };
 
   const submitStaffForm = (values: StaffFormValues) => {
+    const teamNames = values.teams?.split(",").map((item) => item.trim()).filter(Boolean) || [];
+    const teamIds = teamNames.map((teamName) =>
+      teams.find((team) => team.id === teamName || team.name.toLowerCase() === teamName.toLowerCase())?.id
+    );
+    if (teamIds.some((teamId) => !teamId)) {
+      addToast({ type: "error", title: "Unknown team", message: "Use existing team names from Sports Management when assigning a coach." });
+      return;
+    }
     const input: StaffInput = {
       ...values,
       subjects: values.subjects?.split(",").map((item) => item.trim()).filter(Boolean) || [],
       classes: values.classes?.split(",").map((item) => item.trim()).filter(Boolean) || [],
       sports: values.sports?.split(",").map((item) => item.trim()).filter(Boolean) || [],
-      teams: values.teams?.split(",").map((item) => item.trim()).filter(Boolean) || []
+      teams: teamNames,
+      teamIds: teamIds as string[],
     };
     const result = editingStaff ? updateStaff(editingStaff.id, input) : createStaff(input);
     if (!result.ok) {

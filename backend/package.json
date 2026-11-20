@@ -5,9 +5,10 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
+    "vercel-build": "prisma generate && tsc",
     "start": "node dist/server.js",
-    "test": "npm run build && node --test test/admin-class-subject-security.test.cjs test/setup-token.test.cjs test/setup-password-security.test.cjs",
+    "test": "npm run build && node --test test/admin-class-subject-security.test.cjs test/setup-token.test.cjs test/setup-password-security.test.cjs test/otp-security.test.cjs test/auth-otp-limits.test.cjs test/parent-payment-security.test.cjs test/package-payment-approval.test.cjs test/auth-and-marketplace-contracts.test.cjs test/parent-link-security.test.cjs test/staff-team-status.test.cjs test/subscription-feature-security.test.cjs test/student-checkout-security.test.cjs test/email-delivery-config.test.cjs test/package-public-privacy.test.cjs test/admin-metadata-route-authorization.test.cjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "seed": "ts-node prisma/seed.ts"
@@ -22,8 +23,10 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "file-type": "^16.5.4",
+    "google-auth-library": "^10.9.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.5.0",
+    "nodemailer": "^10.6.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -33,6 +36,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/multer": "^2.3.0",
     "@types/node": "^22.10.7",
+    "@types/nodemailer": "^8.0.2",
     "prisma": "^6.2.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.7.3"

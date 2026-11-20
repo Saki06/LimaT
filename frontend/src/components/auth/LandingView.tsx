@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { validatePasswordStrength } from "@/lib/passwordPolicy";
+import { ForgotPasswordModal } from "./ForgotPasswordModal";
 import {
   GraduationCap,
   School,
@@ -77,7 +78,8 @@ export function LandingView({
   onEnterApp: () => void;
   initialPortal?: PortalType;
 }) {
-  const { addToast, schools, t, landingPortal, setLandingPortal, loginUser, registerUser } = useApp();
+  const { addToast, schools, t, landingPortal, setLandingPortal, loginUser, loginWithGoogle, registerUser } = useApp();
+  const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
   // Auto-rotate the student banner image every 3.5 seconds
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -109,6 +111,39 @@ export function LandingView({
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
+  useEffect(() => {
+    if (authMode === "closed" || selectedRole === "super_admin" || !GOOGLE_CLIENT_ID) return;
+    const renderGoogle = () => {
+      const container = document.getElementById("google-signin-btn-login");
+      const google = (window as any).google;
+      if (!container || !google?.accounts?.id) return;
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: async (response: { credential?: string }) => {
+          if (!response.credential) return;
+          const result = await loginWithGoogle(response.credential, selectedRole);
+          if (result.success) {
+            setAuthMode("closed");
+            onEnterApp();
+          } else {
+            addToast({ type: "error", title: "Google Sign-In Failed", message: result.message || "Unable to sign in with Google." });
+          }
+        },
+      });
+      container.replaceChildren();
+      google.accounts.id.renderButton(container, { theme: "outline", size: "large", width: 360, text: "continue_with" });
+    };
+    if (!(window as any).google) {
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.onload = renderGoogle;
+      document.body.appendChild(script);
+      return () => script.remove();
+    }
+    renderGoogle();
+  }, [authMode, selectedRole, loginWithGoogle, onEnterApp, addToast, GOOGLE_CLIENT_ID]);
+
 
   // Sign Up Form State
   const [signupName, setSignupName] = useState("");
@@ -117,11 +152,24 @@ export function LandingView({
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(true);
+  const [studentGrade, setStudentGrade] = useState("");
+  const [studentGender, setStudentGender] = useState("");
+  const [studentMedium, setStudentMedium] = useState("Tamil Medium");
+  const [studentStream, setStudentStream] = useState("");
+  const [studentDistrict, setStudentDistrict] = useState("Jaffna");
+  const isStudentAL = studentGrade === "Grade 12 (A/L)" || studentGrade === "Grade 13 (A/L)";
+
+  const isValidSriLankanPhone = (phone: string) => {
+    const cleaned = phone.trim().replace(/[\s-]/g, "");
+    return /^(?:0[1-9]\d{8}|\+94[1-9]\d{8})$/.test(cleaned);
+  };
+  const isValidEmailAddress = (email: string) => /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(email.trim());
 
   // Sri Lankan Parent-Specific Sign In & Registration States
   const [parentLoginMethod, setParentLoginMethod] = useState<"password" | "otp">("password");
   const [parentOtpSent, setParentOtpSent] = useState(false);
   const [parentOtpCode, setParentOtpCode] = useState("");
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   const [parentTitle, setParentTitle] = useState("Mrs.");
   const [parentRelation, setParentRelation] = useState("Mother");
@@ -233,6 +281,24 @@ export function LandingView({
 
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedRole !== "parent") {
+      if (!isValidEmailAddress(signupEmail)) {
+        addToast({ type: "error", title: "Invalid Email Address", message: "Please enter a valid email address." });
+        return;
+      }
+      if (!isValidSriLankanPhone(signupPhone)) {
+        addToast({ type: "error", title: "Invalid Mobile Number", message: "Please enter a valid Sri Lankan mobile number." });
+        return;
+      }
+      if (!agreeTerms) {
+        addToast({ type: "error", title: "Terms Required", message: "Please agree to the LimaT Terms & Privacy Policy to continue." });
+        return;
+      }
+      if (selectedRole === "student" && (!studentGrade || !studentGender || (isStudentAL && !studentStream))) {
+        addToast({ type: "error", title: "Student Details Required", message: "Please select the student's grade, gender, and A/L stream where applicable." });
+        return;
+      }
+    }
     const passwordError = validatePasswordStrength(signupPassword);
     if (passwordError) {
       addToast({ type: "error", title: "Invalid Password", message: passwordError });
@@ -255,6 +321,10 @@ export function LandingView({
           title: "Missing Required Details",
           message: "Please fill in Guardian Name, Mobile Number, Student Full Name, and Student WhatsApp/ID."
         });
+        return;
+      }
+      if (!isValidSriLankanPhone(parentPhone)) {
+        addToast({ type: "error", title: "Invalid Mobile Number", message: "Please enter a valid Sri Lankan mobile number." });
         return;
       }
       if (!parentConsent) {
@@ -320,7 +390,12 @@ export function LandingView({
           email,
           password: pwd,
           phoneNumber: signupPhone.trim(),
-          gradeLevel: "Grade 10",
+          gradeLevel: selectedRole === "student" ? studentGrade : undefined,
+          section: undefined,
+          gender: selectedRole === "student" ? studentGender : undefined,
+          medium: selectedRole === "student" ? studentMedium : undefined,
+          district: selectedRole === "student" ? studentDistrict : undefined,
+          stream: selectedRole === "student" && isStudentAL ? studentStream : undefined,
           specialization: selectedRole === "teacher" ? "Science & Mathematics" : undefined
         });
         if (res.success) {
@@ -590,13 +665,7 @@ export function LandingView({
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        addToast({
-                          type: "info",
-                          title: "Password Reset Code",
-                          message: selectedRole === "parent"
-                            ? "Use SMS OTP Login to sign in instantly, or enter your mobile to receive a reset code."
-                            : "Enter your registered mobile number or email to receive a password reset OTP code."
-                        });
+                        setIsForgotModalOpen(true);
                       }}
                       className="text-[11px] font-bold text-[#0d5c4d] hover:underline"
                     >
@@ -663,6 +732,7 @@ export function LandingView({
                       : "Teacher Portal"}
                   </span>
                 </button>
+                <div id="google-signin-btn-login" className="flex justify-center min-h-10" />
               </>
             )}
           </form>
@@ -915,6 +985,45 @@ export function LandingView({
                 </div>
               </div>
 
+              {selectedRole === "student" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Grade *</label>
+                    <select required value={studentGrade} onChange={(e) => setStudentGrade(e.target.value)} className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-medium">
+                      <option value="">Select grade</option>
+                      {["Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10", "Grade 11 (O/L)", "Grade 12 (A/L)", "Grade 13 (A/L)"].map((grade) => <option key={grade}>{grade}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Gender *</label>
+                    <select required value={studentGender} onChange={(e) => setStudentGender(e.target.value)} className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-medium">
+                      <option value="">Select gender</option><option>Male</option><option>Female</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Study Medium</label>
+                    <select value={studentMedium} onChange={(e) => setStudentMedium(e.target.value)} className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-medium">
+                      <option>Tamil Medium</option><option>English Medium</option><option>Sinhala Medium</option>
+                    </select>
+                  </div>
+                  {isStudentAL && (
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">A/L Stream *</label>
+                      <select required value={studentStream} onChange={(e) => setStudentStream(e.target.value)} className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-medium">
+                        <option value="">Select stream</option>
+                        {["Physical Science (Maths)", "Biological Science", "Commerce", "Arts", "Engineering Technology", "Bio Systems Technology"].map((stream) => <option key={stream}>{stream}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">District</label>
+                    <select value={studentDistrict} onChange={(e) => setStudentDistrict(e.target.value)} className="w-full h-10 px-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 font-medium">
+                      {["Jaffna", "Colombo", "Kandy", "Batticaloa", "Vavuniya", "Kilinochchi", "Trincomalee", "Mannar", "Mullaitivu", "Gampaha", "Nuwara Eliya", "Ampara", "Puttalam", "Kurunegala", "Galle", "Matara", "Badulla", "Ratnapura", "Anuradhapura", "Polonnaruwa", "Kegalle", "Kalutara", "Matale", "Hambantota", "Monaragala"].map((district) => <option key={district}>{district}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -978,6 +1087,11 @@ export function LandingView({
           )}
         </form>
       )}
+      <ForgotPasswordModal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+        defaultEmail={loginEmail}
+      />
     </div>
   );
 

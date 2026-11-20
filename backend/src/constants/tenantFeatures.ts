@@ -48,6 +48,9 @@
     'sub_brand_logo_theme',
     'sub_brand_whatsapp_bot',
     'sub_brand_revenue_analytics',
+    'sub_tutor_saas_subscription',
+    'sub_tutor_card_payment',
+    'sub_tutor_bank_slip_payment',
   ],
 } as const;
 

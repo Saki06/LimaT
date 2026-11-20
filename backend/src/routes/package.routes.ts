@@ -7,6 +7,7 @@ import {
   updatePackage,
   deletePackage,
   subscribeToPackage,
+  getPackagePaymentDetails,
   getPackageSubscribers,
   getAllTeacherSubscribers,
   verifyBankSlip,
@@ -24,6 +25,13 @@ router.get(
   authenticateToken,
   requireRoles('TEACHER', 'ADMIN', 'SUPER_ADMIN'),
   getMyPackages
+);
+
+router.get(
+  '/:id/payment-details',
+  authenticateToken,
+  requireRoles('STUDENT'),
+  getPackagePaymentDetails
 );
 
 // 2b. Tutor's Subscribers across all packages
@@ -73,6 +81,7 @@ router.delete(
 router.post(
   '/:id/subscribe',
   authenticateToken,
+  requireRoles('STUDENT'),
   subscribeToPackage
 );
 

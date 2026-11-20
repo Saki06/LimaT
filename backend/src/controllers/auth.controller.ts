@@ -7,6 +7,12 @@ import { config } from '../config';
 import { Role } from '@prisma/client';
 import { validatePasswordChange, validatePasswordStrength } from '../utils/passwordPolicy';
 import { hashSetupToken } from '../utils/setupToken';
+import { OAuth2Client } from 'google-auth-library';
+import crypto from 'crypto';
+import { sendPasswordResetEmail } from '../services/email.service';
+import { createOtpChallenge, OtpConfigurationError, OtpLimitError, verifyOtpChallenge } from '../services/otp.service';
+
+const googleClient = new OAuth2Client(config.googleClientId || undefined);
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -127,7 +133,7 @@ const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
 export const registerStudent = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { firstName, lastName, email, password, gradeLevel, studentIdNo, tenantId } = req.body;
+    const { firstName, lastName, email, password, gradeLevel, section, gender, medium, district, stream, phoneNumber, studentIdNo, tenantId } = req.body;
 
     if (!email || !password || !firstName) {
       res.status(400).json({ success: false, message: 'Missing required student registration fields' });
@@ -198,6 +204,12 @@ if (
           create: {
             studentIdNo: studentIdNo || 'STU-' + Math.floor(1000 + Math.random() * 9000),
             gradeLevel: gradeLevel || 'Grade 10',
+            section: section || null,
+            phoneNumber: phoneNumber || null,
+            gender: gender || null,
+            medium: medium || null,
+            district: district || null,
+            stream: stream || null,
           },
         },
       },
@@ -863,4 +875,185 @@ export const getSession = async (
       message: 'Unable to retrieve session.',
     });
   }
+};
+
+export const googleAuth = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { credential, requestedRole } = req.body;
+    if (!credential) {
+      res.status(400).json({ success: false, message: 'Google credential token is required.' });
+      return;
+    }
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: config.googleClientId || undefined,
+    });
+    const payload = ticket.getPayload();
+    const email = payload?.email?.trim().toLowerCase();
+    if (!email || payload?.email_verified !== true) {
+      res.status(401).json({ success: false, message: 'Unable to verify Google account.' });
+      return;
+    }
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { tenant: true, studentProfile: true, teacherProfile: true, parentProfile: true },
+    });
+    if (!user || !user.isActive) {
+      res.status(403).json({ success: false, message: 'Google account is not registered. Please create an account first.' });
+      return;
+    }
+    if (
+      user.tenant &&
+      (user.tenant.deletedAt !== null ||
+        user.tenant.status === 'SUSPENDED' ||
+        user.tenant.status === 'INACTIVE')
+    ) {
+      res.status(403).json({ success: false, message: 'Your organization is currently inactive or suspended.' });
+      return;
+    }
+    if (requestedRole && user.role !== String(requestedRole).toUpperCase()) {
+      res.status(403).json({ success: false, message: 'This account is not registered for the selected portal.' });
+      return;
+    }
+    const token = jwt.sign({
+      userId: user.id, email: user.email, role: user.role, tenantId: user.tenantId,
+      firstName: user.firstName, lastName: user.lastName,
+      mustChangePassword: user.mustChangePassword, tokenVersion: user.tokenVersion,
+    }, config.jwtSecret, { expiresIn: '7d' });
+    const safeUser = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      mustChangePassword: user.mustChangePassword,
+      tenant: user.tenant ? {
+        id: user.tenant.id,
+        name: user.tenant.name,
+        status: user.tenant.status,
+        plan: user.tenant.plan,
+      } : null,
+      studentProfile: user.studentProfile,
+      teacherProfile: user.teacherProfile ? {
+        id: user.teacherProfile.id,
+        userId: user.teacherProfile.userId,
+        employeeNo: user.teacherProfile.employeeNo,
+        specialization: user.teacherProfile.specialization,
+      } : null,
+      parentProfile: user.parentProfile ? {
+        id: user.parentProfile.id,
+        phoneNumber: user.parentProfile.phoneNumber,
+      } : null,
+    };
+    res.status(200).json({ success: true, message: 'Logged in successfully', token, user: safeUser });
+  } catch {
+    res.status(401).json({ success: false, message: 'Invalid or expired Google token.' });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!email) {
+    res.status(400).json({ success: false, message: 'Email is required.' });
+    return;
+  }
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { firstName: true, isActive: true },
+  });
+  if (user?.isActive) {
+    const code = crypto.randomInt(100000, 1000000).toString();
+    let challenge;
+    try {
+      challenge = await createOtpChallenge(email, 'PASSWORD_RESET', code);
+    } catch (error) {
+      if (error instanceof OtpLimitError) {
+        res.status(429).json({ success: false, message: 'Too many reset requests. Try again later.' });
+        return;
+      }
+      if (error instanceof OtpConfigurationError) {
+        res.status(503).json({ success: false, message: 'Password reset is temporarily unavailable.' });
+        return;
+      }
+      throw error;
+    }
+    const delivery = await sendPasswordResetEmail({ to: email, name: user.firstName, otp: code });
+    if (!delivery.success) {
+      await prisma.otpChallenge.updateMany({ where: { id: challenge.id, consumedAt: null }, data: { consumedAt: new Date() } });
+      res.status(503).json({ success: false, message: 'Password reset delivery is temporarily unavailable.' });
+      return;
+    }
+  }
+  res.status(200).json({ success: true, message: 'If an account exists, a reset code has been generated.' });
+};
+
+export const verifyResetCode = async (req: Request, res: Response): Promise<void> => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const code = String(req.body?.otp || '').trim();
+  let verification;
+  try {
+    verification = await verifyOtpChallenge(email, 'PASSWORD_RESET', code);
+  } catch (error) {
+    if (error instanceof OtpConfigurationError) {
+      res.status(503).json({ success: false, message: 'Password reset is temporarily unavailable.' });
+      return;
+    }
+    throw error;
+  }
+  if (!verification.valid) {
+    res.status(400).json({ success: false, message: 'Reset code is invalid or expired.' });
+    return;
+  }
+  res.status(200).json({ success: true, message: 'Reset code verified.' });
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const code = String(req.body?.otp || '').trim();
+  const password = String(req.body?.newPassword || '');
+  const validation = validatePasswordStrength(password);
+  if (!validation.valid) {
+    res.status(400).json({ success: false, message: validation.message });
+    return;
+  }
+  let verification;
+  try {
+    verification = await verifyOtpChallenge(email, 'PASSWORD_RESET', code);
+  } catch (error) {
+    if (error instanceof OtpConfigurationError) {
+      res.status(503).json({ success: false, message: 'Password reset is temporarily unavailable.' });
+      return;
+    }
+    throw error;
+  }
+  if (!verification.valid) {
+    res.status(400).json({ success: false, message: 'Reset code is invalid or expired.' });
+    return;
+  }
+  const passwordHash = await bcrypt.hash(password, 12);
+  const completed = await prisma.$transaction(async (tx) => {
+    const claimed = await tx.otpChallenge.updateMany({
+      where: {
+        id: verification.challengeId,
+        attempts: { equals: verification.attempts, lt: 5 },
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      data: { consumedAt: new Date() },
+    });
+    if (claimed.count !== 1) return false;
+    const user = await tx.user.findUnique({ where: { email }, select: { id: true, isActive: true } });
+    if (!user?.isActive) return false;
+    await tx.user.update({
+      where: { id: user.id },
+      data: { passwordHash, tokenVersion: { increment: 1 }, mustChangePassword: false },
+    });
+    return true;
+  });
+  if (!completed) {
+    res.status(400).json({ success: false, message: 'Reset code is invalid or expired.' });
+    return;
+  }
+  res.status(200).json({ success: true, message: 'Password reset successfully.' });
 };

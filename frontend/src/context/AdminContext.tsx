@@ -231,6 +231,7 @@ const schoolId = isSuperAdmin
         medium: input.medium,
         sport: input.sports?.[0],
         teams: input.teams,
+        teamIds: input.teamIds,
         certification: input.certification,
         availability: input.availability,
         workload: 0,
@@ -248,6 +249,8 @@ const schoolId = isSuperAdmin
         subjects: input.subjects,
         classes: input.classes,
         medium: input.medium,
+        sports: input.sports,
+        teamIds: input.teamIds,
         status: input.status,
 }, adminTenantId).then((saved) => {
         if (saved?.id) {
@@ -283,6 +286,7 @@ const schoolId = isSuperAdmin
         medium: input.medium,
         sport: input.sports?.[0],
         teams: input.teams,
+        teamIds: input.teamIds,
         certification: input.certification,
         availability: input.availability
       } : record));
@@ -298,6 +302,8 @@ const schoolId = isSuperAdmin
         subjects: input.subjects,
         classes: input.classes,
         medium: input.medium,
+        sports: input.sports,
+        teamIds: input.teamIds,
         status: input.status,
 }, adminTenantId).catch((err) => {
         console.error('Failed to update staff in backend:', err);

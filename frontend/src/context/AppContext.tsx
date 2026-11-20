@@ -63,6 +63,20 @@ interface ToastMessage {
   message?: string;
 }
 
+const normalizeTenantFeatureConfig = (config?: Record<string, unknown> | null) => {
+  const normalized: Record<string, boolean> = { ...normalizeTenantFeatures(config) };
+  for (const key of ['sub_tutor_saas_subscription', 'sub_tutor_card_payment', 'sub_tutor_bank_slip_payment']) {
+    if (config?.[key] === undefined) normalized[key] = false;
+  }
+  return normalized;
+};
+
+const mapTenantFromBackend = (data: Parameters<typeof mapBackendTenant>[0]): Tenant => {
+  const tenant = mapBackendTenant(data);
+  tenant.enabledFeatures = normalizeTenantFeatureConfig(data.settings?.enabledFeatures);
+  return tenant;
+};
+
 interface AppContextType {
   currentRole: UserRole;
   setCurrentRole: (role: UserRole) => void;
@@ -92,7 +106,9 @@ interface AppContextType {
   confirmPassword: string;
 }) => Promise<{ success: boolean; message?: string }>;
   refreshSuperAdminAvatar: () => void;
+  refreshMyTenant: () => void;
   loginUser: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  loginWithGoogle: (credential: string, requestedRole?: string) => Promise<{ success: boolean; message?: string }>;
   registerUser: (input: {
     role: 'student' | 'teacher' | 'parent';
     firstName: string;
@@ -101,6 +117,11 @@ interface AppContextType {
     password: string;
     phoneNumber?: string;
     gradeLevel?: string;
+    section?: string;
+    gender?: string;
+    medium?: string;
+    district?: string;
+    stream?: string;
     studentIdNo?: string;
     specialization?: string;
     childStudentId?: string;
@@ -424,6 +445,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Multi-Tenant SaaS State
   const [tenants, setTenants] = useState<Tenant[]>(INITIAL_TENANTS);
   const [activeTenantId, setActiveTenantId] = useState<string>(INITIAL_TENANTS[0].id);
+  const [myTenantVersion, setMyTenantVersion] = useState(0);
+  const refreshMyTenant = useCallback(() => setMyTenantVersion((previous) => previous + 1), []);
 
   const activeTenant = tenants.find((t) => t.id === activeTenantId) || tenants[0];
 
@@ -465,7 +488,7 @@ if (!tenant) {
 
       const currentFeatures =
   latestFeatureConfigs.current[tenantId] ??
-  normalizeTenantFeatures(tenant.enabledFeatures);
+  normalizeTenantFeatureConfig(tenant.enabledFeatures);
 
 const updatedFeatures = {
   ...currentFeatures,
@@ -504,7 +527,7 @@ if (archivedTenantIds.current.has(tenantId)) {
 }
 
 const savedTenant = result.data
-  ? mapBackendTenant(result.data)
+  ? mapTenantFromBackend(result.data)
   : null;
 
 const savedFeatures = savedTenant?.enabledFeatures ?? updatedFeatures;
@@ -571,13 +594,13 @@ const updateTenantFeatures = async (
 
       const currentFeatures =
   latestFeatureConfigs.current[tenantId] ??
-  normalizeTenantFeatures(tenant.enabledFeatures);
+  normalizeTenantFeatureConfig(tenant.enabledFeatures);
 
 const mergedFeatures = replace
   ? { ...changes }
   : { ...currentFeatures, ...changes };
 
-const updatedFeatures = normalizeTenantFeatures(mergedFeatures);
+const updatedFeatures = normalizeTenantFeatureConfig(mergedFeatures);
 
       const result = await api.tenants.updateFeatures(
         tenantId,
@@ -590,7 +613,7 @@ const updatedFeatures = normalizeTenantFeatures(mergedFeatures);
       }
 
       const savedTenant = result.data
-        ? mapBackendTenant(result.data)
+        ? mapTenantFromBackend(result.data)
         : null;
 
       const savedFeatures =
@@ -627,7 +650,7 @@ const updatedFeatures = normalizeTenantFeatures(mergedFeatures);
   const addTenant = (tenant: Tenant) => {
 archivedTenantIds.current.delete(tenant.id);
     latestFeatureConfigs.current[tenant.id] =
-  normalizeTenantFeatures(tenant.enabledFeatures);
+  normalizeTenantFeatureConfig(tenant.enabledFeatures);
 
     setTenants((prev) => {
       const existingTenant = prev.find((t) => t.id === tenant.id);
@@ -644,7 +667,7 @@ archivedTenantIds.current.delete(tenant.id);
 
 
   const updateTenant = (updated: Tenant) => {
-  const normalizedFeatures = normalizeTenantFeatures(
+  const normalizedFeatures = normalizeTenantFeatureConfig(
     updated.enabledFeatures
   );
 
@@ -667,7 +690,7 @@ const updateTenantFeaturesLocally = (
   tenantId: string,
   features: Record<string, boolean>
 ) => {
-  const normalizedFeatures = normalizeTenantFeatures(features);
+  const normalizedFeatures = normalizeTenantFeatureConfig(features);
 
 if (archivedTenantIds.current.has(tenantId)) return;
   latestFeatureConfigs.current[tenantId] = normalizedFeatures;
@@ -704,7 +727,8 @@ if (archivedTenantIds.current.has(tenantId)) return;
       return false;
     }
 
-    return isTenantFeatureEnabled(activeTenant.enabledFeatures, feature);
+    const normalizedFeatures = normalizeTenantFeatureConfig(activeTenant.enabledFeatures);
+    return normalizedFeatures[feature] === true && isTenantFeatureEnabled(normalizedFeatures, feature);
   };
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -721,6 +745,31 @@ const refreshSuperAdminAvatar = useCallback(() => {
   setSuperAdminAvatarVersion((previous) => previous + 1);
 }, []);
 
+  // Load the authenticated school/tutor tenant so its persisted feature flags are enforced.
+  useEffect(() => {
+    if (
+      !authToken ||
+      authUser?.mustChangePassword ||
+      (authUser?.role !== 'TEACHER' && authUser?.role !== 'ADMIN')
+    ) return;
+
+    let cancelled = false;
+    const loadMyTenant = async () => {
+      try {
+        const result = await api.subscription.getMine();
+        if (cancelled || !result?.data?.tenant) return;
+        const mapped = mapTenantFromBackend(result.data.tenant);
+        latestFeatureConfigs.current[mapped.id] = mapped.enabledFeatures;
+        setTenants([mapped]);
+        setActiveTenantId(mapped.id);
+      } catch (error) {
+        if (!cancelled) console.warn('Could not load tutor subscription and tenant features:', error);
+      }
+    };
+    void loadMyTenant();
+    return () => { cancelled = true; };
+  }, [authToken, authUser?.role, authUser?.mustChangePassword, myTenantVersion]);
+
   // Load real tenants for Super Admin
   useEffect(() => {
     if (currentRole !== 'super_admin' && authUser?.role !== 'SUPER_ADMIN') {
@@ -736,11 +785,11 @@ const refreshSuperAdminAvatar = useCallback(() => {
         if (cancelled) return;
 
         if (result?.data && Array.isArray(result.data)) {
-          const realTenants: Tenant[] = result.data.map(mapBackendTenant);
+          const realTenants: Tenant[] = result.data.map(mapTenantFromBackend);
           if (realTenants.length > 0) {
                         realTenants.forEach((tenant) => {
               latestFeatureConfigs.current[tenant.id] =
-                normalizeTenantFeatures(tenant.enabledFeatures);
+                normalizeTenantFeatureConfig(tenant.enabledFeatures);
             });
             setTenants(realTenants);
             if (!realTenants.some((t) => t.id === activeTenantId)) {
@@ -1298,6 +1347,7 @@ useEffect(() => {
           ADMIN: 'admin',
           SUPER_ADMIN: 'super_admin'
         };
+
         const mappedRole = roleMap[res.user.role];
         if (!mappedRole) {
           return { success: false, message: 'Invalid account role' };
@@ -1326,6 +1376,25 @@ useEffect(() => {
     }
   };
 
+  const loginWithGoogle = async (credential: string, requestedRole?: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const res = await api.auth.googleAuth({ credential, requestedRole });
+      if (!res.success || !res.token || !res.user) return { success: false, message: res.message || 'Google sign-in failed' };
+      const roleMap: Record<string, UserRole> = { STUDENT: 'student', TEACHER: 'teacher', PARENT: 'parent', ADMIN: 'admin', SUPER_ADMIN: 'super_admin' };
+      const mappedRole = roleMap[res.user.role];
+      if (!mappedRole) return { success: false, message: 'Invalid account role' };
+      api.token.set(res.token);
+      api.user.set(res.user);
+      setAuthToken(res.token);
+      setAuthUser(res.user);
+      setCurrentRole(mappedRole);
+      setIsLanding(false);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Google sign-in failed' };
+    }
+  };
+
   const registerUser = async (input: {
     role: 'student' | 'teacher' | 'parent';
     firstName: string;
@@ -1334,6 +1403,11 @@ useEffect(() => {
     password: string;
     phoneNumber?: string;
     gradeLevel?: string;
+    section?: string;
+    gender?: string;
+    medium?: string;
+    district?: string;
+    stream?: string;
     studentIdNo?: string;
     specialization?: string;
     childStudentId?: string;
@@ -1346,7 +1420,13 @@ useEffect(() => {
           lastName: input.lastName,
           email: input.email,
           password: input.password,
+          phoneNumber: input.phoneNumber,
           gradeLevel: input.gradeLevel,
+          section: input.section,
+          gender: input.gender,
+          medium: input.medium,
+          district: input.district,
+          stream: input.stream,
           studentIdNo: input.studentIdNo,
         });
       } else if (input.role === 'teacher') {
@@ -1391,10 +1471,24 @@ useEffect(() => {
           void refreshTeacherProfile();
         }
         setIsLanding(false);
+        let accountMessage = `Welcome, ${res.user.firstName || 'User'}! Your profile has been initialized.`;
+        if (input.role === 'parent' && input.childStudentId?.trim()) {
+          try {
+            const linkResult = await api.parents.linkChild(input.childStudentId.trim());
+            if (linkResult?.success && linkResult.verificationRequired) {
+              accountMessage = `${accountMessage} A student approval code was sent to the student's account email.`;
+            } else if (!linkResult?.success) {
+              accountMessage = `${accountMessage} You can request student approval from your Parent Portal.`;
+            }
+          } catch (error) {
+            console.warn('Could not start parent-child verification after registration:', error);
+            accountMessage = `${accountMessage} You can request student approval from your Parent Portal.`;
+          }
+        }
         addToast({
           type: 'success',
           title: 'Account Created',
-          message: `Welcome, ${res.user.firstName || 'User'}! Your profile has been initialized.`
+          message: accountMessage
         });
         return { success: true };
       }
@@ -3674,7 +3768,9 @@ authToken,
 updateAuthUser,
 changePassword,
 refreshSuperAdminAvatar,
+refreshMyTenant,
 loginUser,
+loginWithGoogle,
 registerUser,
 logoutUser
       }}

@@ -17,7 +17,7 @@ import {
   getMyTimetable,
   getMyLibraryResources,
 } from '../controllers/student.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import { authenticateToken, requireRoles } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -37,8 +37,8 @@ router.post('/courses/:courseId/enroll', enrollInCourse);
 
 // 4. Packages & Subscriptions / Tuition Payments
 router.get('/my-packages', getMyPackages);
-router.post('/packages/:packageId/subscribe', subscribePackage);
-router.post('/packages/:packageId/checkout', checkoutPackage);
+router.post('/packages/:packageId/subscribe', requireRoles('STUDENT'), subscribePackage);
+router.post('/packages/:packageId/checkout', requireRoles('STUDENT'), checkoutPackage);
 router.get('/my-purchases', getMyPurchases);
 
 // 5. Assignments & Homework Submissions

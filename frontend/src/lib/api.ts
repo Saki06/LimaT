@@ -184,6 +184,61 @@ function adminHeaders(tenantId?: string): Record<string, string> {
 }
 
 export const api = {
+  // Tutor self-service subscription and billing APIs.
+  subscription: {
+    async getMine() {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const response = await fetch(`${API_BASE_URL}/subscription/me`, { method: 'GET', headers });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Failed to load subscription');
+      return result;
+    },
+    async submitPayment(data: {
+      plan: 'starter' | 'pro' | 'enterprise';
+      paymentMethod?: 'CARD' | 'BANK_SLIP';
+      cardHolderName?: string;
+      cardNumber?: string;
+      cardExpiry?: string;
+      cardCvc?: string;
+      reference?: string;
+      transferDate?: string;
+      note?: string;
+      slipImage?: string | null;
+    }) {
+      return api.subscription._send('POST', '/subscription/me/payment-request', data);
+    },
+    async cancelPayment() {
+      return api.subscription._send('DELETE', '/subscription/me/payment-request');
+    },
+    async listRequests() {
+      return api.subscription._send('GET', '/subscription/requests');
+    },
+    async getBankDetails() {
+      return api.subscription._send('GET', '/subscription/bank-details');
+    },
+    async updateBankDetails(data: { bankName: string; accountName: string; accountNumber: string; branch: string; branchCode?: string }) {
+      return api.subscription._send('PUT', '/subscription/bank-details', data);
+    },
+    async decideRequest(tenantId: string, decision: 'APPROVE' | 'REJECT', reason?: string) {
+      return api.subscription._send('PATCH', `/subscription/requests/${tenantId}`, { decision, reason });
+    },
+    async _send(method: string, path: string, body?: unknown) {
+      const token = api.token.get();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const response = await fetch(`${API_BASE_URL}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Request failed');
+      return result;
+    },
+  },
+
   // Super Admin - Tenant API
   tenants: {
     async getAll() {
@@ -446,12 +501,54 @@ async setupPassword(data: {
   return response.json();
 },
 
+async googleAuth(data: { credential: string; requestedRole?: string }): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/auth/google`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return response.json();
+},
+
+async forgotPassword(email: string) {
+  const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  return response.json();
+},
+
+async verifyResetCode(email: string, otp: string) {
+  const response = await fetch(`${API_BASE_URL}/auth/verify-reset-code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp }),
+  });
+  return response.json();
+},
+
+async resetPassword(data: { email: string; otp: string; newPassword: string }) {
+  const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return response.json();
+},
+
     async registerStudent(data: {
       firstName: string;
       lastName?: string;
       email: string;
       password: string;
+      phoneNumber?: string;
       gradeLevel?: string;
+      section?: string;
+      gender?: string;
+      medium?: string;
+      district?: string;
+      stream?: string;
       studentIdNo?: string;
     }): Promise<AuthResponse> {
       const response = await fetch(`${API_BASE_URL}/auth/register/student`, {
@@ -599,6 +696,14 @@ async setupPassword(data: {
 
     async getById(id: string) {
       const res = await fetch(`${API_BASE_URL}/packages/${id}`);
+      return res.json();
+    },
+
+    async getPaymentDetails(id: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/packages/${id}/payment-details`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
       return res.json();
     },
 
@@ -1461,6 +1566,49 @@ async getMySubjects() {
       return res.json();
     },
 
+    async getPackages(childId: string) {
+      const token = api.token.get();
+      const query = new URLSearchParams({ childId });
+      const res = await fetch(`${API_BASE_URL}/parents/packages?${query.toString()}`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      return res.json();
+    },
+
+    async linkChild(studentIdentifier: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/parents/link-child`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ studentIdentifier }),
+      });
+      return res.json();
+    },
+
+    async getPendingChildLink() {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/parents/link-child/pending`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      return res.json();
+    },
+
+    async confirmChildLink(requestId: string, otp: string) {
+      const token = api.token.get();
+      const res = await fetch(`${API_BASE_URL}/parents/link-child/confirm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ requestId, otp }),
+      });
+      return res.json();
+    },
+
     async getDashboard(childId?: string) {
       const token = api.token.get();
       const query = childId ? `?childId=${encodeURIComponent(childId)}` : '';
@@ -1494,13 +1642,13 @@ async getMySubjects() {
 
     async submitDepositSlip(data: {
       childId: string;
-      packageId?: string;
+      packageId: string;
       slipRefNumber: string;
       bankName?: string;
       branchName?: string;
       depositedDate?: string;
       amountLkr?: number;
-      slipImageUrl?: string;
+      slipImageUrl: string;
       tutorName?: string;
     }) {
       const token = api.token.get();

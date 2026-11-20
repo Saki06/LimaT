@@ -62,12 +62,14 @@ export function ConnectView() {
   const {
     currentUser,
     currentRole,
+    authUser,
     setCurrentView,
     isFeatureEnabled,
     updateTenantFeature,
     activeTenant,
     addToast
   } = useApp();
+  const isParent = String(authUser?.role ?? '').toLowerCase() === 'parent';
   const hubSettings = useHubSettings();
 
   // Feature Flags for Find Teachers & its 3 Sub-Options
@@ -103,40 +105,72 @@ export function ConnectView() {
   const [students, setStudents] = useState<ConnectStudent[]>(initialConnectStudents);
   const [studyGroups, setStudyGroups] = useState<ConnectStudyGroup[]>(initialConnectStudyGroups);
   const [purchases, setPurchases] = useState<ConnectPurchase[]>(initialConnectPurchases);
+  const [parentChildren, setParentChildren] = useState<any[]>([]);
+  const [selectedParentChildId, setSelectedParentChildId] = useState("");
 
   // Load live tutors and packages from backend Marketplace API
   useEffect(() => {
     async function loadMarketplace() {
       try {
-        const res = await api.teachers.getMarketplace();
+        const [res, packagesRes] = await Promise.all([
+          api.teachers.getMarketplace(),
+          api.packages.getAll().catch(() => ({ success: false, data: [] })),
+        ]);
+        if (packagesRes?.success && Array.isArray(packagesRes.data)) {
+          setPackages(packagesRes.data.map((pkg: any) => {
+            const fee = Number(pkg.price) || 0;
+            return {
+              id: pkg.id,
+              teacherId: pkg.teacherId,
+              title: pkg.title,
+              subject: pkg.teacher?.specialization || "General",
+              grade: pkg.courses?.[0]?.course?.title || "All Grades",
+              monthlyFeeLkr: fee,
+              monthlyFee: fee,
+              currency: "LKR",
+              description: pkg.description || "Comprehensive tuition program.",
+              features: Array.isArray(pkg.features) ? pkg.features : typeof pkg.features === "string" ? pkg.features.split("\n").filter(Boolean) : [],
+              billingCycle: pkg.billingCycle === "MONTHLY" ? "Monthly" : (pkg.billingCycle || "Monthly"),
+              liveClassesPerWeek: 2,
+              status: "active",
+              enrolledCount: pkg._count?.subscriptions || 0,
+              badge: "Popular",
+              createdAt: pkg.createdAt || new Date().toISOString(),
+              teacher: pkg.teacher,
+            } as TutorPackage;
+          }));
+        }
         if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
           const mappedTutors: ConnectTeacher[] = res.data.map((t: any) => {
-            const nameParts = (t.name || "Tutor").split(" ");
+            const nameParts = (t.name || "Tutor").trim().split(" ");
+            const teacherPackages = Array.isArray(t.packages) ? t.packages : [];
+            const primaryPackage = teacherPackages[0];
             const initials = nameParts.length > 1
-              ? `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase()
-              : nameParts[0].substring(0, 2).toUpperCase();
+              ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
+              : (nameParts[0] || "TU").substring(0, 2).toUpperCase();
 
             return {
               id: t.id,
-              name: t.name,
+              packageId: primaryPackage?.id,
+              name: t.name || "Tutor",
               initials,
               avatarColor: "bg-[#0d5c4d]",
               verified: Boolean(t.isVerified),
               title: t.title || "Specialist Educator",
-              subject: t.specialization || "Combined Mathematics",
-              studentsCount: 142,
-              lessonsCount: t.coursesCount || 18,
-              liveClassesCount: 4,
-              monthlyFee: t.monthlyFeeLkr || 3500,
+              subject: t.specialization || "General Subjects",
+              studentsCount: t.studentsCount || 0,
+              lessonsCount: t.coursesCount || 0,
+              liveClassesCount: t.liveClassesCount || 0,
+              monthlyFee: primaryPackage?.price || t.monthlyFeeLkr || 0,
               currency: "LKR",
-              rating: t.rating || 4.9,
-              tags: Array.isArray(t.mediums) && t.mediums.length > 0 ? t.mediums : ["A/L", "Provincial"],
-              meetUrl: t.websiteUrl || "https://meet.google.com/limat-math-master",
-              bio: t.bio || "Specialist educator with extensive curriculum experience.",
+              rating: typeof t.rating === "number" && t.rating > 0 ? t.rating : undefined,
+              tags: Array.isArray(t.mediums) && t.mediums.length > 0 ? t.mediums : [t.specialization || "Tuition"],
+              meetUrl: t.websiteUrl || "",
+              bio: t.bio || "Registered specialist educator on Newtoz.",
               qualifications: Array.isArray(t.qualifications) && t.qualifications.length > 0
                 ? t.qualifications.map((q: any) => `${q.degree || q.title || 'Degree'} (${q.institution || 'University'})`).join(", ")
-                : "B.Sc (Hons), PGDE",
-              sampleVideoTitle: "Introductory Masterclass: Core Fundamentals"
+                : (typeof t.qualifications === "string" ? t.qualifications : ""),
+              sampleVideoTitle: t.youtubeUrl ? "Sample Lesson / Masterclass" : "",
             };
           });
 
@@ -153,12 +187,32 @@ export function ConnectView() {
     loadMarketplace();
   }, []);
 
+  useEffect(() => {
+    if (!isParent) return;
+    let active = true;
+    api.parents.getMyChildren().then((res) => {
+      if (!active || !res?.success || !Array.isArray(res.data)) return;
+      setParentChildren(res.data);
+      if (res.data.length > 0) setSelectedParentChildId((current) => current || res.data[0].id);
+    }).catch((err) => console.warn("Could not load linked parent students:", err));
+    return () => { active = false; };
+  }, [isParent]);
+
+  const parentActiveChild = useMemo(
+    () => parentChildren.find((child) => child.id === selectedParentChildId) || parentChildren[0] || null,
+    [parentChildren, selectedParentChildId]
+  );
+
   // Load student's real purchases and active subscriptions from backend
   useEffect(() => {
     async function loadStudentPurchases() {
+      if (isParent) {
+        setPurchases([]);
+        return;
+      }
       try {
         const res = await api.students.getMyPurchases();
-        if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res?.success && Array.isArray(res.data)) {
           setPurchases(res.data);
         }
       } catch (err) {
@@ -166,7 +220,7 @@ export function ConnectView() {
       }
     }
     loadStudentPurchases();
-  }, []);
+  }, [currentRole, isParent]);
 
   // Filters for Teachers tab
   const [selectedSubject, setSelectedSubject] = useState<string>("all");
@@ -181,15 +235,74 @@ export function ConnectView() {
   const [paymentSuccessToast, setPaymentSuccessToast] = useState<string | null>(null);
 
   // Checkout modal form state
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "bank_slip">("card");
-  const [cardNumber, setCardNumber] = useState<string>("4242 •••• •••• 4242");
-  const [cardExpiry, setCardExpiry] = useState<string>("08/28");
-  const [cardCvc, setCardCvc] = useState<string>("892");
-  const [bankRefNo, setBankRefNo] = useState<string>("BOC-TXN-882190");
-  const [uploadedSlipName, setUploadedSlipName] = useState<string>("commercial_bank_deposit_slip.pdf");
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "bank_slip">("bank_slip");
+  const [cardNumber, setCardNumber] = useState<string>("");
+  const [cardExpiry, setCardExpiry] = useState<string>("");
+  const [cardCvc, setCardCvc] = useState<string>("");
+  const [bankRefNo, setBankRefNo] = useState<string>("");
+  const [uploadedSlipName, setUploadedSlipName] = useState<string>("");
   const [uploadedSlipDataUrl, setUploadedSlipDataUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [paymentDetails, setPaymentDetails] = useState<{ bankName?: string | null; accountName?: string | null; accountNumber?: string | null; branch?: string | null } | null>(null);
+  const [isLoadingPaymentDetails, setIsLoadingPaymentDetails] = useState(false);
+
+  const selectedPaymentPackageId = selectedPackageForSubscribe?.id || selectedTeacherForSubscribe?.packageId || "";
+
+  useEffect(() => {
+    if (!selectedPaymentPackageId || isParent) {
+      setPaymentDetails(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingPaymentDetails(true);
+    api.packages.getPaymentDetails(selectedPaymentPackageId).then((result) => {
+      if (cancelled) return;
+      if (!result?.success) throw new Error(result?.message || "Payment details are unavailable.");
+      setPaymentDetails(result.data || null);
+    }).catch((error) => {
+      if (!cancelled) {
+        setPaymentDetails(null);
+        setCheckoutError(error instanceof Error ? error.message : "Payment details are unavailable.");
+      }
+    }).finally(() => {
+      if (!cancelled) setIsLoadingPaymentDetails(false);
+    });
+    return () => { cancelled = true; };
+  }, [selectedPaymentPackageId, isParent]);
+
+  const resetCheckoutModal = () => {
+    setSelectedTeacherForSubscribe(null);
+    setSelectedPackageForSubscribe(null);
+    setCardNumber("");
+    setCardExpiry("");
+    setCardCvc("");
+    setBankRefNo("");
+    setUploadedSlipName("");
+    setUploadedSlipDataUrl(null);
+    setCheckoutError(null);
+    setIsProcessing(false);
+    setPaymentDetails(null);
+  };
+
+  const handleCardNumberChange = (value: string) => {
+    setCardNumber(value.replace(/\D/g, "").slice(0, 16).match(/.{1,4}/g)?.join(" ") || "");
+    setCheckoutError(null);
+  };
+  const handleExpiryChange = (value: string) => {
+    let clean = value.replace(/\D/g, "").slice(0, 4);
+    if (clean.length >= 3) clean = `${clean.slice(0, 2)}/${clean.slice(2)}`;
+    setCardExpiry(clean);
+    setCheckoutError(null);
+  };
+  const handleCvcChange = (value: string) => {
+    setCardCvc(value.replace(/\D/g, "").slice(0, 4));
+    setCheckoutError(null);
+  };
+  const isFormValid = useMemo(() => {
+    return paymentMethod === "bank_slip" && Boolean(selectedPaymentPackageId && paymentDetails?.accountNumber && bankRefNo.trim() && uploadedSlipName && uploadedSlipDataUrl);
+  }, [paymentMethod, selectedPaymentPackageId, paymentDetails, bankRefNo, uploadedSlipName, uploadedSlipDataUrl]);
 
   // Filtered teachers
   const filteredTeachers = useMemo(() => {
@@ -209,11 +322,24 @@ export function ConnectView() {
 
   // Handle Subscribe Completion via Live Supabase API
   const handleConfirmSubscribe = async () => {
+    setCheckoutError(null);
+    if (isParent) {
+      setCheckoutError("Parent checkout requires guardian-aware backend support. No enrollment or payment was submitted.");
+      return;
+    }
+    if (isParent && !parentActiveChild) {
+      setCheckoutError("Link a student to your parent account before enrolling.");
+      return;
+    }
+    if (paymentMethod === "bank_slip" && !isFormValid) {
+      setCheckoutError("Enter the bank reference and upload the deposit slip to continue.");
+      return;
+    }
     const isTeacher = !!selectedTeacherForSubscribe;
     const item = selectedTeacherForSubscribe
       ? {
           id: selectedTeacherForSubscribe.id,
-          packageId: (selectedTeacherForSubscribe as any).packageId || selectedTeacherForSubscribe.id,
+          packageId: selectedTeacherForSubscribe.packageId || "",
           name: selectedTeacherForSubscribe.name,
           initials: selectedTeacherForSubscribe.initials,
           avatarColor: selectedTeacherForSubscribe.avatarColor,
@@ -242,93 +368,27 @@ export function ConnectView() {
     try {
       const targetPackageId = item.packageId || item.id;
       const res = await api.students.checkoutPackage(targetPackageId, {
-        paymentMethod: paymentMethod === 'card' ? 'CARD' : 'BANK_SLIP',
-        bankRefNo: paymentMethod === 'bank_slip' ? bankRefNo : `TXN-CARD-${Date.now().toString().slice(-6)}`,
+        paymentMethod: 'BANK_SLIP',
+        bankRefNo,
         slipFileName: paymentMethod === 'bank_slip' ? uploadedSlipName : undefined,
         slipUrl: paymentMethod === 'bank_slip' ? (uploadedSlipDataUrl || undefined) : undefined,
       });
 
       if (res?.success && res.data) {
         const d = res.data;
-        const newPurchase: ConnectPurchase = {
-          id: d.id,
-          teacherId: d.teacherId || item.id,
-          teacherName: d.teacherName || item.name,
-          teacherInitials: item.initials,
-          teacherColor: item.avatarColor,
-          subject: item.subject,
-          amount: d.amount || item.amount,
-          currency: d.currency || item.currency,
-          date: d.date || new Date().toISOString().split('T')[0],
-          validUntil: d.validUntil || '2026-12-01',
-          status: 'active',
-          paymentMethod: d.paymentMethod || (paymentMethod === "card" ? "Card (Visa/Mastercard)" : "Bank Deposit (Commercial Bank)"),
-          receiptNo: d.receiptNo,
-          meetUrl: d.meetUrl || item.meetUrl,
-        };
-
-        setPurchases((prev) => [newPurchase, ...prev.filter((p) => p.id !== newPurchase.id)]);
-
-        if (selectedTeacherForSubscribe) {
-          setTeachers((prev) =>
-            prev.map((t) =>
-              t.id === item.id
-                ? {
-                    ...t,
-                    isSubscribed: true,
-                    subscribedDate: d.date || "2026-11-01"
-                  }
-                : t
-            )
-          );
+        if (d.status !== 'pending') {
+          throw new Error('Unexpected payment state returned by the server.');
         }
-
-        setPaymentSuccessToast(`Payment Successful! Receipt #${d.receiptNo} issued. Classes & materials unlocked.`);
+        setPaymentSuccessToast('Deposit slip submitted for review. Your subscription will activate after verification.');
+        resetCheckoutModal();
       } else {
-        // Fallback local subscription
-        const newPurchase: ConnectPurchase = {
-          id: `pur_${Date.now()}`,
-          teacherId: item.id,
-          teacherName: item.name,
-          teacherInitials: item.initials,
-          teacherColor: item.avatarColor,
-          subject: item.subject,
-          amount: item.amount,
-          currency: item.currency,
-          date: new Date().toISOString().split('T')[0],
-          validUntil: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-          status: "active",
-          paymentMethod: paymentMethod === "card" ? "Card (Visa/Mastercard)" : "Bank Deposit (Commercial Bank)",
-          receiptNo: `REC-2026-${Math.floor(100000 + Math.random() * 900000)}`,
-          meetUrl: item.meetUrl
-        };
-        setPurchases((prev) => [newPurchase, ...prev]);
-        setPaymentSuccessToast(`Enrolled in ${item.name}! Receipt #${newPurchase.receiptNo} issued.`);
+        throw new Error(res?.message || "Payment could not be confirmed by the server.");
       }
     } catch (err) {
       console.error("Checkout error:", err);
-      const newPurchase: ConnectPurchase = {
-        id: `pur_${Date.now()}`,
-        teacherId: item.id,
-        teacherName: item.name,
-        teacherInitials: item.initials,
-        teacherColor: item.avatarColor,
-        subject: item.subject,
-        amount: item.amount,
-        currency: item.currency,
-        date: new Date().toISOString().split('T')[0],
-        validUntil: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-        status: "active",
-        paymentMethod: paymentMethod === "card" ? "Card (Visa/Mastercard)" : "Bank Deposit (Commercial Bank)",
-        receiptNo: `REC-2026-${Math.floor(100000 + Math.random() * 900000)}`,
-        meetUrl: item.meetUrl
-      };
-      setPurchases((prev) => [newPurchase, ...prev]);
-      setPaymentSuccessToast(`Enrolled in ${item.name}! Receipt #${newPurchase.receiptNo} issued.`);
+      setCheckoutError(err instanceof Error ? err.message : "Payment verification failed. Please retry.");
     } finally {
       setIsProcessing(false);
-      setSelectedTeacherForSubscribe(null);
-      setSelectedPackageForSubscribe(null);
       setTimeout(() => setPaymentSuccessToast(null), 6000);
     }
   };
@@ -465,7 +525,7 @@ export function ConnectView() {
       )}
 
       {/* Parent Child Context Banner */}
-      {currentRole === "parent" && (
+      {isParent && (
         <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-[#0d5c4d] via-[#116b5a] to-[#09473b] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-[#177a67]">
           <div className="flex items-center gap-3.5">
             <div className="h-12 w-12 rounded-2xl bg-[#f3b738] text-slate-950 font-black flex items-center justify-center text-xl shrink-0 shadow-xs">
@@ -474,11 +534,15 @@ export function ConnectView() {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-extrabold text-sm sm:text-base text-white">
-                  Parent Mode: Reviewing Teachers for <strong>Sathurjan K.</strong>
+                  {parentActiveChild
+                    ? <>Parent Mode: Reviewing Teachers for <strong>{parentActiveChild.name}</strong></>
+                    : "Parent Mode: No linked student found"}
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-[#f3b738] text-slate-950 text-[10px] font-black uppercase">
-                  Grade 12 Physical Science
-                </span>
+                {parentActiveChild && (
+                  <span className="px-2 py-0.5 rounded-full bg-[#f3b738] text-slate-950 text-[10px] font-black uppercase">
+                    {parentActiveChild.admissionNo ? `${parentActiveChild.admissionNo} • ` : ""}{parentActiveChild.grade}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-emerald-100/90 mt-0.5">
                 Browse verified solo teachers and monthly fee packages. Enrolling here immediately unlocks live Google Meet classes and monthly tutes in your child's student portal.
@@ -487,6 +551,11 @@ export function ConnectView() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {parentChildren.length > 1 && (
+              <select value={parentActiveChild?.id || ""} onChange={(event) => setSelectedParentChildId(event.target.value)} className="px-2.5 py-1.5 rounded-xl bg-white/15 border border-white/25 text-white text-xs font-bold focus:outline-none cursor-pointer">
+                {parentChildren.map((child) => <option key={child.id} value={child.id} className="text-slate-900">{child.name} ({child.admissionNo || child.grade})</option>)}
+              </select>
+            )}
             <button
               onClick={() => setSelectedSubject("Combined Mathematics")}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -813,11 +882,11 @@ export function ConnectView() {
                   Find Teachers
                 </h1>
                 <span className="text-xs font-medium text-slate-500">
-                  {currentRole === "parent" ? "Browse tutors & enroll your child" : "Pay to unlock full access & live classes"}
+                  {isParent ? "Browse tutors & enroll your child" : "Pay to unlock full access & live classes"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                {currentRole === "parent"
+                {isParent
                   ? "Explore top verified teachers, check monthly fees, review syllabus masterclasses, and enroll your child with direct bank slip verification."
                   : "Join live Google Meet classes, access premium tutes, and receive personal exam mentoring."}
               </p>
@@ -957,7 +1026,7 @@ export function ConnectView() {
                           </h4>
                         </div>
                         <span className="text-[11px] font-semibold text-slate-500">
-                          {currentRole === "parent" ? "Choose a plan to enroll your child" : "Select a plan to subscribe"}
+                          {isParent ? "Choose a plan to enroll your child" : "Select a plan to subscribe"}
                         </span>
                       </div>
 
@@ -1012,7 +1081,7 @@ export function ConnectView() {
                               className="w-full py-2.5 px-3 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-extrabold text-xs shadow-2xs transition-all hover:scale-[1.01] flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                               <CreditCard className="h-3.5 w-3.5 text-[#f3b738]" />
-                              <span>{currentRole === "parent" ? "Enroll Child in Plan" : "Enroll in Plan"}</span>
+                              <span>{isParent ? "Enroll Child in Plan" : "Enroll in Plan"}</span>
                             </button>
                           </div>
                         ))}
@@ -1508,10 +1577,7 @@ export function ConnectView() {
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    setSelectedTeacherForSubscribe(null);
-                    setSelectedPackageForSubscribe(null);
-                  }}
+                  onClick={resetCheckoutModal}
                   className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="h-5 w-5" />
@@ -1521,13 +1587,15 @@ export function ConnectView() {
               {/* Modal Body */}
               <div className="p-6 space-y-4 text-xs">
                 {/* Parent Confirmation Notice */}
-                {currentRole === "parent" && (
+                {isParent && (
                   <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex items-start gap-2.5">
                     <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0 mt-0.5" />
                     <div>
                       <p className="font-extrabold text-xs">Parent Enrollment Confirmation</p>
                       <p className="text-[11px] text-emerald-800">
-                        Enrolling child: <strong>Sathurjan K. (Grade 12 - Physical Science)</strong>. All live links and materials will be automatically linked to their student profile.
+                        {parentActiveChild
+                          ? <>Selected child: <strong>{parentActiveChild.name} ({parentActiveChild.admissionNo || parentActiveChild.grade})</strong>.</>
+                          : "No linked student is available."} Parent payments remain unavailable until the backend supports guardian-targeted checkout.
                       </p>
                     </div>
                   </div>
@@ -1557,8 +1625,10 @@ export function ConnectView() {
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => setPaymentMethod("card")}
-                      className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${
+                      disabled
+                      title="Card checkout is unavailable until a payment provider is configured."
+                      onClick={() => { setPaymentMethod("card"); setCheckoutError(null); }}
+                      className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left opacity-50 cursor-not-allowed ${
                         paymentMethod === "card"
                           ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
                           : "border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -1573,7 +1643,7 @@ export function ConnectView() {
 
                     <button
                       type="button"
-                      onClick={() => setPaymentMethod("bank_slip")}
+                      onClick={() => { setPaymentMethod("bank_slip"); setCheckoutError(null); }}
                       className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${
                         paymentMethod === "bank_slip"
                           ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
@@ -1597,7 +1667,10 @@ export function ConnectView() {
                       <input
                         type="text"
                         value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
+                        onChange={(e) => handleCardNumberChange(e.target.value)}
+                        inputMode="numeric"
+                        autoComplete="cc-number"
+                        placeholder="1234 5678 9012 3456"
                         className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-xs font-semibold"
                       />
                     </div>
@@ -1608,7 +1681,10 @@ export function ConnectView() {
                         <input
                           type="text"
                           value={cardExpiry}
-                          onChange={(e) => setCardExpiry(e.target.value)}
+                          onChange={(e) => handleExpiryChange(e.target.value)}
+                          inputMode="numeric"
+                          autoComplete="cc-exp"
+                          placeholder="MM/YY"
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-center"
                         />
                       </div>
@@ -1617,7 +1693,10 @@ export function ConnectView() {
                         <input
                           type="text"
                           value={cardCvc}
-                          onChange={(e) => setCardCvc(e.target.value)}
+                          onChange={(e) => handleCvcChange(e.target.value)}
+                          inputMode="numeric"
+                          autoComplete="cc-csc"
+                          placeholder="CVC"
                           className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-center"
                         />
                       </div>
@@ -1627,15 +1706,17 @@ export function ConnectView() {
                   <div className="space-y-3 p-4 rounded-2xl bg-amber-50/50 border border-amber-200 text-xs">
                     <div className="p-3 rounded-xl bg-white border border-amber-200 space-y-1">
                       <p className="font-extrabold text-[#0d2b26]">Direct Bank Deposit Details</p>
-                      <p className="text-slate-600 font-mono text-[11px]">
-                        Bank: <span className="font-bold">Commercial Bank of Ceylon</span>
-                      </p>
-                      <p className="text-slate-600 font-mono text-[11px]">
-                        Account: <span className="font-bold">80019284019</span> (LimaT Smart Book)
-                      </p>
-                      <p className="text-slate-600 font-mono text-[11px]">
-                        Branch: <span className="font-bold">Colombo City Center</span>
-                      </p>
+                      {isLoadingPaymentDetails ? (
+                        <p className="text-slate-500 italic text-xs py-1">Loading authorized package payment details…</p>
+                      ) : paymentDetails?.accountNumber ? (
+                        <>
+                          <p className="text-slate-600 font-mono text-[11px]">Bank: <span className="font-bold">{paymentDetails.bankName || "Tutor bank"}</span></p>
+                          <p className="text-slate-600 font-mono text-[11px]">Account: <span className="font-bold">{paymentDetails.accountNumber}</span>{paymentDetails.accountName ? ` (${paymentDetails.accountName})` : ""}</p>
+                          {paymentDetails.branch && <p className="text-slate-600 font-mono text-[11px]">Branch: <span className="font-bold">{paymentDetails.branch}</span></p>}
+                        </>
+                      ) : (
+                        <p className="text-slate-500 italic text-xs py-1">Authorized payment details are unavailable for this package. Checkout is disabled.</p>
+                      )}
                     </div>
 
                     <div className="space-y-1">
@@ -1643,7 +1724,7 @@ export function ConnectView() {
                       <input
                         type="text"
                         value={bankRefNo}
-                        onChange={(e) => setBankRefNo(e.target.value)}
+                        onChange={(e) => { setBankRefNo(e.target.value); setCheckoutError(null); }}
                         placeholder="e.g. BOC-TXN-882190"
                         className="w-full px-3 py-2 rounded-xl border border-amber-200 bg-white font-mono text-xs"
                       />
@@ -1660,6 +1741,7 @@ export function ConnectView() {
                           const file = e.target.files?.[0];
                           if (file) {
                             setUploadedSlipName(file.name);
+                            setCheckoutError(null);
                             const reader = new FileReader();
                             reader.onload = () => {
                               setUploadedSlipDataUrl(reader.result as string);
@@ -1682,6 +1764,13 @@ export function ConnectView() {
                   </div>
                 )}
 
+                {checkoutError && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2" role="alert">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{checkoutError}</span>
+                  </div>
+                )}
+
                 <p className="text-[11px] text-slate-400 text-center">
                   🔒 Secure 256-bit SSL encrypted. Cancel anytime before your next monthly billing cycle.
                 </p>
@@ -1691,10 +1780,7 @@ export function ConnectView() {
               <div className="p-6 border-t border-slate-100 bg-[#fbfcfb] flex items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedTeacherForSubscribe(null);
-                    setSelectedPackageForSubscribe(null);
-                  }}
+                  onClick={resetCheckoutModal}
                   className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition-colors"
                 >
                   Cancel
@@ -1702,12 +1788,12 @@ export function ConnectView() {
 
                 <button
                   type="button"
-                  disabled={isProcessing}
+                  disabled={!isFormValid || isProcessing || isParent}
                   onClick={handleConfirmSubscribe}
-                  className="px-5 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-black text-xs shadow-md transition-all hover:scale-[1.02] flex items-center gap-2"
+                  className="px-5 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a473b] text-white font-black text-xs shadow-md transition-all hover:scale-[1.02] flex items-center gap-2 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none"
                 >
                   {isProcessing ? (
-                    <span>Activating Subscription...</span>
+                    <span>Processing Payment...</span>
                   ) : (
                     <>
                       <span>Confirm &amp; Pay LKR {activeSubTarget.fee.toLocaleString()}</span>

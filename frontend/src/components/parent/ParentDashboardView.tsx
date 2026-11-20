@@ -3,7 +3,6 @@
 import React, { useState, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import {
-  mockChildrenProfiles,
   initialParentLeaveRequests,
   ChildTuitionEnrolment,
   TuitionInvoice,
@@ -63,34 +62,117 @@ import { Modal } from "@/components/ui/modal";
 import { api } from "@/lib/api";
 
 type ParentTab = "overview" | "tuition_classes" | "fees" | "progress" | "circulars";
+type ParentChildrenResponse = { success: boolean; data: Partial<ParentChildProfile>[]; message?: string };
+type PendingChildLink = { requestId: string; studentName: string; maskedEmail: string };
+type ParentPackageOption = { id: string; title: string; price: number; billingCycle: string; durationDays: number; teacher?: { user?: { firstName: string; lastName: string } } };
+
+const EMPTY_CHILD_PROFILE: ParentChildProfile = {
+  id: "",
+  studentId: "",
+  name: "No Student Linked",
+  admissionNo: "—",
+  grade: "Link Student ID",
+  classSection: "—",
+  avatarText: "ST",
+  schoolName: "LimaT Learning Portal",
+  enrolledSinceYear: String(new Date().getFullYear()),
+  admissionGrade: "—",
+  currentStage: "—",
+  cumulativeCareerAverage: 0,
+  totalYearsEnrolled: 0,
+  classTeacher: "—",
+  classTeacherEmail: "",
+  classTeacherPhone: "",
+  attendanceRate: 0,
+  presentDays: 0,
+  totalDays: 0,
+  overallAverage: 0,
+  classRank: 0,
+  totalStudents: 0,
+  upcomingExamsCount: 0,
+  hallTicketNo: "",
+  termReport: {
+    id: "",
+    term: "",
+    shortTermLabel: "",
+    issueDate: "",
+    academicYear: "",
+    gradeLevel: "",
+    classSection: "",
+    subjects: [],
+    overallPercentage: 0,
+    classRank: 0,
+    totalStudents: 0,
+    conduct: "",
+    principalRemarks: "",
+    attendancePercentage: 0,
+  },
+  termReports: [],
+  academicJourney: [],
+  recentAttendance: [],
+  examSchedules: [],
+  pastTermsHistory: [],
+  nextExamDate: "",
+  nextExamName: "",
+  monthlyInvestmentLkr: 0,
+  activeEnrolmentsCount: 0,
+  pendingSlipsCount: 0,
+  enrolments: [],
+  invoices: [],
+  announcements: [],
+  paperMarks: [],
+  attendanceLogs: [],
+};
 
 export function ParentDashboardView() {
   const { currentView, setCurrentView, addToast } = useApp();
 
   // Child selection state (Child 1: Sathurjan K. - A/L 2026, Child 2: Ananya K. - Grade 8)
   const [selectedChildId, setSelectedChildId] = useState<string>("child_01");
-  const [childrenList, setChildrenList] = useState<ParentChildProfile[]>(mockChildrenProfiles);
+  const [childrenList, setChildrenList] = useState<ParentChildProfile[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLinkChildModalOpen, setIsLinkChildModalOpen] = useState(false);
+  const [linkStudentInput, setLinkStudentInput] = useState("");
+  const [isLinkingStudent, setIsLinkingStudent] = useState(false);
+  const [pendingChildLink, setPendingChildLink] = useState<PendingChildLink | null>(null);
+  const [linkVerificationCode, setLinkVerificationCode] = useState("");
 
   const fetchParentData = async (showToast = false) => {
     try {
       setIsLoading(true);
-      const res = await api.parents.getMyChildren();
-      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
-        setChildrenList(res.data);
-        if (!res.data.some((c: any) => c.id === selectedChildId)) {
-          setSelectedChildId(res.data[0].id);
-        }
-        if (showToast) {
-          addToast({
-            type: "success",
-            title: "Parent Portal Refreshed",
-            message: "Updated live attendance, marks, and tuition pass status."
-          });
-        }
+      setLoadError(null);
+      const res = (await api.parents.getMyChildren()) as ParentChildrenResponse;
+      if (!res?.success || !Array.isArray(res.data)) {
+        throw new Error(res?.message || "The parent records response was invalid.");
+      }
+      const children = res.data.map((child) => ({
+        ...EMPTY_CHILD_PROFILE,
+        ...child,
+        id: child.id || "",
+        name: child.name || "Student",
+        grade: child.grade || "",
+        enrolments: Array.isArray(child.enrolments) ? child.enrolments : [],
+        invoices: Array.isArray(child.invoices) ? child.invoices : [],
+        paperMarks: Array.isArray(child.paperMarks) ? child.paperMarks : [],
+        announcements: Array.isArray(child.announcements) ? child.announcements : [],
+        monthlyInvestmentLkr: child.monthlyInvestmentLkr ?? 0,
+        pendingSlipsCount: child.pendingSlipsCount ?? 0,
+      } as ParentChildProfile));
+      setChildrenList(children);
+      if (!children.some((child) => child.id === selectedChildId)) {
+        setSelectedChildId(children[0]?.id || "");
+      }
+      if (showToast) {
+        addToast({
+          type: "success",
+          title: "Parent Portal Refreshed",
+          message: "Updated live attendance, marks, and tuition pass status."
+        });
       }
     } catch (err) {
       console.warn("Could not load backend parent children:", err);
+      setLoadError(err instanceof Error ? err.message : "Could not load linked student records.");
     } finally {
       setIsLoading(false);
     }
@@ -98,9 +180,72 @@ export function ParentDashboardView() {
 
   React.useEffect(() => {
     fetchParentData(false);
+    api.parents.getPendingChildLink().then((response) => {
+      if (response?.success && response.data?.requestId) setPendingChildLink(response.data);
+    }).catch((error) => console.warn("Could not load pending student approval:", error));
   }, []);
 
-  const activeChild = childrenList.find((c) => c.id === selectedChildId) || childrenList[0];
+  const handleLinkChildSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkStudentInput.trim()) {
+      addToast({ type: "warning", title: "Student ID Required", message: "Enter your child's Student ID, mobile number, or email." });
+      return;
+    }
+    try {
+      setIsLinkingStudent(true);
+      const result = await api.parents.linkChild(linkStudentInput.trim());
+      if (!result?.success) {
+        addToast({ type: "error", title: "Could Not Link Student", message: result?.message || "No student matched that identifier." });
+        return;
+      }
+      if (result.alreadyLinked) {
+        addToast({ type: "info", title: "Student Already Linked", message: result.message || "This student is already linked to your Parent Portal." });
+        setLinkStudentInput("");
+        setIsLinkChildModalOpen(false);
+        await fetchParentData(false);
+        return;
+      }
+      if (result.verificationRequired && result.requestId) {
+        setPendingChildLink({ requestId: result.requestId, studentName: result.studentName, maskedEmail: result.maskedEmail });
+        setLinkVerificationCode("");
+        addToast({ type: "info", title: "Student Approval Requested", message: result.message || "A code was sent to the student's account email." });
+        return;
+      }
+      addToast({ type: "success", title: "Student Linked", message: result.message || "Student profile linked to your Parent Portal." });
+      setLinkStudentInput("");
+      setIsLinkChildModalOpen(false);
+      await fetchParentData(false);
+    } catch (err) {
+      addToast({ type: "error", title: "Error Linking Student", message: err instanceof Error ? err.message : "Failed to link student." });
+    } finally {
+      setIsLinkingStudent(false);
+    }
+  };
+
+  const handleConfirmChildLink = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!pendingChildLink) return;
+    try {
+      setIsLinkingStudent(true);
+      const result = await api.parents.confirmChildLink(pendingChildLink.requestId, linkVerificationCode);
+      if (!result?.success) {
+        addToast({ type: "error", title: "Approval Not Confirmed", message: result?.message || "The student approval code was rejected." });
+        return;
+      }
+      addToast({ type: "success", title: "Student Linked", message: result.message || "The student approved access to their Parent Portal records." });
+      setPendingChildLink(null);
+      setLinkVerificationCode("");
+      setLinkStudentInput("");
+      setIsLinkChildModalOpen(false);
+      await fetchParentData(false);
+    } catch (error) {
+      addToast({ type: "error", title: "Link Confirmation Failed", message: error instanceof Error ? error.message : "Could not confirm student approval." });
+    } finally {
+      setIsLinkingStudent(false);
+    }
+  };
+
+  const activeChild = childrenList.find((c) => c.id === selectedChildId) || childrenList[0] || EMPTY_CHILD_PROFILE;
 
   // Map currentView to internal active tab
   const getInitialTab = (): ParentTab => {
@@ -177,20 +322,24 @@ export function ParentDashboardView() {
 
   // Leave Requests state
   const [leaveRequests, setLeaveRequests] = useState<ParentLeaveRequest[]>(initialParentLeaveRequests);
-  const [leaveTutor, setLeaveTutor] = useState(activeChild.enrolments[0]?.teacherName || "Dr. Samantha Perera");
+  const [leaveTutor, setLeaveTutor] = useState(activeChild.enrolments[0]?.teacherName || "");
   const [leaveDate, setLeaveDate] = useState("2026-10-20");
   const [leaveReason, setLeaveReason] = useState<ParentLeaveRequest["reason"]>("School Exam Clashing");
   const [leaveNote, setLeaveNote] = useState("");
 
   // Deposit Slip Upload Form State
-  const [depositTutor, setDepositTutor] = useState(activeChild.enrolments[0]?.teacherName || "Dr. Samantha Perera");
+  const [depositTutor, setDepositTutor] = useState(activeChild.enrolments[0]?.teacherName || "");
   const [depositMonth, setDepositMonth] = useState("October 2026");
-  const [depositAmount, setDepositAmount] = useState(activeChild.enrolments[0]?.monthlyFeeLkr || 3500);
+  const [depositAmount, setDepositAmount] = useState(0);
   const [depositBank, setDepositBank] = useState("Commercial Bank of Ceylon");
   const [depositBranch, setDepositBranch] = useState("Colombo Main Branch");
   const [depositRefNumber, setDepositRefNumber] = useState("");
-  const [depositDate, setDepositDate] = useState("2026-10-14");
-  const [slipFileName, setSlipFileName] = useState("Bank_Deposit_Slip_Receipt.jpg");
+  const [depositDate, setDepositDate] = useState(new Date().toISOString().slice(0, 10));
+  const [slipFileName, setSlipFileName] = useState("");
+  const [slipFileDataUrl, setSlipFileDataUrl] = useState("");
+  const [depositPackages, setDepositPackages] = useState<ParentPackageOption[]>([]);
+  const [depositPackageId, setDepositPackageId] = useState("");
+  const [isDepositSubmitting, setIsDepositSubmitting] = useState(false);
 
   // Invoices list state (allow live additions when parent uploads bank slip)
   const [invoices, setInvoices] = useState<TuitionInvoice[]>(activeChild.invoices);
@@ -202,63 +351,82 @@ export function ParentDashboardView() {
       setDepositTutor(activeChild.enrolments[0].teacherName);
       setDepositAmount(activeChild.enrolments[0].monthlyFeeLkr);
       setLeaveTutor(activeChild.enrolments[0].teacherName);
+    } else {
+      setDepositTutor("");
+      setLeaveTutor("");
     }
   }, [activeChild]);
+
+  React.useEffect(() => {
+    if (!isDepositModalOpen || !activeChild.id) return;
+    let cancelled = false;
+    api.parents.getPackages(activeChild.id).then((response) => {
+      if (cancelled) return;
+      if (!response?.success || !Array.isArray(response.data)) {
+        setDepositPackages([]);
+        addToast({ type: "error", title: "Packages Unavailable", message: response?.message || "Could not load published packages for this child." });
+        return;
+      }
+      const packages = response.data as ParentPackageOption[];
+      setDepositPackages(packages);
+      const first = packages[0];
+      setDepositPackageId(first?.id || "");
+      setDepositAmount(Number(first?.price || 0));
+      setDepositTutor(first?.teacher?.user ? `${first.teacher.user.firstName} ${first.teacher.user.lastName}`.trim() : "");
+    }).catch(() => {
+      if (!cancelled) {
+        setDepositPackages([]);
+        addToast({ type: "error", title: "Packages Unavailable", message: "Could not load published packages for this child." });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [isDepositModalOpen, activeChild.id, addToast]);
 
   // Handle Bank Slip Submission
   const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!depositRefNumber.trim()) {
+    if (!depositPackageId || !depositRefNumber.trim() || !slipFileDataUrl || isDepositSubmitting) {
       addToast({
         type: "warning",
-        title: "Reference Number Required",
-        message: "Please enter the bank slip or transaction reference number."
+        title: "Payment Details Required",
+        message: "Select a published package, enter the bank reference, and upload the actual slip file."
       });
       return;
     }
-
-    const newInvoice: TuitionInvoice = {
-      id: `inv_new_${Date.now()}`,
-      invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
-      childId: activeChild.id,
-      childName: activeChild.name,
-      teacherName: depositTutor,
-      subject: activeChild.enrolments.find((e) => e.teacherName === depositTutor)?.subject || "Tuition Subject",
-      month: depositMonth,
-      amountLkr: Number(depositAmount),
-      status: "under_review",
-      paymentMethod: "bank_slip",
-      slipRefNumber: depositRefNumber.trim().toUpperCase(),
-      bankName: depositBank,
-      branchName: depositBranch,
-      depositedDate: depositDate,
-      slipImageUrl: "/images/mock_slips/sample_slip.jpg",
-      tutorNotes: "Deposit slip submitted via Parent Portal. Awaiting tutor assistant clearance."
-    };
-
-    setInvoices([newInvoice, ...invoices]);
-    setIsDepositModalOpen(false);
-    setDepositRefNumber("");
-
-    addToast({
-      type: "success",
-      title: "Bank Deposit Slip Uploaded!",
-      message: `Deposit slip of LKR ${depositAmount.toLocaleString()} submitted to ${depositTutor}. Temporary class access unlocked!`
-    });
-
+    setIsDepositSubmitting(true);
     try {
-      await api.parents.submitDepositSlip({
+      const response = await api.parents.submitDepositSlip({
         childId: activeChild.id,
+        packageId: depositPackageId,
         slipRefNumber: depositRefNumber.trim().toUpperCase(),
         bankName: depositBank,
         branchName: depositBranch,
         depositedDate: depositDate,
         amountLkr: Number(depositAmount),
-        slipImageUrl: "/images/mock_slips/sample_slip.jpg",
+        slipImageUrl: slipFileDataUrl,
         tutorName: depositTutor,
       });
-    } catch (err) {
-      console.warn("Backend deposit slip submission skipped:", err);
+      if (!response?.success || response?.data?.invoice?.status !== "under_review") {
+        throw new Error(response?.message || "The slip was not accepted for review.");
+      }
+      setInvoices((current) => [response.data.invoice as TuitionInvoice, ...current]);
+      setIsDepositModalOpen(false);
+      setDepositRefNumber("");
+      setSlipFileName("");
+      setSlipFileDataUrl("");
+      addToast({
+        type: "success",
+        title: "Slip Submitted for Review",
+        message: "The subscription remains pending. Class access will be available only after payment approval.",
+      });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "Slip Submission Failed",
+        message: error instanceof Error ? error.message : "Could not submit the bank slip. Please retry.",
+      });
+    } finally {
+      setIsDepositSubmitting(false);
     }
   };
 
@@ -373,6 +541,15 @@ export function ParentDashboardView() {
               })}
             </div>
 
+            <button
+              type="button"
+              onClick={() => setIsLinkChildModalOpen(true)}
+              className="px-3 py-2 rounded-xl bg-white text-[#0d5c4d] font-bold text-xs flex items-center gap-1.5 hover:bg-emerald-50 cursor-pointer shrink-0"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span>Link Student</span>
+            </button>
+
             {/* Live Refresh Button */}
             <button
               type="button"
@@ -387,10 +564,24 @@ export function ParentDashboardView() {
         </div>
       </div>
 
+      {childrenList.length === 0 && (
+        <div className="rounded-3xl border border-[#e6ece8] bg-white p-8 text-center shadow-xs">
+          <h2 className="text-lg font-black text-[#0d2b26]">No Student Linked</h2>
+          <p className="mt-2 text-sm text-slate-600" role={loadError ? "alert" : "status"}>
+            {isLoading ? "Loading linked student records…" : loadError || "Link a student to view tuition, attendance, and progress."}
+          </p>
+          {!isLoading && (
+            <button type="button" onClick={() => setIsLinkChildModalOpen(true)} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#0d5c4d] px-4 py-2 text-sm font-bold text-white hover:bg-[#0a473b]">
+              <PlusCircle className="h-4 w-4" /> Link Student
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ========================================================= */}
       {/* TAB 1: EXECUTIVE OVERVIEW                                 */}
       {/* ========================================================= */}
-      {activeTab === "overview" && (
+      {childrenList.length > 0 && activeTab === "overview" && (
         <div className="space-y-6">
           {/* Key Executive KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -688,7 +879,7 @@ export function ParentDashboardView() {
       {/* ========================================================= */}
       {/* TAB 2: ENROLLED TUTORS & BATCH DETAILS                    */}
       {/* ========================================================= */}
-      {activeTab === "tuition_classes" && (
+      {childrenList.length > 0 && activeTab === "tuition_classes" && (
         <div className="space-y-6">
           <div className="bg-white rounded-3xl p-6 border border-[#e6ece8] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -774,7 +965,7 @@ export function ParentDashboardView() {
       {/* ========================================================= */}
       {/* TAB 3: FEES, INVOICES & BANK DEPOSIT SLIPS                */}
       {/* ========================================================= */}
-      {activeTab === "fees" && (
+      {childrenList.length > 0 && activeTab === "fees" && (
         <div className="space-y-6">
           {/* Tuition Fee Clearance Overview Card */}
           <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-[#0d2b26] to-[#082a24] p-6 sm:p-7 text-white shadow-lg border border-emerald-900/40 relative overflow-hidden">
@@ -887,7 +1078,7 @@ export function ParentDashboardView() {
       {/* ========================================================= */}
       {/* TAB 5: PAPER CLASS MARKS & HOMEWORK (NEW FORMAT)          */}
       {/* ========================================================= */}
-      {activeTab === "progress" && (
+      {childrenList.length > 0 && activeTab === "progress" && (
         <div className="space-y-6">
           {/* Header Controls: Title, View Switcher, and Analytics */}
           <div className="bg-white rounded-3xl p-6 border border-[#e6ece8] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1159,7 +1350,7 @@ export function ParentDashboardView() {
       {/* ========================================================= */}
       {/* TAB 6: TUTOR ANNOUNCEMENTS & CIRCULARS                    */}
       {/* ========================================================= */}
-      {activeTab === "circulars" && (
+      {childrenList.length > 0 && activeTab === "circulars" && (
         <div className="space-y-6">
           <div className="bg-white rounded-3xl p-6 border border-[#e6ece8] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -1222,19 +1413,22 @@ export function ParentDashboardView() {
       >
         <form onSubmit={handleDepositSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Enrolled Educator / Masterclass</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Published package for {activeChild.name}</label>
             <select
-              value={depositTutor}
+              value={depositPackageId}
               onChange={(e) => {
-                setDepositTutor(e.target.value);
-                const match = activeChild.enrolments.find((en) => en.teacherName === e.target.value);
-                if (match) setDepositAmount(match.monthlyFeeLkr);
+                const selected = depositPackages.find((item) => item.id === e.target.value);
+                setDepositPackageId(selected?.id || "");
+                setDepositAmount(Number(selected?.price || 0));
+                setDepositTutor(selected?.teacher?.user ? `${selected.teacher.user.firstName} ${selected.teacher.user.lastName}`.trim() : "");
               }}
               className="w-full h-10 px-3 rounded-xl bg-[#f6f9f7] border border-[#e2e8e4] text-xs font-bold text-slate-800 focus:outline-none focus:border-[#0d5c4d]"
+              required
             >
-              {activeChild.enrolments.map((en) => (
-                <option key={en.id} value={en.teacherName}>
-                  {en.teacherName} — {en.subject} (LKR {en.monthlyFeeLkr.toLocaleString()}/mo)
+              <option value="">{depositPackages.length ? "Select a package" : "No published packages available"}</option>
+              {depositPackages.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title} — LKR {Number(item.price).toLocaleString()} ({item.billingCycle})
                 </option>
               ))}
             </select>
@@ -1320,11 +1514,38 @@ export function ParentDashboardView() {
             </div>
           </div>
 
-          {/* Deposit Slip Attachment Simulator */}
+          {/* Actual deposit slip file upload */}
           <div className="p-4 rounded-xl bg-[#f4f7f5] border-2 border-dashed border-[#c4e9e0] text-center space-y-1">
             <UploadCloud className="h-6 w-6 text-[#0d5c4d] mx-auto" />
-            <p className="font-bold text-slate-800 text-xs">Receipt Image Selected: {slipFileName}</p>
-            <p className="text-[10px] text-slate-500">Supports PNG, JPG, or PDF bank vouchers</p>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
+              required
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+                if (!allowedTypes.includes(file.type) || file.size > 1_000_000) {
+                  setSlipFileName("");
+                  setSlipFileDataUrl("");
+                  event.target.value = "";
+                  addToast({ type: "error", title: "Invalid Slip File", message: "Choose a JPG, PNG, WebP, or PDF file smaller than 1 MB." });
+                  return;
+                }
+                const reader = new FileReader();
+                reader.onload = () => {
+                  if (typeof reader.result === "string") {
+                    setSlipFileName(file.name);
+                    setSlipFileDataUrl(reader.result);
+                  }
+                };
+                reader.onerror = () => addToast({ type: "error", title: "File Read Failed", message: "Could not read the selected bank slip." });
+                reader.readAsDataURL(file);
+              }}
+              className="block w-full text-xs text-slate-700"
+            />
+            <p className="font-bold text-slate-800 text-xs">{slipFileName || "Choose a bank slip file"}</p>
+            <p className="text-[10px] text-slate-500">JPG, PNG, WebP, or PDF, maximum 1 MB</p>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
@@ -1337,10 +1558,11 @@ export function ParentDashboardView() {
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a483c] text-white text-xs font-black shadow-xs cursor-pointer flex items-center gap-1.5"
+              disabled={isDepositSubmitting || !depositPackageId || !slipFileDataUrl}
+              className="px-5 py-2.5 rounded-xl bg-[#0d5c4d] hover:bg-[#0a483c] disabled:opacity-50 text-white text-xs font-black shadow-xs cursor-pointer flex items-center gap-1.5"
             >
               <Check className="h-4 w-4" />
-              <span>Submit Slip for Clearance</span>
+              <span>{isDepositSubmitting ? "Submitting…" : "Submit Slip for Review"}</span>
             </button>
           </div>
         </form>
@@ -1687,6 +1909,62 @@ export function ParentDashboardView() {
           </div>
         </Modal>
       )}
+
+      <Modal
+        isOpen={isLinkChildModalOpen}
+        onClose={() => setIsLinkChildModalOpen(false)}
+        title={pendingChildLink ? "Confirm Student Approval" : "Link a Student"}
+        description={pendingChildLink ? "The student must approve access to their records." : "Enter the student's ID, registered mobile number, or email address."}
+        maxWidth="max-w-md"
+      >
+        {pendingChildLink ? (
+          <form onSubmit={handleConfirmChildLink} className="space-y-4">
+            <p className="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-900">
+              Enter the code sent to <strong>{pendingChildLink.studentName}</strong> at <strong>{pendingChildLink.maskedEmail}</strong>.
+            </p>
+            <label className="block text-xs font-bold text-slate-700" htmlFor="parent-link-code">Student approval code</label>
+            <input
+              id="parent-link-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={linkVerificationCode}
+              onChange={(event) => setLinkVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="6-digit code"
+              className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0d5c4d]/20"
+              required
+            />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => { setPendingChildLink(null); setLinkVerificationCode(""); }} className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold">Start over</button>
+              <button type="submit" disabled={isLinkingStudent || linkVerificationCode.length !== 6} className="px-4 py-2 rounded-xl bg-[#0d5c4d] text-white text-xs font-bold disabled:opacity-60">
+                {isLinkingStudent ? "Verifying…" : "Confirm Link"}
+              </button>
+            </div>
+          </form>
+        ) : (
+        <form onSubmit={handleLinkChildSubmit} className="space-y-4">
+          <label className="block text-xs font-bold text-slate-700" htmlFor="parent-link-student">
+            Student identifier
+          </label>
+          <input
+            id="parent-link-student"
+            value={linkStudentInput}
+            onChange={(event) => setLinkStudentInput(event.target.value)}
+            placeholder="Student ID, phone, or email"
+            className="w-full h-11 px-3 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0d5c4d]/20"
+            autoComplete="off"
+            required
+          />
+          {loadError && <p className="text-xs text-rose-600" role="alert">{loadError}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setIsLinkChildModalOpen(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold">Cancel</button>
+            <button type="submit" disabled={isLinkingStudent} className="px-4 py-2 rounded-xl bg-[#0d5c4d] text-white text-xs font-bold disabled:opacity-60">
+              {isLinkingStudent ? "Linking…" : "Link Student"}
+            </button>
+          </div>
+        </form>
+        )}
+      </Modal>
     </div>
   );
 }

@@ -14,6 +14,7 @@ import announcementRoutes from './announcement.routes';
 import quizRoutes from './quiz.routes';
 import adminRoutes from './admin.routes';
 import parentRoutes from './parent.routes';
+import subscriptionRoutes from './subscription.routes';
 
 const router = Router();
 
@@ -43,5 +44,6 @@ router.use('/announcements', announcementRoutes);
 router.use('/quizzes', quizRoutes);
 router.use('/admin', adminRoutes);
 router.use('/parents', parentRoutes);
+router.use('/subscription', subscriptionRoutes);
 
 export default router;

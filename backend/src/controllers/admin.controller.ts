@@ -224,6 +224,10 @@ export const getStaff = async (
       },
       include: {
         teacherProfile: true,
+        coachedSportsTeams: {
+          where: { tenantId },
+          select: { id: true, name: true },
+        },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -236,20 +240,25 @@ export const getStaff = async (
         schoolId: tenantId,
         name: `${user.firstName} ${user.lastName}`.trim(),
         email: user.email,
-        role: isTeacher ? 'teacher' : 'administrator',
+        role: isTeacher ? (tp?.isCoach ? 'coach' : 'teacher') : 'administrator',
         staffId: tp?.employeeNo || `STAFF-${user.id.substring(0, 6).toUpperCase()}`,
         photo: user.avatarUrl || undefined,
         phone: tp?.phone || undefined,
-        status: user.isActive ? 'active' : 'inactive',
+        status: user.isActive ? (tp?.staffStatus || 'active') : (tp?.staffStatus === 'on_leave' || tp?.staffStatus === 'resigned' ? tp.staffStatus : 'inactive'),
         qualification: (Array.isArray(tp?.qualifications) && tp?.qualifications.length > 0)
           ? (tp.qualifications[0] as any)?.degree || 'B.Sc. Graduate'
           : tp?.specialization || 'Academic Staff',
         subjects: tp?.specialization ? [tp.specialization] : ['General Studies'],
         classes: ['Grade 12-A', 'Grade 13-A'],
         medium: (tp?.mediums && tp.mediums[0]) ? (tp.mediums[0].toLowerCase() as any) : 'english',
-        sports: [],
-        teams: [],
+        sports: tp?.sports || [],
+        sport: tp?.sports?.[0],
+        teams: user.coachedSportsTeams.map((team) => team.name),
+        teamIds: user.coachedSportsTeams.map((team) => team.id),
         workload: 16,
+        district: tp?.district || tp?.city || 'Colombo',
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       };
     });
 
@@ -284,6 +293,8 @@ export const createStaff = async (
       subjects = [],
       classes = [],
       medium = 'english',
+      sports = [],
+      teamIds = [],
       status = 'active',
     } = req.body;
 
@@ -292,7 +303,7 @@ export const createStaff = async (
       return;
     }
 
-    if (!['teacher', 'administrator'].includes(role)) {
+    if (!['teacher', 'coach', 'administrator'].includes(role)) {
   res.status(400).json({
     success: false,
     message: 'Invalid staff role.',
@@ -300,7 +311,7 @@ export const createStaff = async (
   return;
 }
 
-if (!['active', 'inactive'].includes(status)) {
+if (!['active', 'on_leave', 'resigned', 'inactive'].includes(status)) {
   res.status(400).json({
     success: false,
     message: 'Invalid staff status.',
@@ -317,6 +328,10 @@ const existingUser = await prisma.user.findUnique({
       res.status(400).json({ success: false, message: 'A user with this email already exists.' });
       return;
     }
+    if (!['active', 'on_leave', 'resigned', 'inactive'].includes(status)) {
+      res.status(400).json({ success: false, message: 'Invalid staff status.' });
+      return;
+    }
 
     const nameParts = name.trim().split(' ');
     const firstName = nameParts[0] || 'Staff';
@@ -324,6 +339,20 @@ const existingUser = await prisma.user.findUnique({
     const systemRole = role === 'administrator' ? 'ADMIN' : 'TEACHER';
     const employeeNo = staffId || `EMP-${Date.now().toString().slice(-6)}`;
     const specialization = Array.isArray(subjects) && subjects.length > 0 ? subjects.join(', ') : 'Educator';
+
+    const normalizedSports = Array.isArray(sports) ? sports.map(String).filter(Boolean) : [];
+    const normalizedTeamIds = Array.isArray(teamIds) ? teamIds.map(String).filter(Boolean) : [];
+    if (role !== 'coach' && normalizedTeamIds.length > 0) {
+      res.status(400).json({ success: false, message: 'Only coaches can be assigned to sports teams.' });
+      return;
+    }
+    const selectedTeams = normalizedTeamIds.length
+      ? await prisma.sportsTeam.findMany({ where: { id: { in: normalizedTeamIds }, tenantId }, select: { id: true, name: true } })
+      : [];
+    if (selectedTeams.length !== normalizedTeamIds.length) {
+      res.status(400).json({ success: false, message: 'One or more selected sports teams are unavailable.' });
+      return;
+    }
 
     const setupToken = generateSetupToken();
     const setupTokenHash = hashSetupToken(setupToken);
@@ -362,9 +391,19 @@ const existingUser = await prisma.user.findUnique({
             specialization,
             phone: phone || '',
             mediums: [medium.charAt(0).toUpperCase() + medium.slice(1)],
+            sports: normalizedSports,
+            isCoach: role === 'coach',
+            staffStatus: status,
             qualifications: qualification ? [{ degree: qualification, institution: 'Certified Institution' }] : [],
             isVerified: true,
           },
+        });
+      }
+
+      if (normalizedTeamIds.length > 0) {
+        await tx.sportsTeam.updateMany({
+          where: { id: { in: normalizedTeamIds }, tenantId },
+          data: { coachId: newUser.id, coachName: `${firstName} ${lastName}`.trim() },
         });
       }
 
@@ -392,8 +431,10 @@ const existingUser = await prisma.user.findUnique({
       subjects: Array.isArray(subjects) ? subjects : [specialization],
       classes: Array.isArray(classes) ? classes : [],
       medium,
-      sports: [],
-      teams: [],
+      sports: normalizedSports,
+      sport: normalizedSports[0],
+      teamIds: selectedTeams.map((team) => team.id),
+      teams: selectedTeams.map((team) => team.name),
       workload: 12,
     };
 
@@ -423,103 +464,197 @@ export const updateStaff = async (
     const {
       name,
       email,
+      role,
       staffId,
       phone,
       qualification,
       subjects,
       classes,
       medium,
+      sports,
+      teamIds,
       status,
     } = req.body;
 
     const user = await prisma.user.findFirst({
-  where: {
-    id,
-    tenantId,
-    role: { in: ['TEACHER', 'ADMIN'] },
-  },
-  include: { teacherProfile: true },
-});
+      where: { id, tenantId, role: { in: ['TEACHER', 'ADMIN'] } },
+      include: {
+        teacherProfile: true,
+        coachedSportsTeams: {
+          where: { tenantId },
+          select: { id: true, name: true },
+        },
+      },
+    });
     if (!user) {
       res.status(404).json({ success: false, message: 'Staff member not found.' });
       return;
     }
+    if (status !== undefined && !['active', 'on_leave', 'resigned', 'inactive'].includes(status)) {
+      res.status(400).json({ success: false, message: 'Invalid staff status.' });
+      return;
+    }
 
-    const updateUserData: any = {};
+    // Administrator records have no TeacherProfile. Preserve their existing
+    // name, email, and active-state editing path without treating them as coaches.
+    if (user.role === 'ADMIN') {
+      if (role !== undefined && role !== 'administrator') {
+        res.status(400).json({ success: false, message: 'Administrator staff cannot be changed to a teacher or coach.' });
+        return;
+      }
+      const updateData: Record<string, unknown> = {};
+      if (name) {
+        const parts = String(name).trim().split(' ');
+        updateData.firstName = parts[0] || user.firstName;
+        updateData.lastName = parts.slice(1).join(' ') || user.lastName;
+      }
+      if (email && email !== user.email) {
+        const normalizedEmail = String(email).trim().toLowerCase();
+        const existing = await prisma.user.findFirst({
+          where: { email: normalizedEmail, id: { not: id } },
+          select: { id: true },
+        });
+        if (existing) {
+          res.status(409).json({ success: false, message: 'This email is already in use.' });
+          return;
+        }
+        updateData.email = normalizedEmail;
+      }
+      if (status !== undefined) updateData.isActive = status === 'active';
+      if (Object.keys(updateData).length > 0) {
+        const updated = await prisma.user.updateMany({ where: { id, tenantId, role: 'ADMIN' }, data: updateData });
+        if (updated.count !== 1) {
+          res.status(404).json({ success: false, message: 'Staff member not found or access denied.' });
+          return;
+        }
+      }
+      res.status(200).json({
+        success: true,
+        message: 'Staff updated successfully.',
+        data: { id, role: 'administrator', ...(status === undefined ? {} : { status }) },
+      });
+      return;
+    }
+
+    if (user.role !== 'TEACHER' || !user.teacherProfile) {
+      res.status(400).json({ success: false, message: 'Teacher profile is unavailable for this staff member.' });
+      return;
+    }
+    if (role !== undefined && !['teacher', 'coach'].includes(role)) {
+      res.status(400).json({ success: false, message: 'A valid teacher or coach role is required.' });
+      return;
+    }
+
+    const normalizedSports = sports === undefined
+      ? undefined
+      : (Array.isArray(sports) ? sports.map(String).map((value: string) => value.trim()).filter(Boolean) : []);
+    let normalizedTeamIds: string[] | undefined;
+    if (teamIds !== undefined) {
+      normalizedTeamIds = Array.isArray(teamIds) ? teamIds.map(String).map((value: string) => value.trim()).filter(Boolean) : [];
+    } else if (role === 'teacher') {
+      normalizedTeamIds = [];
+    }
+    const isCoach = role === undefined ? user.teacherProfile.isCoach : role === 'coach';
+    if (!isCoach && normalizedTeamIds && normalizedTeamIds.length > 0) {
+      res.status(400).json({ success: false, message: 'Only coaches can be assigned to sports teams.' });
+      return;
+    }
+    const selectedTeams = normalizedTeamIds?.length
+      ? await prisma.sportsTeam.findMany({
+          where: { id: { in: normalizedTeamIds }, tenantId },
+          select: { id: true, name: true },
+        })
+      : [];
+    if (normalizedTeamIds && selectedTeams.length !== normalizedTeamIds.length) {
+      res.status(400).json({ success: false, message: 'One or more selected sports teams are unavailable.' });
+      return;
+    }
+
+    const updateUserData: Record<string, unknown> = {};
     if (name) {
       const parts = name.trim().split(' ');
       updateUserData.firstName = parts[0] || user.firstName;
       updateUserData.lastName = parts.slice(1).join(' ') || user.lastName;
     }
     if (email && email !== user.email) {
-  const normalizedEmail = String(email).trim().toLowerCase();
-
-  const existingEmailUser = await prisma.user.findFirst({
-    where: {
-      email: normalizedEmail,
-      id: { not: id },
-    },
-    select: { id: true },
-  });
-
-  if (existingEmailUser) {
-    res.status(409).json({
-      success: false,
-      message: 'This email is already in use.',
-    });
-    return;
-  }
-
-  updateUserData.email = normalizedEmail;
-}
+      const normalizedEmail = String(email).trim().toLowerCase();
+      const existingEmailUser = await prisma.user.findFirst({
+        where: { email: normalizedEmail, id: { not: id } },
+        select: { id: true },
+      });
+      if (existingEmailUser) {
+        res.status(409).json({ success: false, message: 'This email is already in use.' });
+        return;
+      }
+      updateUserData.email = normalizedEmail;
+    }
     if (status !== undefined) {
       updateUserData.isActive = status === 'active';
     }
 
-    if (Object.keys(updateUserData).length > 0) {
-  const updateResult = await prisma.user.updateMany({
-    where: {
-      id,
-      tenantId,
-      role: { in: ['TEACHER', 'ADMIN'] },
-    },
-    data: updateUserData,
-  });
-
-  if (updateResult.count !== 1) {
-    res.status(404).json({
-      success: false,
-      message: 'Staff member not found or access denied.',
-    });
-    return;
-  }
-}
-
-    if (user.teacherProfile) {
-      const updateProfileData: any = {};
-      if (staffId) updateProfileData.employeeNo = staffId;
-      if (phone) updateProfileData.phone = phone;
-      if (subjects) {
-        updateProfileData.specialization = Array.isArray(subjects) ? subjects.join(', ') : String(subjects);
-      }
-      if (qualification) {
-        updateProfileData.qualifications = [{ degree: qualification }];
-      }
-      if (medium) {
-        updateProfileData.mediums = [medium.charAt(0).toUpperCase() + medium.slice(1)];
-      }
-
-      if (Object.keys(updateProfileData).length > 0) {
-        await prisma.teacherProfile.update({
-          where: { id: user.teacherProfile.id },
-          data: updateProfileData,
-        });
-      }
+    const fullName = name ? String(name).trim() : `${user.firstName} ${user.lastName}`.trim();
+    const updateProfileData: Record<string, unknown> = { isCoach };
+    if (status !== undefined) updateProfileData.staffStatus = status;
+    if (staffId !== undefined) updateProfileData.employeeNo = staffId;
+    if (phone !== undefined) updateProfileData.phone = phone;
+    if (subjects !== undefined) {
+      updateProfileData.specialization = Array.isArray(subjects) ? subjects.join(', ') : String(subjects);
     }
+    if (qualification !== undefined) {
+      updateProfileData.qualifications = qualification ? [{ degree: qualification }] : [];
+    }
+    if (medium) updateProfileData.mediums = [medium.charAt(0).toUpperCase() + medium.slice(1)];
+    if (normalizedSports !== undefined) updateProfileData.sports = normalizedSports;
+
+    await prisma.$transaction(async (tx) => {
+      if (Object.keys(updateUserData).length > 0) {
+        const updateResult = await tx.user.updateMany({
+          where: { id, tenantId, role: user.role },
+          data: updateUserData,
+        });
+        if (updateResult.count !== 1) {
+          throw new TenantResolutionError(404, 'Staff member not found or access denied.');
+        }
+      }
+      await tx.teacherProfile.update({
+        where: { id: user.teacherProfile!.id },
+        data: updateProfileData,
+      });
+      if (normalizedTeamIds !== undefined) {
+        await tx.sportsTeam.updateMany({
+          where: {
+            tenantId,
+            coachId: id,
+            ...(normalizedTeamIds.length > 0 ? { id: { notIn: normalizedTeamIds } } : {}),
+          },
+          data: { coachId: null, coachName: '' },
+        });
+        if (normalizedTeamIds.length > 0) {
+          await tx.sportsTeam.updateMany({
+            where: { id: { in: normalizedTeamIds }, tenantId },
+            data: { coachId: id, coachName: fullName },
+          });
+        }
+      }
+    });
+
+    const returnedSports = normalizedSports ?? user.teacherProfile.sports;
+    const returnedTeamIds = normalizedTeamIds ?? user.coachedSportsTeams.map((team) => team.id);
+    const returnedTeams = normalizedTeamIds === undefined
+      ? user.coachedSportsTeams.map((team) => team.name)
+      : selectedTeams.map((team) => team.name);
 
     res.status(200).json({
       success: true,
       message: 'Staff updated successfully.',
+      data: {
+        id,
+        role: isCoach ? 'coach' : 'teacher',
+        sports: returnedSports,
+        sport: returnedSports[0],
+        teamIds: returnedTeamIds,
+        teams: returnedTeams,
+      },
     });
   } catch (error: any) {
     console.error('Error updating staff:', error);
@@ -539,7 +674,11 @@ export const updateStaffStatus = async (
   try {
     const tenantId = await resolveTenantId(req);
     const id = String(req.params.id);
-    const { status } = req.body; // 'active' | 'inactive' | 'suspended'
+    const { status } = req.body;
+    if (!['active', 'on_leave', 'resigned', 'inactive'].includes(status)) {
+      res.status(400).json({ success: false, message: 'Invalid staff status.' });
+      return;
+    }
 
     const user = await prisma.user.findFirst({
   where: {
@@ -555,13 +694,9 @@ export const updateStaffStatus = async (
 
     const isActive = status === 'active';
     const updateResult = await prisma.user.updateMany({
-  where: {
-    id,
-    tenantId,
-    role: { in: ['TEACHER', 'ADMIN'] },
-  },
-  data: { isActive },
-});
+      where: { id, tenantId, role: { in: ['TEACHER', 'ADMIN'] } },
+      data: { isActive },
+    });
 
 if (updateResult.count !== 1) {
   res.status(404).json({
@@ -570,6 +705,10 @@ if (updateResult.count !== 1) {
   });
   return;
 }
+
+    if (user.role === 'TEACHER') {
+      await prisma.teacherProfile.updateMany({ where: { userId: id }, data: { staffStatus: status } });
+    }
 
     res.status(200).json({
       success: true,

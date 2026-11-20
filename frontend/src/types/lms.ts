@@ -324,8 +324,10 @@ export interface AdminStaffRecord {
   avatar?: string;
   subjects?: string[];
   classes?: string[];
+  sports?: string[];
   sport?: string;
   teams?: string[];
+  teamIds?: string[];
   status: AdminRecordStatus;
   workload: number;
   phone?: string;
@@ -359,6 +361,7 @@ export interface StaffInput {
   medium?: SchoolMedium;
   sports: string[];
   teams: string[];
+  teamIds?: string[];
   certification?: string;
   availability?: string;
 }
@@ -487,6 +490,7 @@ export interface ExamTermResult {
 // Connect Hub / Marketplace Types
 export interface ConnectTeacher {
   id: string;
+  packageId?: string;
   name: string;
   initials: string;
   avatarColor: string; // e.g. "bg-purple-600", "bg-emerald-600"
@@ -558,7 +562,7 @@ export interface ConnectPurchase {
   currency: string;
   date: string;
   validUntil: string;
-  status: 'active' | 'expired';
+  status: 'active' | 'pending' | 'expired';
   paymentMethod: string;
   receiptNo: string;
   meetUrl: string;

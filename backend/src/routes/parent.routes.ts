@@ -6,13 +6,18 @@ import {
   submitDepositSlip,
   getMyParentProfile,
   updateMyParentProfile,
+  linkChildStudent,
+  getPendingChildLink,
+  confirmChildLink,
+  getParentPackages,
 } from '../controllers/parent.controller';
-import { authenticateToken } from '../middlewares/auth.middleware';
+import { authenticateToken, requireRoles } from '../middlewares/auth.middleware';
 
 const router = Router();
 
 // All parent routes require authentication
 router.use(authenticateToken);
+router.use(requireRoles('PARENT'));
 
 // 0. Current Parent Profile
 router.get('/me', getMyParentProfile);
@@ -20,6 +25,10 @@ router.put('/me', updateMyParentProfile);
 
 // 1. Children profiles with live academic standing
 router.get('/children', getMyChildren);
+router.post('/link-child', linkChildStudent);
+router.get('/link-child/pending', getPendingChildLink);
+router.post('/link-child/confirm', confirmChildLink);
+router.get('/packages', getParentPackages);
 
 // 2. Parent Dashboard Cockpit
 router.get('/dashboard', getParentDashboardOverview);

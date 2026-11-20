@@ -1,6 +1,26 @@
 import { Response } from 'express';
 import { prisma } from '../config/prisma';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
+import { fromBuffer } from 'file-type';
+
+const validateBankSlip = async (reference: unknown, slip: unknown): Promise<string | null> => {
+  const normalizedReference = typeof reference === 'string' ? reference.trim() : '';
+  if (normalizedReference.length < 3 || normalizedReference.length > 60) {
+    return 'Bank reference must be between 3 and 60 characters.';
+  }
+  if (typeof slip !== 'string') return 'A bank slip upload is required.';
+  const match = /^data:(image\/(?:jpeg|png|webp)|application\/pdf);base64,([A-Za-z0-9+/]+={0,2})$/.exec(slip);
+  if (!match) return 'Upload a JPG, PNG, WebP, or PDF bank slip.';
+  const bytes = Buffer.from(match[2], 'base64');
+  if (!bytes.length || bytes.length > 1_000_000 || bytes.toString('base64') !== match[2]) {
+    return 'Bank slip file must be valid and smaller than 1 MB.';
+  }
+  const detected = await fromBuffer(bytes);
+  if (!detected || detected.mime !== match[1]) {
+    return 'Uploaded file contents do not match an allowed bank slip format.';
+  }
+  return null;
+};
 
 /**
  * Helper to ensure a StudentProfile exists for the authenticated user
@@ -683,14 +703,28 @@ export const subscribePackage = async (
 
     const packageId = String(req.params.packageId);
     const { paymentMethod = 'CARD', bankRefNo, slipUrl, slipFileName, paymentNotes } = req.body || {};
+    if (String(paymentMethod).toUpperCase() !== 'BANK_SLIP') {
+      res.status(503).json({ success: false, code: 'PAYMENT_PROVIDER_UNAVAILABLE', message: 'Card checkout is unavailable until a payment provider is configured.' });
+      return;
+    }
+    const slipError = await validateBankSlip(bankRefNo, slipUrl);
+    if (slipError) {
+      res.status(400).json({ success: false, message: slipError });
+      return;
+    }
     const profile = await getOrCreateStudentProfile(userId);
     if (!profile) {
       res.status(404).json({ success: false, message: 'Student profile not found' });
       return;
     }
+    const tenantId = profile.user?.tenantId;
+    if (!tenantId) {
+      res.status(403).json({ success: false, message: 'Student account is not assigned to a tenant' });
+      return;
+    }
 
-    const pkg = await prisma.package.findUnique({
-      where: { id: packageId },
+    const pkg = await prisma.package.findFirst({
+      where: { id: packageId, tenantId, isPublished: true },
       include: {
         courses: true,
       },
@@ -707,7 +741,7 @@ export const subscribePackage = async (
     const year = new Date().getFullYear();
     const randomSuffix = Math.floor(100000 + Math.random() * 900000);
     const receiptNo = `REC-${year}-${randomSuffix}`;
-    const normalizedMethod = String(paymentMethod).toUpperCase() === 'BANK_SLIP' ? 'BANK_SLIP' : 'CARD';
+    const normalizedMethod = 'BANK_SLIP';
 
     const subscription = await prisma.packageSubscription.create({
       data: {
@@ -716,7 +750,7 @@ export const subscribePackage = async (
         startDate,
         endDate,
         paidAmount: Number(pkg.price || 0),
-        status: 'ACTIVE',
+        status: 'PENDING',
         paymentMethod: normalizedMethod,
         receiptNo,
         bankRefNo: bankRefNo || null,
@@ -729,30 +763,9 @@ export const subscribePackage = async (
       },
     });
 
-    // Automatically enroll student in all courses included in this package
-    if (pkg.courses && pkg.courses.length > 0) {
-      await Promise.all(
-        pkg.courses.map((pc) =>
-          prisma.enrollment.upsert({
-            where: {
-              courseId_studentId: {
-                courseId: pc.courseId,
-                studentId: profile.id,
-              },
-            },
-            create: {
-              courseId: pc.courseId,
-              studentId: profile.id,
-            },
-            update: {},
-          })
-        )
-      );
-    }
-
     res.status(201).json({
       success: true,
-      message: `Subscribed successfully to ${pkg.title}`,
+      message: `Deposit slip submitted for review for ${pkg.title}`,
       data: subscription,
     });
   } catch (error: any) {
@@ -835,7 +848,7 @@ export const getMyPurchases = async (
         currency: 'LKR',
         date: sub.createdAt.toISOString().split('T')[0],
         validUntil: sub.endDate.toISOString().split('T')[0],
-        status: isActive ? 'active' : 'expired',
+        status: isActive ? 'active' : sub.status === 'PENDING' ? 'pending' : 'expired',
         paymentMethod: sub.paymentMethod === 'BANK_SLIP' ? 'Bank Deposit (Commercial Bank)' : 'Card (Visa/Mastercard)',
         receiptNo,
         bankRefNo: sub.bankRefNo,
@@ -872,15 +885,29 @@ export const checkoutPackage = async (
 
     const packageId = String(req.params.packageId);
     const { paymentMethod = 'CARD', bankRefNo, slipUrl, slipFileName, paymentNotes } = req.body || {};
+    if (String(paymentMethod).toUpperCase() !== 'BANK_SLIP') {
+      res.status(503).json({ success: false, code: 'PAYMENT_PROVIDER_UNAVAILABLE', message: 'Card checkout is unavailable until a payment provider is configured.' });
+      return;
+    }
+    const slipError = await validateBankSlip(bankRefNo, slipUrl);
+    if (slipError) {
+      res.status(400).json({ success: false, message: slipError });
+      return;
+    }
 
     const profile = await getOrCreateStudentProfile(userId);
     if (!profile) {
       res.status(404).json({ success: false, message: 'Student profile not found' });
       return;
     }
+    const tenantId = profile.user?.tenantId;
+    if (!tenantId) {
+      res.status(403).json({ success: false, message: 'Student account is not assigned to a tenant' });
+      return;
+    }
 
-    let pkg = await prisma.package.findUnique({
-      where: { id: packageId },
+    const pkg = await prisma.package.findFirst({
+      where: { id: packageId, tenantId, isPublished: true },
       include: {
         teacher: {
           include: {
@@ -890,44 +917,6 @@ export const checkoutPackage = async (
         courses: true,
       },
     });
-
-    if (!pkg) {
-      // Check if packageId is actually a teacherProfile id
-      const teacher = await prisma.teacherProfile.findUnique({
-        where: { id: packageId },
-        include: {
-          packages: {
-            include: {
-              teacher: { include: { user: { select: { firstName: true, lastName: true } } } },
-              courses: true,
-            },
-            take: 1,
-          },
-          user: true,
-        },
-      });
-
-      if (teacher && teacher.packages.length > 0) {
-        pkg = teacher.packages[0] as any;
-      } else if (teacher) {
-        const tenant = await prisma.tenant.findFirst();
-        pkg = await prisma.package.create({
-          data: {
-            tenantId: teacher.user?.tenantId || tenant?.id || '',
-            teacherId: teacher.id,
-            title: `${teacher.specialization || 'Tuition'} Monthly Pass`,
-            price: 3500,
-            billingCycle: 'MONTHLY',
-            durationDays: 30,
-            isPublished: true,
-          },
-          include: {
-            teacher: { include: { user: { select: { firstName: true, lastName: true } } } },
-            courses: true,
-          },
-        }) as any;
-      }
-    }
 
     if (!pkg) {
       res.status(404).json({ success: false, message: 'Package or tutor not found' });
@@ -940,7 +929,7 @@ export const checkoutPackage = async (
     const year = new Date().getFullYear();
     const randomSuffix = Math.floor(100000 + Math.random() * 900000);
     const receiptNo = `REC-${year}-${randomSuffix}`;
-    const normalizedMethod = String(paymentMethod).toUpperCase() === 'BANK_SLIP' ? 'BANK_SLIP' : 'CARD';
+    const normalizedMethod = 'BANK_SLIP';
 
     // Check if subscription already exists
     const existing = await prisma.packageSubscription.findFirst({
@@ -955,15 +944,15 @@ export const checkoutPackage = async (
       subscription = await prisma.packageSubscription.update({
         where: { id: existing.id },
         data: {
-          status: 'ACTIVE',
+          status: 'PENDING',
           startDate,
           endDate,
           paidAmount: Number(pkg.price || 0),
           paymentMethod: normalizedMethod,
           receiptNo,
-          bankRefNo: bankRefNo || (normalizedMethod === 'CARD' ? `TXN-CARD-${Date.now().toString().slice(-6)}` : `BOC-${Date.now().toString().slice(-6)}`),
-          slipUrl: slipUrl || null,
-          slipFileName: slipFileName || (normalizedMethod === 'BANK_SLIP' ? 'deposit_slip.pdf' : null),
+          bankRefNo,
+          slipUrl,
+          slipFileName: slipFileName || null,
           paymentNotes: paymentNotes || null,
         },
       });
@@ -975,45 +964,22 @@ export const checkoutPackage = async (
           startDate,
           endDate,
           paidAmount: Number(pkg.price || 0),
-          status: 'ACTIVE',
+          status: 'PENDING',
           paymentMethod: normalizedMethod,
           receiptNo,
-          bankRefNo: bankRefNo || (normalizedMethod === 'CARD' ? `TXN-CARD-${Date.now().toString().slice(-6)}` : `BOC-${Date.now().toString().slice(-6)}`),
-          slipUrl: slipUrl || null,
-          slipFileName: slipFileName || (normalizedMethod === 'BANK_SLIP' ? 'deposit_slip.pdf' : null),
+          bankRefNo,
+          slipUrl,
+          slipFileName: slipFileName || null,
           paymentNotes: paymentNotes || null,
         },
       });
-    }
-
-    // Automatically enroll student in all courses included in this package
-    if (pkg.courses && pkg.courses.length > 0) {
-      await Promise.all(
-        pkg.courses.map((pc) =>
-          prisma.enrollment.upsert({
-            where: {
-              courseId_studentId: {
-                courseId: pc.courseId,
-                studentId: profile.id,
-              },
-            },
-            create: {
-              courseId: pc.courseId,
-              studentId: profile.id,
-            },
-            update: {},
-          })
-        )
-      );
     }
 
     const teacherName = pkg.teacher?.user ? `${pkg.teacher.user.firstName} ${pkg.teacher.user.lastName}` : 'Tutor Specialist';
 
     res.status(201).json({
       success: true,
-      message: normalizedMethod === 'BANK_SLIP'
-        ? `Bank deposit slip verified and subscription activated for ${pkg.title}. Receipt #${receiptNo} generated!`
-        : `Online card payment processed successfully for ${pkg.title}. Receipt #${receiptNo} issued!`,
+      message: `Deposit slip submitted for review for ${pkg.title}.`,
       data: {
         id: subscription.id,
         receiptNo,
@@ -1021,7 +987,7 @@ export const checkoutPackage = async (
         packageName: pkg.title,
         amount: subscription.paidAmount,
         currency: 'LKR',
-        paymentMethod: normalizedMethod === 'CARD' ? 'Card (Visa/Mastercard)' : 'Bank Deposit (Commercial Bank)',
+        paymentMethod: 'Bank Deposit (Commercial Bank)',
         bankRefNo: subscription.bankRefNo,
         slipUrl: subscription.slipUrl,
         slipFileName: subscription.slipFileName,
