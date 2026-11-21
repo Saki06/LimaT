@@ -622,7 +622,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Load real tenants for Super Admin
   useEffect(() => {
-    if (currentRole !== 'super_admin' && authUser?.role !== 'SUPER_ADMIN') {
+    if (!authToken || (currentRole !== 'super_admin' && authUser?.role !== 'SUPER_ADMIN')) {
       return;
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useApp } from "@/context/AppContext";
 import {
@@ -137,6 +137,25 @@ export function LandingView({
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
   // Render Google Identity Services Button
+  const isGoogleInitializedRef = useRef(false);
+  const googlePropsRef = useRef({
+    selectedRole,
+    loginWithGoogle,
+    setAuthMode,
+    onEnterApp,
+    addToast,
+  });
+
+  useEffect(() => {
+    googlePropsRef.current = {
+      selectedRole,
+      loginWithGoogle,
+      setAuthMode,
+      onEnterApp,
+      addToast,
+    };
+  });
+
   useEffect(() => {
     if (authMode === "closed" || selectedRole === "super_admin") return;
 
@@ -147,32 +166,36 @@ export function LandingView({
       const googleWin = typeof window !== "undefined" ? (window as GoogleWindow) : undefined;
       if (googleWin?.google?.accounts?.id) {
         try {
-          googleWin.google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: async (response: GoogleCredentialResponse) => {
-              if (response.credential) {
-                const targetRole =
-                  selectedRole === "parent"
-                    ? "parent"
-                    : selectedRole === "teacher"
-                    ? "teacher"
-                    : selectedRole === "admin"
-                    ? "admin"
-                    : "student";
-                const res = await loginWithGoogle(response.credential, targetRole);
-                if (res.success) {
-                  setAuthMode("closed");
-                  onEnterApp();
-                } else {
-                  addToast({
-                    type: "error",
-                    title: "Google Sign-In Failed",
-                    message: res.message || "Unable to sign in with Google",
-                  });
+          if (!isGoogleInitializedRef.current) {
+            googleWin.google.accounts.id.initialize({
+              client_id: GOOGLE_CLIENT_ID,
+              callback: async (response: GoogleCredentialResponse) => {
+                if (response.credential) {
+                  const currentProps = googlePropsRef.current;
+                  const targetRole =
+                    currentProps.selectedRole === "parent"
+                      ? "parent"
+                      : currentProps.selectedRole === "teacher"
+                      ? "teacher"
+                      : currentProps.selectedRole === "admin"
+                      ? "admin"
+                      : "student";
+                  const res = await currentProps.loginWithGoogle(response.credential, targetRole);
+                  if (res.success) {
+                    currentProps.setAuthMode("closed");
+                    currentProps.onEnterApp();
+                  } else {
+                    currentProps.addToast({
+                      type: "error",
+                      title: "Google Sign-In Failed",
+                      message: res.message || "Unable to sign in with Google",
+                    });
+                  }
                 }
-              }
-            },
-          });
+              },
+            });
+            isGoogleInitializedRef.current = true;
+          }
 
           // Measure container width and fit neatly (between 260px and 380px)
           const rect = container.getBoundingClientRect();
@@ -204,7 +227,7 @@ export function LandingView({
     } else {
       renderGoogleBtn();
     }
-  }, [authMode, authTab, selectedRole, loginWithGoogle, onEnterApp, addToast]);
+  }, [authMode, authTab, selectedRole]);
 
 
   // Sign Up Form State
