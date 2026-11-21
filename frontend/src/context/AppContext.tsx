@@ -589,8 +589,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem('newtoz_payment_methods_settings', JSON.stringify(next));
         } catch {}
       }
+      // Persist to backend database so changes apply across all devices & browsers
+      void api.subscription.updatePaymentMethods(next).catch((err) => {
+        console.warn('Failed to persist payment settings to database:', err);
+      });
       return next;
     });
+  }, []);
+
+  // Sync payment settings from backend database on mount and on window focus
+  useEffect(() => {
+    let cancelled = false;
+    const syncPaymentSettings = async () => {
+      try {
+        const res = await api.subscription.getPaymentMethods();
+        if (!cancelled && res?.data) {
+          setPaymentSettings(res.data);
+          try {
+            localStorage.setItem('newtoz_payment_methods_settings', JSON.stringify(res.data));
+          } catch {}
+        }
+      } catch {
+        // Fall back gracefully to cached/default settings
+      }
+    };
+
+    syncPaymentSettings();
+
+    const handleFocus = () => {
+      void syncPaymentSettings();
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'newtoz_payment_methods_settings' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setPaymentSettings(parsed);
+        } catch {}
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   const isFeatureEnabled = (feature: string): boolean => {

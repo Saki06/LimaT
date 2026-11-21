@@ -381,6 +381,19 @@ export const api = {
       return api.subscription._send('GET', '/subscription/bank-details');
     },
 
+    async getPaymentMethods() {
+      const response = await fetch(`${API_BASE_URL}/subscription/payment-methods`, { method: 'GET' });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to load payment methods');
+      }
+      return result;
+    },
+
+    async updatePaymentMethods(data: { enableCardPayment: boolean; enableBankSlip: boolean }) {
+      return api.subscription._send('PUT', '/subscription/payment-methods', data);
+    },
+
     async updateBankDetails(data: {
       bankName: string;
       accountName: string;

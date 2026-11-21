@@ -127,7 +127,8 @@ export function ConnectView() {
     updateTenantFeature,
     activeTenant,
     addToast,
-    paymentSettings
+    paymentSettings,
+    updatePaymentSettings
   } = useApp();
   const hubSettings = useHubSettings();
 
@@ -393,16 +394,25 @@ export function ConnectView() {
     if (checkoutError) setCheckoutError(null);
   };
 
-  // Automatically sync initial paymentMethod to available enabled method
+  // Automatically sync initial paymentMethod to available enabled method & fetch authoritative database settings
   useEffect(() => {
     if (selectedTeacherForSubscribe || selectedPackageForSubscribe) {
+      void api.subscription
+        .getPaymentMethods()
+        .then((res) => {
+          if (res?.data) {
+            updatePaymentSettings(res.data);
+          }
+        })
+        .catch(() => {});
+
       if (isCardPaymentEnabled && !isBankSlipEnabled) {
         setPaymentMethod("card");
       } else if (!isCardPaymentEnabled && isBankSlipEnabled) {
         setPaymentMethod("bank_slip");
       }
     }
-  }, [selectedTeacherForSubscribe, selectedPackageForSubscribe, isCardPaymentEnabled, isBankSlipEnabled]);
+  }, [selectedTeacherForSubscribe, selectedPackageForSubscribe, isCardPaymentEnabled, isBankSlipEnabled, updatePaymentSettings]);
 
   const isFormValid = useMemo(() => {
     if (paymentMethod === "card") {

@@ -41,7 +41,8 @@ export function SuperAdminPortalView({ initialTab }: SuperAdminPortalViewProps =
     updateTenant,
     deleteTenant,
     currentView,
-    setCurrentView
+    setCurrentView,
+    updatePaymentSettings
   } = useApp();
 
   const getTabFromView = (view: string): SuperAdminTab => {
@@ -224,6 +225,13 @@ const saveTenantFeatures = (
           ...tenant,
           enabledFeatures: updatedFeatures,
         });
+
+        if ('sub_tuition_online_pay' in updatedFeatures || 'sub_tuition_slips' in updatedFeatures) {
+          updatePaymentSettings({
+            ...('sub_tuition_online_pay' in updatedFeatures ? { enableCardPayment: updatedFeatures['sub_tuition_online_pay'] } : {}),
+            ...('sub_tuition_slips' in updatedFeatures ? { enableBankSlip: updatedFeatures['sub_tuition_slips'] } : {}),
+          });
+        }
 
         showToast(`Feature settings saved for ${tenant.name}`);
       } catch (error) {

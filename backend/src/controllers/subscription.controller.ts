@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { prisma } from '../config/prisma';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { SAAS_PLANS, SaasPlan, isSaasPlanId } from '../config/saasPlans';
@@ -626,4 +626,107 @@ export const decidePaymentRequest = async (
     res.status(500).json({ success: false, message: 'Failed to process payment request' });
   }
 };
+
+export const getPlatformPaymentMethods = async (
+  _req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const tenants = await prisma.tenant.findMany({
+      where: { deletedAt: null },
+      select: { settings: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let paymentMethods = {
+      enableCardPayment: true,
+      enableBankSlip: true,
+    };
+
+    for (const t of tenants) {
+      const s = getSettings(t.settings);
+      if (s.platformPaymentMethods && typeof s.platformPaymentMethods === 'object') {
+        paymentMethods = {
+          enableCardPayment:
+            typeof s.platformPaymentMethods.enableCardPayment === 'boolean'
+              ? s.platformPaymentMethods.enableCardPayment
+              : true,
+          enableBankSlip:
+            typeof s.platformPaymentMethods.enableBankSlip === 'boolean'
+              ? s.platformPaymentMethods.enableBankSlip
+              : true,
+        };
+        break;
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: paymentMethods,
+    });
+  } catch (error) {
+    console.error('Get platform payment methods error:', error);
+    res.status(200).json({
+      success: true,
+      data: { enableCardPayment: true, enableBankSlip: true },
+    });
+  }
+};
+
+export const updatePlatformPaymentMethods = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { enableCardPayment, enableBankSlip } = req.body || {};
+
+    const platformPaymentMethods = {
+      enableCardPayment:
+        typeof enableCardPayment === 'boolean' ? enableCardPayment : true,
+      enableBankSlip:
+        typeof enableBankSlip === 'boolean' ? enableBankSlip : true,
+    };
+
+    const tenants = await prisma.tenant.findMany({
+      select: { id: true, settings: true },
+    });
+
+    if (tenants.length > 0) {
+      await prisma.$transaction(
+        tenants.map((t) => {
+          const s = getSettings(t.settings);
+          const currentFeatures =
+            (s.enabledFeatures as Record<string, boolean>) || {};
+          return prisma.tenant.update({
+            where: { id: t.id },
+            data: {
+              settings: {
+                ...s,
+                platformPaymentMethods,
+                enabledFeatures: {
+                  ...currentFeatures,
+                  sub_tuition_online_pay: platformPaymentMethods.enableCardPayment,
+                  sub_tuition_slips: platformPaymentMethods.enableBankSlip,
+                },
+              },
+            },
+          });
+        })
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Platform payment methods updated successfully.',
+      data: platformPaymentMethods,
+    });
+  } catch (error) {
+    console.error('Update platform payment methods error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update platform payment methods.',
+    });
+  }
+};
+
 
