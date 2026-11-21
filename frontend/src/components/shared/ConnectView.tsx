@@ -126,7 +126,8 @@ export function ConnectView() {
     isFeatureEnabled,
     updateTenantFeature,
     activeTenant,
-    addToast
+    addToast,
+    paymentSettings
   } = useApp();
   const hubSettings = useHubSettings();
 
@@ -136,6 +137,10 @@ export function ConnectView() {
   const isSubscriptionsTabEnabled = isFeatureEnabled("sub_connect_subscriptions");
   const isStudyGroupsTabEnabled = isFeatureEnabled("sub_connect_study_groups");
   const hasAnyTabEnabled = isFindTeachersTabEnabled || isSubscriptionsTabEnabled || isStudyGroupsTabEnabled;
+
+  // Granular Payment Options (Controlled by Super Admin & Feature Matrix)
+  const isCardPaymentEnabled = isFeatureEnabled("sub_tuition_online_pay") && (paymentSettings?.enableCardPayment ?? true);
+  const isBankSlipEnabled = isFeatureEnabled("sub_tuition_slips") && (paymentSettings?.enableBankSlip ?? true);
 
   // Active sub-tab
   const [activeTab, setActiveTab] = useState<ConnectTab>("teachers");
@@ -388,8 +393,20 @@ export function ConnectView() {
     if (checkoutError) setCheckoutError(null);
   };
 
+  // Automatically sync initial paymentMethod to available enabled method
+  useEffect(() => {
+    if (selectedTeacherForSubscribe || selectedPackageForSubscribe) {
+      if (isCardPaymentEnabled && !isBankSlipEnabled) {
+        setPaymentMethod("card");
+      } else if (!isCardPaymentEnabled && isBankSlipEnabled) {
+        setPaymentMethod("bank_slip");
+      }
+    }
+  }, [selectedTeacherForSubscribe, selectedPackageForSubscribe, isCardPaymentEnabled, isBankSlipEnabled]);
+
   const isFormValid = useMemo(() => {
     if (paymentMethod === "card") {
+      if (!isCardPaymentEnabled) return false;
       const rawCard = cardNumber.replace(/\s+/g, "");
       const isCardValid = rawCard.length >= 15 && rawCard.length <= 19;
       const isExpiryValid = /^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry.trim());
@@ -397,10 +414,11 @@ export function ConnectView() {
       return isCardValid && isExpiryValid && isCvcValid;
     }
     if (paymentMethod === "bank_slip") {
+      if (!isBankSlipEnabled) return false;
       return Boolean(uploadedSlipName || uploadedSlipDataUrl);
     }
     return false;
-  }, [paymentMethod, cardNumber, cardExpiry, cardCvc, uploadedSlipName, uploadedSlipDataUrl]);
+  }, [paymentMethod, cardNumber, cardExpiry, cardCvc, uploadedSlipName, uploadedSlipDataUrl, isCardPaymentEnabled, isBankSlipEnabled]);
 
   const activeBankDetails = useMemo(() => {
     if (selectedTeacherForSubscribe) {
@@ -1639,47 +1657,61 @@ export function ConnectView() {
                 {/* Payment Method Selector */}
                 <div className="space-y-2">
                   <label className="font-extrabold text-slate-700">Select Payment Method</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod("card");
-                        setCheckoutError(null);
-                      }}
-                      className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${paymentMethod === "card"
-                        ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }`}
-                    >
-                      <div className="flex items-center gap-1.5 font-bold text-xs">
-                        <CreditCard className="h-4 w-4 text-[#0d5c4d]" />
-                        <span>Card / Online</span>
+                  {!isCardPaymentEnabled && !isBankSlipEnabled ? (
+                    <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-3">
+                      <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+                      <div>
+                        <p className="font-bold">Payment Methods Currently Disabled</p>
+                        <p className="text-[11px] text-amber-700">Online payment and bank slip uploads are disabled by Super Administrator. Please contact your academy administrator.</p>
                       </div>
-                      <span className="text-[10px] text-slate-400">Visa, Mastercard, FriMi</span>
-                    </button>
+                    </div>
+                  ) : (
+                    <div className={`grid gap-3 ${isCardPaymentEnabled && isBankSlipEnabled ? "grid-cols-2" : "grid-cols-1"}`}>
+                      {isCardPaymentEnabled && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPaymentMethod("card");
+                            setCheckoutError(null);
+                          }}
+                          className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${paymentMethod === "card"
+                            ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
+                            : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                            }`}
+                        >
+                          <div className="flex items-center gap-1.5 font-bold text-xs">
+                            <CreditCard className="h-4 w-4 text-[#0d5c4d]" />
+                            <span>Card / Online</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">Visa, Mastercard, FriMi</span>
+                        </button>
+                      )}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod("bank_slip");
-                        setCheckoutError(null);
-                      }}
-                      className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${paymentMethod === "bank_slip"
-                        ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }`}
-                    >
-                      <div className="flex items-center gap-1.5 font-bold text-xs">
-                        <Building className="h-4 w-4 text-emerald-700" />
-                        <span>Bank Slip Upload</span>
-                      </div>
-                      <span className="text-[10px] text-slate-400">BOC, Commercial Bank</span>
-                    </button>
-                  </div>
+                      {isBankSlipEnabled && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPaymentMethod("bank_slip");
+                            setCheckoutError(null);
+                          }}
+                          className={`p-3 rounded-xl border flex flex-col items-start gap-1.5 transition-all text-left ${paymentMethod === "bank_slip"
+                            ? "bg-white border-[#0d5c4d] shadow-sm ring-2 ring-[#0d5c4d]/20 text-[#0d2b26]"
+                            : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                            }`}
+                        >
+                          <div className="flex items-center gap-1.5 font-bold text-xs">
+                            <Building className="h-4 w-4 text-emerald-700" />
+                            <span>Bank Slip Upload</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">BOC, Commercial Bank</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Payment Details form depending on method */}
-                {paymentMethod === "card" ? (
+                {isCardPaymentEnabled && paymentMethod === "card" ? (
                   <div className="space-y-3 p-4 rounded-2xl bg-slate-50 border border-slate-200">
                     <div className="space-y-1">
                       <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
@@ -1721,7 +1753,7 @@ export function ConnectView() {
                       </div>
                     </div>
                   </div>
-                ) : (
+                ) : isBankSlipEnabled && paymentMethod === "bank_slip" ? (
                   <div className="space-y-3 p-4 rounded-2xl bg-amber-50/50 border border-amber-200 text-xs">
                     <div className="p-3.5 rounded-xl bg-white border border-amber-200 space-y-1.5">
                       <div className="flex items-center justify-between">
@@ -1818,7 +1850,7 @@ export function ConnectView() {
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {/* Validation error banner */}
                 {checkoutError && (

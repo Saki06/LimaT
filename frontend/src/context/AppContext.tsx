@@ -246,6 +246,13 @@ interface AppContextType {
   deleteTenant: (tenantId: string) => void;
   isFeatureEnabled: (feature: string) => boolean;
 
+  // Platform Payment Method Controls
+  paymentSettings: {
+    enableCardPayment: boolean;
+    enableBankSlip: boolean;
+  };
+  updatePaymentSettings: (settings: Partial<{ enableCardPayment: boolean; enableBankSlip: boolean }>) => void;
+
   // Toasts
   toasts: ToastMessage[];
   addToast: (toast: Omit<ToastMessage, 'id'>) => void;
@@ -554,7 +561,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Platform Global Payment Method Settings (Controlled by Super Admin)
+  const [paymentSettings, setPaymentSettings] = useState<{
+    enableCardPayment: boolean;
+    enableBankSlip: boolean;
+  }>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('newtoz_payment_methods_settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return {
+            enableCardPayment: typeof parsed.enableCardPayment === 'boolean' ? parsed.enableCardPayment : true,
+            enableBankSlip: typeof parsed.enableBankSlip === 'boolean' ? parsed.enableBankSlip : true,
+          };
+        }
+      } catch {}
+    }
+    return { enableCardPayment: true, enableBankSlip: true };
+  });
+
+  const updatePaymentSettings = useCallback((updates: Partial<{ enableCardPayment: boolean; enableBankSlip: boolean }>) => {
+    setPaymentSettings((prev) => {
+      const next = { ...prev, ...updates };
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('newtoz_payment_methods_settings', JSON.stringify(next));
+        } catch {}
+      }
+      return next;
+    });
+  }, []);
+
   const isFeatureEnabled = (feature: string): boolean => {
+    if (feature === 'sub_tuition_online_pay' && !paymentSettings.enableCardPayment) {
+      return false;
+    }
+    if (feature === 'sub_tuition_slips' && !paymentSettings.enableBankSlip) {
+      return false;
+    }
+
     if (authUser?.role === 'SUPER_ADMIN' && !activeTenant) {
       return false;
     }
@@ -3695,6 +3741,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updateTenant,
         deleteTenant,
         isFeatureEnabled,
+        paymentSettings,
+        updatePaymentSettings,
         toasts,
         addToast,
         removeToast,

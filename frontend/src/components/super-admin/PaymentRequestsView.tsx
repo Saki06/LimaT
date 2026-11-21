@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Loader2, CheckCircle2, XCircle, RefreshCw, CreditCard, Landmark, Save, Edit3 } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, RefreshCw, CreditCard, Landmark, Save, Edit3, Sliders, Building } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,7 +55,7 @@ interface PaymentRequestsViewProps {
 }
 
 export function PaymentRequestsView({ onPaymentProcessed }: PaymentRequestsViewProps = {}) {
-  const { addToast } = useApp();
+  const { addToast, paymentSettings, updatePaymentSettings } = useApp();
   const [requests, setRequests] = useState<PaymentRequest[]>([]);
   const [completedPayments, setCompletedPayments] = useState<CompletedPayment[]>([]);
   const [bankDetails, setBankDetails] = useState<PlatformBankDetails>({
@@ -330,6 +330,152 @@ export function PaymentRequestsView({ onPaymentProcessed }: PaymentRequestsViewP
             </div>
           </div>
         )}
+      </Card>
+
+      {/* Section 0.5: Student Tuition & Enrollment Payment Methods Control */}
+      <Card className="border-[#c4e9e0] bg-white p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-[#ecf8f5] text-[#0d5c4d] flex items-center justify-center">
+              <Sliders className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-[#0d2b26]">
+                Student Tuition &amp; Enrollment Payment Methods Control
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Enable or disable specific payment options (Card Checkout or Bank Slip Upload) shown to Students &amp; Parents.
+              </p>
+            </div>
+          </div>
+          <Badge variant="outline" className="text-[10px] font-bold text-[#0d5c4d] bg-[#ecf8f5] border-[#c4e9e0]">
+            Global Checkout Policy
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+          {/* Card / Online Payment Toggle */}
+          <div className={`p-4 rounded-2xl border transition-all ${
+            paymentSettings.enableCardPayment
+              ? "bg-[#f8fdfb] border-emerald-300 shadow-2xs"
+              : "bg-slate-50 border-slate-200 opacity-80"
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
+                  paymentSettings.enableCardPayment ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-500"
+                }`}>
+                  <CreditCard className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-[#0d2b26]">Card / Online Payment</p>
+                  <p className="text-[10px] text-slate-400">Visa, Mastercard, FriMi</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextState = !paymentSettings.enableCardPayment;
+                  updatePaymentSettings({ enableCardPayment: nextState });
+                  addToast({
+                    type: nextState ? "success" : "info",
+                    title: `Card Payments ${nextState ? "Enabled" : "Disabled"}`,
+                    message: nextState
+                      ? "Students & Parents can now pay online via Credit/Debit card."
+                      : "Card payment option is now hidden from student enrollment checkouts.",
+                  });
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  paymentSettings.enableCardPayment ? "bg-[#0d5c4d]" : "bg-slate-300"
+                }`}
+                role="switch"
+                aria-checked={paymentSettings.enableCardPayment}
+                aria-label="Toggle Online Card Payment"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    paymentSettings.enableCardPayment ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-600">
+              When enabled, students can instantly enroll and pay monthly tuition fees via credit or debit card.
+            </p>
+            <div className="mt-3 flex items-center gap-1.5 text-[10px] font-bold">
+              {paymentSettings.enableCardPayment ? (
+                <span className="flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <CheckCircle2 className="h-3 w-3" /> Active on Student Checkout
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                  <XCircle className="h-3 w-3" /> Disabled by Super Admin
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Bank Slip Upload Toggle */}
+          <div className={`p-4 rounded-2xl border transition-all ${
+            paymentSettings.enableBankSlip
+              ? "bg-[#f8fdfb] border-emerald-300 shadow-2xs"
+              : "bg-slate-50 border-slate-200 opacity-80"
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
+                  paymentSettings.enableBankSlip ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-500"
+                }`}>
+                  <Building className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-[#0d2b26]">Bank Slip Upload</p>
+                  <p className="text-[10px] text-slate-400">BOC, Commercial Bank, HNB</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextState = !paymentSettings.enableBankSlip;
+                  updatePaymentSettings({ enableBankSlip: nextState });
+                  addToast({
+                    type: nextState ? "success" : "info",
+                    title: `Bank Slip Upload ${nextState ? "Enabled" : "Disabled"}`,
+                    message: nextState
+                      ? "Students can now upload direct deposit bank slips."
+                      : "Bank slip upload option is now hidden from student enrollment checkouts.",
+                  });
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  paymentSettings.enableBankSlip ? "bg-[#0d5c4d]" : "bg-slate-300"
+                }`}
+                role="switch"
+                aria-checked={paymentSettings.enableBankSlip}
+                aria-label="Toggle Bank Slip Upload"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    paymentSettings.enableBankSlip ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-600">
+              When enabled, students and parents can transfer to the tutor&apos;s bank account and upload the deposit receipt.
+            </p>
+            <div className="mt-3 flex items-center gap-1.5 text-[10px] font-bold">
+              {paymentSettings.enableBankSlip ? (
+                <span className="flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <CheckCircle2 className="h-3 w-3" /> Active on Student Checkout
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                  <XCircle className="h-3 w-3" /> Disabled by Super Admin
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       </Card>
 
       {/* Section 1: Pending Bank Slip Approvals */}
