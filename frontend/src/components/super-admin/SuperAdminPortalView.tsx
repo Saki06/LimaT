@@ -229,11 +229,12 @@ const saveTenantFeatures = (
       } catch (error) {
         console.error("Feature save failed:", error);
 
-        alert(
-          error instanceof Error
-            ? error.message
-            : "Failed to save feature settings"
-        );
+        const errorMessage = error instanceof Error ? error.message : "Failed to save feature settings";
+        if (errorMessage.includes("Forbidden") || errorMessage.includes("requires one of [SUPER_ADMIN]")) {
+          showToast("Access Denied: Please sign in with Super Admin account (superadmin@apex.edu) to save live changes.");
+        } else {
+          showToast(errorMessage);
+        }
 
         // Reload the authoritative database state after failure.
         try {
@@ -700,11 +701,12 @@ const saveTenantFeatures = (
     } catch (error) {
       console.error("Tenant update failed:", error);
 
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to update tenant"
-      );
+      const errorMessage = error instanceof Error ? error.message : "Failed to update tenant";
+      if (errorMessage.includes("Forbidden") || errorMessage.includes("requires one of [SUPER_ADMIN]")) {
+        showToast("Access Denied: Super Admin authentication required to update tenant.");
+      } else {
+        showToast(errorMessage);
+      }
     }
   }}
 />
