@@ -10,7 +10,7 @@ export function ToastContainer() {
   if (!toasts.length) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none">
+    <div className="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:bottom-5 sm:right-5 z-50 flex flex-col gap-2.5 sm:max-w-sm pointer-events-none">
       {toasts.map((toast) => {
         let borderClass = "border-indigo-500/40";
         let icon = <Info className="h-5 w-5 text-indigo-400 shrink-0" />;

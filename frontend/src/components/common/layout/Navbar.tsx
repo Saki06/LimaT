@@ -95,12 +95,12 @@ export function Navbar({ onToggleMobileSidebar }: { onToggleMobileSidebar: () =>
             <>
               {/* Backdrop for click outside */}
               <div
-                className="fixed inset-0 z-40"
+                className="fixed inset-0 z-40 bg-black/10 sm:bg-transparent"
                 onClick={() => setShowNotifications(false)}
               />
 
               {/* Notification Popover Panel */}
-              <div className="absolute right-0 top-full mt-2 w-72 sm:w-96 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95">
+              <div className="fixed inset-x-3 top-[68px] sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div className="flex items-center gap-2">
                     <p className="font-extrabold text-sm text-[#0d2b26]">
