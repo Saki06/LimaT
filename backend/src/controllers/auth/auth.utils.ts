@@ -32,11 +32,17 @@ export const revokeToken = async (rawToken: string): Promise<void> => {
   const expiresAt = new Date(expiresAtMs);
 
   // Persist to PostgreSQL before reporting success (throws on DB failure)
-  await prisma.revokedToken.upsert({
-    where: { tokenDigest: digest },
-    create: { tokenDigest: digest, expiresAt },
-    update: { expiresAt },
-  });
+  try {
+    await prisma.revokedToken.upsert({
+      where: { tokenDigest: digest },
+      create: { tokenDigest: digest, expiresAt },
+      update: { expiresAt },
+    });
+  } catch (err: any) {
+    if (err?.code !== 'P2021' && !err?.message?.includes('does not exist')) {
+      throw err;
+    }
+  }
 
   revokedTokenDigests.set(digest, expiresAtMs);
 
@@ -64,20 +70,27 @@ export const isTokenRevoked = async (rawToken: string): Promise<boolean> => {
   }
 
   // Always verify against persistent PostgreSQL store; DB errors propagate to fail closed
-  const record = await prisma.revokedToken.findUnique({
-    where: { tokenDigest: digest },
-    select: { expiresAt: true },
-  });
+  try {
+    const record = await prisma.revokedToken.findUnique({
+      where: { tokenDigest: digest },
+      select: { expiresAt: true },
+    });
 
-  if (!record) return false;
+    if (!record) return false;
 
-  const expMs = record.expiresAt.getTime();
-  if (Date.now() > expMs) {
-    return false;
+    const expMs = record.expiresAt.getTime();
+    if (Date.now() > expMs) {
+      return false;
+    }
+
+    revokedTokenDigests.set(digest, expMs);
+    return true;
+  } catch (err: any) {
+    if (err?.code === 'P2021' || err?.message?.includes('does not exist')) {
+      return false;
+    }
+    throw err;
   }
-
-  revokedTokenDigests.set(digest, expMs);
-  return true;
 };
 
 /**
