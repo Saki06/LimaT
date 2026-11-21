@@ -290,7 +290,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   const [editingStaff, setEditingStaff] = useState<AdminStaffRecord | null>(null);
   const [staffMenuId, setStaffMenuId] = useState<string | null>(null);
   const [confirmStaff, setConfirmStaff] = useState<AdminStaffRecord | null>(null);
-  const [hubTab, setHubTab] = useState<"overview" | "hubs" | "moderation" | "settings">("overview");
+  const [hubTab, setHubTab] = useState<"overview" | "hubs">("overview");
   const [selectedHubId, setSelectedHubId] = useState<string | null>(null);
   const [hubReason, setHubReason] = useState("");
   const [hubAction, setHubAction] = useState<"pause" | "suspend" | "flag" | "hide" | "remove" | "warn" | "dismiss" | null>(null);
@@ -471,19 +471,20 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
             name: s.name,
             initials: s.name.split(" ").map((w) => w[0]).join("").toUpperCase().substring(0, 2),
             avatarColor: "bg-[#0d5c4d]",
-            verified: true,
-            title: s.qualification || "Senior Master Teacher & Subject Specialist",
+            verified: s.verified ?? true,
+            status: s.status === "active" ? "active" : "suspended",
+            title: s.qualification || "Subject Specialist",
             subject: s.subjects?.[0] || "General Curriculum",
-            studentsCount: s.workload || 45,
-            lessonsCount: 16,
-            liveClassesCount: 4,
-            monthlyFee: 3500,
+            studentsCount: s.subscribersCount ?? s.workload ?? 0,
+            lessonsCount: 0,
+            liveClassesCount: 0,
+            monthlyFee: s.monthlyFee || 0,
             currency: "LKR",
-            rating: 5.0,
-            tags: s.subjects || ["Theory", "Revision"],
-            meetUrl: "https://meet.google.com/live-stream",
-            bio: `${s.name} is a certified educator handling ${s.medium || "English"} medium instruction.`,
-            qualifications: s.qualification || "B.Sc. / B.Ed."
+            rating: s.rating ?? 5.0,
+            tags: s.subjects || [],
+            meetUrl: s.meetUrl || "",
+            bio: s.bio || `${s.name} is an active faculty educator in the curriculum network.`,
+            qualifications: s.qualification || "Academic Faculty"
           }));
         setSoloTutors(staffTeachers);
       } else {
@@ -503,12 +504,12 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
 
   const initialNewTutorForm = {
     name: "",
-    title: "Mathematics Specialist • Grade 12 & A/L",
-    subject: "Combined Mathematics",
-    monthlyFee: 2500,
-    meetUrl: "https://meet.google.com/new-tutor-live",
-    bio: "Passionate educator with structured lessons and past paper breakdowns.",
-    qualifications: "B.Sc. (Hons), Dip. in Education",
+    title: "",
+    subject: "",
+    monthlyFee: 0,
+    meetUrl: "",
+    bio: "",
+    qualifications: "",
     verified: true
   };
   const [newTutorForm, setNewTutorForm] = useState(initialNewTutorForm);
@@ -516,14 +517,14 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
   // Student Dossier & Manual Enroll states
   const [selectedStudentForDossier, setSelectedStudentForDossier] = useState<PlatformUser | null>(null);
   const [selectedStudentForEnroll, setSelectedStudentForEnroll] = useState<PlatformUser | null>(null);
-  const [manualEnrollTutorName, setManualEnrollTutorName] = useState("Ms. Kavitha Rajan (Combined Maths)");
+  const [manualEnrollTutorName, setManualEnrollTutorName] = useState("");
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
   const [newStudentForm, setNewStudentForm] = useState({
     name: "",
     email: "",
-    school: "Colombo Hindu College",
-    grade: "Grade 12 - Physical Science",
-    enrolledTutor: "Ms. Kavitha Rajan (Combined Maths)"
+    school: "",
+    grade: "",
+    enrolledTutor: ""
   });
 
   // Filtered Tutors
@@ -554,10 +555,10 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
 
   const handleToggleTutorSuspension = (tutorId: string) => {
     setSoloTutors((prev) =>
-      prev.map((t) => (t.id === tutorId ? { ...t, rating: t.rating > 0 ? 0 : 4.9 } : t))
+      prev.map((t) => (t.id === tutorId ? { ...t, status: t.status === "suspended" ? "active" : "suspended" } : t))
     );
     const t = soloTutors.find((item) => item.id === tutorId);
-    const isNowSuspended = (t?.rating || 0) > 0;
+    const isNowSuspended = t?.status !== "suspended";
     addToast({
       type: isNowSuspended ? "warning" : "success",
       title: "Account Status Changed",
@@ -1415,7 +1416,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
           <div className="flex flex-col gap-4 border-b border-[#e6ece8] pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-[#b47a16]">
-                {staffSubTab === "solo_tutors" ? "LimaT Independent Tutor Network" : "LimaT Athletics & Sports Coaching"}
+                {staffSubTab === "solo_tutors" ? (currentUser.schoolName ? `${currentUser.schoolName} Tutor Network` : "Independent Tutor Network") : (currentUser.schoolName ? `${currentUser.schoolName} Sports Coaching` : "Athletics & Sports Coaching")}
               </p>
               <h1 className="mt-1 text-2xl font-black text-[#0d2b26]">
                 {staffSubTab === "solo_tutors" ? "Tutors Management (Individual Tutors)" : "Sports Coaches Management (Athletic Coaches)"}
@@ -1479,7 +1480,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
           {staffSubTab === "solo_tutors" && (
             <div className="space-y-4">
               {/* Quick KPI Strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Card className="border-[#e6ece8] bg-white p-3.5 shadow-2xs">
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Active Tutors</p>
                   <p className="text-xl font-black text-[#0d2b26] mt-0.5">{soloTutors.length}</p>
@@ -1494,12 +1495,6 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   <p className="text-[10px] font-bold text-slate-400 uppercase">Total Subscribers</p>
                   <p className="text-xl font-black text-[#b47a16] mt-0.5">
                     {soloTutors.reduce((acc, t) => acc + t.studentsCount, 0)}
-                  </p>
-                </Card>
-                <Card className="border-[#e6ece8] bg-white p-3.5 shadow-2xs">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Average Rating</p>
-                  <p className="text-xl font-black text-[#0d2b26] mt-0.5 flex items-center gap-1">
-                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" /> 4.9
                   </p>
                 </Card>
               </div>
@@ -1552,14 +1547,14 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                         <th className="p-3.5">Tutor Profile</th>
                         <th className="p-3.5">Subject & Bio</th>
                         <th className="p-3.5">Monthly Fee & Meet Room</th>
-                        <th className="p-3.5">Students & Rating</th>
+                        <th className="p-3.5">Active Subscribers</th>
                         <th className="p-3.5">Verification</th>
                         <th className="p-3.5 text-right">Admin Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#e6ece8] text-slate-700">
                       {filteredSoloTutors.map((tutor) => {
-                        const isSuspended = tutor.rating === 0;
+                        const isSuspended = tutor.status === "suspended";
                         return (
                           <tr key={tutor.id} className="hover:bg-[#fbfcfb] transition-colors">
                             <td className="p-3.5">
@@ -1590,10 +1585,16 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                             </td>
 
                             <td className="p-3.5">
-                              <p className="font-extrabold text-[#0d2b26] text-xs">
-                                LKR {tutor.monthlyFee.toLocaleString()}
-                                <span className="text-[10px] text-slate-400 font-normal"> / month</span>
-                              </p>
+                              {tutor.monthlyFee > 0 ? (
+                                <p className="font-extrabold text-[#0d2b26] text-xs">
+                                  LKR {tutor.monthlyFee.toLocaleString()}
+                                  <span className="text-[10px] text-slate-400 font-normal"> / month</span>
+                                </p>
+                              ) : (
+                                <p className="text-xs font-semibold text-slate-500">
+                                  Package not set
+                                </p>
+                              )}
                               {tutor.meetUrl ? (
                                 <a
                                   href={tutor.meetUrl}
@@ -1609,11 +1610,8 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                             </td>
 
                             <td className="p-3.5">
-                              <p className="font-bold text-slate-900">{tutor.studentsCount} Students</p>
-                              <div className="flex items-center gap-1 text-[11px] text-amber-600 font-semibold mt-0.5">
-                                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                                {tutor.rating > 0 ? tutor.rating.toFixed(1) : "Suspended"}
-                              </div>
+                              <p className="font-bold text-slate-900">{tutor.studentsCount} Student{tutor.studentsCount !== 1 ? 's' : ''}</p>
+                              <span className="text-[10px] text-slate-400 font-medium">Active Enrolled</span>
                             </td>
 
                             <td className="p-3.5">
@@ -1917,8 +1915,23 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       {activeAdminTab === "connect" && (
         <div className="space-y-5">
           <div className="flex flex-col gap-3 border-b border-[#e6ece8] pb-5 sm:flex-row sm:items-end sm:justify-between">
-            <div><p className="text-xs font-bold uppercase tracking-wider text-[#b47a16]">{currentUser.schoolName}</p><h1 className="mt-1 text-2xl font-black text-[#0d2b26]">Admin Connect Hub</h1><p className="mt-1 text-sm text-slate-500">Oversee teacher hubs, subscriptions and community safety.</p></div>
-            <div className="flex flex-wrap gap-2">{(["overview", "hubs", "moderation", "settings"] as const).map((tab) => <button key={tab} type="button" onClick={() => setHubTab(tab)} className={`min-h-[44px] md:min-h-0 rounded-full px-4 py-2 text-xs font-bold capitalize ${hubTab === tab ? "bg-[#0d5c4d] text-white" : "bg-white text-slate-600 hover:bg-[#ecf8f5]"}`}>{tab === "hubs" ? "Teacher hubs" : tab}</button>)}</div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-[#b47a16]">{currentUser.schoolName || "Tuition & Billing"}</p>
+              <h1 className="mt-1 text-2xl font-black text-[#0d2b26]">Tuition Hubs &amp; Subscriptions</h1>
+              <p className="mt-1 text-sm text-slate-500">Oversee teacher hubs, student enrollments, and tuition fee subscriptions.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(["overview", "hubs"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setHubTab(tab)}
+                  className={`min-h-[44px] md:min-h-0 rounded-full px-4 py-2 text-xs font-bold capitalize ${hubTab === tab ? "bg-[#0d5c4d] text-white" : "bg-white text-slate-600 hover:bg-[#ecf8f5]"}`}
+                >
+                  {tab === "hubs" ? "Teacher hubs" : "Overview"}
+                </button>
+              ))}
+            </div>
           </div>
 
           {hubTab === "overview" && <div className="space-y-5">
@@ -1927,7 +1940,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                 ["Teachers with active hubs", teacherHubs.filter((hub) => hub.status === "active").length],
                 ["Total subscriptions", subscriptions.filter((item) => item.status === "active").length],
                 ["New this week", subscriptions.filter((item) => now - new Date(item.subscribedDate).getTime() < 7 * 86400000).length],
-                ["Flagged items", hubFlags.filter((flag) => flag.status === "open").length]
+                ["Pending verification", subscriptions.filter((item) => item.status === "pending").length]
               ].map(([label, value]) => <Card key={label as string} className="p-5"><p className="text-xs font-bold text-slate-500">{label}</p><p className="mt-3 text-3xl font-black text-[#0d2b26]">{value}</p></Card>)}
             </div>
             <div className="grid gap-5 lg:grid-cols-2">
@@ -1999,17 +2012,13 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                   <span className="text-[#0d5c4d]">Daily Peak: {Math.max(...subscriptionChartData.map(d => d.count), 0)} Subscriptions</span>
                 </div>
               </Card>
-              <Card className="p-5"><h2 className="text-sm font-black text-[#0d2b26]">Top teachers by subscribers</h2><div className="mt-4 space-y-3">{teacherHubs.sort((a, b) => b.subscriberCount - a.subscriberCount).slice(0, 4).map((hub) => <div key={hub.id} className="flex items-center justify-between rounded-xl bg-[#f8faf9] p-3"><span className="text-sm font-bold text-slate-700">{hub.teacherName}</span><Badge variant="success">{hub.subscriberCount}</Badge></div>)}</div></Card>
+              <Card className="p-5"><h2 className="text-sm font-black text-[#0d2b26]">Top teachers by subscribers</h2><div className="mt-4 space-y-3">{[...teacherHubs].sort((a, b) => b.subscriberCount - a.subscriberCount).slice(0, 4).map((hub) => <div key={hub.id} className="flex items-center justify-between rounded-xl bg-[#f8faf9] p-3"><span className="text-sm font-bold text-slate-700">{hub.teacherName}</span><Badge variant="success">{hub.subscriberCount}</Badge></div>)}</div></Card>
             </div>
           </div>}
 
           {hubTab === "hubs" && <Card className="overflow-visible">
-            <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b border-[#e6ece8] bg-[#f8faf9] text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4">Teacher</th><th className="px-5 py-4">Subjects</th><th className="px-5 py-4">Subscribers</th><th className="px-5 py-4">Posts this month</th><th className="px-5 py-4">Status</th><th className="px-5 py-4">Actions</th></tr></thead><tbody className="divide-y divide-[#eef2ef]">{teacherHubs.map((hub) => <tr key={hub.id} onClick={() => setSelectedHubId(hub.id)} className="cursor-pointer hover:bg-[#f8faf9]"><td className="px-5 py-4 font-bold">{hub.teacherName}</td><td className="px-5 py-4">{hub.subjects.join(", ")}</td><td className="px-5 py-4">{hub.subscriberCount}</td><td className="px-5 py-4">{hub.postsThisMonth}</td><td className="px-5 py-4"><Badge variant={hub.status === "active" ? "success" : hub.status === "paused" ? "warning" : "destructive"}>{hub.status}</Badge></td><td className="px-5 py-4" onClick={(event) => event.stopPropagation()}><div className="flex gap-2"><button type="button" className="text-xs font-bold text-[#0d5c4d]" onClick={() => { setSelectedHubId(hub.id); setHubAction(hub.status === "active" ? "pause" : "suspend"); }}> {hub.status === "active" ? "Pause" : "Suspend"} </button><button type="button" className="text-xs font-bold text-rose-600" onClick={() => { setSelectedHubId(hub.id); setHubAction("suspend"); }}>Suspend</button></div></td></tr>)}</tbody></table></div>
+            <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b border-[#e6ece8] bg-[#f8faf9] text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-4">Teacher</th><th className="px-5 py-4">Subjects</th><th className="px-5 py-4">Subscribers</th><th className="px-5 py-4">Posts this month</th><th className="px-5 py-4">Status</th><th className="px-5 py-4">Actions</th></tr></thead><tbody className="divide-y divide-[#eef2ef]">{teacherHubs.length === 0 ? (<tr><td colSpan={6} className="py-8 text-center text-sm text-slate-500">No teacher hubs registered yet.</td></tr>) : teacherHubs.map((hub) => <tr key={hub.id} onClick={() => setSelectedHubId(hub.id)} className="cursor-pointer hover:bg-[#f8faf9]"><td className="px-5 py-4 font-bold">{hub.teacherName}</td><td className="px-5 py-4">{hub.subjects.join(", ")}</td><td className="px-5 py-4">{hub.subscriberCount}</td><td className="px-5 py-4">{hub.postsThisMonth}</td><td className="px-5 py-4"><Badge variant={hub.status === "active" ? "success" : hub.status === "paused" ? "warning" : "destructive"}>{hub.status}</Badge></td><td className="px-5 py-4" onClick={(event) => event.stopPropagation()}><div className="flex gap-2"><button type="button" className="text-xs font-bold text-[#0d5c4d]" onClick={() => { setSelectedHubId(hub.id); setHubAction(hub.status === "active" ? "pause" : "suspend"); }}> {hub.status === "active" ? "Pause" : "Suspend"} </button><button type="button" className="text-xs font-bold text-rose-600" onClick={() => { setSelectedHubId(hub.id); setHubAction("suspend"); }}>Suspend</button></div></td></tr>)}</tbody></table></div>
           </Card>}
-
-          {hubTab === "moderation" && <Card className="p-5"><div className="space-y-3">{hubFlags.length === 0 && <p className="py-8 text-center text-sm text-slate-500">No flagged items.</p>}{hubFlags.map((flag) => <div key={flag.id} className="flex flex-col gap-3 rounded-xl border border-[#e6ece8] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold text-[#0d2b26]">{flag.teacherName} · {flag.contentType}</p><p className="mt-1 text-sm text-slate-600">{flag.content}</p><p className="mt-1 text-xs text-slate-400">{flag.reason} · {flag.createdAt}</p></div>{flag.status === "open" ? <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => { setSelectedHubId(flag.id); setHubAction("dismiss"); }}>Dismiss</Button><Button size="sm" variant="outline" onClick={() => { setSelectedHubId(flag.id); setHubAction("hide"); }}>Hide</Button><Button size="sm" variant="destructive" onClick={() => { setSelectedHubId(flag.id); setHubAction("remove"); }}>Remove</Button><Button size="sm" variant="gold" onClick={() => { setSelectedHubId(flag.id); setHubAction("warn"); }}>Warn teacher</Button></div> : <Badge variant="secondary">{flag.status}</Badge>}</div>)}</div></Card>}
-
-          {hubTab === "settings" && <Card className="max-w-2xl p-6"><h2 className="text-base font-black text-[#0d2b26]">Hub rules for {currentUser.schoolName}</h2><div className="mt-5 space-y-4">{[["enabled", "Enable Connect Hub"], ["approvalRequired", "Require approval for new subscriptions"], ["allowDirectMessages", "Allow direct messages"]].map(([key, label]) => <label key={key} className="flex items-center justify-between rounded-xl border border-[#e6ece8] p-4 text-sm font-bold text-slate-700"><span>{label}</span><input type="checkbox" checked={hubSettingsDraft[key as keyof typeof hubSettingsDraft] as boolean} onChange={(event) => setHubSettingsDraft({ ...hubSettingsDraft, [key]: event.target.checked })} className="h-4 w-4 accent-[#0d5c4d]" /></label>)}<label className="block text-sm font-bold text-slate-700">Maximum subscribers per teacher<input type="number" min="1" value={hubSettingsDraft.maxSubscribersPerTeacher || ""} onChange={(event) => setHubSettingsDraft({ ...hubSettingsDraft, maxSubscribersPerTeacher: event.target.value ? Number(event.target.value) : undefined })} className="mt-2 h-10 w-full rounded-xl border border-slate-200 px-3" placeholder="Unlimited" /></label><Button onClick={() => { const result = hubSettingsSchema.safeParse(hubSettingsDraft); if (!result.success) { addToast({ type: "error", title: "Invalid hub settings" }); return; } updateHubSettings(hubSettingsDraft); addToast({ type: "success", title: "Connect Hub settings saved" }); }}>Save settings</Button></div></Card>}
         </div>
       )}
 

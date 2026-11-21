@@ -342,6 +342,12 @@ export interface AdminStaffRecord {
   medium?: SchoolMedium;
   certification?: string;
   availability?: string;
+  subscribersCount?: number;
+  monthlyFee?: number;
+  rating?: number;
+  bio?: string;
+  verified?: boolean;
+  meetUrl?: string;
 }
 
 export interface StaffInput {
@@ -514,6 +520,7 @@ export interface ConnectTeacher {
   isSubscribed?: boolean;
   subscribedDate?: string;
   sampleVideoTitle?: string;
+  status?: 'active' | 'suspended';
 }
 
 export interface ConnectStudent {

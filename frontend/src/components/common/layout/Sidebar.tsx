@@ -270,7 +270,7 @@ export function Sidebar({ isMobileOpen, onCloseMobile }: SidebarProps) {
         },
         {
           id: "connect_admin",
-          label: "Tuition Fees & Bank Slips",
+          label: "Tuition Hubs & Subscriptions",
           icon: CreditCard,
           group: "Tuition & Billing"
         }

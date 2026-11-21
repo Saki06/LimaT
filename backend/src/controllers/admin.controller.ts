@@ -129,25 +129,39 @@ export const getStaff = async (
   try {
     const tenantId = await resolveTenantId(req);
 
-    const users = await prisma.user.findMany({
-      where: {
-        tenantId,
-        role: { in: ['TEACHER', 'ADMIN'] },
-      },
-      include: {
-        teacherProfile: true,
-        coachedSportsTeams: {
-          where: { tenantId },
-          select: { id: true, name: true },
+    const [users, packages, subscriptions] = await Promise.all([
+      prisma.user.findMany({
+        where: {
+          tenantId,
+          role: { in: ['TEACHER', 'ADMIN'] },
         },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+        include: {
+          teacherProfile: true,
+          coachedSportsTeams: {
+            where: { tenantId },
+            select: { id: true, name: true },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.package.findMany({
+        where: { tenantId },
+        select: { id: true, teacherId: true, price: true, title: true },
+      }),
+      prisma.packageSubscription.findMany({
+        where: { package: { tenantId }, status: 'ACTIVE' },
+        select: { id: true, packageId: true },
+      }),
+    ]);
 
     const staffList = users.map((user) => {
       const isTeacher = user.role === 'TEACHER';
       const tp = user.teacherProfile;
       const sports = tp?.sports || [];
+      const teacherPkgs = isTeacher && tp?.id ? packages.filter((p) => p.teacherId === tp.id) : [];
+      const teacherPkgIds = new Set(teacherPkgs.map((p) => p.id));
+      const subscriberCount = subscriptions.filter((s) => teacherPkgIds.has(s.packageId)).length;
+      const primaryFee = teacherPkgs.length > 0 ? teacherPkgs[0].price : 0;
       return {
         id: user.id,
         schoolId: tenantId,
@@ -168,7 +182,13 @@ export const getStaff = async (
         sport: sports[0],
         teamIds: user.coachedSportsTeams.map((team) => team.id),
         teams: user.coachedSportsTeams.map((team) => team.name),
-        workload: 16,
+        workload: subscriberCount,
+        subscribersCount: subscriberCount,
+        monthlyFee: primaryFee,
+        rating: tp?.rating ?? 5.0,
+        bio: tp?.bio || undefined,
+        verified: tp?.isVerified ?? true,
+        meetUrl: tp?.youtubeUrl || tp?.websiteUrl || undefined,
         district: tp?.district || tp?.city || 'Colombo',
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,

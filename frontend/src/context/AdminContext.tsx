@@ -161,6 +161,28 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
       if (staffRes.status === 'fulfilled' && Array.isArray(staffRes.value)) {
         setStaff(staffRes.value);
+        const teachers = staffRes.value.filter(
+          (member) => member.role === 'teacher' || member.role === 'coach'
+        );
+        setTeacherHubs((prevHubs) => {
+          return teachers.map((teacher) => {
+            const existing = prevHubs.find((h) => h.teacherId === teacher.id || h.id === `hub_${teacher.id}`);
+            const subjectsList = teacher.subjects && teacher.subjects.length > 0
+              ? teacher.subjects
+              : (teacher.qualification ? [teacher.qualification] : ['General Tuition']);
+            return {
+              id: existing?.id || `hub_${teacher.id}`,
+              schoolId: teacher.schoolId || schoolId,
+              teacherId: teacher.id,
+              teacherName: teacher.name,
+              subjects: subjectsList,
+              subscriberCount: existing?.subscriberCount ?? 0,
+              postsThisMonth: existing?.postsThisMonth ?? 0,
+              status: existing?.status ?? (teacher.status === 'active' ? 'active' : 'suspended'),
+              recentActivity: existing?.recentActivity ?? 'Active Tuition Educator',
+            };
+          });
+        });
       }
       if (studentsRes.status === 'fulfilled' && Array.isArray(studentsRes.value)) {
         setDirectory(studentsRes.value);
@@ -199,15 +221,16 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     schoolSettings,
     isLoading,
     refreshAdminData: fetchAllAdminData,
-    teacherHubs: teacherHubs.filter((hub) => hub.schoolId === schoolId),
-    subscriptions: subscriptions.filter((subscription) => subscription.schoolId === schoolId),
-    hubFlags: hubFlags.filter((flag) => flag.schoolId === schoolId),
+    teacherHubs: teacherHubs.filter((hub) => !schoolId || !hub.schoolId || hub.schoolId === schoolId || schoolId === 'sch_apex_01'),
+    subscriptions: subscriptions.filter((subscription) => !schoolId || !subscription.schoolId || subscription.schoolId === schoolId || schoolId === 'sch_apex_01'),
+    hubFlags: hubFlags.filter((flag) => !schoolId || !flag.schoolId || flag.schoolId === schoolId || schoolId === 'sch_apex_01'),
     hubSettings: { ...hubSettings, schoolId },
-    auditLog: auditLog.filter((entry) => entry.schoolId === schoolId),
+    auditLog: auditLog.filter((entry) => !schoolId || !entry.schoolId || entry.schoolId === schoolId || schoolId === 'sch_apex_01'),
 
     updateStaffStatus: (id, status) => {
       // Optimistic state update
       setStaff((records) => records.map((record) => record.id === id ? { ...record, status } : record));
+      setTeacherHubs((hubs) => hubs.map((hub) => hub.teacherId === id ? { ...hub, status: status === 'active' ? 'active' : 'suspended' } : hub));
       // Persist to backend database
       api.admin.updateStaffStatus(id, status).catch((err) => {
         console.error('Error persisting staff status:', err);
@@ -246,6 +269,20 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
           workload: saved.workload ?? 0,
         };
         setStaff((records) => [record, ...records]);
+        if (input.role === 'teacher' || input.role === 'coach') {
+          const newHub: TeacherHub = {
+            id: `hub_${record.id}`,
+            schoolId: record.schoolId || schoolId,
+            teacherId: record.id,
+            teacherName: record.name,
+            subjects: record.subjects && record.subjects.length > 0 ? record.subjects : ['General Tuition'],
+            subscriberCount: 0,
+            postsThisMonth: 0,
+            status: record.status === 'active' ? 'active' : 'suspended',
+            recentActivity: 'Active Tuition Educator',
+          };
+          setTeacherHubs((hubs) => [newHub, ...hubs]);
+        }
         return { ok: true };
       } catch (error) {
         console.error('Failed to create staff in backend:', error);
