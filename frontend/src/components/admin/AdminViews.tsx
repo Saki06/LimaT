@@ -310,7 +310,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
     setIsChartMounted(true);
   }, []);
 
-  // Compute 7-day dynamic rolling subscription data for Connect Hub
+  // Compute 7-day dynamic rolling subscription data for Connect Hub (Strict Real Data)
   const subscriptionChartData = useMemo(() => {
     const days: { dateStr: string; label: string; count: number; dayName: string }[] = [];
     const today = new Date();
@@ -322,7 +322,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
       const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
       const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
 
-      // Match actual subscriptions created or active on this date
+      // Match actual subscriptions created or active on this date from database
       const matchingCount = subscriptions.filter((s) => {
         if (!s.subscribedDate) return false;
         return s.subscribedDate.startsWith(dateStr) && s.status !== "removed";
@@ -334,23 +334,6 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
         dayName,
         count: matchingCount
       });
-    }
-
-    const totalRecorded = days.reduce((acc, d) => acc + d.count, 0);
-    // If no daily timestamped records yet, provide a realistic baseline curve
-    if (totalRecorded === 0 && subscriptions.length > 0) {
-      const activeTotal = subscriptions.filter((s) => s.status === "active").length;
-      const weights = [0.08, 0.12, 0.10, 0.18, 0.15, 0.20, 0.17];
-      return days.map((d, idx) => ({
-        ...d,
-        count: Math.max(1, Math.round(activeTotal * (weights[idx] || 0.14)))
-      }));
-    } else if (totalRecorded === 0) {
-      const fallbackCounts = [3, 5, 4, 7, 6, 9, 8];
-      return days.map((d, idx) => ({
-        ...d,
-        count: fallbackCounts[idx] ?? 4
-      }));
     }
 
     return days;
@@ -1958,7 +1941,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                       </h2>
                       <p className="text-[11px] text-slate-500 font-medium">Daily student enrollment &amp; tuition activations</p>
                     </div>
-                    <Badge variant="success" className="text-[10px] font-bold">
+                    <Badge variant={weeklySubscriptionTotal > 0 ? "success" : "outline"} className="text-[10px] font-bold">
                       {weeklySubscriptionTotal} Subscriptions This Week
                     </Badge>
                   </div>
@@ -1975,6 +1958,7 @@ export function AdminViews({ initialTab = "overview" }: AdminViewsProps) {
                             tickLine={false}
                           />
                           <YAxis
+                            domain={[0, Math.max(5, ...subscriptionChartData.map(d => d.count))]}
                             tick={{ fontSize: 10, fill: '#64748b' }}
                             axisLine={false}
                             tickLine={false}
